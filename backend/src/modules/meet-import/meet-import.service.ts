@@ -45,8 +45,15 @@ function inferSessionTypeName(sessionTime: string): string {
   return "Noche";
 }
 
-/** Días que abarca el rango, ambos extremos incluidos. */
-function countDays(startDate: Date, endDate: Date): number {
+/**
+ * Días que abarca el rango, ambos extremos incluidos.
+ *
+ * Se exporta para que la guarda del fixture sintético y el anonimizador que lo
+ * genera usen ESTA aritmética y no una copia suya: un fixture que abarcase más
+ * de un día sería rechazado por la importación, y el desajuste solo aparecería
+ * al correr la suite de integración.
+ */
+export function countDays(startDate: Date, endDate: Date): number {
   const dias = Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1;
   return Math.max(1, dias);
 }

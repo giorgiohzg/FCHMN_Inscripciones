@@ -2,7 +2,7 @@
  * Hallazgo 14 — ida y vuelta EV3 → modelo → HY3 de la distancia.
  *
  * El defecto: el parser .ev3 guardaba la distancia TOTAL del relevo (un 4×50
- * llega como 200, verificado contra el exportación real de Hy-Tek) y el
+ * llega como 200, verificado contra la exportación real de Hy-Tek) y el
  * exportador la multiplicaba por 4 asumiendo que era por posta. Resultado:
  * un 4×50 importado se exportaba como un relevo de 800 metros, y el ciclo
  * importar → exportar no devolvía el mismo archivo.
@@ -57,11 +57,11 @@ function f1(distanceMeters: number): string {
 }
 
 describe("EV3 → modelo: la distancia que llega es la TOTAL", () => {
-  it("un relevo del exportación real de Hy-Tek llega como 200 (4×50), no como 50", () => {
+  it("un relevo del fixture llega como 200 (4×50), no como 50", () => {
     const parsed = parseEv3File(SAMPLE_EV3);
     const relevos = parsed.events.filter((e) => e.isRelay);
 
-    expect(relevos.length, "la exportación real debe traer relevos").toBeGreaterThan(0);
+    expect(relevos.length, "el fixture debe traer relevos").toBeGreaterThan(0);
     for (const relevo of relevos) {
       expect(relevo.distanceMeters, "el .ev3 declara la distancia total del relevo").toBe(200);
     }
