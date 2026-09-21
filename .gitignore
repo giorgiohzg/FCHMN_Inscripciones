@@ -69,6 +69,18 @@ web_modules/
 .env
 .env.*
 !.env.example
+!.env.test.example
+
+# Configuración local de herramientas de asistencia (Claude Code).
+#
+# `.claude/settings.local.json` guarda permisos y ajustes de esta máquina, y
+# puede contener rutas y cadenas de conexión locales. Hasta ahora solo lo
+# excluía el archivo de exclusiones PERSONAL del usuario
+# (`~/.config/git/ignore`), que no viaja con el repositorio: en otro equipo el
+# archivo habría entrado en el primer `git add .`. Se excluye el directorio
+# completo, no un archivo concreto, para que cualquier otro ajuste local que
+# la herramienta cree en el futuro quede cubierto desde el principio.
+.claude/
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -141,3 +153,48 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+coverage-combinada/
+
+# Ruido de sistemas operativos y herramientas personales
+.DS_Store
+Thumbs.db
+.idea/
+
+# Red de seguridad frente a claves privadas y certificados. No debería haber
+# ninguno en el árbol; esto evita que uno entre por descuido.
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Volcados de base y residuos de edición o de fusión
+*.dump
+*.bak
+*.orig
+*.rej
+
+# Documentación interna: hallazgos de auditoría, propuestas no aplicadas y el
+# instructivo personal de traslado del entorno. Registran el proceso de
+# desarrollo, no el producto, y varios describen defectos abiertos o cambios
+# rechazados: no forman parte de la entrega.
+#
+# Lo que SÍ sigue incluido: README, los dos instructivos de instalación
+# (`Instructivo_Instalacion_Local.md`, `Instructivo_Instalacion_Nube.md`), los
+# entregables numerados del requerimiento (`01`, `09`, `13`) y todas las
+# migraciones con sus `rollback.sql`.
+#
+# Esos tres entregables viven ahora en `docs/internas/`, agrupados para que su
+# carácter interno sea explícito. Siguen versionados y NO pueden excluirse:
+# `backend/tests/documentacion.test.ts` lee `docs/internas/01_Propuesta_Base.md`
+# y `docs/internas/13_Resumen_Final.md`, y sin ellos la suite falla en un clon
+# recién hecho.
+/HALLAZGO_*.md
+/Instructivo_Mover_Proyecto_y_Conectar_GitHub.md
+backend/prisma/migrations/AUDITORIA_MIGRACIONES.md
+backend/prisma/migrations/PROPUESTA_*.md
+
+# Material local y documentos de trabajo no versionables
+/tmp/
+
+# Salida regenerable de Graphify
+/graphify-out/

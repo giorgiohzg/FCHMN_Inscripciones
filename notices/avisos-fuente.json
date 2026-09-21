@@ -1,0 +1,1593 @@
+{
+  "proposito": "Avisos de copyright propios de cada paquete FUENTE de Alpine. Un texto canonico SPDX cubre el cuerpo de la licencia pero NO los titulares, anos ni textos especificos de cada proyecto: eso es lo que se recoge aqui.",
+  "revisado": "2026-09-20",
+  "deduplicacion": "por paquete FUENTE, no por paquete binario: varios binarios salen del mismo fuente y comparten sus avisos.",
+  "alcance": "Se inspeccionan DOS lugares en la version exacta: el arbol de aports en el commit del campo `c:`, y el repositorio upstream en su etiqueta correspondiente cuando la fuente declarada es un repositorio. Se cubren tambien las licencias permisivas, no solo copyleft y Apache.",
+  "estados": {
+    "encontrado": "se recupero el archivo, con su URL y su SHA-256",
+    "verificado-ausente": "se inspecciono el lugar exacto y no hay archivo de aviso; no se inventa ninguno",
+    "no-verificable": "la fuente exacta se publica solo como tarball, o su URL usa variables que no se resolvieron; comprobarlo exigiria descargar un binario, fuera del alcance autorizado. NO se afirma ausencia."
+  },
+  "resumen": {
+    "paquetesFuente": 64,
+    "conAvisoPropio": 15,
+    "verificadoAusente": 4,
+    "noVerificable": 45,
+    "archivosDeAviso": 27
+  },
+  "paquetes": [
+    {
+      "paqueteFuente": "alpine-base",
+      "version": "3.21.3-r0",
+      "commitAports": "899c70c801638ce9aea29a822aaa07a1488efa15",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://alpinelinux.org",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "alpine-release"
+      ],
+      "estado": "verificado-ausente",
+      "nota": "paquete propio de Alpine: se inspecciono su directorio en aports en el commit exacto y no contiene archivo de aviso",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/899c70c801638ce9aea29a822aaa07a1488efa15/main/alpine-base/"
+      ]
+    },
+    {
+      "paqueteFuente": "alpine-base",
+      "version": "3.24.1-r0",
+      "commitAports": "0934530484bbcde7498e2c694c710a49616a450e",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://alpinelinux.org",
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "binarios": [
+        "alpine-release"
+      ],
+      "estado": "verificado-ausente",
+      "nota": "paquete propio de Alpine: se inspecciono su directorio en aports en el commit exacto y no contiene archivo de aviso",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/0934530484bbcde7498e2c694c710a49616a450e/main/alpine-base/"
+      ]
+    },
+    {
+      "paqueteFuente": "alpine-baselayout",
+      "version": "3.6.8-r1",
+      "commitAports": "5f0cd7890349e7fe11128478ac506c709805224d",
+      "expresionAlpine": "GPL-2.0-only",
+      "licenseApkbuild": "GPL-2.0-only",
+      "urlProyecto": "https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "alpine-baselayout",
+        "alpine-baselayout-data"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/5f0cd7890349e7fe11128478ac506c709805224d/main/alpine-baselayout/"
+      ],
+      "fuenteTarball": "https://salsa.debian.org/md/netbase/-/raw/v6.4/etc/protocols"
+    },
+    {
+      "paqueteFuente": "alpine-baselayout",
+      "version": "3.7.2-r1",
+      "commitAports": "60a7585bbab2fa0f762504eb617dbca90216e31f",
+      "expresionAlpine": "GPL-2.0-only",
+      "licenseApkbuild": "GPL-2.0-only",
+      "urlProyecto": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/master/main/alpine-baselayout",
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "binarios": [
+        "alpine-baselayout",
+        "alpine-baselayout-data"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/60a7585bbab2fa0f762504eb617dbca90216e31f/main/alpine-baselayout/"
+      ],
+      "fuenteTarball": "https://salsa.debian.org/md/netbase/-/raw/v6.4/etc/protocols"
+    },
+    {
+      "paqueteFuente": "alpine-keys",
+      "version": "2.5-r0",
+      "commitAports": "6d473fb38effb2389f567b29fb7eb27039b3a279",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://alpinelinux.org",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "alpine-keys"
+      ],
+      "estado": "verificado-ausente",
+      "nota": "paquete propio de Alpine: se inspecciono su directorio en aports en el commit exacto y no contiene archivo de aviso",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/6d473fb38effb2389f567b29fb7eb27039b3a279/main/alpine-keys/"
+      ]
+    },
+    {
+      "paqueteFuente": "alpine-keys",
+      "version": "2.6-r0",
+      "commitAports": "b9f23becced4d7b3ccc0fa0f28530243ccd314a0",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://alpinelinux.org",
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "binarios": [
+        "alpine-keys"
+      ],
+      "estado": "verificado-ausente",
+      "nota": "paquete propio de Alpine: se inspecciono su directorio en aports en el commit exacto y no contiene archivo de aviso",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/b9f23becced4d7b3ccc0fa0f28530243ccd314a0/main/alpine-keys/"
+      ]
+    },
+    {
+      "paqueteFuente": "aom",
+      "version": "3.11.0-r0",
+      "commitAports": "566a03ffbe0922833d0cc76ee4f93a44df5dfb93",
+      "expresionAlpine": "BSD-2-Clause AND custom",
+      "licenseApkbuild": "BSD-2-Clause AND custom",
+      "urlProyecto": "https://aomedia.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "aom-libs"
+      ],
+      "estado": "encontrado",
+      "nota": null,
+      "avisos": [
+        {
+          "archivo": "LICENSE",
+          "url": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.11.0/LICENSE?format=TEXT",
+          "origen": "repositorio oficial aomedia/aom@v3.11.0",
+          "bytes": 1316,
+          "sha256": "4764a286d8b2faeaf42f4418e7d7a28d58fc8fd4d00a3d0a7f44b0a4099de7f2"
+        },
+        {
+          "archivo": "PATENTS",
+          "url": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.11.0/PATENTS?format=TEXT",
+          "origen": "repositorio oficial aomedia/aom@v3.11.0",
+          "bytes": 5701,
+          "sha256": "661fb8e504744e95587b556b94a58343448300606a41bea8c7a9b97125696e61"
+        },
+        {
+          "archivo": "AUTHORS",
+          "url": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.11.0/AUTHORS?format=TEXT",
+          "origen": "repositorio oficial aomedia/aom@v3.11.0",
+          "bytes": 12121,
+          "sha256": "d6e0a5250dd67ab8106d32809dd71f2629f1205b570f7807487b5ea7b7964322"
+        }
+      ],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/566a03ffbe0922833d0cc76ee4f93a44df5dfb93/main/aom/",
+        "https://aomedia.googlesource.com/aom/+/refs/tags/v3.11.0/"
+      ]
+    },
+    {
+      "paqueteFuente": "apk-tools",
+      "version": "2.14.6-r3",
+      "commitAports": "41847d6ccff08940b5bf1ba0d6005e95897039f9",
+      "expresionAlpine": "GPL-2.0-only",
+      "licenseApkbuild": "GPL-2.0-only",
+      "urlProyecto": "https://gitlab.alpinelinux.org/alpine/apk-tools",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "apk-tools"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/41847d6ccff08940b5bf1ba0d6005e95897039f9/main/apk-tools/"
+      ],
+      "fuenteTarball": "https://gitlab.alpinelinux.org/alpine/apk-tools/-/archive/v2.14.6/apk-tools-v2.14.6.tar.gz"
+    },
+    {
+      "paqueteFuente": "apk-tools",
+      "version": "3.0.6-r0",
+      "commitAports": "1403ea7a8ae3fb8e5a11207ddb1ff536eb8de912",
+      "expresionAlpine": "GPL-2.0-only",
+      "licenseApkbuild": "GPL-2.0-only",
+      "urlProyecto": "https://gitlab.alpinelinux.org/alpine/apk-tools",
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "binarios": [
+        "apk-tools",
+        "libapk"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/1403ea7a8ae3fb8e5a11207ddb1ff536eb8de912/main/apk-tools/"
+      ],
+      "fuenteTarball": "https://gitlab.alpinelinux.org/alpine/apk-tools/-/archive/v3.0.6/apk-tools-v3.0.6.tar.gz"
+    },
+    {
+      "paqueteFuente": "brotli",
+      "version": "1.1.0-r2",
+      "commitAports": "bdeb5ac39445d803f7d97bb9b3cf9171d9a35f52",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://github.com/google/brotli",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "brotli-libs"
+      ],
+      "estado": "encontrado",
+      "nota": null,
+      "avisos": [
+        {
+          "archivo": "LICENSE",
+          "url": "https://raw.githubusercontent.com/google/brotli/v1.1.0/LICENSE",
+          "origen": "upstream github google/brotli@v1.1.0",
+          "bytes": 1084,
+          "sha256": "3d180008e36922a4e8daec11c34c7af264fed5962d07924aea928c38e8663c94"
+        }
+      ],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/bdeb5ac39445d803f7d97bb9b3cf9171d9a35f52/main/brotli/",
+        "https://raw.githubusercontent.com/google/brotli/v1.1.0/"
+      ]
+    },
+    {
+      "paqueteFuente": "busybox",
+      "version": "1.37.0-r12",
+      "commitAports": "9c49608930ef6a9936750e9e39edec56b3db9cd5",
+      "expresionAlpine": "GPL-2.0-only",
+      "licenseApkbuild": "GPL-2.0-only",
+      "urlProyecto": "https://busybox.net/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "busybox",
+        "busybox-binsh",
+        "ssl_client"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/9c49608930ef6a9936750e9e39edec56b3db9cd5/main/busybox/"
+      ],
+      "fuenteTarball": "https://busybox.net/downloads/busybox-1.37.0.tar.bz2"
+    },
+    {
+      "paqueteFuente": "busybox",
+      "version": "1.37.0-r31",
+      "commitAports": "c3ef5d10e6ef6528852c51f0564963e2f8c1be19",
+      "expresionAlpine": "GPL-2.0-only",
+      "licenseApkbuild": "GPL-2.0-only",
+      "urlProyecto": "https://busybox.net/",
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "binarios": [
+        "busybox",
+        "busybox-binsh",
+        "ssl_client"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/c3ef5d10e6ef6528852c51f0564963e2f8c1be19/main/busybox/"
+      ],
+      "fuenteTarball": "https://busybox.net/downloads/busybox-1.37.0.tar.bz2"
+    },
+    {
+      "paqueteFuente": "bzip2",
+      "version": "1.0.8-r6",
+      "commitAports": "33283848034c9885d984c8e8697c645c57324938",
+      "expresionAlpine": "bzip2-1.0.6",
+      "licenseApkbuild": "bzip2-1.0.6",
+      "urlProyecto": "https://sourceware.org/bzip2/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libbz2"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/33283848034c9885d984c8e8697c645c57324938/main/bzip2/"
+      ],
+      "fuenteTarball": "https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz"
+    },
+    {
+      "paqueteFuente": "c-ares",
+      "version": "1.34.5-r0",
+      "commitAports": "e7fe61bc1a50c88db90d446688444acc8bf13dbf",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://c-ares.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "c-ares"
+      ],
+      "estado": "encontrado",
+      "nota": null,
+      "avisos": [
+        {
+          "archivo": "LICENSE.md",
+          "url": "https://raw.githubusercontent.com/c-ares/c-ares/v1.34.5/LICENSE.md",
+          "origen": "upstream github c-ares/c-ares@v1.34.5",
+          "bytes": 1211,
+          "sha256": "460f5e768fda3752ca2169a95df062578a10fb126bfd65f3b9b1a1bed2f84807"
+        },
+        {
+          "archivo": "AUTHORS",
+          "url": "https://raw.githubusercontent.com/c-ares/c-ares/v1.34.5/AUTHORS",
+          "origen": "upstream github c-ares/c-ares@v1.34.5",
+          "bytes": 1258,
+          "sha256": "10274d04e1aa59b340e84dbef26550bfc9827fc70908f78bfa755e1a8729939b"
+        }
+      ],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/e7fe61bc1a50c88db90d446688444acc8bf13dbf/main/c-ares/",
+        "https://raw.githubusercontent.com/c-ares/c-ares/v1.34.5/"
+      ]
+    },
+    {
+      "paqueteFuente": "ca-certificates",
+      "version": "20241121-r1",
+      "commitAports": "707ff77afebd8ef5bd60f3a5dd1b08f8c480f531",
+      "expresionAlpine": "MPL-2.0 AND MIT",
+      "licenseApkbuild": "MPL-2.0 AND MIT",
+      "urlProyecto": "https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "ca-certificates",
+        "ca-certificates-bundle"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/707ff77afebd8ef5bd60f3a5dd1b08f8c480f531/main/ca-certificates/"
+      ],
+      "fuenteTarball": "https://gitlab.alpinelinux.org/alpine/ca-certificates/-/archive/20241121/ca-certificates-20241121.tar.bz2"
+    },
+    {
+      "paqueteFuente": "ca-certificates",
+      "version": "20260611-r0",
+      "commitAports": "e41cbd2ae991adfe8df298ba8e8e777e90bd0e03",
+      "expresionAlpine": "MPL-2.0 AND MIT",
+      "licenseApkbuild": "MPL-2.0 AND MIT",
+      "urlProyecto": "https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/",
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "binarios": [
+        "ca-certificates-bundle"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/e41cbd2ae991adfe8df298ba8e8e777e90bd0e03/main/ca-certificates/"
+      ],
+      "fuenteTarball": "https://gitlab.alpinelinux.org/alpine/ca-certificates/-/archive/20260611/ca-certificates-20260611.tar.bz2"
+    },
+    {
+      "paqueteFuente": "curl",
+      "version": "8.12.1-r1",
+      "commitAports": "f7044762c3757181b5b0f7689cbf305a07215887",
+      "expresionAlpine": "curl",
+      "licenseApkbuild": "curl",
+      "urlProyecto": "https://curl.se/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "curl",
+        "libcurl"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/f7044762c3757181b5b0f7689cbf305a07215887/main/curl/"
+      ],
+      "fuenteTarball": "https://curl.se/download/curl-8.12.1.tar.xz"
+    },
+    {
+      "paqueteFuente": "dav1d",
+      "version": "1.5.0-r0",
+      "commitAports": "209790842fd2d60db34aed86d7e5f8b035f89b0e",
+      "expresionAlpine": "BSD-2-Clause",
+      "licenseApkbuild": "BSD-2-Clause",
+      "urlProyecto": "https://code.videolan.org/videolan/dav1d",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libdav1d"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/209790842fd2d60db34aed86d7e5f8b035f89b0e/main/dav1d/"
+      ],
+      "fuenteTarball": "https://code.videolan.org/videolan/dav1d/-/archive/1.5.0/dav1d-1.5.0.tar.bz2"
+    },
+    {
+      "paqueteFuente": "expat",
+      "version": "2.7.0-r0",
+      "commitAports": "6b8bc07f26b221e11bb5cd6b34535d3985cac606",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://libexpat.github.io/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libexpat"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/6b8bc07f26b221e11bb5cd6b34535d3985cac606/main/expat/"
+      ],
+      "fuenteTarball": "https://downloads.sourceforge.net/project/expat/expat/2.7.0/expat-2.7.0.tar.bz2"
+    },
+    {
+      "paqueteFuente": "fontconfig",
+      "version": "2.15.0-r1",
+      "commitAports": "bdeb5ac39445d803f7d97bb9b3cf9171d9a35f52",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://www.freedesktop.org/wiki/Software/fontconfig",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "fontconfig"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/bdeb5ac39445d803f7d97bb9b3cf9171d9a35f52/main/fontconfig/"
+      ],
+      "fuenteTarball": "https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.15.0.tar.gz"
+    },
+    {
+      "paqueteFuente": "freetype",
+      "version": "2.13.3-r0",
+      "commitAports": "9404f86086f8e5c970b156336e71c56828a1e587",
+      "expresionAlpine": "FTL OR GPL-2.0-or-later",
+      "licenseApkbuild": "FTL OR GPL-2.0-or-later",
+      "urlProyecto": "https://www.freetype.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "freetype"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/9404f86086f8e5c970b156336e71c56828a1e587/main/freetype/"
+      ],
+      "fuenteTarball": "https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz"
+    },
+    {
+      "paqueteFuente": "gcc",
+      "version": "15.2.0-r5",
+      "commitAports": "423a8ad043d07f2c7546c8ec3e2b0384cda360ae",
+      "expresionAlpine": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "licenseApkbuild": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "urlProyecto": "https://gcc.gnu.org",
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "binarios": [
+        "libgcc",
+        "libstdc++"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/423a8ad043d07f2c7546c8ec3e2b0384cda360ae/main/gcc/"
+      ],
+      "fuenteTarball": "https://gcc.gnu.org/pub/gcc/releases/gcc-15.2.0%%_git*}/gcc-15.2.0%%_git*}.tar.xz"
+    },
+    {
+      "paqueteFuente": "gd",
+      "version": "2.3.3-r9",
+      "commitAports": "21d29cabd99e7ff6534d2e99601cbd77abf30f8a",
+      "expresionAlpine": "GD",
+      "licenseApkbuild": "GD",
+      "urlProyecto": "https://libgd.github.io/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libgd"
+      ],
+      "estado": "encontrado",
+      "nota": null,
+      "avisos": [
+        {
+          "archivo": "COPYING",
+          "url": "https://raw.githubusercontent.com/libgd/libgd/gd-2.3.3/COPYING",
+          "origen": "upstream github libgd/libgd@gd-2.3.3",
+          "bytes": 2991,
+          "sha256": "005f4b6b0141d1bd11d371bbf7d4f67947f85a4906b7f5465f942204cf918ba3"
+        }
+      ],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/21d29cabd99e7ff6534d2e99601cbd77abf30f8a/main/gd/",
+        "https://raw.githubusercontent.com/libgd/libgd/gd-2.3.3/"
+      ]
+    },
+    {
+      "paqueteFuente": "geoip",
+      "version": "1.6.12-r5",
+      "commitAports": "fc95c59998285564fbcb0bfb2443898c62e10171",
+      "expresionAlpine": "LGPL-2.1-or-later",
+      "licenseApkbuild": "LGPL-2.1-or-later",
+      "urlProyecto": "http://www.maxmind.com/app/ip-location",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "geoip"
+      ],
+      "estado": "encontrado",
+      "nota": null,
+      "avisos": [
+        {
+          "archivo": "LICENSE",
+          "url": "https://raw.githubusercontent.com/maxmind/geoip-api-c/v1.6.12/LICENSE",
+          "origen": "upstream github maxmind/geoip-api-c@v1.6.12",
+          "bytes": 1144,
+          "sha256": "d0c01186cb63bcbfded70b18b8271864cfcab29618d4bf35918380d49ce1af3d"
+        },
+        {
+          "archivo": "COPYING",
+          "url": "https://raw.githubusercontent.com/maxmind/geoip-api-c/v1.6.12/COPYING",
+          "origen": "upstream github maxmind/geoip-api-c@v1.6.12",
+          "bytes": 26434,
+          "sha256": "36b6d3fa47916943fd5fec313c584784946047ec1337a78b440e5992cb595f89"
+        },
+        {
+          "archivo": "AUTHORS",
+          "url": "https://raw.githubusercontent.com/maxmind/geoip-api-c/v1.6.12/AUTHORS",
+          "origen": "upstream github maxmind/geoip-api-c@v1.6.12",
+          "bytes": 35,
+          "sha256": "0cfa2de95ab4f61488224f7ff086b12fd848e13ce7b8f5a3ce37949cdf76df09"
+        }
+      ],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/fc95c59998285564fbcb0bfb2443898c62e10171/main/geoip/",
+        "https://raw.githubusercontent.com/maxmind/geoip-api-c/v1.6.12/"
+      ]
+    },
+    {
+      "paqueteFuente": "gettext",
+      "version": "0.22.5-r0",
+      "commitAports": "c49ded5d54b708768165f7a99589464cd5c5eeee",
+      "expresionAlpine": "GPL-3.0-or-later AND LGPL-2.1-or-later AND MIT",
+      "licenseApkbuild": "GPL-3.0-or-later AND LGPL-2.1-or-later AND MIT",
+      "urlProyecto": "https://www.gnu.org/software/gettext/gettext.html",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "gettext-envsubst",
+        "libintl"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/c49ded5d54b708768165f7a99589464cd5c5eeee/main/gettext/"
+      ],
+      "fuenteTarball": "https://ftp.gnu.org/gnu/gettext/gettext-0.22.5.tar.xz"
+    },
+    {
+      "paqueteFuente": "libavif",
+      "version": "1.0.4-r0",
+      "commitAports": "b957b6e51ead6a412cb11ecc63a77e3a70edbfd5",
+      "expresionAlpine": "BSD-2-Clause",
+      "licenseApkbuild": "BSD-2-Clause",
+      "urlProyecto": "https://aomediacodec.github.io/av1-avif/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libavif"
+      ],
+      "estado": "encontrado",
+      "nota": null,
+      "avisos": [
+        {
+          "archivo": "LICENSE",
+          "url": "https://raw.githubusercontent.com/AOMediaCodec/libavif/v1.0.4/LICENSE",
+          "origen": "upstream github AOMediaCodec/libavif@v1.0.4",
+          "bytes": 18799,
+          "sha256": "10952217a6d404de8bf8a997fbea9b88f682df1fe98cb9b9f467ade641525639"
+        }
+      ],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/b957b6e51ead6a412cb11ecc63a77e3a70edbfd5/main/libavif/",
+        "https://raw.githubusercontent.com/AOMediaCodec/libavif/v1.0.4/"
+      ]
+    },
+    {
+      "paqueteFuente": "libbsd",
+      "version": "0.12.2-r0",
+      "commitAports": "02365e78d654a7beb23fd35d7d69f4a649009ede",
+      "expresionAlpine": "BSD-3-Clause",
+      "licenseApkbuild": "BSD-3-Clause",
+      "urlProyecto": "https://libbsd.freedesktop.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libbsd"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/02365e78d654a7beb23fd35d7d69f4a649009ede/main/libbsd/"
+      ],
+      "fuenteTarball": "https://libbsd.freedesktop.org/releases/libbsd-0.12.2.tar.xz"
+    },
+    {
+      "paqueteFuente": "libedit",
+      "version": "20240808.3.1-r0",
+      "commitAports": "ee9c3251f481e457cafb2a39a31fdf734c7c55d8",
+      "expresionAlpine": "BSD-3-Clause",
+      "licenseApkbuild": "BSD-3-Clause",
+      "urlProyecto": "https://www.thrysoee.dk/editline",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libedit"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/ee9c3251f481e457cafb2a39a31fdf734c7c55d8/main/libedit/"
+      ],
+      "fuenteTarball": "https://www.thrysoee.dk/editline/libedit-20240808.3.1/./-}.tar.gz"
+    },
+    {
+      "paqueteFuente": "libgcrypt",
+      "version": "1.10.3-r1",
+      "commitAports": "40176cc16c5dfa243d502fa9e1f7b9e68ebcad0b",
+      "expresionAlpine": "LGPL-2.1-or-later AND GPL-2.0-or-later",
+      "licenseApkbuild": "LGPL-2.1-or-later AND GPL-2.0-or-later",
+      "urlProyecto": "https://www.gnupg.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libgcrypt"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/40176cc16c5dfa243d502fa9e1f7b9e68ebcad0b/main/libgcrypt/"
+      ],
+      "fuenteTarball": "https://www.gnupg.org/ftp/gcrypt/libgcrypt/libgcrypt-1.10.3.tar.bz2"
+    },
+    {
+      "paqueteFuente": "libgpg-error",
+      "version": "1.51-r0",
+      "commitAports": "59a563eec99ff1e59c5cb42ecf7a482be3684a1c",
+      "expresionAlpine": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "licenseApkbuild": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "urlProyecto": "https://www.gnupg.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libgpg-error"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/59a563eec99ff1e59c5cb42ecf7a482be3684a1c/main/libgpg-error/"
+      ],
+      "fuenteTarball": "https://gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-1.51.tar.bz2"
+    },
+    {
+      "paqueteFuente": "libice",
+      "version": "1.1.1-r6",
+      "commitAports": "614e9166706cec427fc3d907b8d981390a42e088",
+      "expresionAlpine": "X11",
+      "licenseApkbuild": "X11",
+      "urlProyecto": "https://xorg.freedesktop.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libice"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/614e9166706cec427fc3d907b8d981390a42e088/main/libice/"
+      ],
+      "fuenteTarball": "https://www.x.org/releases/individual/lib/libICE-1.1.1.tar.xz"
+    },
+    {
+      "paqueteFuente": "libidn2",
+      "version": "2.3.7-r0",
+      "commitAports": "1cdcdd0eccbee1f60078417a7aaf83f92f6e6754",
+      "expresionAlpine": "GPL-2.0-or-later OR LGPL-3.0-or-later",
+      "licenseApkbuild": "GPL-2.0-or-later OR LGPL-3.0-or-later",
+      "urlProyecto": "https://www.gnu.org/software/libidn#libidn2",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libidn2"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/1cdcdd0eccbee1f60078417a7aaf83f92f6e6754/main/libidn2/"
+      ],
+      "fuenteTarball": "https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz"
+    },
+    {
+      "paqueteFuente": "libjpeg-turbo",
+      "version": "3.0.4-r0",
+      "commitAports": "30b4b4d47dba66db916d78a58ea7a4639447a04f",
+      "expresionAlpine": "BSD-3-Clause AND IJG AND Zlib",
+      "licenseApkbuild": "BSD-3-Clause AND IJG AND Zlib",
+      "urlProyecto": "https://libjpeg-turbo.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libjpeg-turbo"
+      ],
+      "estado": "encontrado",
+      "nota": null,
+      "avisos": [
+        {
+          "archivo": "LICENSE.md",
+          "url": "https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/3.0.4/LICENSE.md",
+          "origen": "upstream github libjpeg-turbo/libjpeg-turbo@3.0.4",
+          "bytes": 5620,
+          "sha256": "e548c96c0c09397c94b5c5531836c02ff2c403f1f2b130cad8e3ec9439b5a7cc"
+        }
+      ],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/30b4b4d47dba66db916d78a58ea7a4639447a04f/main/libjpeg-turbo/",
+        "https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/3.0.4/"
+      ]
+    },
+    {
+      "paqueteFuente": "libmd",
+      "version": "1.1.0-r0",
+      "commitAports": "73e716067b9edc32c4cc7818cb7d206e57fdde15",
+      "expresionAlpine": "BSD-3-Clause AND BSD-2-Clause AND ISC AND Beerware AND Public Domain",
+      "licenseApkbuild": "BSD-3-Clause AND BSD-2-Clause AND ISC AND Beerware AND Public Domain",
+      "urlProyecto": "https://www.hadrons.org/software/libmd/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libmd"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/73e716067b9edc32c4cc7818cb7d206e57fdde15/main/libmd/"
+      ],
+      "fuenteTarball": "https://archive.hadrons.org/software/libmd/libmd-1.1.0.tar.xz"
+    },
+    {
+      "paqueteFuente": "libpng",
+      "version": "1.6.47-r0",
+      "commitAports": "b7f398fb35c0533ad2b0d3b693c09dcb08eb5974",
+      "expresionAlpine": "Libpng",
+      "licenseApkbuild": "Libpng",
+      "urlProyecto": "http://www.libpng.org",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libpng"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/b7f398fb35c0533ad2b0d3b693c09dcb08eb5974/main/libpng/"
+      ],
+      "fuenteTarball": "https://downloads.sourceforge.net/libpng/libpng-1.6.47.tar.gz"
+    },
+    {
+      "paqueteFuente": "libpsl",
+      "version": "0.21.5-r3",
+      "commitAports": "398a5aee3025ec8a4d0d761e448dc86ac777fa09",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://rockdaboot.github.io/libpsl",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libpsl"
+      ],
+      "estado": "encontrado",
+      "nota": null,
+      "avisos": [
+        {
+          "archivo": "LICENSE",
+          "url": "https://raw.githubusercontent.com/rockdaboot/libpsl/0.21.5/LICENSE",
+          "origen": "upstream github rockdaboot/libpsl@0.21.5",
+          "bytes": 1060,
+          "sha256": "322392e6001b2b3b0fca705dc9f11f26e12441188ecde50eb1d22909980b2925"
+        },
+        {
+          "archivo": "COPYING",
+          "url": "https://raw.githubusercontent.com/rockdaboot/libpsl/0.21.5/COPYING",
+          "origen": "upstream github rockdaboot/libpsl@0.21.5",
+          "bytes": 1060,
+          "sha256": "322392e6001b2b3b0fca705dc9f11f26e12441188ecde50eb1d22909980b2925"
+        },
+        {
+          "archivo": "AUTHORS",
+          "url": "https://raw.githubusercontent.com/rockdaboot/libpsl/0.21.5/AUTHORS",
+          "origen": "upstream github rockdaboot/libpsl@0.21.5",
+          "bytes": 916,
+          "sha256": "f8583862f775c397643c7eac9c6645abfdd3f6d2918311e35f0fba719f8fa818"
+        }
+      ],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/398a5aee3025ec8a4d0d761e448dc86ac777fa09/main/libpsl/",
+        "https://raw.githubusercontent.com/rockdaboot/libpsl/0.21.5/"
+      ]
+    },
+    {
+      "paqueteFuente": "libsm",
+      "version": "1.2.4-r4",
+      "commitAports": "614e9166706cec427fc3d907b8d981390a42e088",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://xorg.freedesktop.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libsm"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/614e9166706cec427fc3d907b8d981390a42e088/main/libsm/"
+      ],
+      "fuenteTarball": "https://www.x.org/releases/individual/lib/libSM-1.2.4.tar.xz"
+    },
+    {
+      "paqueteFuente": "libunistring",
+      "version": "1.2-r0",
+      "commitAports": "c4c67852adc5bc15e278054876bc3c70c321948e",
+      "expresionAlpine": "GPL-2.0-or-later OR LGPL-3.0-or-later",
+      "licenseApkbuild": "GPL-2.0-or-later OR LGPL-3.0-or-later",
+      "urlProyecto": "https://www.gnu.org/software/libunistring/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libunistring"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/c4c67852adc5bc15e278054876bc3c70c321948e/main/libunistring/"
+      ],
+      "fuenteTarball": "https://ftp.gnu.org/gnu/libunistring/libunistring-1.2.tar.xz"
+    },
+    {
+      "paqueteFuente": "libwebp",
+      "version": "1.4.0-r0",
+      "commitAports": "9e9632efda29b66bba6f82b0010a94660831760e",
+      "expresionAlpine": "BSD-3-Clause",
+      "licenseApkbuild": "BSD-3-Clause",
+      "urlProyecto": "https://developers.google.com/speed/webp",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libsharpyuv",
+        "libwebp"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/9e9632efda29b66bba6f82b0010a94660831760e/main/libwebp/"
+      ],
+      "fuenteTarball": "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.4.0.tar.gz"
+    },
+    {
+      "paqueteFuente": "libx11",
+      "version": "1.8.10-r0",
+      "commitAports": "35f49f7d1dd8609d25302034acf39e5a0fd68391",
+      "expresionAlpine": "X11",
+      "licenseApkbuild": "X11",
+      "urlProyecto": "https://xorg.freedesktop.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libx11"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/35f49f7d1dd8609d25302034acf39e5a0fd68391/main/libx11/"
+      ],
+      "fuenteTarball": "https://www.x.org/releases/individual/lib/libX11-1.8.10.tar.xz"
+    },
+    {
+      "paqueteFuente": "libxau",
+      "version": "1.0.11-r4",
+      "commitAports": "614e9166706cec427fc3d907b8d981390a42e088",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://xorg.freedesktop.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libxau"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/614e9166706cec427fc3d907b8d981390a42e088/main/libxau/"
+      ],
+      "fuenteTarball": "https://www.x.org/releases/individual/lib/libXau-1.0.11.tar.xz"
+    },
+    {
+      "paqueteFuente": "libxcb",
+      "version": "1.16.1-r0",
+      "commitAports": "96c0dfa57f3437a68b4df24fdbbdcf49f1698248",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://xcb.freedesktop.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libxcb"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/96c0dfa57f3437a68b4df24fdbbdcf49f1698248/main/libxcb/"
+      ],
+      "fuenteTarball": "https://xorg.freedesktop.org/archive/individual/lib/libxcb-1.16.1.tar.xz"
+    },
+    {
+      "paqueteFuente": "libxdmcp",
+      "version": "1.1.5-r1",
+      "commitAports": "614e9166706cec427fc3d907b8d981390a42e088",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://xorg.freedesktop.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libxdmcp"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/614e9166706cec427fc3d907b8d981390a42e088/main/libxdmcp/"
+      ],
+      "fuenteTarball": "https://www.x.org/releases/individual/lib/libXdmcp-1.1.5.tar.xz"
+    },
+    {
+      "paqueteFuente": "libxext",
+      "version": "1.3.6-r2",
+      "commitAports": "614e9166706cec427fc3d907b8d981390a42e088",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://xorg.freedesktop.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libxext"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/614e9166706cec427fc3d907b8d981390a42e088/main/libxext/"
+      ],
+      "fuenteTarball": "https://www.x.org/releases/individual/lib/libXext-1.3.6.tar.xz"
+    },
+    {
+      "paqueteFuente": "libxml2",
+      "version": "2.13.4-r5",
+      "commitAports": "c9b177afb6ad46a0857b45194c1b0ac7aba123ab",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://gitlab.gnome.org/GNOME/libxml2",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libxml2"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/c9b177afb6ad46a0857b45194c1b0ac7aba123ab/main/libxml2/"
+      ],
+      "fuenteTarball": "https://download.gnome.org/sources/libxml2/2.13.4%.*}/libxml2-2.13.4.tar.xz"
+    },
+    {
+      "paqueteFuente": "libxpm",
+      "version": "3.5.17-r0",
+      "commitAports": "1be698a8f385af9d03e946f4ddee9c4c89d4feca",
+      "expresionAlpine": "X11",
+      "licenseApkbuild": "X11",
+      "urlProyecto": "https://xorg.freedesktop.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libxpm"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/1be698a8f385af9d03e946f4ddee9c4c89d4feca/main/libxpm/"
+      ],
+      "fuenteTarball": "https://www.x.org/releases/individual/lib/libXpm-3.5.17.tar.xz"
+    },
+    {
+      "paqueteFuente": "libxslt",
+      "version": "1.1.42-r2",
+      "commitAports": "dab69828342ba8e073aeff49d41670f9091ddb62",
+      "expresionAlpine": "X11",
+      "licenseApkbuild": "X11",
+      "urlProyecto": "http://xmlsoft.org/XSLT/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libxslt"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/dab69828342ba8e073aeff49d41670f9091ddb62/main/libxslt/"
+      ],
+      "fuenteTarball": "https://download.gnome.org/sources/libxslt/1.1.42%.*}/libxslt-1.1.42.tar.xz"
+    },
+    {
+      "paqueteFuente": "libxt",
+      "version": "1.3.1-r0",
+      "commitAports": "60222ebeadec75e483e49194130c6963d0fcbf75",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://xorg.freedesktop.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libxt"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/60222ebeadec75e483e49194130c6963d0fcbf75/main/libxt/"
+      ],
+      "fuenteTarball": "https://www.x.org/releases/individual/lib/libXt-1.3.1.tar.xz"
+    },
+    {
+      "paqueteFuente": "musl",
+      "version": "1.2.5-r9",
+      "commitAports": "efd4d5df7be0ea48d98512671f676fc5ceb14899",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://musl.libc.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "musl",
+        "musl-utils"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/efd4d5df7be0ea48d98512671f676fc5ceb14899/main/musl/"
+      ],
+      "fuenteTarball": "https://musl.libc.org/releases/musl-1.2.5.tar.gz"
+    },
+    {
+      "paqueteFuente": "musl",
+      "version": "1.2.6-r2",
+      "commitAports": "f5640d3a10f664c9119720c60515265d3d6f6d01",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://musl.libc.org/",
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "binarios": [
+        "musl",
+        "musl-utils"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/f5640d3a10f664c9119720c60515265d3d6f6d01/main/musl/"
+      ],
+      "fuenteTarball": "https://musl.libc.org/releases/musl-1.2.6.tar.gz"
+    },
+    {
+      "paqueteFuente": "ncurses",
+      "version": "6.5_p20241006-r3",
+      "commitAports": "2cf24c798675a7f7deb2603c350d4adc7b59c8bb",
+      "expresionAlpine": "X11",
+      "licenseApkbuild": "X11",
+      "urlProyecto": "https://invisible-island.net/ncurses/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libncursesw",
+        "ncurses-terminfo-base"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/2cf24c798675a7f7deb2603c350d4adc7b59c8bb/main/ncurses/"
+      ],
+      "fuenteTarball": "https://invisible-mirror.net/archives/ncurses/current/ncurses-6.5_p20241006/_p/-}.tgz"
+    },
+    {
+      "paqueteFuente": "nghttp2",
+      "version": "1.64.0-r0",
+      "commitAports": "08e359a7bafd226d766d421eb66e27b6fc1144d2",
+      "expresionAlpine": "MIT",
+      "licenseApkbuild": "MIT",
+      "urlProyecto": "https://nghttp2.org",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "nghttp2-libs"
+      ],
+      "estado": "encontrado",
+      "nota": null,
+      "avisos": [
+        {
+          "archivo": "LICENSE",
+          "url": "https://raw.githubusercontent.com/nghttp2/nghttp2/v1.64.0/LICENSE",
+          "origen": "upstream github nghttp2/nghttp2@v1.64.0",
+          "bytes": 12,
+          "sha256": "f0518afc0a555337bac2f0fb37d33cdee6111983da69aaa504a1876beeddfde0"
+        },
+        {
+          "archivo": "COPYING",
+          "url": "https://raw.githubusercontent.com/nghttp2/nghttp2/v1.64.0/COPYING",
+          "origen": "upstream github nghttp2/nghttp2@v1.64.0",
+          "bytes": 1156,
+          "sha256": "6b94f3abc1aabd0c72a7c7d92a77f79dda7c8a0cb3df839a97890b4116a2de2a"
+        },
+        {
+          "archivo": "AUTHORS",
+          "url": "https://raw.githubusercontent.com/nghttp2/nghttp2/v1.64.0/AUTHORS",
+          "origen": "upstream github nghttp2/nghttp2@v1.64.0",
+          "bytes": 2666,
+          "sha256": "75664388115945d87bca38c5be467c8a8dadfea2e3af89371d450fa4d5758915"
+        }
+      ],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/08e359a7bafd226d766d421eb66e27b6fc1144d2/main/nghttp2/",
+        "https://raw.githubusercontent.com/nghttp2/nghttp2/v1.64.0/"
+      ]
+    },
+    {
+      "paqueteFuente": "openssl",
+      "version": "3.3.3-r0",
+      "commitAports": "ddbf4a43b534e1e2da4ccb72bdc4ffcd9b85ce03",
+      "expresionAlpine": "Apache-2.0",
+      "licenseApkbuild": "Apache-2.0",
+      "urlProyecto": "https://www.openssl.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libcrypto3",
+        "libssl3"
+      ],
+      "estado": "encontrado",
+      "nota": null,
+      "avisos": [
+        {
+          "archivo": "LICENSE.txt",
+          "url": "https://raw.githubusercontent.com/openssl/openssl/openssl-3.3.3/LICENSE.txt",
+          "origen": "upstream github openssl/openssl@openssl-3.3.3",
+          "bytes": 10175,
+          "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+        }
+      ],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/ddbf4a43b534e1e2da4ccb72bdc4ffcd9b85ce03/main/openssl/",
+        "https://raw.githubusercontent.com/openssl/openssl/openssl-3.3.3/"
+      ]
+    },
+    {
+      "paqueteFuente": "openssl",
+      "version": "3.5.8-r0",
+      "commitAports": "013edf8b29199933e8ea34dde460b5584b979042",
+      "expresionAlpine": "Apache-2.0",
+      "licenseApkbuild": "Apache-2.0",
+      "urlProyecto": "https://www.openssl.org/",
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "binarios": [
+        "libcrypto3",
+        "libssl3",
+        "openssl"
+      ],
+      "estado": "encontrado",
+      "nota": null,
+      "avisos": [
+        {
+          "archivo": "LICENSE.txt",
+          "url": "https://raw.githubusercontent.com/openssl/openssl/openssl-3.5.8/LICENSE.txt",
+          "origen": "upstream github openssl/openssl@openssl-3.5.8",
+          "bytes": 10175,
+          "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a"
+        }
+      ],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/013edf8b29199933e8ea34dde460b5584b979042/main/openssl/",
+        "https://raw.githubusercontent.com/openssl/openssl/openssl-3.5.8/"
+      ]
+    },
+    {
+      "paqueteFuente": "pax-utils",
+      "version": "1.3.8-r1",
+      "commitAports": "398a5aee3025ec8a4d0d761e448dc86ac777fa09",
+      "expresionAlpine": "GPL-2.0-only",
+      "licenseApkbuild": "GPL-2.0-only",
+      "urlProyecto": "https://wiki.gentoo.org/wiki/Hardened/PaX_Utilities",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "scanelf"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/398a5aee3025ec8a4d0d761e448dc86ac777fa09/main/pax-utils/"
+      ],
+      "fuenteTarball": "https://dev.gentoo.org/~sam/distfiles/app-misc/pax-utils/pax-utils-1.3.8.tar.xz"
+    },
+    {
+      "paqueteFuente": "pax-utils",
+      "version": "1.3.9-r1",
+      "commitAports": "c61801eeacb3ffcd9c2025b09e402153bb93fb39",
+      "expresionAlpine": "GPL-2.0-only",
+      "licenseApkbuild": "GPL-2.0-only",
+      "urlProyecto": "https://wiki.gentoo.org/wiki/Hardened/PaX_Utilities",
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "binarios": [
+        "scanelf"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/c61801eeacb3ffcd9c2025b09e402153bb93fb39/main/pax-utils/"
+      ],
+      "fuenteTarball": "https://dev.gentoo.org/~sam/distfiles/app-misc/pax-utils/pax-utils-1.3.9.tar.xz"
+    },
+    {
+      "paqueteFuente": "pcre2",
+      "version": "10.43-r0",
+      "commitAports": "0826e91f0c743946bdc6ffa51fe90479bf4a83da",
+      "expresionAlpine": "BSD-3-Clause",
+      "licenseApkbuild": "BSD-3-Clause",
+      "urlProyecto": "https://pcre.org/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "pcre2"
+      ],
+      "estado": "encontrado",
+      "nota": null,
+      "avisos": [
+        {
+          "archivo": "COPYING",
+          "url": "https://raw.githubusercontent.com/PhilipHazel/pcre2/pcre2-10.43/COPYING",
+          "origen": "upstream github PhilipHazel/pcre2@pcre2-10.43",
+          "bytes": 97,
+          "sha256": "99272c55f3dcfa07a8a7e15a5c1a33096e4727de74241d65fa049fccfdd59507"
+        },
+        {
+          "archivo": "AUTHORS",
+          "url": "https://raw.githubusercontent.com/PhilipHazel/pcre2/pcre2-10.43/AUTHORS",
+          "origen": "upstream github PhilipHazel/pcre2@pcre2-10.43",
+          "bytes": 749,
+          "sha256": "466a8f8e30b195e8452471745b944258901b78b6c071f553ffd72d992492b06c"
+        }
+      ],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/0826e91f0c743946bdc6ffa51fe90479bf4a83da/main/pcre2/",
+        "https://raw.githubusercontent.com/PhilipHazel/pcre2/pcre2-10.43/"
+      ]
+    },
+    {
+      "paqueteFuente": "tiff",
+      "version": "4.7.0-r0",
+      "commitAports": "cb62264d3973d8a6ffb6b9b97ddf44705183bd54",
+      "expresionAlpine": "libtiff",
+      "licenseApkbuild": "libtiff",
+      "urlProyecto": "https://gitlab.com/libtiff/libtiff",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "tiff"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/cb62264d3973d8a6ffb6b9b97ddf44705183bd54/main/tiff/"
+      ],
+      "fuenteTarball": "https://download.osgeo.org/libtiff/tiff-4.7.0.tar.gz"
+    },
+    {
+      "paqueteFuente": "tzdata",
+      "version": "2025b-r0",
+      "commitAports": "c4a545b4457088daf2edfe933fecbaa8eeb774a4",
+      "expresionAlpine": "Public-Domain",
+      "licenseApkbuild": "Public-Domain",
+      "urlProyecto": "https://www.iana.org/time-zones",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "tzdata"
+      ],
+      "estado": "encontrado",
+      "nota": null,
+      "avisos": [
+        {
+          "archivo": "LICENSE",
+          "url": "https://raw.githubusercontent.com/eggert/tz/2025b/LICENSE",
+          "origen": "repositorio oficial eggert/tz@2025b",
+          "bytes": 252,
+          "sha256": "0613408568889f5739e5ae252b722a2659c02002839ad970a63dc5e9174b27cf"
+        }
+      ],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/c4a545b4457088daf2edfe933fecbaa8eeb774a4/main/tzdata/",
+        "https://raw.githubusercontent.com/eggert/tz/2025b/"
+      ]
+    },
+    {
+      "paqueteFuente": "util-linux",
+      "version": "2.40.4-r1",
+      "commitAports": "67123673d9594a0de26838c585ce77ac2e75e7de",
+      "expresionAlpine": "BSD-3-Clause",
+      "licenseApkbuild": "GPL-3.0-or-later AND GPL-2.0-or-later AND GPL-2.0-only AND",
+      "urlProyecto": "https://git.kernel.org/cgit/utils/util-linux/util-linux.git",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "libuuid"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente declarada usa variables del APKBUILD que este cosechador no resolvio; no se afirma ausencia sin haber mirado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/67123673d9594a0de26838c585ce77ac2e75e7de/main/util-linux/"
+      ],
+      "fuenteSinResolver": "https://www.kernel.org/pub/linux/utils/util-linux/v$_v/util-linux-2.40.4.tar.xz"
+    },
+    {
+      "paqueteFuente": "xz",
+      "version": "5.6.3-r1",
+      "commitAports": "0e019d9722d6d8e51ef4658074b2bc736f60b4dc",
+      "expresionAlpine": "GPL-2.0-or-later AND 0BSD AND Public-Domain AND LGPL-2.1-or-later",
+      "licenseApkbuild": "GPL-2.0-or-later AND 0BSD AND Public-Domain AND LGPL-2.1-or-later",
+      "urlProyecto": "https://tukaani.org/xz/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "xz-libs"
+      ],
+      "estado": "encontrado",
+      "nota": null,
+      "avisos": [
+        {
+          "archivo": "COPYING",
+          "url": "https://raw.githubusercontent.com/tukaani-project/xz/v5.6.3/COPYING",
+          "origen": "upstream github tukaani-project/xz@v5.6.3",
+          "bytes": 3885,
+          "sha256": "ee3b35b82f7bb0ba5fd9f13ca34ebbe757a59c05bfde5ab9d50ff4188ed33396"
+        },
+        {
+          "archivo": "AUTHORS",
+          "url": "https://raw.githubusercontent.com/tukaani-project/xz/v5.6.3/AUTHORS",
+          "origen": "upstream github tukaani-project/xz@v5.6.3",
+          "bytes": 2148,
+          "sha256": "653b31fe6bebcc7fc2aa7089219df259e0d4df88b114c361df51ee6d134ac3c6"
+        }
+      ],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/0e019d9722d6d8e51ef4658074b2bc736f60b4dc/main/xz/",
+        "https://raw.githubusercontent.com/tukaani-project/xz/v5.6.3/"
+      ]
+    },
+    {
+      "paqueteFuente": "zlib",
+      "version": "1.3.1-r2",
+      "commitAports": "4c2722e7ecc1c5e3ba882429044a101497121223",
+      "expresionAlpine": "Zlib",
+      "licenseApkbuild": "Zlib",
+      "urlProyecto": "https://zlib.net/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "zlib"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/4c2722e7ecc1c5e3ba882429044a101497121223/main/zlib/"
+      ],
+      "fuenteTarball": "https://zlib.net/fossils/zlib-1.3.1.tar.gz"
+    },
+    {
+      "paqueteFuente": "zlib",
+      "version": "1.3.2-r0",
+      "commitAports": "f248b33b5943c7dc69bf691031d7612ab2e8ed93",
+      "expresionAlpine": "Zlib",
+      "licenseApkbuild": "Zlib",
+      "urlProyecto": "https://zlib.net/",
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "binarios": [
+        "zlib"
+      ],
+      "estado": "no-verificable",
+      "nota": "la fuente exacta se publica solo como tarball; comprobarlo exigiria descargar un binario, fuera del alcance autorizado",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/f248b33b5943c7dc69bf691031d7612ab2e8ed93/main/zlib/"
+      ],
+      "fuenteTarball": "https://zlib.net/fossils/zlib-1.3.2.tar.gz"
+    },
+    {
+      "paqueteFuente": "zstd",
+      "version": "1.5.6-r2",
+      "commitAports": "5c2ddf18f193dafdd25ae7391d96c7e30766eecd",
+      "expresionAlpine": "BSD-3-Clause OR GPL-2.0-or-later",
+      "licenseApkbuild": "BSD-3-Clause OR GPL-2.0-or-later",
+      "urlProyecto": "https://facebook.github.io/zstd/",
+      "artefactos": [
+        "frontend-image"
+      ],
+      "binarios": [
+        "zstd-libs"
+      ],
+      "estado": "encontrado",
+      "nota": null,
+      "avisos": [
+        {
+          "archivo": "LICENSE",
+          "url": "https://raw.githubusercontent.com/facebook/zstd/v1.5.6/LICENSE",
+          "origen": "upstream github facebook/zstd@v1.5.6",
+          "bytes": 1549,
+          "sha256": "7055266497633c9025b777c78eb7235af13922117480ed5c674677adc381c9d8"
+        },
+        {
+          "archivo": "COPYING",
+          "url": "https://raw.githubusercontent.com/facebook/zstd/v1.5.6/COPYING",
+          "origen": "upstream github facebook/zstd@v1.5.6",
+          "bytes": 18091,
+          "sha256": "f9c375a1be4a41f7b70301dd83c91cb89e41567478859b77eef375a52d782505"
+        }
+      ],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/5c2ddf18f193dafdd25ae7391d96c7e30766eecd/main/zstd/",
+        "https://raw.githubusercontent.com/facebook/zstd/v1.5.6/"
+      ]
+    }
+  ]
+}

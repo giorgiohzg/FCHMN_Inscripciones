@@ -1,0 +1,37 @@
+# Base de datos DESECHABLE para las pruebas de integración.
+#
+# Deliberadamente separada de `docker-compose.yml`:
+#   - Puerto 55432 (no 5432): imposible apuntar por accidente a la base de trabajo.
+#   - Nombre de base `natacion_test`: el guard de `tests/helpers/testDb.ts`
+#     se niega a ejecutar si la base no termina en `_test`.
+#   - Sin volumen persistente (tmpfs): al detener el contenedor no queda nada.
+#
+# Uso:
+#   docker compose -f docker-compose.test.yml up -d
+#   npm --prefix backend run test:integration
+#   docker compose -f docker-compose.test.yml down
+
+# Proyecto Compose PROPIO: sin esto, Compose considera los contenedores de
+# `docker-compose.yml` como "huérfanos" de este archivo, y un
+# `down --remove-orphans` aquí apagaría la base de trabajo.
+name: fchmn_inscripciones_test
+
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: natacion
+      POSTGRES_PASSWORD: clave-publica-solo-pruebas
+      POSTGRES_DB: natacion_test
+    # Loopback: esta base usa las credenciales conocidas del repositorio y se
+    # vacía entera entre corridas. Exponerla a la red local sería regalar una
+    # base escribible a cualquiera que esté en ella.
+    ports:
+      - "127.0.0.1:55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U natacion -d natacion_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 10

@@ -1,0 +1,9 @@
+node_modules
+dist
+build
+coverage
+backend/prisma/migrations
+backend/tests/fixtures
+*.hy3
+*.ev3
+*.md

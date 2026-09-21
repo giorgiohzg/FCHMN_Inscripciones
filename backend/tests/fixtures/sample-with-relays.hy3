@@ -1,0 +1,84 @@
+A102Meet Entries             Hy-Tek, Ltd    Win-TM 8.0De  01032030 19:00 AM EAM MANAGER Lite                                    99
+B1Competencia Sintética de Pruebas             sint                                         010120300102203012312030            70
+B2                                                                                            06  S 290,00S                     61
+C1SINT Club Sintético de Pruebas                                                                                       MAS      24
+C2                                                                                                      CHI OTH                 71
+C3                                                                                                                              10
+D1M  334Álamo               Persona01                                10000000-1         01011970 56                             89
+D1M  338Bravo               Persona02                                 1000001-4         02021971 55                             39
+D1M  345Ñandú               Persona03                                10000002-K         03031972 54                             70
+D1M  361Delta               Persona04                                10000003-4         04041973 53                             39
+D1F  363Eco                 Persona05                                 1000004-7         05051974 52                             18
+D1F  370Foxtrot             Persona06                                10000005-K         06061975 51                             90
+D1F  373Golf                Persona07                                10000006-7         07071976 50                             19
+D1M  374Hotel               Persona08                                 1000007-0         08081977 49                             49
+D1M  375India               Persona09                                10000008-K         09091978 48                             79
+D1M  376Julieta             Persona10                                10000009-0         10101979 47                             60
+D1F  380Kilo                Persona11                                 1000010-3         11111980 46                             88
+D1M  385Lima                Persona12                                10000011-K         12121981 45                             09
+D1M  386Mike                Persona13                                10000012-3         01131982 44                             09
+D1F  333Noviembre           Persona14                                 1000013-6         02141983 43                             41
+E1F  333NovieFF   200A  0109      0,00  1        0S  179,00S                               C                                    37
+E1F  333NovieFF    50B  0109      0,00  5        0S   60,00S                               C                                    17
+D1F  336Oscar               Persona15                                10000014-K         03151984 42                             59
+E1F  336OscarFF   100D  0109      0,00  3        0S  102,00S                               C                                    27
+E1F  336OscarFF    50A  0109      0,00  9        0S   56,56S                               C                                    27
+D1M  339Papa                Persona16                                10000015-66        04161985 41                             29
+E1M  339Papa MM   100D  0109      0,00  4        0S  103,35S                               C                                    07
+E1M  339Papa MM   100C  0109      0,00  8        0S  118,35S                               C                                    07
+D1M  341Quebec              Persona17                                 1000016-9         05171986 40                             00
+E1M  341QuebeMM   100D  0109      0,00  4        0S  104,64S                               C                                    47
+E1M  341QuebeMM   100C  0109      0,00  8        0S  119,64S                               C                                    57
+D1F  343Romeo               Persona18                                10000017-K         06181987 39                             79
+E1F  343RomeoFF   200A  0109      0,00  1        0S  183,93S                               C                                    47
+E1F  343RomeoFF    50B  0109      0,00  5        0S   64,43S                               C                                    17
+E1F  343RomeoFF    50A  0109      0,00  9        0S   59,43S                               C                                    27
+D1M  344Sierra              Persona19                                10000018-9K        07191988 38                             80
+E1M  344SierrMM   100D  0109      0,00  4        0S  106,22S                               C                                    57
+E1M  344SierrMM    50A  0109      0,00 10        0S   43,72S                               C                                    57
+D1M  346Tango               Persona20                                 1000019-2         08201989 37                             39
+E1M  346TangoMM   200A  0109      0,00  2        0S  185,00S                               C                                    37
+E1M  346TangoMM   100C  0109      0,00  8        0S  105,51S                               C                                    47
+D1M  348Uniforme            Persona21                                10000020-K         09211990 36                             41
+E1M  348UnifoMM   100C  0109      0,00  8        0S  106,00S                               C                                    57
+E1M  348UnifoMM    50A  0109      0,00 10        0S   45,30S                               C                                    47
+D1F  349Victor              Persona22                                10000021-2         10221991 35                             20
+E1F  349VictoFF   200A  0109      0,00  1        0S  170,09S                               C                                    47
+E1F  349VictoFF   100C  0109      0,00  7        0S  107,09S                               C                                    57
+D1F  350Whisky              Persona23                                 1000022-5         11231992 34                             10
+E1F  350WhiskFF   200A  0109      0,00  1        0S  171,00S                               C                                    37
+E1F  350WhiskFF   100D  0109      0,00  3        0S   93,38S                               C                                    27
+D1F  351Xray                Persona24                                10000023-K         12241993 33                             39
+E1F  351Xray FF   100D  0109      0,00  3        0S   94,00S                               C                                    96
+E1F  351Xray FF    50A  0109      0,00  9        0S   48,17S                               C                                    07
+D1F  353Yanqui              Persona25                                10000024-5         01251994 32                             20
+E1F  353YanquFF    50B  0109      0,00  5        0S   54,46S                               C                                    27
+E1F  353YanquFF    50A  0109      0,00  9        0S   49,46S                               C                                    37
+D1M  354Zulu                Persona26                                 1000025-8         02261995 31                             29
+E1M  354Zulu MM   200A  0109      0,00  2        0S  174,00S                               C                                    37
+E1M  354Zulu MM   100C  0109      0,00  8        0S  111,25S                               C                                    37
+D1F  356Ambar               Persona27                                10000026-K         03271996 30                             59
+E1F  356AmbarFF   100D  0109      0,00  3        0S   97,00S                               C                                    07
+E1F  356AmbarFF   100C  0109      0,00  7        0S  112,00S                               C                                    17
+D1M  357Bosque              Persona28                                10000027-8         04281997 29                             40
+E1M  357BosquMM   200A  0109      0,00  2        0S  176,83S                               C                                    67
+E1M  357BosquMM   100C  0109      0,00  8        0S  113,83S                               C                                    67
+D1F  358Cobre               Persona29                                 1000028-12        05011998 28                             59
+E1F  358CobreFF    50B  0109      0,00  5        0S   58,00S                               C                                    17
+E1F  358CobreFF    50A  0109      0,00  9        0S   53,00S                               C                                    17
+D1F  383Duna                Persona30                                10000029-K         06021999 27                             29
+E1F  383Duna FF   100D  0109      0,00  3        0S  100,00S                               C                                    86
+E1F  383Duna FF    50B  0109      0,00  5        0S   59,91S                               C                                    86
+D1M  384Ermita              Persona31                                10000030-1         07031970 56                             10
+E1M  384ErmitMM   200A  0109      0,00  2        0S  179,70S                               C                                    67
+E1M  384ErmitMM    50A  0109      0,00 10        0S   55,20S                               C                                    47
+F1SINT A 160FFF   200E  0109      0,00 11        0S    0.00S                                                                    16
+F3F  333NovieF1F  373Golf F2F  380Kilo F3F  370FoxtrF4                                                                          43
+F1SINT A 240MMM   200E  0109      0,00 12        0S    0.00S                                                                    26
+F3M  334ÁlamoF1M  339Papa F2M  374HotelF3M  376JulieF4                                                                          44
+F1SINT A 200MMM   200E  0109      0,00 12        0S    0.00S                                                                    26
+F3M  338BravoF1M  341QuebeF2M  345ÑandúF3M  375IndiaF4                                                                          65
+F1SINT A 280FFF   200A  0109      0,00 13        0S    0.00S                                                                    16
+F3F  343RomeoF1F  353YanquF2F  363Eco  F3F  358CobreF4                                                                          23
+F1SINT A 160MMM   200A  0109      0,00 14        0S    0.00S                                                                    26
+F3M  386Mike F1M  354Zulu F2M  361DeltaF3M  385Lima F4                                                                          92

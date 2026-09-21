@@ -1,0 +1,57 @@
+{
+  "proposito": "Registro de RECUPERACION de textos de licencia que no viajan en el artefacto distribuido. Separado de sources.json, que registra la fuente del CODIGO de los componentes copyleft. Aqui solo se anota de donde salio cada TEXTO.",
+  "revisado": "2026-09-20",
+  "reglas": [
+    "El origen es el lanzamiento o etiqueta exacta de la version instalada, nunca una rama actual ni otra version.",
+    "El texto canonico SPDX no sustituye en silencio a una licencia especifica: cuando se usa, queda marcado como canonico en el aviso emitido y en notices/excepciones.json.",
+    "El titular se toma de metadatos o avisos verificables. No se inventa."
+  ],
+  "recuperados": [
+    {
+      "paquete": "saxes",
+      "version": "5.0.1",
+      "expresionDeclarada": "ISC",
+      "url": "https://raw.githubusercontent.com/lddubeau/saxes/6ef6a275b20f19cb67808daf0d8f64e06aaf5b0e/LICENSE",
+      "repositorio": "https://github.com/lddubeau/saxes",
+      "etiqueta": "v5.0.1",
+      "commit": "6ef6a275b20f19cb67808daf0d8f64e06aaf5b0e",
+      "origenDelTexto": "archivo LICENSE de la etiqueta exacta",
+      "bytes": 3011,
+      "sha256": "0fac2374380621b22e6b50451057721a9c52935b02d16d106a9f04897f061d0e",
+      "almacenadoEn": "notices/textos/0fac2374380621b22e6b50451057721a9c52935b02d16d106a9f04897f061d0e.txt",
+      "observacion": "El archivo contiene TRES concesiones: ISC de los contribuyentes de saxes, ISC de sax (Isaac Z. Schlueter y colaboradores) y MIT de Mathias Bynens. El texto canonico de ISC habria omitido dos titulares."
+    }
+  ],
+  "canonicosUtilizados": [
+    {
+      "expresion": "MIT",
+      "archivo": "notices/textos-canonicos/MIT.txt",
+      "origen": "texto canonico SPDX de la licencia MIT",
+      "aplicadoA": [
+        { "paquete": "@swc/helpers", "version": "0.3.17", "titular": "강동윤 (kdy1997.dev@gmail.com)", "titularDesde": "campo author del manifiesto publicado" },
+        { "paquete": "brotli", "version": "1.3.3", "titular": "Devon Govett", "titularDesde": "campo author del manifiesto publicado" },
+        { "paquete": "abstract-logging", "version": "2.0.1", "titular": "James Sumners", "titularDesde": "campo author del manifiesto publicado" },
+        { "paquete": "dfa", "version": "1.2.0", "titular": "Devon Govett", "titularDesde": "campo author del manifiesto publicado" },
+        { "paquete": "fontkit", "version": "1.9.0", "titular": "Devon Govett", "titularDesde": "campo author del manifiesto publicado" }
+      ],
+      "advertencia": "En los cinco casos se comprobo que NO existe texto de licencia ni en el tarball publicado ni en la etiqueta exacta del repositorio oficial. El aviso emitido lo declara expresamente."
+    }
+  ],
+  "consultasRealizadas": [
+    { "url": "https://api.github.com/repos/lddubeau/saxes/tags", "resultado": "v5.0.1 -> 6ef6a275b20f19cb67808daf0d8f64e06aaf5b0e" },
+    { "url": "https://api.github.com/repos/jsumners/abstract-logging/tags", "resultado": "v2.0.1 -> 80dfaef91ee87008f4ed2b6e78921d383bccd406" },
+    { "url": "https://api.github.com/repos/devongovett/brotli.js/tags", "resultado": "v1.3.3 -> e36051345f6d27a56e5f39ea70d2f789b8574046" },
+    { "url": "https://api.github.com/repos/devongovett/dfa/tags", "resultado": "v1.2.0 -> 3f5e603e5082caedabefefdf53e8a6ca3111e966" },
+    { "url": "https://api.github.com/repos/foliojs/fontkit/tags", "resultado": "v1.9.0 -> fc8d99b8f5a8767aba8a8a89e2ada83cd1b099b3" },
+    { "url": "https://api.github.com/repos/swc-project/swc/git/matching-refs/tags/@swc/helpers@0.3.17", "resultado": "vacio: no existe etiqueta para esa version" },
+    { "url": "https://registry.npmjs.org/@swc/helpers/0.3.17", "resultado": "license=MIT; sin gitHead" },
+    { "url": "https://api.github.com/repos/jsumners/abstract-logging/contents/?ref=80dfaef9...", "resultado": "raiz sin archivo de licencia" },
+    { "url": "https://api.github.com/repos/devongovett/dfa/contents/?ref=3f5e603e...", "resultado": "raiz sin archivo de licencia" },
+    { "url": "https://api.github.com/repos/devongovett/brotli.js/contents/?ref=e3605134...", "resultado": "raiz sin archivo de licencia" },
+    { "url": "https://api.github.com/repos/foliojs/fontkit/contents/?ref=fc8d99b8...", "resultado": "raiz sin archivo de licencia" }
+  ],
+  "noDescargado": [
+    "No se ha descargado ningun tarball de codigo fuente al repositorio.",
+    "Los textos de licencia de los paquetes que SI los traen se leen del artefacto instalado, no de la red."
+  ]
+}

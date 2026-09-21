@@ -1,0 +1,15 @@
+# Sin esto, el contexto de build arrastra node_modules entero y, peor, el .env
+# real: quedaría copiado dentro de una capa de la imagen.
+node_modules
+dist
+coverage
+.env
+.env.*
+!.env.example
+!.env.test.example
+*.log
+*.tsbuildinfo
+tests
+vitest.config.ts
+vitest.integration.config.ts
+eslint.config.*

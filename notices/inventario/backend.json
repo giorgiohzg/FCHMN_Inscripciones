@@ -1,0 +1,4687 @@
+{
+  "artefacto": "backend",
+  "sistema": [
+    {
+      "nombre": "alpine-baselayout",
+      "version": "3.7.2-r1",
+      "expresion": "GPL-2.0-only",
+      "origen": "alpine-baselayout",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/master/main/alpine-baselayout",
+      "commit": "60a7585bbab2fa0f762504eb617dbca90216e31f",
+      "construido": "2026-03-24T19:40:54.000Z"
+    },
+    {
+      "nombre": "alpine-baselayout-data",
+      "version": "3.7.2-r1",
+      "expresion": "GPL-2.0-only",
+      "origen": "alpine-baselayout",
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/master/main/alpine-baselayout",
+      "commit": "60a7585bbab2fa0f762504eb617dbca90216e31f",
+      "construido": "2026-03-24T19:40:54.000Z"
+    },
+    {
+      "nombre": "alpine-keys",
+      "version": "2.6-r0",
+      "expresion": "MIT",
+      "origen": "alpine-keys",
+      "url": "https://alpinelinux.org",
+      "commit": "b9f23becced4d7b3ccc0fa0f28530243ccd314a0",
+      "construido": "2025-09-18T17:13:52.000Z"
+    },
+    {
+      "nombre": "alpine-release",
+      "version": "3.24.1-r0",
+      "expresion": "MIT",
+      "origen": "alpine-base",
+      "url": "https://alpinelinux.org",
+      "commit": "0934530484bbcde7498e2c694c710a49616a450e",
+      "construido": "2026-06-13T15:17:55.000Z"
+    },
+    {
+      "nombre": "apk-tools",
+      "version": "3.0.6-r0",
+      "expresion": "GPL-2.0-only",
+      "origen": "apk-tools",
+      "url": "https://gitlab.alpinelinux.org/alpine/apk-tools",
+      "commit": "1403ea7a8ae3fb8e5a11207ddb1ff536eb8de912",
+      "construido": "2026-04-13T09:23:00.000Z"
+    },
+    {
+      "nombre": "busybox",
+      "version": "1.37.0-r31",
+      "expresion": "GPL-2.0-only",
+      "origen": "busybox",
+      "url": "https://busybox.net/",
+      "commit": "c3ef5d10e6ef6528852c51f0564963e2f8c1be19",
+      "construido": "2026-01-10T15:38:28.000Z"
+    },
+    {
+      "nombre": "busybox-binsh",
+      "version": "1.37.0-r31",
+      "expresion": "GPL-2.0-only",
+      "origen": "busybox",
+      "url": "https://busybox.net/",
+      "commit": "c3ef5d10e6ef6528852c51f0564963e2f8c1be19",
+      "construido": "2026-01-10T15:38:28.000Z"
+    },
+    {
+      "nombre": "ca-certificates-bundle",
+      "version": "20260611-r0",
+      "expresion": "MPL-2.0 AND MIT",
+      "origen": "ca-certificates",
+      "url": "https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/",
+      "commit": "e41cbd2ae991adfe8df298ba8e8e777e90bd0e03",
+      "construido": "2026-06-13T14:47:22.000Z"
+    },
+    {
+      "nombre": "libapk",
+      "version": "3.0.6-r0",
+      "expresion": "GPL-2.0-only",
+      "origen": "apk-tools",
+      "url": "https://gitlab.alpinelinux.org/alpine/apk-tools",
+      "commit": "1403ea7a8ae3fb8e5a11207ddb1ff536eb8de912",
+      "construido": "2026-04-13T09:23:00.000Z"
+    },
+    {
+      "nombre": "libcrypto3",
+      "version": "3.5.8-r0",
+      "expresion": "Apache-2.0",
+      "origen": "openssl",
+      "url": "https://www.openssl.org/",
+      "commit": "013edf8b29199933e8ea34dde460b5584b979042",
+      "construido": "2026-08-25T20:58:57.000Z"
+    },
+    {
+      "nombre": "libgcc",
+      "version": "15.2.0-r5",
+      "expresion": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "origen": "gcc",
+      "url": "https://gcc.gnu.org",
+      "commit": "423a8ad043d07f2c7546c8ec3e2b0384cda360ae",
+      "construido": "2026-05-29T19:59:26.000Z"
+    },
+    {
+      "nombre": "libssl3",
+      "version": "3.5.8-r0",
+      "expresion": "Apache-2.0",
+      "origen": "openssl",
+      "url": "https://www.openssl.org/",
+      "commit": "013edf8b29199933e8ea34dde460b5584b979042",
+      "construido": "2026-08-25T20:58:57.000Z"
+    },
+    {
+      "nombre": "libstdc++",
+      "version": "15.2.0-r5",
+      "expresion": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "origen": "gcc",
+      "url": "https://gcc.gnu.org",
+      "commit": "423a8ad043d07f2c7546c8ec3e2b0384cda360ae",
+      "construido": "2026-05-29T19:59:26.000Z"
+    },
+    {
+      "nombre": "musl",
+      "version": "1.2.6-r2",
+      "expresion": "MIT",
+      "origen": "musl",
+      "url": "https://musl.libc.org/",
+      "commit": "f5640d3a10f664c9119720c60515265d3d6f6d01",
+      "construido": "2026-04-11T09:33:27.000Z"
+    },
+    {
+      "nombre": "musl-utils",
+      "version": "1.2.6-r2",
+      "expresion": "MIT AND BSD-2-Clause AND GPL-2.0-or-later",
+      "origen": "musl",
+      "url": "https://musl.libc.org/",
+      "commit": "f5640d3a10f664c9119720c60515265d3d6f6d01",
+      "construido": "2026-04-11T09:33:27.000Z"
+    },
+    {
+      "nombre": "openssl",
+      "version": "3.5.8-r0",
+      "expresion": "Apache-2.0",
+      "origen": "openssl",
+      "url": "https://www.openssl.org/",
+      "commit": "013edf8b29199933e8ea34dde460b5584b979042",
+      "construido": "2026-08-25T20:58:57.000Z"
+    },
+    {
+      "nombre": "scanelf",
+      "version": "1.3.9-r1",
+      "expresion": "GPL-2.0-only",
+      "origen": "pax-utils",
+      "url": "https://wiki.gentoo.org/wiki/Hardened/PaX_Utilities",
+      "commit": "c61801eeacb3ffcd9c2025b09e402153bb93fb39",
+      "construido": "2026-03-27T19:39:10.000Z"
+    },
+    {
+      "nombre": "ssl_client",
+      "version": "1.37.0-r31",
+      "expresion": "GPL-2.0-only",
+      "origen": "busybox",
+      "url": "https://busybox.net/",
+      "commit": "c3ef5d10e6ef6528852c51f0564963e2f8c1be19",
+      "construido": "2026-01-10T15:38:28.000Z"
+    },
+    {
+      "nombre": "zlib",
+      "version": "1.3.2-r0",
+      "expresion": "Zlib",
+      "origen": "zlib",
+      "url": "https://zlib.net/",
+      "commit": "f248b33b5943c7dc69bf691031d7612ab2e8ed93",
+      "construido": "2026-03-05T10:00:20.000Z"
+    }
+  ],
+  "node": [
+    {
+      "nombre": "@fast-csv/format",
+      "version": "4.3.5",
+      "expresion": "MIT",
+      "autor": "doug-martin <doug@dougamartin.com>",
+      "repositorio": "git+https://github.com/C2FO/fast-csv.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "2450088d1769a2b36e210a5a345a55b209944f4c6a9a89f7ce3aaba163680a42",
+          "bytes": 1069
+        }
+      ]
+    },
+    {
+      "nombre": "@fast-csv/parse",
+      "version": "4.3.6",
+      "expresion": "MIT",
+      "autor": "doug-martin <doug@dougamartin.com>",
+      "repositorio": "git+https://github.com/C2FO/fast-csv.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "2450088d1769a2b36e210a5a345a55b209944f4c6a9a89f7ce3aaba163680a42",
+          "bytes": 1069
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/accept-negotiator",
+      "version": "2.1.0",
+      "expresion": "MIT",
+      "autor": "Aras Abbasi <aras.abbasi@gmail.com>",
+      "repositorio": "git+https://github.com/fastify/accept-negotiator.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "e2d09f74a77005e85e9f9bd501e3b7599ccae19d918538461196dde42f7f1b97",
+          "bytes": 1123
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/ajv-compiler",
+      "version": "4.0.6",
+      "expresion": "MIT",
+      "autor": "Manuel Spigolon <behemoth89@gmail.com> (https://github.com/Eomm)",
+      "repositorio": "git+https://github.com/fastify/ajv-compiler.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "e2d09f74a77005e85e9f9bd501e3b7599ccae19d918538461196dde42f7f1b97",
+          "bytes": 1123
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/busboy",
+      "version": "3.2.2",
+      "expresion": "MIT",
+      "autor": "Brian White <mscdex@mscdex.net>",
+      "repositorio": "git+https://github.com/fastify/busboy.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "07544f419a6479527aeb8b012e95ff51f2f9a374e901d1af9668ebd0583003ec",
+          "bytes": 1167
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/cookie",
+      "version": "11.1.2",
+      "expresion": "MIT",
+      "autor": "James Sumners <james.sumners@gmail.com>",
+      "repositorio": "git+https://github.com/fastify/fastify-cookie.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ba9677e5a34c2738c26b36bb478f95e0369cac48fbe68a01a91fd5c7972f2043",
+          "bytes": 1123
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/cors",
+      "version": "11.3.0",
+      "expresion": "MIT",
+      "autor": "Tomas Della Vedova - @delvedor (https://delvedor.dev)",
+      "repositorio": "git+https://github.com/fastify/fastify-cors.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "d24d2e5bdc50e739dcc8c73f547e54fce61388ea77bb57cf836e0c6ece46f8e8",
+          "bytes": 1123
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/deepmerge",
+      "version": "3.2.1",
+      "expresion": "MIT",
+      "autor": "Aras Abbasi <aras.abbasi@gmail.com>",
+      "repositorio": "git+https://github.com/fastify/deepmerge.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "9107d3439217d1dc2db08b738d2da931cd8d911049ec187de50657df7ae69927",
+          "bytes": 1162
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/error",
+      "version": "4.2.0",
+      "expresion": "MIT",
+      "autor": "Tomas Della Vedova",
+      "repositorio": "git+https://github.com/fastify/fastify-error.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ec99456b6f97f7e559790df166a17a2418dbdbf595d63502792a5ce661f1346c",
+          "bytes": 1064
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/fast-json-stringify-compiler",
+      "version": "5.1.0",
+      "expresion": "MIT",
+      "autor": "Manuel Spigolon <manuel.spigolon@nearform.com> (https://github.com/Eomm)",
+      "repositorio": "git+https://github.com/fastify/fast-json-stringify-compiler.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "e2d09f74a77005e85e9f9bd501e3b7599ccae19d918538461196dde42f7f1b97",
+          "bytes": 1123
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/forwarded",
+      "version": "3.0.2",
+      "expresion": "MIT",
+      "autor": "Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "repositorio": "git+https://github.com/fastify/forwarded.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "9276503e39bdcaad7d26993fae17b1e82d7ef65cf0fe0ae54c361bbc6cbc33da",
+          "bytes": 1174
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/helmet",
+      "version": "13.1.1",
+      "expresion": "MIT",
+      "autor": "Matteo Collina <hello@matteocollina.com>",
+      "repositorio": "git+https://github.com/fastify/fastify-helmet.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "964706cd807eeda84e0244cff3b85f1fd595dcdaaee145bfee17c97e6495508c",
+          "bytes": 2245
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/merge-json-schemas",
+      "version": "0.2.1",
+      "expresion": "MIT",
+      "autor": "Ivan Tymoshenko <ivan@tymoshenko.me>",
+      "repositorio": "git+https://github.com/fastify/merge-json-schemas.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "a5b84e79d71db5b8baef48e7c04143ca70117ee0a0b637133c02ab63a79fa6c7",
+          "bytes": 1064
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/multipart",
+      "version": "9.4.0",
+      "expresion": "MIT",
+      "autor": "Matteo Collina <hello@matteocollina.com>",
+      "repositorio": "git+https://github.com/fastify/fastify-multipart.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "fe26044de416cf0cdb2cfd12ed299e5756d05b5d2ee6c59d3fd25ed304635d58",
+          "bytes": 1162
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/proxy-addr",
+      "version": "5.1.0",
+      "expresion": "MIT",
+      "autor": "Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "repositorio": "git+https://github.com/fastify/proxy-addr.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "2b78f11c8624f013751e54a34d87e8b5be5dd525dff65c7cda86f5439ed8bf8e",
+          "bytes": 1213
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/rate-limit",
+      "version": "10.3.0",
+      "expresion": "MIT",
+      "autor": "Tomas Della Vedova - @delvedor (http://delved.org)",
+      "repositorio": "git+https://github.com/fastify/fastify-rate-limit.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "2ea8c792510e3a013fad1f5810e2f904ec2349d04df8e7a82ee3d74b13f720a2",
+          "bytes": 1064
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/send",
+      "version": "4.1.1",
+      "expresion": "MIT",
+      "autor": "TJ Holowaychuk <tj@vision-media.ca>",
+      "repositorio": "git+https://github.com/fastify/send.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "1756787cdb2b0e68ef6c927c41f16f60dea0e31b282fe5378babde842ad1842b",
+          "bytes": 1208
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/static",
+      "version": "10.1.3",
+      "expresion": "MIT",
+      "autor": "Tommaso Allevi - @allevo",
+      "repositorio": "git+https://github.com/fastify/fastify-static.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ba9677e5a34c2738c26b36bb478f95e0369cac48fbe68a01a91fd5c7972f2043",
+          "bytes": 1123
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/swagger-ui",
+      "version": "6.1.1",
+      "expresion": "MIT",
+      "autor": "Aras Abbasi <aras.abbasi@gmail.com>",
+      "repositorio": "git+https://github.com/fastify/fastify-swagger-ui.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "e2d09f74a77005e85e9f9bd501e3b7599ccae19d918538461196dde42f7f1b97",
+          "bytes": 1123
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/swagger",
+      "version": "9.8.1",
+      "expresion": "MIT",
+      "autor": "Tomas Della Vedova - @delvedor (https://delvedor.dev)",
+      "repositorio": "git+https://github.com/fastify/fastify-swagger.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ba9677e5a34c2738c26b36bb478f95e0369cac48fbe68a01a91fd5c7972f2043",
+          "bytes": 1123
+        }
+      ]
+    },
+    {
+      "nombre": "@lukeed/ms",
+      "version": "2.0.2",
+      "expresion": "MIT",
+      "autor": "Luke Edwards",
+      "repositorio": "lukeed/ms",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "license"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "license",
+          "sha256": "9a9edad7baae52622bddf3c15b2ef8a33d2c89f2d25408ad13e8a7481c6b0c97",
+          "bytes": 1104
+        }
+      ]
+    },
+    {
+      "nombre": "@phc/format",
+      "version": "1.0.0",
+      "expresion": "MIT",
+      "autor": "Simone Primarosa <simonepri@outlook.com> (https://simoneprimarosa.com)",
+      "repositorio": "github:simonepri/phc-format",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "license"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "license",
+          "sha256": "d46c1f48844edece7dc48e0ba4aa2ce8fa8ab78c7664b0310a9e7a98df262ba1",
+          "bytes": 1078
+        }
+      ]
+    },
+    {
+      "nombre": "@pinojs/redact",
+      "version": "0.4.0",
+      "expresion": "MIT",
+      "autor": "Matteo Collina <hello@matteocollina.com>",
+      "repositorio": "git+https://github.com/pinojs/redact.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "58d4023bfbed5fb530c5bb8d44641299eac62c850267415ec939cc42dea87e4f",
+          "bytes": 1076
+        }
+      ]
+    },
+    {
+      "nombre": "@prisma/client",
+      "version": "5.22.0",
+      "expresion": "Apache-2.0",
+      "autor": "Tim Suchanek <suchanek@prisma.io>",
+      "repositorio": "https://github.com/prisma/prisma.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "bytes": 11357
+        }
+      ]
+    },
+    {
+      "nombre": "@swc/helpers",
+      "version": "0.3.17",
+      "expresion": "MIT",
+      "autor": "강동윤 <kdy1997.dev@gmail.com>",
+      "repositorio": "git+https://github.com/swc-project/swc.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [],
+      "tieneNotice": false,
+      "licencias": []
+    },
+    {
+      "nombre": "abstract-logging",
+      "version": "2.0.1",
+      "expresion": "MIT",
+      "autor": "James Sumners <james.sumners@gmail.com>",
+      "repositorio": "git+https://github.com/jsumners/abstract-logging.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [],
+      "tieneNotice": false,
+      "licencias": []
+    },
+    {
+      "nombre": "adm-zip",
+      "version": "0.6.1",
+      "expresion": "MIT",
+      "autor": "Nasca Iacob <adm-zip@pm.me> (https://github.com/cthackers)",
+      "repositorio": "https://github.com/cthackers/adm-zip.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "6bb5b2d4c07d793ca928daa63a8899c6914fafb5ac3aa04ec10cae07f3d57dca",
+          "bytes": 1106
+        }
+      ]
+    },
+    {
+      "nombre": "ajv-formats",
+      "version": "3.0.1",
+      "expresion": "MIT",
+      "autor": "Evgeny Poberezkin",
+      "repositorio": "git+https://github.com/ajv-validator/ajv-formats.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "9df3bb69929a3b650ed73b3bfa1756725aaff0ac296461605753547004eafeaf",
+          "bytes": 1074
+        }
+      ]
+    },
+    {
+      "nombre": "ajv",
+      "version": "8.20.0",
+      "expresion": "MIT",
+      "autor": "Evgeny Poberezkin",
+      "repositorio": "ajv-validator/ajv",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "a05350a88e318e4f5f2c2a1ff1e2e88daa4dd38e6e78b71cccae422bdc762cc3",
+          "bytes": 1090
+        }
+      ]
+    },
+    {
+      "nombre": "archiver-utils",
+      "version": "2.1.0",
+      "expresion": "MIT",
+      "autor": "Chris Talkington",
+      "repositorio": "https://github.com/archiverjs/archiver-utils.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "19a37eba4fee8b33d904c46235c30bd668cff139f50b1fa5c7c57d2f920e6a4f",
+          "bytes": 1081
+        }
+      ]
+    },
+    {
+      "nombre": "archiver",
+      "version": "5.3.2",
+      "expresion": "MIT",
+      "autor": "Chris Talkington",
+      "repositorio": "https://github.com/archiverjs/node-archiver.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "9e23899170d96e708b24a2afce11e96d169c8cebf1bd24ac60b675a400cb1cf1",
+          "bytes": 1079
+        }
+      ]
+    },
+    {
+      "nombre": "argon2",
+      "version": "0.40.3",
+      "expresion": "MIT",
+      "autor": "Ranieri Althoff <ranisalt+argon2@gmail.com>",
+      "repositorio": "https://github.com/ranisalt/node-argon2.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ec63daa8f09b41da3bc6d1b2bae784941cdf0511715a006229117cabae8ed44a",
+          "bytes": 1083
+        }
+      ]
+    },
+    {
+      "nombre": "array-buffer-byte-length",
+      "version": "1.0.2",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/inspect-js/array-buffer-byte-length.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "499507afc8a14166950bd5e445a8206d0b38fab61ea54e436b8bf2fa073cd59a",
+          "bytes": 1067
+        }
+      ]
+    },
+    {
+      "nombre": "async",
+      "version": "3.2.6",
+      "expresion": "MIT",
+      "autor": "Caolan McMahon",
+      "repositorio": "https://github.com/caolan/async.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "d9fed24f132985934fca621c4dc1dfb53e03377a24d0568d424383d7eaa9c0ac",
+          "bytes": 1063
+        }
+      ]
+    },
+    {
+      "nombre": "atomic-sleep",
+      "version": "1.0.0",
+      "expresion": "MIT",
+      "autor": "David Mark Clements (@davidmarkclem)",
+      "repositorio": "git+https://github.com/davidmarkclements/atomic-sleep.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "8d58741278b289a7f4b6dde2d6273fca7711b9849452c477933d1cccd03db1e7",
+          "bytes": 1087
+        }
+      ]
+    },
+    {
+      "nombre": "available-typed-arrays",
+      "version": "1.0.7",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/inspect-js/available-typed-arrays.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "6d0917530cf3b3dca12c1ab7798e4d38ad0a6798ecc1bd27849a3048ba91d265",
+          "bytes": 1067
+        }
+      ]
+    },
+    {
+      "nombre": "avvio",
+      "version": "9.3.0",
+      "expresion": "MIT",
+      "autor": "Matteo Collina <hello@matteocollina.com>",
+      "repositorio": "git+https://github.com/fastify/avvio.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "0dae13c0bb4d8c6dc73d7d49ddecdba7f56075975ffb2ee17050c63f3f3666f0",
+          "bytes": 1162
+        }
+      ]
+    },
+    {
+      "nombre": "balanced-match",
+      "version": "1.0.2",
+      "expresion": "MIT",
+      "autor": "Julian Gruber",
+      "repositorio": "git://github.com/juliangruber/balanced-match.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.md"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.md",
+          "sha256": "a1bd5deadb6a06dd74efa852c1b8b23f63b67f2214fbe9c8bd591da51da69268",
+          "bytes": 1096
+        }
+      ]
+    },
+    {
+      "nombre": "base64-js",
+      "version": "1.5.1",
+      "expresion": "MIT",
+      "autor": "T. Jameson Little <t.jameson.little@gmail.com>",
+      "repositorio": "git://github.com/beatgammit/base64-js.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5b37224c080cdcc97c871ada971c224e9926370fe74f11b539aa1cf9f3b1aca1",
+          "bytes": 1081
+        }
+      ]
+    },
+    {
+      "nombre": "bl",
+      "version": "4.1.0",
+      "expresion": "MIT",
+      "autor": null,
+      "repositorio": "https://github.com/rvagg/bl.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.md"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.md",
+          "sha256": "9377db95383c8befacf05c6e465d969d756edf178487ca1344fdf3ba147c596f",
+          "bytes": 1216
+        }
+      ]
+    },
+    {
+      "nombre": "bluebird",
+      "version": "3.7.2",
+      "expresion": "MIT",
+      "autor": "Petka Antonov",
+      "repositorio": "git://github.com/petkaantonov/bluebird.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "87092fe7ffd1e92eba5d1dd39b73a73fdb4fdd4df3474beacc3d9f6b08ece82c",
+          "bytes": 1086
+        }
+      ]
+    },
+    {
+      "nombre": "brace-expansion",
+      "version": "2.1.4",
+      "expresion": "MIT",
+      "autor": "Julian Gruber",
+      "repositorio": "git://github.com/juliangruber/brace-expansion.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "68f12f6e2c33688699249c01d8f9623c534da20aa71989c57b061b7bc1676d14",
+          "bytes": 1096
+        }
+      ]
+    },
+    {
+      "nombre": "brotli",
+      "version": "1.3.3",
+      "expresion": "MIT",
+      "autor": "Devon Govett <devongovett@gmail.com>",
+      "repositorio": "https://github.com/devongovett/brotli.js.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [],
+      "tieneNotice": false,
+      "licencias": []
+    },
+    {
+      "nombre": "browserify-zlib",
+      "version": "0.2.0",
+      "expresion": "MIT",
+      "autor": "Devon Govett <devongovett@gmail.com>",
+      "repositorio": "git+https://github.com/devongovett/browserify-zlib.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ddd770379e07bf0574dfaa4485be80a23b3248b36d09f33ec79276c09b829daf",
+          "bytes": 3486
+        }
+      ]
+    },
+    {
+      "nombre": "buffer-crc32",
+      "version": "0.2.13",
+      "expresion": "MIT",
+      "autor": "Brian J. Brennan <brianloveswords@gmail.com>",
+      "repositorio": "git://github.com/brianloveswords/buffer-crc32.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "14895b82e3367b66bdb127fe91505f8615491f2a23eb1c0b7d8f7c54be67f57a",
+          "bytes": 1085
+        }
+      ]
+    },
+    {
+      "nombre": "buffer-equal-constant-time",
+      "version": "1.0.1",
+      "expresion": "BSD-3-Clause",
+      "autor": "GoInstant Inc., a salesforce.com company",
+      "repositorio": "git@github.com:goinstant/buffer-equal-constant-time.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.txt"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.txt",
+          "sha256": "751d0e80fb5c828f8c3de198cc760e1e05377e47c8263ab6ee2f10cdc19ba658",
+          "bytes": 1518
+        }
+      ]
+    },
+    {
+      "nombre": "buffer",
+      "version": "5.7.1",
+      "expresion": "MIT",
+      "autor": "Feross Aboukhadijeh",
+      "repositorio": "git://github.com/feross/buffer.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "06bafa45fdad2579ba0e43b0c9b2c6290287c99c4203c300254a462b38a307f6",
+          "bytes": 1106
+        }
+      ]
+    },
+    {
+      "nombre": "call-bind-apply-helpers",
+      "version": "1.0.2",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/call-bind-apply-helpers.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5e325595b4ea8cfec3802f545b1def5d7b73e4a5b8e9ba63e32a320f67732292",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "call-bind",
+      "version": "1.0.9",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/call-bind.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "39c5ec504cf6bd5cd782a7c695828e09189df79f5d94840e4f08feb97b9fd416",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "call-bound",
+      "version": "1.0.4",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/call-bound.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5e325595b4ea8cfec3802f545b1def5d7b73e4a5b8e9ba63e32a320f67732292",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "clone",
+      "version": "2.1.2",
+      "expresion": "MIT",
+      "autor": "Paul Vorbach <paul@vorba.ch> (http://paul.vorba.ch/)",
+      "repositorio": "git://github.com/pvorb/node-clone.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "3fb0857ef0133928cf72c88dfc464e931486e88778961eedec25585e2321507f",
+          "bytes": 1070
+        }
+      ]
+    },
+    {
+      "nombre": "compress-commons",
+      "version": "4.1.2",
+      "expresion": "MIT",
+      "autor": "Chris Talkington",
+      "repositorio": "https://github.com/archiverjs/node-compress-commons.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "79bad9f51738814f83251ae89460326b2ff2ea19ff5f71ab8f7636b2e17bb231",
+          "bytes": 1074
+        }
+      ]
+    },
+    {
+      "nombre": "concat-map",
+      "version": "0.0.1",
+      "expresion": "MIT",
+      "autor": "James Halliday",
+      "repositorio": "git://github.com/substack/node-concat-map.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "435a6722c786b0a56fbe7387028f1d9d3f3a2d0fb615bb8fee118727c3f59b7b",
+          "bytes": 1073
+        }
+      ]
+    },
+    {
+      "nombre": "content-disposition",
+      "version": "2.0.1",
+      "expresion": "MIT",
+      "autor": "Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "repositorio": "jshttp/content-disposition",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "bd47ce7b88c7759630d1e2b9fcfa170a0f1fde522be09e13fb1581a79d090400",
+          "bytes": 1094
+        }
+      ]
+    },
+    {
+      "nombre": "cookie",
+      "version": "1.1.1",
+      "expresion": "MIT",
+      "autor": "Roman Shtylman <shtylman@gmail.com>",
+      "repositorio": "jshttp/cookie",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c02110eedc16c7114f1a9bdc026c65626ce1d9c7e27fd51a8e0feee8a48a6858",
+          "bytes": 1175
+        }
+      ]
+    },
+    {
+      "nombre": "core-util-is",
+      "version": "1.0.3",
+      "expresion": "MIT",
+      "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
+      "repositorio": "git://github.com/isaacs/core-util-is",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "33b734d60042d0fe0c92dd1fc1e874193a1c899ec3e276a2eb935d2d0bf5b710",
+          "bytes": 1077
+        }
+      ]
+    },
+    {
+      "nombre": "crc-32",
+      "version": "1.2.2",
+      "expresion": "Apache-2.0",
+      "autor": "sheetjs",
+      "repositorio": "git://github.com/SheetJS/js-crc32.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c542ba7851b5d39a5face477e47a27cb7c00a9759e321b66824e79718bffe1ac",
+          "bytes": 11355
+        }
+      ]
+    },
+    {
+      "nombre": "crc32-stream",
+      "version": "4.0.3",
+      "expresion": "MIT",
+      "autor": "Chris Talkington",
+      "repositorio": "https://github.com/archiverjs/node-crc32-stream.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "79bad9f51738814f83251ae89460326b2ff2ea19ff5f71ab8f7636b2e17bb231",
+          "bytes": 1074
+        }
+      ]
+    },
+    {
+      "nombre": "crypto-js",
+      "version": "4.2.0",
+      "expresion": "MIT",
+      "autor": "Evan Vosberg",
+      "repositorio": "http://github.com/brix/crypto-js.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "f729d14b7e1bf8adca0dcc38b93b929d14d53fcd5db56c3d1c9b2daa7aa69396",
+          "bytes": 1169
+        }
+      ]
+    },
+    {
+      "nombre": "dayjs",
+      "version": "1.11.23",
+      "expresion": "MIT",
+      "autor": "iamkun",
+      "repositorio": "https://github.com/iamkun/dayjs.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5faab7526d055651be3aab769d58897be6bd91f3d39d137f25f12dba1b31d5dc",
+          "bytes": 1072
+        }
+      ]
+    },
+    {
+      "nombre": "debug",
+      "version": "4.4.3",
+      "expresion": "MIT",
+      "autor": "Josh Junon (https://github.com/qix-)",
+      "repositorio": "git://github.com/debug-js/debug.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "3a61c6c96caf5c1d9b623fb9b04c822b783dfcb78aa7e49c76a3f643e6ed7f95",
+          "bytes": 1139
+        }
+      ]
+    },
+    {
+      "nombre": "deep-equal",
+      "version": "2.2.3",
+      "expresion": "MIT",
+      "autor": "James Halliday",
+      "repositorio": "http://github.com/inspect-js/node-deep-equal.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "4839125439c51ef70db530780f90cfa90e3a09b7e18694fc914d5daa2e463d14",
+          "bytes": 1140
+        }
+      ]
+    },
+    {
+      "nombre": "define-data-property",
+      "version": "1.1.4",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/define-data-property.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "b41d08bc3624d8c436fc80237d73ebb361985a67f4504bbcd703e5ca2b27254c",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "define-properties",
+      "version": "1.2.1",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git://github.com/ljharb/define-properties.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "00d402c2bbe7c67369bd01ce2c16b8ed46ccc949a1ee2d6bb8f9606afa8c7434",
+          "bytes": 1080
+        }
+      ]
+    },
+    {
+      "nombre": "depd",
+      "version": "2.0.0",
+      "expresion": "MIT",
+      "autor": "Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "repositorio": "dougwilson/nodejs-depd",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "bd134b41da59e452fb5a1d366b660886f741c87c2bf9428e93764c419fbc40f5",
+          "bytes": 1094
+        }
+      ]
+    },
+    {
+      "nombre": "dequal",
+      "version": "2.0.3",
+      "expresion": "MIT",
+      "autor": "Luke Edwards",
+      "repositorio": "lukeed/dequal",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "license"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "license",
+          "sha256": "306fa513e39b23a6e8747520de761809d206b99800ef41907b530226574c59ae",
+          "bytes": 1114
+        }
+      ]
+    },
+    {
+      "nombre": "dfa",
+      "version": "1.2.0",
+      "expresion": "MIT",
+      "autor": "Devon Govett <devongovett@gmail.com>",
+      "repositorio": "git+ssh://git@github.com/devongovett/dfa.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [],
+      "tieneNotice": false,
+      "licencias": []
+    },
+    {
+      "nombre": "dunder-proto",
+      "version": "1.0.1",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/es-shims/dunder-proto.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "2b770a704c15de238c3f622b01b0044ddd60b49ee30608ea6991ebf19db7a7a1",
+          "bytes": 1073
+        }
+      ]
+    },
+    {
+      "nombre": "duplexer2",
+      "version": "0.1.4",
+      "expresion": "BSD-3-Clause",
+      "autor": "Conrad Pankoff <deoxxa@fknsrs.biz> (http://www.fknsrs.biz/)",
+      "repositorio": "deoxxa/duplexer2",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.md"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.md",
+          "sha256": "252a200ba7a38686f7954ec4cb09b3ad7788fa099eb724de167d7ab16b1244b9",
+          "bytes": 1535
+        }
+      ]
+    },
+    {
+      "nombre": "ecdsa-sig-formatter",
+      "version": "1.0.11",
+      "expresion": "Apache-2.0",
+      "autor": "D2L Corporation",
+      "repositorio": "git+ssh://git@github.com/Brightspace/node-ecdsa-sig-formatter.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "50a6b24f8defc31a078aa9799a91d776f83948071574854f12473362aee74d0d",
+          "bytes": 11312
+        }
+      ]
+    },
+    {
+      "nombre": "end-of-stream",
+      "version": "1.4.5",
+      "expresion": "MIT",
+      "autor": "Mathias Buus <mathiasbuus@gmail.com>",
+      "repositorio": "git://github.com/mafintosh/end-of-stream.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "3fe8d55a98dbf260eace67c00cf9bc53edb46234e840098a0b93df3096b97fb6",
+          "bytes": 1078
+        }
+      ]
+    },
+    {
+      "nombre": "es-define-property",
+      "version": "1.0.1",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/es-define-property.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5e325595b4ea8cfec3802f545b1def5d7b73e4a5b8e9ba63e32a320f67732292",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "es-errors",
+      "version": "1.3.0",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/es-errors.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5e325595b4ea8cfec3802f545b1def5d7b73e4a5b8e9ba63e32a320f67732292",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "es-get-iterator",
+      "version": "1.1.3",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/es-get-iterator.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "cfc3f455254c0af0655cc3ff46a41ed644b67599f6043346169d285bf2b3cf3b",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "es-object-atoms",
+      "version": "1.1.2",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/es-object-atoms.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5e325595b4ea8cfec3802f545b1def5d7b73e4a5b8e9ba63e32a320f67732292",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "escape-html",
+      "version": "1.0.3",
+      "expresion": "MIT",
+      "autor": null,
+      "repositorio": "component/escape-html",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "255aa557a1f55224ce522f311629c0bf20854740a67955cefd798fbd1d3d1ded",
+          "bytes": 1157
+        }
+      ]
+    },
+    {
+      "nombre": "exceljs",
+      "version": "4.4.0",
+      "expresion": "MIT",
+      "autor": "Guyon Roche",
+      "repositorio": "https://github.com/exceljs/exceljs.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "2ed526b7e7c7681dc2347995b5036ddf73dc27d0539cdea59b6d4a72b63a57a0",
+          "bytes": 1084
+        }
+      ]
+    },
+    {
+      "nombre": "fast-csv",
+      "version": "4.3.6",
+      "expresion": "MIT",
+      "autor": "Doug Martin",
+      "repositorio": "git+https://github.com/C2FO/fast-csv.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "2450088d1769a2b36e210a5a345a55b209944f4c6a9a89f7ce3aaba163680a42",
+          "bytes": 1069
+        }
+      ]
+    },
+    {
+      "nombre": "fast-decode-uri-component",
+      "version": "1.0.1",
+      "expresion": "MIT",
+      "autor": "Tomas Della Vedova - @delvedor (http://delved.org)",
+      "repositorio": "git+https://github.com/delvedor/fast-decode-uri-component.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "27384b39baee4b476fb876670a75f282286fa55658bf0db14639621dd3801c9a",
+          "bytes": 1174
+        }
+      ]
+    },
+    {
+      "nombre": "fast-deep-equal",
+      "version": "3.1.3",
+      "expresion": "MIT",
+      "autor": "Evgeny Poberezkin",
+      "repositorio": "git+https://github.com/epoberezkin/fast-deep-equal.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "7bf9b2de73a6b356761c948d0e9eeb4be6c1270bd04c79cd489c1e400ffdfc1a",
+          "bytes": 1074
+        }
+      ]
+    },
+    {
+      "nombre": "fast-json-stringify",
+      "version": "7.0.1",
+      "expresion": "MIT",
+      "autor": "Matteo Collina <hello@matteocollina.com>",
+      "repositorio": "git+https://github.com/fastify/fast-json-stringify.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "b08de5bb7b21f44a8358edf74febe50c75ef2a1e5470e06c8919eb934cba067c",
+          "bytes": 1165
+        }
+      ]
+    },
+    {
+      "nombre": "fast-querystring",
+      "version": "1.1.2",
+      "expresion": "MIT",
+      "autor": "Yagiz Nizipli <yagiz@nizipli.com>",
+      "repositorio": "git+https://github.com/anonrig/fast-querystring.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "4f8cf48502224399442f7eadd8620d96ef18125f9beb4949c53084ab3b05a4d4",
+          "bytes": 1057
+        }
+      ]
+    },
+    {
+      "nombre": "fast-uri",
+      "version": "4.1.4",
+      "expresion": "BSD-3-Clause",
+      "autor": "Vincent Le Goff <vince.legoff@gmail.com> (https://github.com/zekth)",
+      "repositorio": "git+https://github.com/fastify/fast-uri.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "b010b0dfdfdb23d7396e03b82cd4621fc9bb8f95d6b0aea70b9c24e12074c786",
+          "bytes": 1813
+        }
+      ]
+    },
+    {
+      "nombre": "fastify-plugin",
+      "version": "6.0.0",
+      "expresion": "MIT",
+      "autor": "Tomas Della Vedova - @delvedor (http://delved.org)",
+      "repositorio": "git+https://github.com/fastify/fastify-plugin.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ba9677e5a34c2738c26b36bb478f95e0369cac48fbe68a01a91fd5c7972f2043",
+          "bytes": 1123
+        }
+      ]
+    },
+    {
+      "nombre": "fastify",
+      "version": "5.12.3",
+      "expresion": "MIT",
+      "autor": "Matteo Collina <hello@matteocollina.com>",
+      "repositorio": "git+https://github.com/fastify/fastify.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "23c91863859171455a536380991b4160fee4e19e2d8dc353ecf7143cc4e53ca2",
+          "bytes": 1123
+        }
+      ]
+    },
+    {
+      "nombre": "fastq",
+      "version": "1.20.3",
+      "expresion": "ISC",
+      "autor": "Matteo Collina <hello@matteocollina.com>",
+      "repositorio": "git+https://github.com/mcollina/fastq.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c3367f6d01a79d368fc4fbb41b3615fcd92f243d6597ab96742f6f976f9325af",
+          "bytes": 765
+        }
+      ]
+    },
+    {
+      "nombre": "find-my-way",
+      "version": "9.9.0",
+      "expresion": "MIT",
+      "autor": "Tomas Della Vedova - @delvedor (http://delved.org)",
+      "repositorio": "git+https://github.com/delvedor/find-my-way.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "693f9539655acc1847add1ccd364312ba570bf8ce84706b6059e7e0b5ceb90e6",
+          "bytes": 1080
+        }
+      ]
+    },
+    {
+      "nombre": "fontkit",
+      "version": "1.9.0",
+      "expresion": "MIT",
+      "autor": "Devon Govett <devongovett@gmail.com>",
+      "repositorio": "git://github.com/foliojs/fontkit.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [],
+      "tieneNotice": false,
+      "licencias": []
+    },
+    {
+      "nombre": "for-each",
+      "version": "0.3.5",
+      "expresion": "MIT",
+      "autor": "Raynos <raynos2@gmail.com>",
+      "repositorio": "https://github.com/Raynos/for-each.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "d07913d776eef217a95d7ee3ee83577fc3c365b9c870f5a3411f785b81090614",
+          "bytes": 1075
+        }
+      ]
+    },
+    {
+      "nombre": "fs-constants",
+      "version": "1.0.0",
+      "expresion": "MIT",
+      "autor": "Mathias Buus (@mafintosh)",
+      "repositorio": "https://github.com/mafintosh/fs-constants.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "2281f2db407bdbb54f069eec38128b2dee2c0c952f52b786ef1faecb81767b3c",
+          "bytes": 1079
+        }
+      ]
+    },
+    {
+      "nombre": "fs-extra",
+      "version": "11.3.1",
+      "expresion": "MIT",
+      "autor": "JP Richardson <jprichardson@gmail.com>",
+      "repositorio": "https://github.com/jprichardson/node-fs-extra",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c6a7de1428955aa5a692f4d3a3d3ede658d959616944713337cda296736442e1",
+          "bytes": 1084
+        }
+      ]
+    },
+    {
+      "nombre": "fs.realpath",
+      "version": "1.0.0",
+      "expresion": "ISC",
+      "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
+      "repositorio": "git+https://github.com/isaacs/fs.realpath.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "8465b04b67f473341171b5c9c8b2c741a4a395b3f6ed58339b3a4f4db3db7472",
+          "bytes": 2125
+        }
+      ]
+    },
+    {
+      "nombre": "function-bind",
+      "version": "1.1.2",
+      "expresion": "MIT",
+      "autor": "Raynos <raynos2@gmail.com>",
+      "repositorio": "https://github.com/Raynos/function-bind.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "773e131a7684726005a7e4688a80b4620033bc08499bc1404dd1a1eb3bca725e",
+          "bytes": 1052
+        }
+      ]
+    },
+    {
+      "nombre": "functions-have-names",
+      "version": "1.2.3",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/inspect-js/functions-have-names.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "cfc3f455254c0af0655cc3ff46a41ed644b67599f6043346169d285bf2b3cf3b",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "get-intrinsic",
+      "version": "1.3.0",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/get-intrinsic.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "39c5ec504cf6bd5cd782a7c695828e09189df79f5d94840e4f08feb97b9fd416",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "get-proto",
+      "version": "1.0.1",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/get-proto.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "be46ce1e3b0479af9ce82d22b465a6d7d2ff084fca0aaf3d54172da2b5eb5781",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "glob",
+      "version": "13.0.6",
+      "expresion": "BlueOak-1.0.0",
+      "autor": "Isaac Z. Schlueter <i@izs.me> (https://blog.izs.me/)",
+      "repositorio": "git@github.com:isaacs/node-glob.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.md"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.md",
+          "sha256": "a49c9ba464796f65b59fca3f1e6ca40912df1e859f575383223f7ec6c5baae09",
+          "bytes": 1764
+        }
+      ]
+    },
+    {
+      "nombre": "gopd",
+      "version": "1.2.0",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/gopd.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "d90bf0a089da4cf43d644ed240a0b3825dcdb705e64e38371d56995a4cc9e4c5",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "graceful-fs",
+      "version": "4.2.11",
+      "expresion": "ISC",
+      "autor": null,
+      "repositorio": "https://github.com/isaacs/node-graceful-fs",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "f65c5d9f22a317b2a10803bd1868461ce6499c2ed7217bc80c0cc772a748789c",
+          "bytes": 791
+        }
+      ]
+    },
+    {
+      "nombre": "has-bigints",
+      "version": "1.1.0",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/has-bigints.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "cfc3f455254c0af0655cc3ff46a41ed644b67599f6043346169d285bf2b3cf3b",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "has-property-descriptors",
+      "version": "1.0.2",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/inspect-js/has-property-descriptors.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "0f0ca96f50793990031ebc488a38f7292ff70bce8ab6a8e5eeda674abc32ccdf",
+          "bytes": 1067
+        }
+      ]
+    },
+    {
+      "nombre": "has-symbols",
+      "version": "1.1.0",
+      "expresion": "MIT",
+      "autor": "Jordan Harband",
+      "repositorio": "git://github.com/inspect-js/has-symbols.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "206c1adcf206dc0031b11232f5b054ec5f1662407ab1ca415247921cab2068ab",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "has-tostringtag",
+      "version": "1.0.2",
+      "expresion": "MIT",
+      "autor": "Jordan Harband",
+      "repositorio": "git+https://github.com/inspect-js/has-tostringtag.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "e2560e002e13281578c75c850061d9255c33d16d732939e8c2db64c2506642fa",
+          "bytes": 1067
+        }
+      ]
+    },
+    {
+      "nombre": "hasown",
+      "version": "2.0.4",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/inspect-js/hasOwn.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "bf9b0d665be2a689851eea667ca9f42066ea1d903b38349c51e6a44b2577680a",
+          "bytes": 1083
+        }
+      ]
+    },
+    {
+      "nombre": "helmet",
+      "version": "8.3.0",
+      "expresion": "MIT",
+      "autor": "Adam Baldwin <adam@npmjs.com> (https://evilpacket.net)",
+      "repositorio": "git://github.com/helmetjs/helmet.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "dd282ebd50392cbba041f6f5a4766a28f01a4ee89ea237cd7a7badc3d7871dc8",
+          "bytes": 1089
+        }
+      ]
+    },
+    {
+      "nombre": "http-errors",
+      "version": "2.0.1",
+      "expresion": "MIT",
+      "autor": "Jonathan Ong <me@jongleberry.com> (http://jongleberry.com)",
+      "repositorio": "jshttp/http-errors",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "dcb94ff9b1e037a847bc20589dc81a1066d041fd4c16deb18b0fa968c66cf395",
+          "bytes": 1168
+        }
+      ]
+    },
+    {
+      "nombre": "ieee754",
+      "version": "1.2.1",
+      "expresion": "BSD-3-Clause",
+      "autor": "Feross Aboukhadijeh",
+      "repositorio": "git://github.com/feross/ieee754.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "18d45466ba3253deae04667e267a91ea8de8548f18c1125264d1c9db28194cc1",
+          "bytes": 1465
+        }
+      ]
+    },
+    {
+      "nombre": "immediate",
+      "version": "3.0.6",
+      "expresion": "MIT",
+      "autor": null,
+      "repositorio": "git://github.com/calvinmetcalf/immediate.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.txt"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.txt",
+          "sha256": "809e66de579fb7d92503848bbe6d1f348f4f6521a71e5d294fe7cc0c87a3b4ff",
+          "bytes": 1115
+        }
+      ]
+    },
+    {
+      "nombre": "inflight",
+      "version": "1.0.6",
+      "expresion": "ISC",
+      "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
+      "repositorio": "https://github.com/npm/inflight.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "05dc4d785ac3a488676d3ed10e901b75ad89dafcc63f8e66610fd4a39cc5c7e8",
+          "bytes": 748
+        }
+      ]
+    },
+    {
+      "nombre": "inherits",
+      "version": "2.0.4",
+      "expresion": "ISC",
+      "autor": null,
+      "repositorio": "git://github.com/isaacs/inherits",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5ffe28e7ade7d8f10d85d5337a73fd793dac5c462fb9a28fbf8c5046c7fbca3b",
+          "bytes": 749
+        }
+      ]
+    },
+    {
+      "nombre": "internal-slot",
+      "version": "1.1.0",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/internal-slot.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "cfc3f455254c0af0655cc3ff46a41ed644b67599f6043346169d285bf2b3cf3b",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "ipaddr.js",
+      "version": "2.5.0",
+      "expresion": "MIT",
+      "autor": "whitequark <whitequark@whitequark.org>",
+      "repositorio": "git+https://github.com/whitequark/ipaddr.js.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "62568a2d1337b77171ecca9db10579163446de1ba6151678e81f06cdc199971b",
+          "bytes": 1087
+        }
+      ]
+    },
+    {
+      "nombre": "is-arguments",
+      "version": "1.2.0",
+      "expresion": "MIT",
+      "autor": "Jordan Harband",
+      "repositorio": "git://github.com/inspect-js/is-arguments.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "dc0fe5a22d9336f345ee984f9bf56f11f22877a3aa5fd16a1db9a8ca0e23a5d1",
+          "bytes": 1081
+        }
+      ]
+    },
+    {
+      "nombre": "is-array-buffer",
+      "version": "3.0.5",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/inspect-js/is-array-buffer.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "b505862c2bf0b38f98a4629efe0d17fb87690cbd35a9f3ae95d2fd769d7cea23",
+          "bytes": 1082
+        }
+      ]
+    },
+    {
+      "nombre": "is-bigint",
+      "version": "1.1.0",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/inspect-js/is-bigint.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "971e376febf7afbcceab6857e243f2ccb3ea88f520b68c324af15a28171f5de3",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "is-boolean-object",
+      "version": "1.2.2",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git://github.com/inspect-js/is-boolean-object.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c61652db3d2808f667b48af0a358f0d85fd07ad4a0d0b1a50882dec3b764c522",
+          "bytes": 1082
+        }
+      ]
+    },
+    {
+      "nombre": "is-callable",
+      "version": "1.2.7",
+      "expresion": "MIT",
+      "autor": "Jordan Harband",
+      "repositorio": "git://github.com/inspect-js/is-callable.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c61652db3d2808f667b48af0a358f0d85fd07ad4a0d0b1a50882dec3b764c522",
+          "bytes": 1082
+        }
+      ]
+    },
+    {
+      "nombre": "is-date-object",
+      "version": "1.1.0",
+      "expresion": "MIT",
+      "autor": "Jordan Harband",
+      "repositorio": "git://github.com/inspect-js/is-date-object.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c61652db3d2808f667b48af0a358f0d85fd07ad4a0d0b1a50882dec3b764c522",
+          "bytes": 1082
+        }
+      ]
+    },
+    {
+      "nombre": "is-map",
+      "version": "2.0.3",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/inspect-js/is-map.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5a26e47b9d7020848f061bcad66f8e73cab95f529dab5c02588b21e57c4f876c",
+          "bytes": 1067
+        }
+      ]
+    },
+    {
+      "nombre": "is-number-object",
+      "version": "1.1.1",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git://github.com/inspect-js/is-number-object.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c61652db3d2808f667b48af0a358f0d85fd07ad4a0d0b1a50882dec3b764c522",
+          "bytes": 1082
+        }
+      ]
+    },
+    {
+      "nombre": "is-regex",
+      "version": "1.2.1",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git://github.com/inspect-js/is-regex.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "dc0fe5a22d9336f345ee984f9bf56f11f22877a3aa5fd16a1db9a8ca0e23a5d1",
+          "bytes": 1081
+        }
+      ]
+    },
+    {
+      "nombre": "is-set",
+      "version": "2.0.3",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/inspect-js/is-set.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5a26e47b9d7020848f061bcad66f8e73cab95f529dab5c02588b21e57c4f876c",
+          "bytes": 1067
+        }
+      ]
+    },
+    {
+      "nombre": "is-shared-array-buffer",
+      "version": "1.0.4",
+      "expresion": "MIT",
+      "autor": "Jordan Harband",
+      "repositorio": "git+https://github.com/inspect-js/is-shared-array-buffer.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "e2560e002e13281578c75c850061d9255c33d16d732939e8c2db64c2506642fa",
+          "bytes": 1067
+        }
+      ]
+    },
+    {
+      "nombre": "is-string",
+      "version": "1.1.1",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git://github.com/inspect-js/is-string.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c61652db3d2808f667b48af0a358f0d85fd07ad4a0d0b1a50882dec3b764c522",
+          "bytes": 1082
+        }
+      ]
+    },
+    {
+      "nombre": "is-symbol",
+      "version": "1.1.1",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git://github.com/inspect-js/is-symbol.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c61652db3d2808f667b48af0a358f0d85fd07ad4a0d0b1a50882dec3b764c522",
+          "bytes": 1082
+        }
+      ]
+    },
+    {
+      "nombre": "is-weakmap",
+      "version": "2.0.2",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/inspect-js/is-weakmap.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5a26e47b9d7020848f061bcad66f8e73cab95f529dab5c02588b21e57c4f876c",
+          "bytes": 1067
+        }
+      ]
+    },
+    {
+      "nombre": "is-weakset",
+      "version": "2.0.4",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/inspect-js/is-weakset.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5a26e47b9d7020848f061bcad66f8e73cab95f529dab5c02588b21e57c4f876c",
+          "bytes": 1067
+        }
+      ]
+    },
+    {
+      "nombre": "isarray",
+      "version": "2.0.5",
+      "expresion": "MIT",
+      "autor": "Julian Gruber",
+      "repositorio": "git://github.com/juliangruber/isarray.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "68f12f6e2c33688699249c01d8f9623c534da20aa71989c57b061b7bc1676d14",
+          "bytes": 1096
+        }
+      ]
+    },
+    {
+      "nombre": "jpeg-exif",
+      "version": "1.1.4",
+      "expresion": "MIT",
+      "autor": "s@zhso.net",
+      "repositorio": "https://github.com/zhso/jpeg-exif.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.txt"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.txt",
+          "sha256": "a8202d59ed0629ee6e58df1f883519d5ede193cd64419a00003e31f29c62e26d",
+          "bytes": 1077
+        }
+      ]
+    },
+    {
+      "nombre": "json-schema-ref-resolver",
+      "version": "3.0.0",
+      "expresion": "MIT",
+      "autor": "Ivan Tymoshenko <ivan@tymoshenko.me>",
+      "repositorio": "git+https://github.com/fastify/json-schema-ref-resolver.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "0943b637252a9c6f1a062c77063aa58213ae93a18d5445f2fb77d1de7c60dc12",
+          "bytes": 1064
+        }
+      ]
+    },
+    {
+      "nombre": "json-schema-resolver",
+      "version": "3.0.0",
+      "expresion": "MIT",
+      "autor": "Manuel Spigolon <behemoth89@gmail.com> (https://github.com/Eomm)",
+      "repositorio": "git+https://github.com/Eomm/json-schema-resolver.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "dfc6eb4df78850d3a5d38be7d10c7a997f2a95d09db91cfac2e77e51e4f8062c",
+          "bytes": 1072
+        }
+      ]
+    },
+    {
+      "nombre": "json-schema-traverse",
+      "version": "1.0.0",
+      "expresion": "MIT",
+      "autor": "Evgeny Poberezkin",
+      "repositorio": "git+https://github.com/epoberezkin/json-schema-traverse.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "7bf9b2de73a6b356761c948d0e9eeb4be6c1270bd04c79cd489c1e400ffdfc1a",
+          "bytes": 1074
+        }
+      ]
+    },
+    {
+      "nombre": "jsonfile",
+      "version": "6.2.1",
+      "expresion": "MIT",
+      "autor": "JP Richardson <jprichardson@gmail.com>",
+      "repositorio": "git@github.com:jprichardson/node-jsonfile.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "a9801fb52ba22ef808682a094da8a7a480584b7ed0dfd0d888ab543616335031",
+          "bytes": 1110
+        }
+      ]
+    },
+    {
+      "nombre": "jsonwebtoken",
+      "version": "9.0.3",
+      "expresion": "MIT",
+      "autor": "auth0",
+      "repositorio": "https://github.com/auth0/node-jsonwebtoken",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "2144eb6894cb440fde6b2b3aaae3b617c8f1dc9bb19813079dcf62ec6c517042",
+          "bytes": 1121
+        }
+      ]
+    },
+    {
+      "nombre": "jszip",
+      "version": "3.10.1",
+      "expresion": "(MIT OR GPL-3.0-or-later)",
+      "autor": "Stuart Knightley <stuart@stuartk.com>",
+      "repositorio": "https://github.com/Stuk/jszip.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.markdown"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.markdown",
+          "sha256": "566c953c6090b1218ca6217dd7359d45dde46581968586dc607d59a78af6a9c4",
+          "bytes": 33753
+        }
+      ]
+    },
+    {
+      "nombre": "jwa",
+      "version": "2.0.1",
+      "expresion": "MIT",
+      "autor": "Brian J. Brennan <brianloveswords@gmail.com>",
+      "repositorio": "git://github.com/brianloveswords/node-jwa.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "3320319f8a5f42bc4254e65471eca7a5ea4dc8c883c4c24b4868e36b14890bcf",
+          "bytes": 1068
+        }
+      ]
+    },
+    {
+      "nombre": "jws",
+      "version": "4.0.1",
+      "expresion": "MIT",
+      "autor": "Brian J Brennan",
+      "repositorio": "git://github.com/brianloveswords/node-jws.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "3320319f8a5f42bc4254e65471eca7a5ea4dc8c883c4c24b4868e36b14890bcf",
+          "bytes": 1068
+        }
+      ]
+    },
+    {
+      "nombre": "lazystream",
+      "version": "1.0.1",
+      "expresion": "MIT",
+      "autor": "Jonas Pommerening",
+      "repositorio": "https://github.com/jpommerening/node-lazystream.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "e7f5d28405c9fe6580db684634bace66953055b436d7fbb6f860d0c800c44a9f",
+          "bytes": 1074
+        }
+      ]
+    },
+    {
+      "nombre": "lie",
+      "version": "3.3.0",
+      "expresion": "MIT",
+      "autor": null,
+      "repositorio": "https://github.com/calvinmetcalf/lie.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "license.md"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "license.md",
+          "sha256": "5c81b0caa98593408b03125efa25efe622341ed87ae55561968828cd887d64a4",
+          "bytes": 1084
+        }
+      ]
+    },
+    {
+      "nombre": "light-my-request",
+      "version": "6.6.0",
+      "expresion": "BSD-3-Clause",
+      "autor": "Tomas Della Vedova - @delvedor (http://delved.org)",
+      "repositorio": "git+https://github.com/fastify/light-my-request.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c59ffead4ccbc72ddc3258c23d608bc6f10cea5241038ca8d39cdd7d7e7667c9",
+          "bytes": 1778
+        }
+      ]
+    },
+    {
+      "nombre": "linebreak",
+      "version": "1.1.0",
+      "expresion": "MIT",
+      "autor": "Devon Govett <devongovett@gmail.com>",
+      "repositorio": "https://github.com/devongovett/linebreaker.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "cf22b8198f0886a8d4626121579114f23141070e1fceab02ab3c1c361e163440",
+          "bytes": 1077
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.defaults",
+      "version": "4.2.0",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ffd8b33b354585f4ce119f19c53728281e48a97b074491eb6bf6d5c5ff305272",
+          "bytes": 1951
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.difference",
+      "version": "4.5.0",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ffd8b33b354585f4ce119f19c53728281e48a97b074491eb6bf6d5c5ff305272",
+          "bytes": 1951
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.escaperegexp",
+      "version": "4.1.2",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ffd8b33b354585f4ce119f19c53728281e48a97b074491eb6bf6d5c5ff305272",
+          "bytes": 1951
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.flatten",
+      "version": "4.4.0",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ffd8b33b354585f4ce119f19c53728281e48a97b074491eb6bf6d5c5ff305272",
+          "bytes": 1951
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.groupby",
+      "version": "4.6.0",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ffd8b33b354585f4ce119f19c53728281e48a97b074491eb6bf6d5c5ff305272",
+          "bytes": 1951
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.includes",
+      "version": "4.3.0",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ffd8b33b354585f4ce119f19c53728281e48a97b074491eb6bf6d5c5ff305272",
+          "bytes": 1951
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.isboolean",
+      "version": "3.0.3",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "25a399d4a42f419445101092a1fc3f9b4bfe06d614f84128222d79e3a2105fe7",
+          "bytes": 1233
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.isequal",
+      "version": "4.5.0",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "e159c6d48c989185448658f276375bfb2300362ec6d4ae5525a2d49c4bcb947d",
+          "bytes": 1950
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.isfunction",
+      "version": "3.0.9",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "e159c6d48c989185448658f276375bfb2300362ec6d4ae5525a2d49c4bcb947d",
+          "bytes": 1950
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.isinteger",
+      "version": "4.0.4",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ffd8b33b354585f4ce119f19c53728281e48a97b074491eb6bf6d5c5ff305272",
+          "bytes": 1951
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.isnil",
+      "version": "4.0.0",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "25a399d4a42f419445101092a1fc3f9b4bfe06d614f84128222d79e3a2105fe7",
+          "bytes": 1233
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.isnumber",
+      "version": "3.0.3",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "25a399d4a42f419445101092a1fc3f9b4bfe06d614f84128222d79e3a2105fe7",
+          "bytes": 1233
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.isplainobject",
+      "version": "4.0.6",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ffd8b33b354585f4ce119f19c53728281e48a97b074491eb6bf6d5c5ff305272",
+          "bytes": 1951
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.isstring",
+      "version": "4.0.1",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "25a399d4a42f419445101092a1fc3f9b4bfe06d614f84128222d79e3a2105fe7",
+          "bytes": 1233
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.isundefined",
+      "version": "3.0.1",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.txt"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.txt",
+          "sha256": "90df9e2220f682e1f77e24b1c0f72d2de18b818096c957a65698e74c41a4826f",
+          "bytes": 1233
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.once",
+      "version": "4.1.1",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ffd8b33b354585f4ce119f19c53728281e48a97b074491eb6bf6d5c5ff305272",
+          "bytes": 1951
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.union",
+      "version": "4.6.0",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ffd8b33b354585f4ce119f19c53728281e48a97b074491eb6bf6d5c5ff305272",
+          "bytes": 1951
+        }
+      ]
+    },
+    {
+      "nombre": "lodash.uniq",
+      "version": "4.5.0",
+      "expresion": "MIT",
+      "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
+      "repositorio": "lodash/lodash",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ffd8b33b354585f4ce119f19c53728281e48a97b074491eb6bf6d5c5ff305272",
+          "bytes": 1951
+        }
+      ]
+    },
+    {
+      "nombre": "lru-cache",
+      "version": "11.5.2",
+      "expresion": "BlueOak-1.0.0",
+      "autor": "Isaac Z. Schlueter <i@izs.me>",
+      "repositorio": "git+ssh://git@github.com/isaacs/node-lru-cache.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.md"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.md",
+          "sha256": "8a1af140fdfbf5afd3df27f7e662f989c5b963a300020dfafce42033cae9e004",
+          "bytes": 1552
+        }
+      ]
+    },
+    {
+      "nombre": "math-intrinsics",
+      "version": "1.1.0",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/es-shims/math-intrinsics.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "2b770a704c15de238c3f622b01b0044ddd60b49ee30608ea6991ebf19db7a7a1",
+          "bytes": 1073
+        }
+      ]
+    },
+    {
+      "nombre": "mime",
+      "version": "3.0.0",
+      "expresion": "MIT",
+      "autor": "Robert Kieffer",
+      "repositorio": "https://github.com/broofa/mime",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "8f2658c03422c408b2b2ce4d151decc3b1a6fd3d86e5ca9433777bccdcdf75a2",
+          "bytes": 1098
+        }
+      ]
+    },
+    {
+      "nombre": "minimatch",
+      "version": "10.2.6",
+      "expresion": "BlueOak-1.0.0",
+      "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)",
+      "repositorio": "git@github.com:isaacs/minimatch",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.md"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.md",
+          "sha256": "2c7c5d22ed5a8ee968c64757710979afcd77438c48b4a265b94e615babd8a901",
+          "bytes": 1550
+        }
+      ]
+    },
+    {
+      "nombre": "minipass",
+      "version": "7.1.3",
+      "expresion": "BlueOak-1.0.0",
+      "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
+      "repositorio": "https://github.com/isaacs/minipass",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.md"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.md",
+          "sha256": "8a1af140fdfbf5afd3df27f7e662f989c5b963a300020dfafce42033cae9e004",
+          "bytes": 1552
+        }
+      ]
+    },
+    {
+      "nombre": "ms",
+      "version": "2.1.3",
+      "expresion": "MIT",
+      "autor": null,
+      "repositorio": "vercel/ms",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "license.md"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "license.md",
+          "sha256": "1662fae9b5314d11cf51284e2dcd1f006a354f7343f08712a730fcff9a359801",
+          "bytes": 1079
+        }
+      ]
+    },
+    {
+      "nombre": "node-addon-api",
+      "version": "8.9.2",
+      "expresion": "MIT",
+      "autor": null,
+      "repositorio": "git://github.com/nodejs/node-addon-api.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.md"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.md",
+          "sha256": "89024017b88a9f2b763f79b941a4f2db3b4428edfcacdc0b23866b2da633ad0c",
+          "bytes": 1150
+        }
+      ]
+    },
+    {
+      "nombre": "node-gyp-build",
+      "version": "4.8.4",
+      "expresion": "MIT",
+      "autor": "Mathias Buus (@mafintosh)",
+      "repositorio": "https://github.com/prebuild/node-gyp-build.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "7b3638496004b2daed183a91c4ba45d3ef6331db6c9d0eb1dd882a505630c172",
+          "bytes": 1079
+        }
+      ]
+    },
+    {
+      "nombre": "node-int64",
+      "version": "0.4.0",
+      "expresion": "MIT",
+      "autor": "Robert Kieffer <robert@broofa.com>",
+      "repositorio": "https://github.com/broofa/node-int64",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "8f85aab053e268546014761da47630a09886626afbd0d8d440cb2c69611bb8d3",
+          "bytes": 1058
+        }
+      ]
+    },
+    {
+      "nombre": "normalize-path",
+      "version": "3.0.0",
+      "expresion": "MIT",
+      "autor": "Jon Schlinkert (https://github.com/jonschlinkert)",
+      "repositorio": "jonschlinkert/normalize-path",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "e70ff771504ba41f2be55de812a017ff46433d7a250c862e38fc419159e44500",
+          "bytes": 1088
+        }
+      ]
+    },
+    {
+      "nombre": "object-inspect",
+      "version": "1.13.4",
+      "expresion": "MIT",
+      "autor": "James Halliday",
+      "repositorio": "git://github.com/inspect-js/object-inspect.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "bd40cc437e28a3ad7bef2ad34e6b72e757b182e67bda1acadbab4ef0476f8232",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "object-is",
+      "version": "1.1.6",
+      "expresion": "MIT",
+      "autor": "Jordan Harband",
+      "repositorio": "git://github.com/es-shims/object-is.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "dc0fe5a22d9336f345ee984f9bf56f11f22877a3aa5fd16a1db9a8ca0e23a5d1",
+          "bytes": 1081
+        }
+      ]
+    },
+    {
+      "nombre": "object-keys",
+      "version": "1.1.1",
+      "expresion": "MIT",
+      "autor": "Jordan Harband",
+      "repositorio": "git://github.com/ljharb/object-keys.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5640e5cbe2e9f57f6ccfdd8dbfbeadb875495bdbcb69d2666ce3177ccd0942e4",
+          "bytes": 1080
+        }
+      ]
+    },
+    {
+      "nombre": "object.assign",
+      "version": "4.1.7",
+      "expresion": "MIT",
+      "autor": "Jordan Harband",
+      "repositorio": "git://github.com/ljharb/object.assign.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "a596744eec6b05682ed972bf93937668bbc8da2caed93fbf6510389de019b5c0",
+          "bytes": 1080
+        }
+      ]
+    },
+    {
+      "nombre": "on-exit-leak-free",
+      "version": "2.1.2",
+      "expresion": "MIT",
+      "autor": "Matteo Collina <hello@matteocollina.com>",
+      "repositorio": "git+https://github.com/mcollina/on-exit-or-gc.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "47404ffc18f1267832bc0623857871de5a3a93ebb19693f5e1b963af91fab54b",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "once",
+      "version": "1.4.0",
+      "expresion": "ISC",
+      "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
+      "repositorio": "git://github.com/isaacs/once",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b",
+          "bytes": 765
+        }
+      ]
+    },
+    {
+      "nombre": "openapi-types",
+      "version": "12.1.3",
+      "expresion": "MIT",
+      "autor": "Joseph Spencer",
+      "repositorio": "https://github.com/kogosoftwarellc/open-api/tree/master/packages/openapi-types",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "a5b243ddbec533f2fc6e809f1194d24623dfc302bb4a29f99093e087928561e8",
+          "bytes": 1083
+        }
+      ]
+    },
+    {
+      "nombre": "pako",
+      "version": "1.0.11",
+      "expresion": "(MIT AND Zlib)",
+      "autor": null,
+      "repositorio": "nodeca/pako",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "a04665b3b2de56c66730c1f720f528175739e4104f79073614aa611da1e85539",
+          "bytes": 1104
+        }
+      ]
+    },
+    {
+      "nombre": "path-is-absolute",
+      "version": "1.0.1",
+      "expresion": "MIT",
+      "autor": "Sindre Sorhus",
+      "repositorio": "sindresorhus/path-is-absolute",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "license"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "license",
+          "sha256": "6fb9754611c20f6649f68805e8c990e83261f29316e29de9e6cedae607b8634c",
+          "bytes": 1119
+        }
+      ]
+    },
+    {
+      "nombre": "path-scurry",
+      "version": "2.0.2",
+      "expresion": "BlueOak-1.0.0",
+      "autor": "Isaac Z. Schlueter <i@izs.me> (https://blog.izs.me)",
+      "repositorio": "git+https://github.com/isaacs/path-scurry",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.md"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.md",
+          "sha256": "8a1af140fdfbf5afd3df27f7e662f989c5b963a300020dfafce42033cae9e004",
+          "bytes": 1552
+        }
+      ]
+    },
+    {
+      "nombre": "pdfkit",
+      "version": "0.15.2",
+      "expresion": "MIT",
+      "autor": "Devon Govett",
+      "repositorio": "https://github.com/foliojs/pdfkit.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "427d01cbe37b367b97f2ea655935d94f4ed03ed11343c3c00e78c8366df810cc",
+          "bytes": 1074
+        }
+      ]
+    },
+    {
+      "nombre": "pino-abstract-transport",
+      "version": "2.0.0",
+      "expresion": "MIT",
+      "autor": "Matteo Collina <hello@matteocollina.com>",
+      "repositorio": "git+https://github.com/pinojs/pino-abstract-transport.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "31f005ecff86a12a1351f4c2cb1133267c0b152546b08cd6fa4bdeb1943e00cd",
+          "bytes": 1061
+        }
+      ]
+    },
+    {
+      "nombre": "pino-std-serializers",
+      "version": "7.1.0",
+      "expresion": "MIT",
+      "autor": "James Sumners <james.sumners@gmail.com>",
+      "repositorio": "git+ssh://git@github.com/pinojs/pino-std-serializers.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "6206673d24786f09656f7a480b7c50af289e9690963aaa135af5b626de5250df",
+          "bytes": 1084
+        }
+      ]
+    },
+    {
+      "nombre": "pino",
+      "version": "9.14.0",
+      "expresion": "MIT",
+      "autor": "Matteo Collina <hello@matteocollina.com>",
+      "repositorio": "git+https://github.com/pinojs/pino.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "d4eb00c3ef2fa54cdf05d167b15e994bc67226a7998e090e22a0bc8b16223a6c",
+          "bytes": 1209
+        }
+      ]
+    },
+    {
+      "nombre": "png-js",
+      "version": "1.1.0",
+      "expresion": null,
+      "autor": "Devon Govett",
+      "repositorio": "https://github.com/devongovett/png.js.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "bdb26a2ec815931ed6a38f3416362566204ee85ecdef96702b636402da4c75c3",
+          "bytes": 1069
+        }
+      ]
+    },
+    {
+      "nombre": "possible-typed-array-names",
+      "version": "1.1.0",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/possible-typed-array-names.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5e325595b4ea8cfec3802f545b1def5d7b73e4a5b8e9ba63e32a320f67732292",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "process-nextick-args",
+      "version": "2.0.1",
+      "expresion": "MIT",
+      "autor": "",
+      "repositorio": "https://github.com/calvinmetcalf/process-nextick-args.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "license.md"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "license.md",
+          "sha256": "ecdccbcf39024f624ded480c01c0b25458e1eca8f26ecf040933865ce56d9a4f",
+          "bytes": 1064
+        }
+      ]
+    },
+    {
+      "nombre": "process-warning",
+      "version": "5.1.0",
+      "expresion": "MIT",
+      "autor": "Tomas Della Vedova",
+      "repositorio": "git+https://github.com/fastify/process-warning.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "8d3c1dd501e056405ab56f4ad87b987070d55d1fe814616584ec2360045f9017",
+          "bytes": 1123
+        }
+      ]
+    },
+    {
+      "nombre": "quick-format-unescaped",
+      "version": "4.0.4",
+      "expresion": "MIT",
+      "autor": "David Mark Clements",
+      "repositorio": "git+https://github.com/davidmarkclements/quick-format.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5ac141bfc70bec8f40838502436bfcb85e3f4c24377e41b9ddef07bdd6aa51bc",
+          "bytes": 1091
+        }
+      ]
+    },
+    {
+      "nombre": "readable-stream",
+      "version": "3.6.2",
+      "expresion": "MIT",
+      "autor": null,
+      "repositorio": "git://github.com/nodejs/readable-stream",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ec62dc96da0099b87f4511736c87309335527fb7031639493e06c95728dc8c54",
+          "bytes": 2337
+        }
+      ]
+    },
+    {
+      "nombre": "readdir-glob",
+      "version": "1.1.3",
+      "expresion": "Apache-2.0",
+      "autor": "Yann Armelin",
+      "repositorio": "git://github.com/Yqnn/node-readdir-glob.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "8cd23e2d76d2791765f7dd1025a9df99d81db91da9e2701f283987a1c0435aa3",
+          "bytes": 11341
+        }
+      ]
+    },
+    {
+      "nombre": "real-require",
+      "version": "0.2.0",
+      "expresion": "MIT",
+      "autor": "Paolo Insogna <shogun@cowtech.it>",
+      "repositorio": "git+https://github.com/pinojs/real-require.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.md"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.md",
+          "sha256": "cbf263504e800cf09f99962cce8497b76eef79c3526bca434b90c3ef4c17220d",
+          "bytes": 1114
+        }
+      ]
+    },
+    {
+      "nombre": "regexp.prototype.flags",
+      "version": "1.5.4",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git://github.com/es-shims/RegExp.prototype.flags.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "9616325393b574ca774a0409b95b05cb0f640393513f72da00c5e3191de4a1ea",
+          "bytes": 1082
+        }
+      ]
+    },
+    {
+      "nombre": "require-from-string",
+      "version": "2.0.2",
+      "expresion": "MIT",
+      "autor": "Vsevolod Strukchinsky",
+      "repositorio": "floatdrop/require-from-string",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "license"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "license",
+          "sha256": "6ee0feb1f6ef996ff5a68600f8cf98909cf412d39ef3cdceaefd87d636fa1b7f",
+          "bytes": 1128
+        }
+      ]
+    },
+    {
+      "nombre": "restructure",
+      "version": "2.0.1",
+      "expresion": "MIT",
+      "autor": "Devon Govett <devongovett@gmail.com>",
+      "repositorio": "git://github.com/devongovett/restructure.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c0df7f551401f8f80197ff31bf69b8cd23727d127423403282514d242a3ab132",
+          "bytes": 1077
+        }
+      ]
+    },
+    {
+      "nombre": "ret",
+      "version": "0.5.0",
+      "expresion": "MIT",
+      "autor": "fent <fentbox@gmail.com> (https://github.com/fent)",
+      "repositorio": "git://github.com/fent/ret.js.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "bfc2c678db20d806b3787956f607a1509da5fca45b4d40a97c671cbee737159d",
+          "bytes": 1065
+        }
+      ]
+    },
+    {
+      "nombre": "reusify",
+      "version": "1.1.0",
+      "expresion": "MIT",
+      "autor": "Matteo Collina <hello@matteocollina.com>",
+      "repositorio": "git+https://github.com/mcollina/reusify.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "93a1506953b08ad4874e1cc0971a1d2ac387ca510da91e4d05e460a6c4966fa3",
+          "bytes": 1087
+        }
+      ]
+    },
+    {
+      "nombre": "rfdc",
+      "version": "1.4.1",
+      "expresion": "MIT",
+      "autor": "David Mark Clements <david.clements@nearform.com>",
+      "repositorio": "git+https://github.com/davidmarkclements/rfdc.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "1ce941682a96c7b898ecd125d0f2e22319758ea6f3adbf498a65d649b0f3f7dd",
+          "bytes": 1101
+        }
+      ]
+    },
+    {
+      "nombre": "safe-buffer",
+      "version": "5.2.1",
+      "expresion": "MIT",
+      "autor": "Feross Aboukhadijeh",
+      "repositorio": "git://github.com/feross/safe-buffer.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c7cc929b57080f4b9d0c6cf57669f0463fc5b39906344dfc8d3bc43426b30eac",
+          "bytes": 1081
+        }
+      ]
+    },
+    {
+      "nombre": "safe-regex-test",
+      "version": "1.1.0",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/safe-regex-test.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "d90bf0a089da4cf43d644ed240a0b3825dcdb705e64e38371d56995a4cc9e4c5",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "safe-regex2",
+      "version": "5.1.1",
+      "expresion": "MIT",
+      "autor": "James Halliday",
+      "repositorio": "git://github.com/fastify/safe-regex2.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "3871c31d0cc373951d836b8bb97275a2227f8af7464df7c51bc3f98769b87653",
+          "bytes": 1123
+        }
+      ]
+    },
+    {
+      "nombre": "safe-stable-stringify",
+      "version": "2.5.0",
+      "expresion": "MIT",
+      "autor": "Ruben Bridgewater",
+      "repositorio": "git+https://github.com/BridgeAR/safe-stable-stringify.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "3a6d6de49d284a36c5d271ef0e62eca1838cc460dd7630e3f2c347c8f5b2232a",
+          "bytes": 1079
+        }
+      ]
+    },
+    {
+      "nombre": "saxes",
+      "version": "5.0.1",
+      "expresion": "ISC",
+      "autor": "Louis-Dominique Dubeau <ldd@lddubeau.com>",
+      "repositorio": "https://github.com/lddubeau/saxes.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [],
+      "tieneNotice": false,
+      "licencias": []
+    },
+    {
+      "nombre": "secure-json-parse",
+      "version": "4.1.0",
+      "expresion": "BSD-3-Clause",
+      "autor": "Eran Hammer <eran@sideway.com>",
+      "repositorio": "git+https://github.com/fastify/secure-json-parse.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "d490035c46547ddc88330bc0b42fcd89eabfd66435c4291352d1b9b68d62c729",
+          "bytes": 1807
+        }
+      ]
+    },
+    {
+      "nombre": "semver",
+      "version": "7.8.5",
+      "expresion": "ISC",
+      "autor": "GitHub Inc.",
+      "repositorio": "git+https://github.com/npm/node-semver.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b",
+          "bytes": 765
+        }
+      ]
+    },
+    {
+      "nombre": "set-cookie-parser",
+      "version": "2.7.2",
+      "expresion": "MIT",
+      "autor": "Nathan Friedly",
+      "repositorio": "nfriedly/set-cookie-parser",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c5c6c5183a789d122f267c405f685037efb87e27fcde28ab1dd7378a2d2f5962",
+          "bytes": 1126
+        }
+      ]
+    },
+    {
+      "nombre": "set-function-length",
+      "version": "1.2.2",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/set-function-length.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "bf9b0d665be2a689851eea667ca9f42066ea1d903b38349c51e6a44b2577680a",
+          "bytes": 1083
+        }
+      ]
+    },
+    {
+      "nombre": "set-function-name",
+      "version": "2.0.2",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/set-function-name.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "bf9b0d665be2a689851eea667ca9f42066ea1d903b38349c51e6a44b2577680a",
+          "bytes": 1083
+        }
+      ]
+    },
+    {
+      "nombre": "setimmediate",
+      "version": "1.0.5",
+      "expresion": "MIT",
+      "autor": "YuzuJS",
+      "repositorio": "YuzuJS/setImmediate",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.txt"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.txt",
+          "sha256": "c4b4ad3a5746f1f5249a6dd90396ec519264e1bb02e01e48a6522c48a3a97cb4",
+          "bytes": 1103
+        }
+      ]
+    },
+    {
+      "nombre": "setprototypeof",
+      "version": "1.2.0",
+      "expresion": "ISC",
+      "autor": "Wes Todd",
+      "repositorio": "https://github.com/wesleytodd/setprototypeof.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "76d6d1ea0c268da37dd3c961b4fcfb23dee8417fff9e8786d4d44c585b781b69",
+          "bytes": 727
+        }
+      ]
+    },
+    {
+      "nombre": "side-channel-list",
+      "version": "1.0.1",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/side-channel-list.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5e325595b4ea8cfec3802f545b1def5d7b73e4a5b8e9ba63e32a320f67732292",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "side-channel-map",
+      "version": "1.0.1",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/side-channel-map.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5e325595b4ea8cfec3802f545b1def5d7b73e4a5b8e9ba63e32a320f67732292",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "side-channel-weakmap",
+      "version": "1.0.2",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/side-channel-weakmap.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "cfc3f455254c0af0655cc3ff46a41ed644b67599f6043346169d285bf2b3cf3b",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "side-channel",
+      "version": "1.1.1",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/side-channel.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "cfc3f455254c0af0655cc3ff46a41ed644b67599f6043346169d285bf2b3cf3b",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "sonic-boom",
+      "version": "4.2.1",
+      "expresion": "MIT",
+      "autor": "Matteo Collina <hello@matteocollina.com>",
+      "repositorio": "git+https://github.com/pinojs/sonic-boom.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "db5c3795cb080810fed0380bf4d6adef3f81579e8ae3a867d3c2abab2329db9d",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "split2",
+      "version": "4.2.0",
+      "expresion": "ISC",
+      "autor": "Matteo Collina <hello@matteocollina.com>",
+      "repositorio": "https://github.com/mcollina/split2.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c372ef2fa1dfcb124ed807609751e75e3a009f108c5724916b489288fcb88a0c",
+          "bytes": 764
+        }
+      ]
+    },
+    {
+      "nombre": "statuses",
+      "version": "2.0.2",
+      "expresion": "MIT",
+      "autor": null,
+      "repositorio": "jshttp/statuses",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "512cfa4d5e7a7569c7ae4dd95241cb6ae2aaf648ef9ebd080c01bd24868d26e9",
+          "bytes": 1172
+        }
+      ]
+    },
+    {
+      "nombre": "stop-iteration-iterator",
+      "version": "1.1.0",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/stop-iteration-iterator.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "b41d08bc3624d8c436fc80237d73ebb361985a67f4504bbcd703e5ca2b27254c",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "string_decoder",
+      "version": "1.3.0",
+      "expresion": "MIT",
+      "autor": null,
+      "repositorio": "git://github.com/nodejs/string_decoder.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "11f2aafb37d06b3ee5bdaf06e9811141d0da05263c316f3d627f45c20d43261b",
+          "bytes": 2338
+        }
+      ]
+    },
+    {
+      "nombre": "tar-stream",
+      "version": "2.2.0",
+      "expresion": "MIT",
+      "autor": "Mathias Buus <mathiasbuus@gmail.com>",
+      "repositorio": "git+https://github.com/mafintosh/tar-stream.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "3fe8d55a98dbf260eace67c00cf9bc53edb46234e840098a0b93df3096b97fb6",
+          "bytes": 1078
+        }
+      ]
+    },
+    {
+      "nombre": "thread-stream",
+      "version": "3.2.0",
+      "expresion": "MIT",
+      "autor": "Matteo Collina <hello@matteocollina.com>",
+      "repositorio": "git+https://github.com/mcollina/thread-stream.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "47404ffc18f1267832bc0623857871de5a3a93ebb19693f5e1b963af91fab54b",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "tiny-inflate",
+      "version": "1.0.3",
+      "expresion": "MIT",
+      "autor": "Devon Govett <devongovett@gmail.com>",
+      "repositorio": "git://github.com/devongovett/tiny-inflate.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c0df7f551401f8f80197ff31bf69b8cd23727d127423403282514d242a3ab132",
+          "bytes": 1077
+        }
+      ]
+    },
+    {
+      "nombre": "tmp",
+      "version": "0.2.7",
+      "expresion": "MIT",
+      "autor": "KARASZI István <github@spam.raszi.hu>",
+      "repositorio": "https://github.com/raszi/node-tmp.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "162413c61e0982abe89a06bf7a02ec760dc49a7364d838bd9f01daebb5b95954",
+          "bytes": 1082
+        }
+      ]
+    },
+    {
+      "nombre": "toad-cache",
+      "version": "3.7.4",
+      "expresion": "MIT",
+      "autor": "Igor Savin <kibertoad@gmail.com>",
+      "repositorio": "git+https://github.com/kibertoad/toad-cache.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "644304c533dee96438937c0bdcbb49897d80fd8df3be4573f3c57b9c2ca22587",
+          "bytes": 1067
+        }
+      ]
+    },
+    {
+      "nombre": "toidentifier",
+      "version": "1.0.1",
+      "expresion": "MIT",
+      "autor": "Douglas Christopher Wilson <doug@somethingdoug.com>",
+      "repositorio": "component/toidentifier",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "a832d679750e49ab433626ab196350b89964b60eb0d3edd3341887c7d5f4c128",
+          "bytes": 1108
+        }
+      ]
+    },
+    {
+      "nombre": "tslib",
+      "version": "2.8.1",
+      "expresion": "0BSD",
+      "autor": "Microsoft Corp.",
+      "repositorio": "https://github.com/Microsoft/tslib.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.txt"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.txt",
+          "sha256": "210b19e543130388c68654b7497e967119ce17145f66ab7d85688fbd70f08751",
+          "bytes": 655
+        }
+      ]
+    },
+    {
+      "nombre": "unicode-properties",
+      "version": "1.4.1",
+      "expresion": "MIT",
+      "autor": "Devon Govett <devongovett@gmail.com>",
+      "repositorio": "git://github.com/devongovett/unicode-properties.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "43439dbd4f43837aadab215cdbe5a422cc6323a50c4ea84d8d6bbc3671666a1d",
+          "bytes": 1040
+        }
+      ]
+    },
+    {
+      "nombre": "unicode-trie",
+      "version": "2.0.0",
+      "expresion": "MIT",
+      "autor": "Devon Govett <devongovett@gmail.com>",
+      "repositorio": "git://github.com/devongovett/unicode-trie.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "43439dbd4f43837aadab215cdbe5a422cc6323a50c4ea84d8d6bbc3671666a1d",
+          "bytes": 1040
+        }
+      ]
+    },
+    {
+      "nombre": "universalify",
+      "version": "2.0.1",
+      "expresion": "MIT",
+      "autor": "Ryan Zimmerman <opensrc@ryanzim.com>",
+      "repositorio": "git+https://github.com/RyanZim/universalify.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "3fda5977c0904e226190b4e21d64340c1731e2142d6fe5f3dee0090a216b8b63",
+          "bytes": 1100
+        }
+      ]
+    },
+    {
+      "nombre": "unzipper",
+      "version": "0.12.5",
+      "expresion": "MIT",
+      "autor": "Ziggy Jonsson <ziggy.jonsson.nyc@gmail.com>",
+      "repositorio": "https://github.com/ZJONSSON/node-unzipper.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "b9e9abeaf8b92573dc28915d4948dbce30d55b30c688d109898b35e6105c4215",
+          "bytes": 1219
+        }
+      ]
+    },
+    {
+      "nombre": "util-deprecate",
+      "version": "1.0.2",
+      "expresion": "MIT",
+      "autor": "Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)",
+      "repositorio": "git://github.com/TooTallNate/util-deprecate.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "0154425673db15cdfa80ecba2c9b1f1a867f7197a006764712849bfc3a93cbb7",
+          "bytes": 1102
+        }
+      ]
+    },
+    {
+      "nombre": "uuid",
+      "version": "11.1.1",
+      "expresion": "MIT",
+      "autor": null,
+      "repositorio": "https://github.com/uuidjs/uuid.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE.md"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.md",
+          "sha256": "beaa6b04fb82e41dd2ad679e19e27953afb5999b1abbb455b6564e78ebfeb332",
+          "bytes": 1109
+        }
+      ]
+    },
+    {
+      "nombre": "which-boxed-primitive",
+      "version": "1.1.1",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/inspect-js/which-boxed-primitive.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "cfc3f455254c0af0655cc3ff46a41ed644b67599f6043346169d285bf2b3cf3b",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "nombre": "which-collection",
+      "version": "1.0.2",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/inspect-js/which-collection.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5a26e47b9d7020848f061bcad66f8e73cab95f529dab5c02588b21e57c4f876c",
+          "bytes": 1067
+        }
+      ]
+    },
+    {
+      "nombre": "which-typed-array",
+      "version": "1.1.22",
+      "expresion": "MIT",
+      "autor": "Jordan Harband",
+      "repositorio": "git://github.com/inspect-js/which-typed-array.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c61652db3d2808f667b48af0a358f0d85fd07ad4a0d0b1a50882dec3b764c522",
+          "bytes": 1082
+        }
+      ]
+    },
+    {
+      "nombre": "wrappy",
+      "version": "1.0.2",
+      "expresion": "ISC",
+      "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
+      "repositorio": "https://github.com/npm/wrappy",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b",
+          "bytes": 765
+        }
+      ]
+    },
+    {
+      "nombre": "xmlchars",
+      "version": "2.2.0",
+      "expresion": "MIT",
+      "autor": "Louis-Dominique Dubeau <ldd@lddubeau.com>",
+      "repositorio": "https://github.com/lddubeau/xmlchars.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "45d196313c2647d313cc65ca9b093d2d6974b64d35ee7346f2c60c9d518dff2c",
+          "bytes": 1086
+        }
+      ]
+    },
+    {
+      "nombre": "yaml",
+      "version": "2.9.0",
+      "expresion": "ISC",
+      "autor": "Eemeli Aro <eemeli@gmail.com>",
+      "repositorio": "github:eemeli/yaml",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5bba27375d93e9119f76c1015f7672cf9ad5f70952296e0842fb2243d6376869",
+          "bytes": 738
+        }
+      ]
+    },
+    {
+      "nombre": "zip-stream",
+      "version": "4.1.1",
+      "expresion": "MIT",
+      "autor": "Chris Talkington",
+      "repositorio": "https://github.com/archiverjs/node-zip-stream.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "79bad9f51738814f83251ae89460326b2ff2ea19ff5f71ab8f7636b2e17bb231",
+          "bytes": 1074
+        }
+      ]
+    },
+    {
+      "nombre": "zod",
+      "version": "3.25.76",
+      "expresion": "MIT",
+      "autor": "Colin McDonnell <zod@colinhacks.com>",
+      "repositorio": "git+https://github.com/colinhacks/zod.git",
+      "base": "/app/node_modules",
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "3f1189b28e3866e0d979968d466b78f813f76827cfdca1fbb124cc0a5c8841f8",
+          "bytes": 1072
+        }
+      ]
+    }
+  ],
+  "sueltos": [
+    {
+      "componente": "Node.js",
+      "ruta": "/usr/local/LICENSE",
+      "nota": "licencia combinada de Node.js; enumera sus componentes de terceros",
+      "sha256": "c738ae413cf561f174e34f6961f8ca458aae2369a73640dda6234c629b98bcc4",
+      "bytes": 145485
+    },
+    {
+      "componente": "Yarn",
+      "ruta": "/opt/yarn-v1.22.22/LICENSE",
+      "nota": "Yarn viene incluido en la imagen base de Node",
+      "sha256": "ae09761b5d27e237571245437653b483bbb85de3cc64b802e8ef47d03aabec1e",
+      "bytes": 1355
+    }
+  ]
+}

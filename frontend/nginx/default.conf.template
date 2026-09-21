@@ -1,0 +1,58 @@
+# Configuración de Nginx para servir la SPA.
+#
+# Es una PLANTILLA: la imagen oficial de Nginx procesa todo lo que esté en
+# /etc/nginx/templates/*.template con `envsubst` al arrancar, y deja el
+# resultado en /etc/nginx/conf.d/. Eso permite obedecer el puerto que asigna el
+# entorno.
+#
+# `${PORT}` es imprescindible en Railway (y en Heroku, Cloud Run y similares):
+# esas plataformas asignan un puerto en tiempo de ejecución y esperan que el
+# proceso escuche EN ÉL. Con `listen 80` fijo, el enrutador no encuentra nada
+# escuchando donde busca y el despliegue queda inaccesible sin ningún error en
+# los registros del contenedor. Fuera de esas plataformas, el Dockerfile le da
+# el valor por omisión 80.
+#
+# `NGINX_ENVSUBST_FILTER=PORT` (en el Dockerfile) limita la sustitución a esa
+# variable: sin el filtro, `envsubst` también reemplazaría `$uri`, `$host` y
+# `$http_upgrade` —que son variables de NGINX, no del entorno— por cadenas
+# vacías, y la configuración dejaría de funcionar.
+#
+# El otro punto crítico es el `try_files` de más abajo: sin él, recargar el
+# navegador en /competencias o entrar directo por un enlace a /clubes/:id
+# devuelve 404, porque esas rutas solo existen dentro de React Router y no hay
+# ningún archivo con ese nombre en disco.
+
+server {
+    listen ${PORT};
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # No anunciar la versión de Nginx.
+    server_tokens off;
+
+    # Los archivos con hash en el nombre (los que emite Vite) son inmutables:
+    # cambia el nombre en cada build, así que se pueden cachear indefinidamente.
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    # `index.html` NO se cachea: es el que apunta a los bundles nuevos. Si el
+    # navegador se queda con uno viejo, sigue pidiendo archivos que ya no
+    # existen y la aplicación queda rota tras cada despliegue.
+    location = /index.html {
+        add_header Cache-Control "no-store";
+    }
+
+    # Fallback de SPA: cualquier ruta desconocida entrega index.html y deja que
+    # React Router resuelva.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    gzip on;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+}

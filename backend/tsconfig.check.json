@@ -1,0 +1,27 @@
+{
+  // ===========================================================================
+  // Fase 6, hallazgo 31 — TYPE-CHECK DE TODO LO MANTENIDO.
+  //
+  // `tsconfig.json` es la configuración de BUILD y se limita a `src`, que es lo
+  // correcto: `tests`, `scripts` y `prisma` no se compilan a `dist`. Pero eso
+  // dejaba fuera del type-check ~140 archivos que sí se mantienen y que ESLint sí
+  // revisa. Un error de tipos en una prueba o en un script de reparación no lo
+  // veía nadie hasta ejecutarlo.
+  //
+  // Esta configuración NO emite nada: solo comprueba. Hereda las mismas reglas
+  // —`strict`, `noUncheckedIndexedAccess`, `noUnusedLocals`,
+  // `noUnusedParameters`— sin relajar ninguna.
+  // ===========================================================================
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // `rootDir` del build apunta a `src`; aquí el programa abarca más carpetas,
+    // así que se ensancha a la raíz del paquete. Como no se emite nada, no
+    // afecta a la estructura de `dist`.
+    "rootDir": ".",
+    // Vitest inyecta `describe`, `it` y `expect` como globales.
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts", "prisma/**/*.ts"],
+  "exclude": ["node_modules", "dist", "coverage", "prisma/migrations", "prisma/generated"]
+}

@@ -1,0 +1,815 @@
+// ==========================================================================
+// SCHEMA — Módulo 1: Autenticación y Usuarios
+// Incluye únicamente los modelos necesarios para este módulo.
+// Person / Club se incluyen como stubs mínimos (se completan en Módulos 2-3).
+// ==========================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountStatus {
+  active
+  locked
+  disabled
+}
+
+// Dueño de una cuenta de acceso (RB-01).
+//
+// `system` modela EXPLÍCITAMENTE la excepción del administrador (hallazgo 20):
+// antes se guardaba como `person` con `person_id` nulo, un estado que
+// contradecía su propio tipo y que impedía exigir la coherencia en la base.
+// Con el valor propio, la restricción `users_owner_coherente` puede exigir que
+// `person` traiga persona, `club` traiga club y `system` no traiga ninguna.
+enum OwnerType {
+  person
+  club
+  system
+}
+
+// --------------------------------------------------------------------------
+// USERS / RBAC
+// --------------------------------------------------------------------------
+
+model User {
+  id                 String        @id @default(uuid())
+  // Unicidad PARCIAL (solo cuentas vigentes), como índice SQL en la migración
+  // `phase4_user_identity`. Era un índice TOTAL, incoherente con la unicidad
+  // parcial de `persons.username` y `clubs.username`: al eliminar lógicamente
+  // a una persona su nombre de usuario quedaba libre, pero el de su cuenta no,
+  // así que recrearla funcionaba y darle credenciales ya no (hallazgo 20).
+  username           String
+  passwordHash       String        @map("password_hash")
+  mustChangePassword Boolean       @default(true) @map("must_change_password")
+  status             AccountStatus @default(active)
+
+  // Regla RB-01: un user pertenece a UNA persona O a UN club, nunca a ambos;
+  // `system` es la cuenta administrativa, sin persona ni club. La coherencia
+  // entre `ownerType`, `personId` y `clubId` la exige la base de datos con la
+  // restricción `users_owner_coherente` (hallazgo 20).
+  ownerType OwnerType @map("owner_type")
+  personId  String?   @unique @map("person_id")
+  clubId    String?   @unique @map("club_id")
+
+  lastLoginAt         DateTime? @map("last_login_at")
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  createdBy String?   @map("created_by")
+  updatedBy String?   @map("updated_by")
+  deletedAt DateTime? @map("deleted_at")
+
+  person        Person?        @relation(fields: [personId], references: [id])
+  club          Club?          @relation(fields: [clubId], references: [id])
+  refreshTokens RefreshToken[]
+  userRoles     UserRole[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+// Registro global de nombres de usuario (hallazgo 20).
+//
+// El nombre de usuario vive en tres tablas —`persons`, `clubs` y `users`— y
+// ningún índice podía impedir que una persona y un club tomaran el mismo:
+// PostgreSQL no tiene índices únicos entre tablas. El choque solo aparecía al
+// crear las credenciales de la segunda, cuando su nombre de usuario ya era
+// inmutable y la única salida era eliminarla y rehacerla.
+//
+// Esta tabla es la reserva global: cada nombre de usuario vigente tiene aquí
+// exactamente una fila, y su clave primaria es la que garantiza la unicidad.
+// `owner_kind` + `owner_id` identifican al TITULAR (la persona, el club, o la
+// propia cuenta si es del sistema), de modo que una persona y su cuenta de
+// acceso comparten titular y no chocan entre sí, mientras que dos titulares
+// distintos sí.
+//
+// La mantienen disparadores en las tres tablas: la aplicación no la escribe.
+//
+// Desde `phase4_identity_guards` la relación entre titular y cuenta es más
+// estricta de lo que decía este comentario:
+//
+//   - Un titular y su cuenta VIGENTE tienen el mismo nombre de usuario y por
+//     lo tanto UNA sola reserva, la del titular. El nombre de usuario es uno
+//     por titular; la cuenta es su credencial, no una identidad aparte.
+//   - Una cuenta ELIMINADA lógicamente sí puede conservar un nombre histórico
+//     desalineado: es lo que permite liberar el nombre para otro titular, y lo
+//     que necesita el plan de reversión de `phase4_user_identity`. Ese nombre
+//     histórico no tiene reserva, porque la reserva solo cubre lo vigente.
+//   - Al REACTIVAR una cuenta se vuelve a exigir la coincidencia con su
+//     titular: no puede volver a estar vigente con un nombre ajeno.
+//
+// Lo que ningún titular puede hacer, en ningún caso, es tomar el nombre de
+// otro.
+model UsernameReservation {
+  username  String   @id
+  ownerKind String   @map("owner_kind")
+  ownerId   String   @map("owner_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([ownerKind, ownerId])
+  @@map("username_reservations")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique // admin, club, delegate, coach
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(uuid())
+  code        String  @unique // e.g. "persons:write", "registrations:write"
+  description String?
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id")
+  roleId String @map("role_id")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  tokenHash  String    @unique @map("token_hash") // nunca se guarda el token en claro
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  replacedBy String?   @map("replaced_by") // rotación: id del token que lo reemplazó
+  ipAddress  String?   @map("ip_address")
+  userAgent  String?   @map("user_agent")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  action     String // e.g. "LOGIN", "LOGIN_FAILED", "USER_LOCKED", "PASSWORD_CHANGED"
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  ipAddress  String?  @map("ip_address")
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+// --------------------------------------------------------------------------
+// PERSONS (Módulo 2)
+// --------------------------------------------------------------------------
+
+enum PersonRoleType {
+  swimmer
+  delegate
+  coach
+  legal_representative
+}
+
+enum PersonGender {
+  male
+  female
+}
+
+model Person {
+  id       String @id @default(uuid())
+  // `run` y `username` tienen unicidad PARCIAL (solo entre personas
+  // vigentes), como índice SQL en la migración `20260905_phase2_integrity`:
+  // eliminar lógicamente a una persona y volver a crearla con el mismo RUN
+  // fallaba con P2002 contra una fila invisible para el usuario.
+  run      String
+  username String
+
+  // Nombre, apellido paterno y apellido materno se ingresan por separado
+  // (convención chilena); `fullName` se sigue guardando como columna real
+  // pero ahora es CALCULADA automáticamente a partir de esos 3 campos en
+  // `persons.service.ts` (nunca se ingresa directo) — se mantiene como
+  // columna para no tener que tocar cada lugar del sistema que ya la lee
+  // (reportes, exportación a Team Manager, listados, etc.).
+  // Nullable por compatibilidad con personas creadas antes de este campo
+  // (esa fila conserva su `fullName` histórico intacto hasta que se edite).
+  firstName        String? @map("first_name")
+  paternalLastName String? @map("paternal_last_name")
+  maternalLastName String? @map("maternal_last_name")
+  fullName         String  @map("full_name")
+
+  birthDate DateTime      @map("birth_date")
+  gender    PersonGender
+  email     String?
+  phone     String?
+  status    AccountStatus @default(active)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  createdBy String?   @map("created_by")
+  updatedBy String?   @map("updated_by")
+  deletedAt DateTime? @map("deleted_at")
+
+  user             User?
+  roles            PersonRole[]
+  clubStaffRoles   ClubStaff[]
+  clubAssignments  ClubSwimmer[]
+  registrations    Registration[]
+  relayMemberships RelayRegistrationMember[]
+
+  @@index([status])
+  @@map("persons")
+}
+
+// RB-04: una persona puede tener varios roles simultáneos (nadador,
+// delegado, entrenador). Se modela como tabla en vez de booleanos en
+// `persons` para poder auditar cuándo se asignó/retiró cada rol.
+model PersonRole {
+  id       String         @id @default(uuid())
+  personId String         @map("person_id")
+  roleType PersonRoleType @map("role_type")
+  active   Boolean        @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([personId, roleType])
+  @@map("person_roles")
+}
+
+// --------------------------------------------------------------------------
+// CLUBS (Módulo 3)
+// --------------------------------------------------------------------------
+
+model Club {
+  id       String @id @default(uuid())
+  name     String @map("name")
+  // Unicidad PARCIAL (solo clubes vigentes) — ver la nota en `Person`.
+  username String
+  code     String @map("code") // sigla o abreviación, máx. 5 caracteres (validado en Zod)
+
+  hasLegalStatus Boolean @default(false) @map("has_legal_status")
+  rut            String? @map("rut") // obligatorio solo si hasLegalStatus=true (RB-02)
+  legalName      String? @map("legal_name")
+
+  email String
+
+  isAchmnMember       Boolean @default(false) @map("is_achmn_member")
+  isAchmnCollaborator Boolean @default(false) @map("is_achmn_collaborator")
+  isFchmnMember       Boolean @default(false) @map("is_fchmn_member")
+  isFchmnCollaborator Boolean @default(false) @map("is_fchmn_collaborator")
+
+  status AccountStatus @default(active)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  createdBy String?   @map("created_by")
+  updatedBy String?   @map("updated_by")
+  deletedAt DateTime? @map("deleted_at")
+
+  user               User?
+  staff              ClubStaff[]
+  swimmers           ClubSwimmer[]
+  registrations      Registration[]
+  relayRegistrations RelayRegistration[]
+
+  @@index([status])
+  @@map("clubs")
+}
+
+// Delegado(a) / Entrenador(a) / Representante legal de un club — A-01/A-02
+// ampliado: ahora un club puede tener VARIOS delegados y VARIOS
+// entrenadores (antes era una relación 1:1 directa). El representante
+// legal solo aplica si el club tiene personalidad jurídica, y en la
+// práctica se maneja como un único registro (la interfaz no ofrece
+// agregar más de uno), aunque el modelo no lo restringe.
+// Asignar (o quitar) a alguien como delegado/entrenador de un club
+// sincroniza automáticamente su rol funcional de acceso (PersonRole) —
+// ver clubs.service.ts.
+enum ClubStaffRole {
+  delegate
+  coach
+  legal_representative
+}
+
+model ClubStaff {
+  id       String        @id @default(uuid())
+  clubId   String        @map("club_id")
+  personId String        @map("person_id")
+  roleType ClubStaffRole @map("role_type")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  club   Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, personId, roleType])
+  @@map("club_staff")
+}
+
+// --------------------------------------------------------------------------
+// SWIMMER-CLUB ASSIGNMENT (Módulo 4)
+// --------------------------------------------------------------------------
+
+enum ClubSwimmerStatus {
+  pending // propuesto por el club, esperando aprobación (A-05)
+  active
+  rejected
+  ended
+}
+
+// Historial de pertenencia de un nadador a un club.
+//
+// RB-06 es una INVARIANTE, no un parámetro: un nadador tiene como máximo UNA
+// fila `active` a la vez. Se comprueba en la capa de servicio —para dar un
+// mensaje entendible antes de que la base lo impida— y la garantiza el índice
+// único parcial `club_swimmers_unique_active_person`, que además cubre dos
+// inserciones concurrentes, cosa que la comprobación por sí sola no puede.
+//
+// El comentario anterior decía que no había restricción SQL rígida y que la
+// regla podía desactivarse con `SWIMMER_SINGLE_CLUB_ACTIVE` sin migración. Las
+// dos cosas eran falsas: el índice se crea siempre, y el parámetro —retirado
+// el 13 de septiembre de 2026— solo conseguía que el usuario viera un error de base de datos en
+// vez del mensaje de negocio.
+model ClubSwimmer {
+  id       String            @id @default(uuid())
+  clubId   String            @map("club_id")
+  personId String            @map("person_id")
+  status   ClubSwimmerStatus @default(pending)
+
+  requestedByUserId String    @map("requested_by_user_id")
+  reviewedByUserId  String?   @map("reviewed_by_user_id")
+  reviewedAt        DateTime? @map("reviewed_at")
+  rejectionReason   String?   @map("rejection_reason")
+
+  startDate DateTime? @map("start_date") // se completa al aprobar
+  endDate   DateTime? @map("end_date") // se completa al finalizar
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  club   Club   @relation(fields: [clubId], references: [id])
+  person Person @relation(fields: [personId], references: [id])
+
+  @@index([clubId])
+  @@index([personId])
+  @@index([status])
+  @@map("club_swimmers")
+}
+
+// --------------------------------------------------------------------------
+// TIPOS DE PRUEBAS, CATEGORÍAS Y PRUEBAS (Módulo 5)
+// --------------------------------------------------------------------------
+
+enum EventGender {
+  male
+  female
+  mixed
+}
+
+// Sección 6: inicialmente Individual (1 nadador) y Relevo (4 nadadores).
+// `swimmersCount` es lo que hace extensible el catálogo a futuros tipos.
+model TestType {
+  id            String @id @default(uuid())
+  name          String @unique
+  swimmersCount Int    @map("swimmers_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  categories Category[]
+  events     Event[]
+
+  @@map("test_types")
+}
+
+// Catálogo extensible de distancias (sección 8).
+model Distance {
+  id     String @id @default(uuid())
+  meters Int    @unique
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  events Event[]
+
+  @@map("distances")
+}
+
+// Catálogo extensible de estilos (sección 8).
+model Stroke {
+  id   String @id @default(uuid())
+  name String @unique
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  events Event[]
+
+  @@map("strokes")
+}
+
+// A-07: catálogo global reutilizable entre competencias (no se duplica por
+// competencia). RB-05: la edad se calcula con birthDate vs. una fecha de
+// corte implícita (31 de diciembre del año en curso — convención estándar
+// de natación máster), no una fecha por categoría. Ver shared/age.util.ts.
+// Agrupador de categorías (ej. "Máster Damas", "Máster Varones",
+// "Juvenil") — puramente organizativo para facilitar la administración
+// del catálogo; no impone reglas de negocio adicionales sobre las
+// categorías que agrupa.
+model CategoryGroup {
+  id   String @id @default(uuid())
+  // Unicidad PARCIAL (solo grupos vigentes) — ver la nota en `Person`.
+  name String
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  categories Category[]
+
+  @@map("category_groups")
+}
+
+model Category {
+  id              String  @id @default(uuid())
+  testTypeId      String  @map("test_type_id")
+  categoryGroupId String? @map("category_group_id")
+  name            String
+  minAge          Int     @map("min_age")
+  maxAge          Int     @map("max_age")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  createdBy String?   @map("created_by")
+  updatedBy String?   @map("updated_by")
+  deletedAt DateTime? @map("deleted_at")
+
+  testType                   TestType                   @relation(fields: [testTypeId], references: [id])
+  categoryGroup              CategoryGroup?             @relation(fields: [categoryGroupId], references: [id])
+  competitionEventCategories CompetitionEventCategory[]
+  registrations              Registration[]
+  relayRegistrations         RelayRegistration[]
+
+  // La unicidad de (tipo de prueba, nombre) es PARCIAL: solo entre las
+  // categorías vigentes. Prisma no sabe expresar índices parciales, así que
+  // vive como SQL en la migración `20260905_phase2_integrity`. Con el
+  // `@@unique` completo, borrar lógicamente "Master A" y volver a crearla
+  // fallaba con P2002 contra una fila que el usuario ya no puede ver.
+  @@map("categories")
+}
+
+// "Prueba maestra": distancia + estilo + género + tipo.
+model Event {
+  id         String      @id @default(uuid())
+  testTypeId String      @map("test_type_id")
+  distanceId String      @map("distance_id")
+  strokeId   String      @map("stroke_id")
+  gender     EventGender
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  createdBy String?   @map("created_by")
+  updatedBy String?   @map("updated_by")
+  deletedAt DateTime? @map("deleted_at")
+
+  testType          TestType           @relation(fields: [testTypeId], references: [id])
+  distance          Distance           @relation(fields: [distanceId], references: [id])
+  stroke            Stroke             @relation(fields: [strokeId], references: [id])
+  competitionEvents CompetitionEvent[]
+
+  // Índice único PARCIAL (solo pruebas vigentes) — ver la nota en `Category`.
+  @@map("events")
+}
+
+// --------------------------------------------------------------------------
+// COMPETENCIAS, FECHAS Y JORNADAS (Módulo 6)
+// --------------------------------------------------------------------------
+
+enum CompetitionStatus {
+  draft // Borrador
+  scheduled // Inscripciones programadas
+  open // Inscripciones abiertas
+  closed // Inscripciones cerradas
+  in_progress // En ejecución
+  finished // Finalizada
+  cancelled // Cancelada
+}
+
+// Catálogo reutilizable de piscinas/recintos (mismo recinto se repite entre
+// competencias) — RB-05.1: el único dato que realmente importa para la
+// exportación a Team Manager es `courseLength` (resuelve la limitación
+// documentada del campo "L"/"S" en el HY3, que antes quedaba fijo en "larga").
+enum PoolCourseLength {
+  short_25m
+  long_50m
+}
+
+model Pool {
+  id           String           @id @default(uuid())
+  name         String
+  address      String?
+  isHeated     Boolean          @default(false) @map("is_heated")
+  isCovered    Boolean          @default(false) @map("is_covered")
+  courseLength PoolCourseLength @map("course_length")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  competitions Competition[]
+
+  @@map("pools")
+}
+
+model Competition {
+  id          String            @id @default(uuid())
+  name        String
+  description String?
+  status      CompetitionStatus @default(draft)
+
+  registrationStartAt DateTime @map("registration_start_at")
+  registrationEndAt   DateTime @map("registration_end_at")
+
+  // RB-05: fecha de corte para el cálculo de edad por categoría, ÚNICA para
+  // toda la competencia (no por categoría). Nullable por compatibilidad con
+  // competencias creadas antes de este campo — para esas, el sistema usa
+  // como respaldo el 31 de diciembre del año en curso (getDefaultAgeCutoffDate).
+  ageCutoffDate DateTime? @map("age_cutoff_date")
+
+  // RB-10 a nivel de competencia completa: cantidad máxima de pruebas
+  // INDIVIDUALES (excluye relevos) que un mismo nadador puede inscribir en
+  // TODA la competencia, sin importar fecha/jornada. Es adicional a — no
+  // reemplaza — los límites por fecha+jornada de `SessionLimit` (sección 12).
+  // Nullable = sin límite a nivel de competencia (solo aplican los de sesión).
+  maxIndividualEventsPerSwimmer Int? @map("max_individual_events_per_swimmer")
+
+  // Máximo de RELEVOS que un mismo nadador puede inscribir por jornada
+  // (fecha + tipo de jornada). Antes este tope estaba escrito a fuego en el
+  // código como "1", ignorando lo que dijera `SessionLimit.maxRelayEvents`.
+  // Ahora se define al crear la competencia; el valor por defecto (1)
+  // conserva el comportamiento histórico. `SessionLimit.maxRelayEvents`
+  // sigue existiendo y puede restringir MÁS para una jornada puntual: el
+  // límite efectivo es el menor de los dos.
+  maxRelayEventsPerSwimmerPerSession Int @default(1) @map("max_relay_events_per_swimmer_per_session")
+
+  // Opcional a propósito — no bloquea competencias ya creadas antes de este
+  // campo. Si no está seleccionada, la exportación a Team Manager sigue
+  // usando "piscina larga" por defecto (comportamiento previo, sin cambios).
+  poolId String? @map("pool_id")
+  pool   Pool?   @relation(fields: [poolId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
+  updatedBy String?  @map("updated_by")
+
+  dates             CompetitionDate[]
+  competitionEvents CompetitionEvent[]
+
+  @@map("competitions")
+}
+
+model CompetitionDate {
+  id            String   @id @default(uuid())
+  competitionId String   @map("competition_id")
+  date          DateTime @map("date")
+
+  competition Competition          @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  sessions    CompetitionSession[]
+
+  @@unique([competitionId, date])
+  @@map("competition_dates")
+}
+
+// Catálogo extensible de tipos de jornada (sección 11: Mañana/Tarde/Noche/Especial...).
+model SessionType {
+  id   String @id @default(uuid())
+  name String @unique
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  sessions CompetitionSession[]
+
+  @@map("session_types")
+}
+
+model CompetitionSession {
+  id                String @id @default(uuid())
+  competitionDateId String @map("competition_date_id")
+  sessionTypeId     String @map("session_type_id")
+
+  // Columna DERIVADA de la fecha (`competition_dates.competition_id`), no un
+  // dato que se capture aparte. Existe para poder garantizar en PostgreSQL
+  // que una prueba de competencia solo se asocie a jornadas DE SU PROPIA
+  // competencia: `competition_events` tiene una clave foránea compuesta
+  // (competition_session_id, competition_id) contra el par único de abajo.
+  // Un disparador la mantiene sincronizada ante cualquier escritura, venga
+  // o no desde este código. Ver `20260905000000_phase2_integrity`.
+  competitionId String @map("competition_id")
+
+  competitionDate   CompetitionDate    @relation(fields: [competitionDateId], references: [id], onDelete: Cascade)
+  sessionType       SessionType        @relation(fields: [sessionTypeId], references: [id])
+  limit             SessionLimit?
+  competitionEvents CompetitionEvent[]
+
+  @@unique([competitionDateId, sessionTypeId])
+  @@unique([id, competitionId])
+  @@map("competition_sessions")
+}
+
+// Sección 12: límites de inscripción por fecha+jornada. NULL = sin límite.
+// A-09: uniforme para todos los nadadores/categorías de esa fecha+jornada.
+model SessionLimit {
+  id                   String @id @default(uuid())
+  competitionSessionId String @unique @map("competition_session_id")
+  maxIndividualEvents  Int?   @map("max_individual_events")
+  maxRelayEvents       Int?   @map("max_relay_events")
+
+  competitionSession CompetitionSession @relation(fields: [competitionSessionId], references: [id], onDelete: Cascade)
+
+  @@map("session_limits")
+}
+
+enum CompetitionEventStatus {
+  enabled
+  disabled
+}
+
+// Prueba habilitada dentro de una competencia (sección 13). RB-13: la
+// relación es independiente de la prueba maestra — eliminar esta fila
+// NUNCA elimina el `Event` referenciado.
+model CompetitionEvent {
+  id                   String                 @id @default(uuid())
+  competitionId        String                 @map("competition_id")
+  eventId              String                 @map("event_id")
+  competitionSessionId String                 @map("competition_session_id")
+  status               CompetitionEventStatus @default(enabled)
+  displayOrder         Int?                   @map("display_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  competition        Competition                @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  event              Event                      @relation(fields: [eventId], references: [id])
+  competitionSession CompetitionSession         @relation(fields: [competitionSessionId], references: [id])
+  enabledCategories  CompetitionEventCategory[]
+  registrations      Registration[]
+  relayRegistrations RelayRegistration[]
+
+  @@unique([competitionId, eventId, competitionSessionId])
+  @@map("competition_events")
+}
+
+// Subconjunto de categorías habilitadas para esta prueba EN ESTA competencia.
+model CompetitionEventCategory {
+  competitionEventId String @map("competition_event_id")
+  categoryId         String @map("category_id")
+
+  competitionEvent CompetitionEvent @relation(fields: [competitionEventId], references: [id], onDelete: Cascade)
+  category         Category         @relation(fields: [categoryId], references: [id])
+
+  @@id([competitionEventId, categoryId])
+  @@map("competition_event_categories")
+}
+
+// --------------------------------------------------------------------------
+// INSCRIPCIONES INDIVIDUALES (Módulo 7)
+// --------------------------------------------------------------------------
+
+enum RegistrationStatus {
+  confirmed
+  cancelled
+}
+
+// RB-09: no puede existir más de una inscripción CONFIRMADA del mismo
+// nadador en la misma `competition_event` (validado en capa de servicio,
+// análogo al patrón usado en `club_swimmers` para la regla de un solo club
+// activo — evita depender de un índice único parcial específico de motor).
+model Registration {
+  id                 String             @id @default(uuid())
+  competitionEventId String             @map("competition_event_id")
+  personId           String             @map("person_id")
+  clubId             String             @map("club_id")
+  categoryId         String             @map("category_id")
+  status             RegistrationStatus @default(confirmed)
+
+  // Tiempo estimado de la prueba, en CENTÉSIMAS de segundo totales (ej.
+  // 1:25,67 -> 8567). El frontend lo captura como un solo campo con
+  // formato "mmss,dd" (minutos, segundos, centésimas) y lo convierte a
+  // este total antes de enviarlo. Opcional — no todos los nadadores
+  // tienen una marca de referencia previa.
+  seedTimeCentiseconds Int? @map("seed_time_centiseconds")
+
+  registeredByUserId String    @map("registered_by_user_id")
+  cancelledByUserId  String?   @map("cancelled_by_user_id")
+  cancelledAt        DateTime? @map("cancelled_at")
+
+  // RB-08: true si se creó/modificó/canceló como excepción manual de un
+  // administrador DESPUÉS del cierre de inscripciones — trazabilidad explícita.
+  isPostCloseException Boolean @default(false) @map("is_post_close_exception")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // RESTRICT, no Cascade: eliminar una prueba de la competencia NO puede
+  // borrar en silencio las inscripciones asociadas (ver RB-13 y el servicio
+  // `removeCompetitionEvent`, que ahora exige que no queden inscripciones
+  // históricas antes de permitir la eliminación).
+  competitionEvent CompetitionEvent @relation(fields: [competitionEventId], references: [id], onDelete: Restrict)
+  person           Person           @relation(fields: [personId], references: [id])
+  club             Club             @relation(fields: [clubId], references: [id])
+  category         Category         @relation(fields: [categoryId], references: [id])
+
+  @@index([competitionEventId])
+  @@index([personId])
+  @@index([clubId])
+  @@map("registrations")
+}
+
+// --------------------------------------------------------------------------
+// INSCRIPCIONES DE RELEVOS (Módulo 8)
+// --------------------------------------------------------------------------
+
+// Un equipo de relevo por club, por prueba de competencia y categoría.
+// RB-11: exactamente 4 integrantes, sin duplicados (validado en capa de
+// servicio + `@@unique` a nivel de integrantes).
+model RelayRegistration {
+  id                 String             @id @default(uuid())
+  competitionEventId String             @map("competition_event_id")
+  clubId             String             @map("club_id")
+  categoryId         String             @map("category_id")
+  status             RegistrationStatus @default(confirmed)
+
+  // Tiempo estimado del EQUIPO de relevo (no por nadador), en CENTÉSIMAS
+  // de segundo totales — mismo formato de captura "mmsscc" que las
+  // inscripciones individuales.
+  seedTimeCentiseconds Int? @map("seed_time_centiseconds")
+
+  registeredByUserId   String    @map("registered_by_user_id")
+  cancelledByUserId    String?   @map("cancelled_by_user_id")
+  cancelledAt          DateTime? @map("cancelled_at")
+  isPostCloseException Boolean   @default(false) @map("is_post_close_exception")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // RESTRICT por el mismo motivo que en `Registration`.
+  competitionEvent CompetitionEvent          @relation(fields: [competitionEventId], references: [id], onDelete: Restrict)
+  club             Club                      @relation(fields: [clubId], references: [id])
+  category         Category                  @relation(fields: [categoryId], references: [id])
+  members          RelayRegistrationMember[]
+
+  @@index([competitionEventId])
+  @@index([clubId])
+  @@map("relay_registrations")
+}
+
+model RelayRegistrationMember {
+  id                  String @id @default(uuid())
+  relayRegistrationId String @map("relay_registration_id")
+  personId            String @map("person_id")
+  orderPosition       Int    @map("order_position") // 1-4
+
+  relayRegistration RelayRegistration @relation(fields: [relayRegistrationId], references: [id], onDelete: Cascade)
+  person            Person            @relation(fields: [personId], references: [id])
+
+  @@unique([relayRegistrationId, personId])
+  @@unique([relayRegistrationId, orderPosition])
+  @@map("relay_registration_members")
+}

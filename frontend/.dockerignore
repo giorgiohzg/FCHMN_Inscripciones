@@ -1,0 +1,10 @@
+# El Dockerfile hace `COPY . .`: sin este archivo entrarían node_modules, el
+# build anterior y cualquier .env local.
+node_modules
+dist
+coverage
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo

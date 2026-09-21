@@ -1,0 +1,52 @@
+# Normalización de finales de línea.
+#
+# Sin este archivo, `core.autocrlf` decide por su cuenta en cada equipo y el
+# mismo contenido produce diferencias distintas según quién lo revise. Con
+# `text=auto eol=lf`, el repositorio guarda LF siempre y cada quien ve en su
+# copia de trabajo lo que su plataforma espera. El CI corre sobre Ubuntu.
+* text=auto eol=lf
+
+# Formatos binarios: Git no debe intentar normalizarlos ni diferenciarlos.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.woff binary
+*.woff2 binary
+
+# Fixtures Hy-Tek: CP1252 y CRLF forman parte del formato.
+#
+# `.ev3` va por la misma regla y por la misma razón: es 100 % CRLF y, sin esto,
+# `text=auto eol=lf` lo normalizaría a LF al commitear. En un clon nuevo el
+# archivo dejaría de tener la forma que el formato describe.
+*.hy3 binary
+*.ev3 binary
+
+# Corpus de licencias preservado byte a byte y verificado por hashes.
+#
+# Los textos de `notices/` son copias literales de licencias de terceros, y el
+# proyecto las mantiene con su procedencia y sus hashes reproducibles. Varios
+# archivos de `notices/textos/` se LLAMAN por el SHA-256 de su contenido, y
+# `tests/avisos-terceros.test.ts` comprueba esa correspondencia.
+#
+# Hacen falta los DOS atributos, y por motivos distintos:
+#
+#   -text        impide la conversión de finales de línea. Sin él, `text=auto
+#                eol=lf` normalizaría los CRLF que traen algunos de esos
+#                textos; en un clon nuevo su contenido cambiaría, su SHA-256
+#                dejaría de coincidir con su nombre y la verificación de
+#                avisos fallaría.
+#
+#   -whitespace  silencia los avisos de `git diff --check` sobre espacios
+#                finales y sangrías heredadas de esos textos, que no podemos
+#                ni debemos tocar.
+#
+# Preservar el espaciado y los finales de línea es una exigencia de ESTE
+# mecanismo de trazabilidad, no una obligación legal en sí: lo que la licencia
+# obliga a conservar son los avisos y los textos aplicables.
+notices/** -text -whitespace

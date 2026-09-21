@@ -1,0 +1,173 @@
+# =============================================================================
+# Entorno completo: base de datos, API y web.
+#
+# Cambios respecto de la versión anterior, y por qué:
+#
+#  - Se quitó `version: "3.9"`: Compose v2 lo ignora y advierte que está
+#    obsoleto.
+#  - `backend` construía desde ./backend, donde NO había Dockerfile: el
+#    servicio no podía levantarse. Ahora existe.
+#  - El arranque del backend era
+#        migrate deploy && prisma db seed && npm run start
+#    en una sola línea. Eso tenía dos problemas: `prisma db seed` fallaba
+#    porque `package.json` no declaraba la clave `prisma.seed`, y —más
+#    grave— sembraba en CADA reinicio, incluida la creación del usuario
+#    administrador con credenciales por omisión conocidas. Ahora hay un
+#    servicio `migrate` efímero que corre una vez, y `backend` solo sirve.
+#  - El administrador inicial NO se crea automáticamente: es un comando
+#    manual y explícito (ver más abajo).
+#
+# Uso:
+#
+#   INSTALACIÓN NUEVA
+#     docker compose up -d postgres
+#     docker compose --profile mantenimiento run --rm migrate
+#     docker compose --profile mantenimiento run --rm migrate npm run seed:admin
+#     docker compose up -d
+#
+#   ACTUALIZACIÓN
+#     docker compose --profile mantenimiento run --rm migrate npx prisma migrate deploy
+#     docker compose up -d --no-deps --force-recreate backend
+#
+#   ARRANQUE COTIDIANO
+#     docker compose up -d        # levanta solo postgres, backend y frontend
+#
+# Si una migración o un seed termina con ERROR, NO arranque el backend: corrija
+# la causa y repita el paso antes de continuar.
+#
+# Para apuntar la web a otro backend hay que RECONSTRUIRLA: la URL queda
+# incrustada en el bundle (ver frontend/Dockerfile).
+#   docker compose build --build-arg VITE_API_URL=https://api.ejemplo.cl frontend
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# DATABASE_URL DENTRO DE COMPOSE
+# ---------------------------------------------------------------------------
+# `backend/.env` trae `localhost:5432`, que es correcto para desarrollo en la
+# máquina pero NO dentro de un contenedor: ahí `localhost` es el propio
+# contenedor, no el host, y la conexión falla con ECONNREFUSED. Entre servicios
+# de Compose el host es el NOMBRE del servicio (`postgres`) y el puerto es el
+# interno (5432), no el publicado.
+#
+# Por eso `migrate` y `backend` sobrescriben la variable con `environment:`, que
+# tiene prioridad sobre `env_file:`. El resto de la configuración —secretos,
+# límites— sigue viniendo del archivo.
+# ---------------------------------------------------------------------------
+
+name: fchmn_inscripciones
+
+services:
+  postgres:
+    restart: unless-stopped
+    # Fijada por DIGEST, no solo por etiqueta: `16-alpine` se mueve, y una
+    # base de datos que cambia de version sola no es aceptable. Este es el
+    # digest en uso, verificado el 2026-09-20.
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    environment:
+      POSTGRES_USER: natacion
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en el .env de la raiz}"
+      POSTGRES_DB: natacion
+    # Publicación acotada a LOOPBACK.
+    #
+    # `"5432:5432"` se enlaza a todas las interfaces, así que la base quedaba
+    # alcanzable desde la red local —con las credenciales conocidas que están
+    # escritas unas líneas más arriba, y en el repositorio—. Con `127.0.0.1`
+    # delante, solo este computador puede conectarse. Los contenedores entre sí
+    # no usan este puerto publicado: se hablan por la red interna de Compose.
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U natacion -d natacion"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Contenedor EFÍMERO: aplica migraciones y siembra datos de referencia
+  # (permisos, roles, parámetros y catálogos — todo idempotente). Termina y no
+  # se reinicia. Es también el contenedor desde el que se ejecuta, a mano, la
+  # creación del administrador inicial: `npm run seed:admin`.
+  migrate:
+    build:
+      context: ./backend
+      target: migrate
+      # Los avisos de terceros viven en la raiz del repositorio; este
+      # contexto adicional los hace alcanzables sin ampliar el contexto
+      # principal ni duplicar archivos.
+      additional_contexts:
+        avisos: ./notices
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: "postgresql://natacion:${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en el .env de la raiz}@postgres:5432/natacion?schema=public"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    # Perfil de MANTENIMIENTO: queda fuera del `up` por omisión y se ejecuta de
+    # forma explícita.
+    #   docker compose --profile mantenimiento run --rm migrate
+    profiles: ["mantenimiento"]
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed"
+
+  backend:
+    restart: unless-stopped
+    build:
+      context: ./backend
+      target: runtime
+      # Los avisos de terceros viven en la raiz del repositorio; este
+      # contexto adicional los hace alcanzables sin ampliar el contexto
+      # principal ni duplicar archivos.
+      additional_contexts:
+        avisos: ./notices
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: "postgresql://natacion:${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en el .env de la raiz}@postgres:5432/natacion?schema=public"
+    # Ídem: la API solo se atiende desde este computador.
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      # Espera a PostgreSQL sano, nada más. Las migraciones son un paso PREVIO
+      # de operación, no un requisito de arranque: ver el perfil `mantenimiento`.
+    healthcheck:
+      # `/ready` sí consulta PostgreSQL: es la pregunta correcta para decidir
+      # si este contenedor puede atender tráfico.
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://127.0.0.1:3000/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+
+  frontend:
+    restart: unless-stopped
+    build:
+      context: ./frontend
+      target: runtime
+      # Los avisos de terceros viven en la raiz del repositorio; este
+      # contexto adicional los hace alcanzables sin ampliar el contexto
+      # principal ni duplicar archivos.
+      additional_contexts:
+        avisos: ./notices
+      args:
+        # Se resuelve al CONSTRUIR. Cambiarla aquí sin reconstruir no tiene
+        # ningún efecto sobre una imagen ya creada.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    # Ídem: la web solo se sirve a este computador.
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://127.0.0.1/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+
+volumes:
+  pgdata:

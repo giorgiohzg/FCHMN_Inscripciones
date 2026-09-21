@@ -1,0 +1,348 @@
+{
+  "proposito": "Corpus de textos de licencia. Un identificador SPDX no es un aviso: las licencias que lo exigen deben entregar su TEXTO, y los paquetes de Alpine no lo incluyen dentro del binario.",
+  "revisado": "2026-09-20",
+  "fuenteCanonica": {
+    "nombre": "SPDX License List",
+    "version": "v3.29.0",
+    "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+    "repositorio": "https://github.com/spdx/license-list-data",
+    "nota": "Fijada por commit, no por rama: una rama se mueve y la procedencia dejaria de ser reproducible."
+  },
+  "reglas": [
+    "Un texto especifico de un componente NUNCA se sustituye por el canonico SPDX equivalente.",
+    "Un identificador que no sea SPDX se declara como tal, con su tratamiento explicito.",
+    "Si un componente de una expresion conjuntiva no tiene texto, la entrega externa queda bloqueada."
+  ],
+  "totalConTexto": 25,
+  "sinResolver": [],
+  "licencias": [
+    {
+      "identificador": "0BSD",
+      "archivo": "notices/licencias/0BSD.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/0BSD.txt",
+      "bytes": 643,
+      "sha256": "e3f18c71e10d673590eb9856c1d79dd3b4b0d65404efb5e8584dbede7edd608b",
+      "resuelto": true
+    },
+    {
+      "identificador": "2-clause BSD-like license",
+      "archivo": null,
+      "origen": "no es un identificador SPDX",
+      "tratamiento": "texto-propio-del-componente",
+      "nota": "Es la licencia de nginx. Su texto exacto viaja en la imagen del frontend, en /usr/share/licenses/<paquete>/COPYRIGHT, y el aviso lo reproduce integro. No se sustituye por BSD-2-Clause canonico: no son el mismo texto. Estos cinco paquetes proceden de nginx.org, no de aports, y por eso su registro en la base de apk no lleva commit de aports.",
+      "resuelto": true,
+      "paquetesAfectados": [
+        "nginx",
+        "nginx-module-geoip",
+        "nginx-module-image-filter",
+        "nginx-module-njs",
+        "nginx-module-xslt"
+      ]
+    },
+    {
+      "identificador": "Apache-2.0",
+      "archivo": "notices/licencias/Apache-2.0.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/Apache-2.0.txt",
+      "bytes": 10280,
+      "sha256": "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff",
+      "resuelto": true
+    },
+    {
+      "identificador": "Beerware",
+      "archivo": "notices/licencias/Beerware.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/Beerware.txt",
+      "bytes": 266,
+      "sha256": "991d8a58e0b4be84a174a9bd333a8ca33807a0c1ce6d23a2e25a21f7ece482d0",
+      "resuelto": true
+    },
+    {
+      "identificador": "BlueOak-1.0.0",
+      "archivo": "notices/licencias/BlueOak-1.0.0.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/BlueOak-1.0.0.txt",
+      "bytes": 1552,
+      "sha256": "8a1af140fdfbf5afd3df27f7e662f989c5b963a300020dfafce42033cae9e004",
+      "resuelto": true
+    },
+    {
+      "identificador": "BSD-2-Clause",
+      "archivo": "notices/licencias/BSD-2-Clause.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/BSD-2-Clause.txt",
+      "bytes": 1267,
+      "sha256": "f32fb3b417a194167cfad068223fc975ba96c5960513a10f66a3c28720aec1df",
+      "resuelto": true
+    },
+    {
+      "identificador": "BSD-3-Clause",
+      "archivo": "notices/licencias/BSD-3-Clause.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/BSD-3-Clause.txt",
+      "bytes": 1460,
+      "sha256": "5a93d5831e1297ab10fe643e1a631e83be392896da14ee2951285a79012df69d",
+      "resuelto": true
+    },
+    {
+      "identificador": "bzip2-1.0.6",
+      "archivo": "notices/licencias/bzip2-1.0.6.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/bzip2-1.0.6.txt",
+      "bytes": 1739,
+      "sha256": "0a56dbabe7d2ff65dea26e8b795fe42c6204a192b974d8e9304fe356ccda9fd1",
+      "resuelto": true
+    },
+    {
+      "identificador": "curl",
+      "archivo": "notices/licencias/curl.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/curl.txt",
+      "bytes": 1043,
+      "sha256": "272d1239bdcef73bb98bac206168ca1040bd4a31296755fadfb7515bcea18df3",
+      "resuelto": true
+    },
+    {
+      "identificador": "custom",
+      "archivo": "notices/licencias/LicenseRef-AOM-Patent-1.0.txt",
+      "origen": "archivo PATENTS de la version exacta de aom",
+      "tratamiento": "identificado-y-recuperado",
+      "nota": "El atomo `custom` de la expresion de Alpine para aom-libs 3.11.0-r0 corresponde a la Alliance for Open Media Patent License 1.0. Se confirmo con el archivo PATENTS de la version exacta, no con el texto actual del sitio web.",
+      "resuelto": true,
+      "paquetesAfectados": [
+        "aom-libs@3.11.0-r0"
+      ],
+      "artefactosAfectados": [
+        "frontend-image"
+      ],
+      "accionPendiente": "Recuperar el archivo de licencia de aom en el commit de aports con el que se construyo el binario, o retirar la dependencia si no resulta exigible.",
+      "identificadorLegible": "LicenseRef-AOM-Patent-1.0",
+      "url": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.11.0/PATENTS?format=TEXT",
+      "etiquetaUpstream": "aomedia/aom@v3.11.0",
+      "commitUpstream": "d6f30ae474dd6c358f26de0a0fc26a0d7340a84c",
+      "bytes": 5701,
+      "sha256": "661fb8e504744e95587b556b94a58343448300606a41bea8c7a9b97125696e61",
+      "expresionOriginalAlpine": "BSD-2-Clause AND custom",
+      "expresionLegible": "BSD-2-Clause AND LicenseRef-AOM-Patent-1.0"
+    },
+    {
+      "identificador": "FTL",
+      "archivo": "notices/licencias/FTL.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/FTL.txt",
+      "bytes": 5979,
+      "sha256": "ced6622122ce451cb1ea0c3c3f507a640e2a44c075c04900ddd9fae8acb5369f",
+      "resuelto": true
+    },
+    {
+      "identificador": "GD",
+      "archivo": "notices/licencias/GD.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/GD.txt",
+      "bytes": 2983,
+      "sha256": "5294cfc75f9d13209ae8c88ecda14e255d4ce8b27f282e924d33f7e7845ed8d7",
+      "resuelto": true
+    },
+    {
+      "identificador": "GPL-2.0-only",
+      "archivo": "notices/licencias/GPL-2.0-only.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/GPL-2.0-only.txt",
+      "bytes": 17337,
+      "sha256": "aaf135472f81c5b4a0dca9367e5bb5e9750032b5bebe5442b36e4c0a47430df3",
+      "resuelto": true
+    },
+    {
+      "identificador": "GPL-2.0-or-later",
+      "archivo": "notices/licencias/GPL-2.0-or-later.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/GPL-2.0-or-later.txt",
+      "bytes": 17337,
+      "sha256": "aaf135472f81c5b4a0dca9367e5bb5e9750032b5bebe5442b36e4c0a47430df3",
+      "resuelto": true
+    },
+    {
+      "identificador": "GPL-3.0-or-later",
+      "archivo": "notices/licencias/GPL-3.0-or-later.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/GPL-3.0-or-later.txt",
+      "bytes": 34674,
+      "sha256": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
+      "resuelto": true
+    },
+    {
+      "identificador": "IJG",
+      "archivo": "notices/licencias/IJG.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/IJG.txt",
+      "bytes": 4244,
+      "sha256": "7658542977bfdced9e1059a6c934ce4281de76d103b831007b825917dc62511a",
+      "resuelto": true
+    },
+    {
+      "identificador": "ISC",
+      "archivo": "notices/licencias/ISC.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/ISC.txt",
+      "bytes": 737,
+      "sha256": "521c6f0ed8e64736684f89843d16a4df6b4b7449acbcfc6ca6630a3037ca8c53",
+      "resuelto": true
+    },
+    {
+      "identificador": "LGPL-2.1-or-later",
+      "archivo": "notices/licencias/LGPL-2.1-or-later.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/LGPL-2.1-or-later.txt",
+      "bytes": 26001,
+      "sha256": "5749785c8bdefafcb5d798270ed0a967036fe2ca63dcedade1627565dfef81d2",
+      "resuelto": true
+    },
+    {
+      "identificador": "LGPL-3.0-or-later",
+      "archivo": "notices/licencias/LGPL-3.0-or-later.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/LGPL-3.0-or-later.txt",
+      "bytes": 42098,
+      "sha256": "996af0513df21f7496288951c41428a03c174e9e4a9d63665c57d670f845ccb1",
+      "resuelto": true
+    },
+    {
+      "identificador": "Libpng",
+      "archivo": "notices/licencias/Libpng.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/Libpng.txt",
+      "bytes": 4218,
+      "sha256": "7667a8c88c7a63690244988d626bcddd27ed895526e2c3ab1a9adb463a5fa287",
+      "resuelto": true
+    },
+    {
+      "identificador": "libtiff",
+      "archivo": "notices/licencias/libtiff.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/libtiff.txt",
+      "bytes": 1139,
+      "sha256": "a6ecaa20c8c1b7a8215ed05e5f58764f821596e36d31acc05282c6154cf0dc44",
+      "resuelto": true
+    },
+    {
+      "identificador": "LicenseRef-AOM-Patent-1.0",
+      "archivo": "notices/licencias/LicenseRef-AOM-Patent-1.0.txt",
+      "origen": "archivo PATENTS de aom v3.11.0",
+      "url": "https://aomedia.googlesource.com/aom/+/refs/tags/v3.11.0/PATENTS?format=TEXT",
+      "etiquetaUpstream": "aomedia/aom@v3.11.0",
+      "commitUpstream": "d6f30ae474dd6c358f26de0a0fc26a0d7340a84c",
+      "bytes": 5701,
+      "sha256": "661fb8e504744e95587b556b94a58343448300606a41bea8c7a9b97125696e61",
+      "resuelto": true,
+      "nota": "Alliance for Open Media Patent License 1.0, tal como se publica en la version exacta. No es un identificador de la lista SPDX: se nombra con el prefijo LicenseRef- que SPDX reserva para licencias no listadas."
+    },
+    {
+      "identificador": "MIT",
+      "archivo": "notices/licencias/MIT.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MIT.txt",
+      "bytes": 1078,
+      "sha256": "b05785f9f18e6716bab63424b11454513b9943a222595b70411009202fc592b5",
+      "resuelto": true
+    },
+    {
+      "identificador": "MPL-2.0",
+      "archivo": "notices/licencias/MPL-2.0.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/MPL-2.0.txt",
+      "bytes": 16727,
+      "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172",
+      "resuelto": true
+    },
+    {
+      "identificador": "Public Domain",
+      "archivo": null,
+      "origen": "no es un identificador SPDX",
+      "tratamiento": "sin-texto-que-reproducir",
+      "nota": "Una dedicacion al dominio publico no concede licencia ni impone condiciones: no hay texto exigible que entregar. Se registra el hecho, no se inventa un texto.",
+      "resuelto": true
+    },
+    {
+      "identificador": "Public-Domain",
+      "archivo": null,
+      "origen": "no es un identificador SPDX",
+      "tratamiento": "sin-texto-que-reproducir",
+      "nota": "Variante de grafia de 'Public Domain' usada por Alpine. Mismo tratamiento.",
+      "resuelto": true
+    },
+    {
+      "identificador": "X11",
+      "archivo": "notices/licencias/X11.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/X11.txt",
+      "bytes": 1338,
+      "sha256": "e1963c9958b93bc2578b34f8ae22cfe205e8c0e7d5be7235cfdbdefbf92a5423",
+      "resuelto": true
+    },
+    {
+      "identificador": "Zlib",
+      "archivo": "notices/licencias/Zlib.txt",
+      "origen": "lista oficial SPDX",
+      "version": "v3.29.0",
+      "commit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+      "url": "https://raw.githubusercontent.com/spdx/license-list-data/31ba1a50e5397e00a304dbadc76531740e89ee48/text/Zlib.txt",
+      "bytes": 838,
+      "sha256": "bfb1112d49db5b1daecdfef24bd7e2f3ea0bafb33aa67aa0ab51e2bf8407c03d",
+      "resuelto": true
+    }
+  ],
+  "expresionesLegibles": [
+    {
+      "paquete": "aom-libs",
+      "version": "3.11.0-r0",
+      "original": "BSD-2-Clause AND custom",
+      "legible": "BSD-2-Clause AND LicenseRef-AOM-Patent-1.0",
+      "nota": "Se conserva la expresion original de Alpine junto a la legible. Es CONJUNTIVA: se cumplen ambas."
+    }
+  ]
+}

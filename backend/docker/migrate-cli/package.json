@@ -1,0 +1,10 @@
+﻿{
+  "name": "fchmn-migrate-cli",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "CLI de Prisma para la imagen `migrate`. Paquete interno, no publicable.",
+  "dependencies": {
+    "prisma": "5.22.0"
+  }
+}

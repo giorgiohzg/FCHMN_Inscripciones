@@ -1,0 +1,613 @@
+{
+  "proposito": "Relaciona cada componente copyleft o Apache distribuido en las imagenes con su fuente exacta y con el mecanismo previsto para ponerla a disposicion. Es un registro de PROCEDENCIA y de PLAN, no una declaracion de disponibilidad.",
+  "revisado": "2026-09-20",
+  "generadoPor": "scripts/generar-sources.mjs a partir de notices/inventario/*.json",
+  "origenDeLosCommits": {
+    "campo": "c: de /lib/apk/db/installed",
+    "porQue": "apk conserva dentro del artefacto el commit de aports con el que se construyo cada binario. Es la fuente correspondiente exacta. Consultar que version publica hoy la rama NO sirve: en la resolucion del 2026-09-20, 27 de 87 paquetes ya tenian en su rama una version posterior a la distribuida.",
+    "prioridadSeguida": [
+      "1. metadatos conservados en la base de apk instalada (campo c:) -- USADA",
+      "2. historial del espejo oficial de aports -- no necesaria",
+      "3. archivo oficial de Alpine -- no necesaria"
+    ]
+  },
+  "estadoDeDisponibilidad": {
+    "archivoDeFuentesCreado": false,
+    "ofertaEscritaPublicada": false,
+    "nota": "Todavia NO existe archivo de fuentes correspondiente ni oferta publicada. Este manifiesto no debe citarse como prueba de disponibilidad hasta que ese material exista."
+  },
+  "entregaExterna": {
+    "bloqueada": true,
+    "hitos": {
+      "candidatasFinalesConstruidasYVerificadas": false,
+      "archivoDeFuentesCorrespondienteCreado": false
+    },
+    "motivos": [
+      "45 paquetes fuente cuyos avisos de copyright NO pudieron verificarse: su fuente exacta se publica solo como tarball. No se afirma que carezcan de aviso; se afirma que no se comprobo.",
+      "las candidatas finales no se han construido ni verificado",
+      "no existe archivo de fuentes correspondiente para una eventual entrega externa"
+    ],
+    "nota": "Mientras exista un solo motivo en esta lista, las imagenes NO pueden entregarse fuera de FCHMN."
+  },
+  "escenarioActual": {
+    "repositorio": "privado",
+    "uso": "interno de FCHMN",
+    "imagenesEntregadasFueraDeFCHMN": false,
+    "frontendEntregadoANavegadores": true,
+    "consecuencia": "Las obligaciones de ofrecer fuente por distribucion externa no se activan todavia. Esto NO elimina las condiciones de atribucion: los avisos se incorporan igualmente, como politica conservadora de cumplimiento y para dejar el proyecto listo para una entrega externa futura."
+  },
+  "mecanismoPrevisto": {
+    "preferido": "archivo-de-fuentes-acompanante",
+    "descripcion": "Cada version publicada de las imagenes se acompanara de un archivo con la fuente correspondiente a ESAS versiones exactas: el APKBUILD y los parches de aports en el commit registrado aqui, mas los tarballs upstream que ese APKBUILD declara en `source=`.",
+    "porQueNoOfertaEscrita": "Una oferta escrita depende de una promesa operativa posterior y de enlaces que caducan: dl-cdn.alpinelinux.org retira las ramas al terminar su soporte, de modo que las versiones exactas dejan de estar disponibles. Acompanar la fuente elimina esa dependencia.",
+    "lgpl": {
+      "mecanismoDeEnlace": "enlace dinamico contra bibliotecas compartidas del sistema",
+      "consecuencia": "El destinatario puede sustituir la biblioteca reemplazando el objeto compartido dentro de la imagen. Esta condicion es la que hace admisible el enlace y se declara en el aviso.",
+      "pendienteDeVerificar": "Confirmar el enlace dinamico sobre las candidatas finales, no sobre las imagenes actuales."
+    },
+    "mpl": {
+      "alcance": "MPL-2.0 cubre archivos concretos, no la obra entera.",
+      "queRecibeElDestinatario": "La ubicacion de la fuente de los archivos cubiertos y el aviso de que estan bajo MPL-2.0, con derecho a obtenerlos en forma de codigo fuente."
+    }
+  },
+  "fuentesNoAlpine": [
+    {
+      "componente": "nginx y sus modulos (geoip, image-filter, njs, xslt)",
+      "expresion": "2-clause BSD-like license",
+      "clase": "permisiva",
+      "origen": "paquetes publicados por nginx.org e instalados por la imagen base oficial nginx",
+      "proyectoUpstream": "https://nginx.org/",
+      "avisoIncluidoEnLaImagen": "/usr/share/licenses/<paquete>/COPYRIGHT",
+      "nota": "No proceden de aports: su registro en la base de apk no lleva campo `c:`. No requieren oferta de fuente por ser permisiva, y su texto exacto ya viaja en la imagen."
+    },
+    {
+      "componente": "Node.js",
+      "origen": "imagen base oficial node",
+      "avisoIncluidoEnLaImagen": "/usr/local/LICENSE",
+      "nota": "Licencia combinada que enumera 43 componentes de terceros, entre ellos OpenSSL, V8, ICU, libuv y zlib. Ya viaja en la imagen y el aviso la reproduce."
+    },
+    {
+      "componente": "Yarn",
+      "expresion": "BSD-2-Clause",
+      "origen": "imagen base oficial node",
+      "avisoIncluidoEnLaImagen": "/opt/yarn-v1.22.22/LICENSE",
+      "nota": "Viaja en backend y migrate aunque el proyecto no lo usa. Candidato a retirada en una revision posterior del Dockerfile."
+    }
+  ],
+  "avisosDeCopyright": {
+    "manifiesto": "notices/avisos-fuente.json",
+    "paquetesFuente": 64,
+    "conAvisoPropio": 15,
+    "verificadoAusente": 4,
+    "noVerificable": 45
+  },
+  "totalComponentes": 24,
+  "componentesSinResolver": 0,
+  "componentes": [
+    {
+      "ramaAports": "3.21-stable",
+      "paqueteFuente": "alpine-baselayout",
+      "versionDistribuida": "3.6.8-r1",
+      "expresion": "GPL-2.0-only",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout",
+      "binarios": [
+        "alpine-baselayout",
+        "alpine-baselayout-data"
+      ],
+      "artefactos": [
+        "frontend-image"
+      ],
+      "commitAports": "5f0cd7890349e7fe11128478ac506c709805224d",
+      "construido": "2025-01-04T07:04:48.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/5f0cd7890349e7fe11128478ac506c709805224d/main/alpine-baselayout/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/5f0cd7890349e7fe11128478ac506c709805224d/main/alpine-baselayout",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/5f0cd7890349e7fe11128478ac506c709805224d/main/alpine-baselayout",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.21-stable",
+      "paqueteFuente": "apk-tools",
+      "versionDistribuida": "2.14.6-r3",
+      "expresion": "GPL-2.0-only",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://gitlab.alpinelinux.org/alpine/apk-tools",
+      "binarios": [
+        "apk-tools"
+      ],
+      "artefactos": [
+        "frontend-image"
+      ],
+      "commitAports": "41847d6ccff08940b5bf1ba0d6005e95897039f9",
+      "construido": "2025-02-13T21:57:30.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/41847d6ccff08940b5bf1ba0d6005e95897039f9/main/apk-tools/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/41847d6ccff08940b5bf1ba0d6005e95897039f9/main/apk-tools",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/41847d6ccff08940b5bf1ba0d6005e95897039f9/main/apk-tools",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.21-stable",
+      "paqueteFuente": "busybox",
+      "versionDistribuida": "1.37.0-r12",
+      "expresion": "GPL-2.0-only",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://busybox.net/",
+      "binarios": [
+        "busybox",
+        "busybox-binsh",
+        "ssl_client"
+      ],
+      "artefactos": [
+        "frontend-image"
+      ],
+      "commitAports": "9c49608930ef6a9936750e9e39edec56b3db9cd5",
+      "construido": "2025-01-17T18:12:01.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/9c49608930ef6a9936750e9e39edec56b3db9cd5/main/busybox/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/9c49608930ef6a9936750e9e39edec56b3db9cd5/main/busybox",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/9c49608930ef6a9936750e9e39edec56b3db9cd5/main/busybox",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.21-stable",
+      "paqueteFuente": "ca-certificates",
+      "versionDistribuida": "20241121-r1",
+      "expresion": "MPL-2.0 AND MIT",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/",
+      "binarios": [
+        "ca-certificates",
+        "ca-certificates-bundle"
+      ],
+      "artefactos": [
+        "frontend-image"
+      ],
+      "commitAports": "707ff77afebd8ef5bd60f3a5dd1b08f8c480f531",
+      "construido": "2025-01-08T09:56:39.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/707ff77afebd8ef5bd60f3a5dd1b08f8c480f531/main/ca-certificates/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/707ff77afebd8ef5bd60f3a5dd1b08f8c480f531/main/ca-certificates",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/707ff77afebd8ef5bd60f3a5dd1b08f8c480f531/main/ca-certificates",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.21-stable",
+      "paqueteFuente": "freetype",
+      "versionDistribuida": "2.13.3-r0",
+      "expresion": "FTL OR GPL-2.0-or-later",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://www.freetype.org/",
+      "binarios": [
+        "freetype"
+      ],
+      "artefactos": [
+        "frontend-image"
+      ],
+      "commitAports": "9404f86086f8e5c970b156336e71c56828a1e587",
+      "construido": "2024-09-05T03:44:08.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/9404f86086f8e5c970b156336e71c56828a1e587/main/freetype/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/9404f86086f8e5c970b156336e71c56828a1e587/main/freetype",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/9404f86086f8e5c970b156336e71c56828a1e587/main/freetype",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.21-stable",
+      "paqueteFuente": "geoip",
+      "versionDistribuida": "1.6.12-r5",
+      "expresion": "LGPL-2.1-or-later",
+      "clase": "copyleft",
+      "proyectoUpstream": "http://www.maxmind.com/app/ip-location",
+      "binarios": [
+        "geoip"
+      ],
+      "artefactos": [
+        "frontend-image"
+      ],
+      "commitAports": "fc95c59998285564fbcb0bfb2443898c62e10171",
+      "construido": "2024-03-12T15:33:42.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/fc95c59998285564fbcb0bfb2443898c62e10171/main/geoip/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/fc95c59998285564fbcb0bfb2443898c62e10171/main/geoip",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/fc95c59998285564fbcb0bfb2443898c62e10171/main/geoip",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.21-stable",
+      "paqueteFuente": "gettext",
+      "versionDistribuida": "0.22.5-r0",
+      "expresion": "GPL-3.0-or-later AND LGPL-2.1-or-later AND MIT",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://www.gnu.org/software/gettext/gettext.html",
+      "binarios": [
+        "gettext-envsubst",
+        "libintl"
+      ],
+      "artefactos": [
+        "frontend-image"
+      ],
+      "commitAports": "c49ded5d54b708768165f7a99589464cd5c5eeee",
+      "construido": "2024-03-27T17:11:29.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/c49ded5d54b708768165f7a99589464cd5c5eeee/main/gettext/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/c49ded5d54b708768165f7a99589464cd5c5eeee/main/gettext",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/c49ded5d54b708768165f7a99589464cd5c5eeee/main/gettext",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.21-stable",
+      "paqueteFuente": "libgcrypt",
+      "versionDistribuida": "1.10.3-r1",
+      "expresion": "LGPL-2.1-or-later AND GPL-2.0-or-later",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://www.gnupg.org/",
+      "binarios": [
+        "libgcrypt"
+      ],
+      "artefactos": [
+        "frontend-image"
+      ],
+      "commitAports": "40176cc16c5dfa243d502fa9e1f7b9e68ebcad0b",
+      "construido": "2024-10-15T11:56:28.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/40176cc16c5dfa243d502fa9e1f7b9e68ebcad0b/main/libgcrypt/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/40176cc16c5dfa243d502fa9e1f7b9e68ebcad0b/main/libgcrypt",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/40176cc16c5dfa243d502fa9e1f7b9e68ebcad0b/main/libgcrypt",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.21-stable",
+      "paqueteFuente": "libgpg-error",
+      "versionDistribuida": "1.51-r0",
+      "expresion": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://www.gnupg.org/",
+      "binarios": [
+        "libgpg-error"
+      ],
+      "artefactos": [
+        "frontend-image"
+      ],
+      "commitAports": "59a563eec99ff1e59c5cb42ecf7a482be3684a1c",
+      "construido": "2024-11-19T07:21:14.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/59a563eec99ff1e59c5cb42ecf7a482be3684a1c/main/libgpg-error/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/59a563eec99ff1e59c5cb42ecf7a482be3684a1c/main/libgpg-error",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/59a563eec99ff1e59c5cb42ecf7a482be3684a1c/main/libgpg-error",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.21-stable",
+      "paqueteFuente": "libidn2",
+      "versionDistribuida": "2.3.7-r0",
+      "expresion": "GPL-2.0-or-later OR LGPL-3.0-or-later",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://www.gnu.org/software/libidn#libidn2",
+      "binarios": [
+        "libidn2"
+      ],
+      "artefactos": [
+        "frontend-image"
+      ],
+      "commitAports": "1cdcdd0eccbee1f60078417a7aaf83f92f6e6754",
+      "construido": "2024-01-28T21:37:39.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/1cdcdd0eccbee1f60078417a7aaf83f92f6e6754/main/libidn2/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/1cdcdd0eccbee1f60078417a7aaf83f92f6e6754/main/libidn2",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/1cdcdd0eccbee1f60078417a7aaf83f92f6e6754/main/libidn2",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.21-stable",
+      "paqueteFuente": "libunistring",
+      "versionDistribuida": "1.2-r0",
+      "expresion": "GPL-2.0-or-later OR LGPL-3.0-or-later",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://www.gnu.org/software/libunistring/",
+      "binarios": [
+        "libunistring"
+      ],
+      "artefactos": [
+        "frontend-image"
+      ],
+      "commitAports": "c4c67852adc5bc15e278054876bc3c70c321948e",
+      "construido": "2024-02-29T09:08:45.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/c4c67852adc5bc15e278054876bc3c70c321948e/main/libunistring/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/c4c67852adc5bc15e278054876bc3c70c321948e/main/libunistring",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/c4c67852adc5bc15e278054876bc3c70c321948e/main/libunistring",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.21-stable",
+      "paqueteFuente": "musl",
+      "versionDistribuida": "1.2.5-r9",
+      "expresion": "MIT AND BSD-2-Clause AND GPL-2.0-or-later",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://musl.libc.org/",
+      "binarios": [
+        "musl-utils"
+      ],
+      "artefactos": [
+        "frontend-image"
+      ],
+      "commitAports": "efd4d5df7be0ea48d98512671f676fc5ceb14899",
+      "construido": "2025-02-13T17:26:26.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/efd4d5df7be0ea48d98512671f676fc5ceb14899/main/musl/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/efd4d5df7be0ea48d98512671f676fc5ceb14899/main/musl",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/efd4d5df7be0ea48d98512671f676fc5ceb14899/main/musl",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.21-stable",
+      "paqueteFuente": "openssl",
+      "versionDistribuida": "3.3.3-r0",
+      "expresion": "Apache-2.0",
+      "clase": "apache",
+      "proyectoUpstream": "https://www.openssl.org/",
+      "binarios": [
+        "libcrypto3",
+        "libssl3"
+      ],
+      "artefactos": [
+        "frontend-image"
+      ],
+      "commitAports": "ddbf4a43b534e1e2da4ccb72bdc4ffcd9b85ce03",
+      "construido": "2025-02-11T17:51:32.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/ddbf4a43b534e1e2da4ccb72bdc4ffcd9b85ce03/main/openssl/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/ddbf4a43b534e1e2da4ccb72bdc4ffcd9b85ce03/main/openssl",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/ddbf4a43b534e1e2da4ccb72bdc4ffcd9b85ce03/main/openssl",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.21-stable",
+      "paqueteFuente": "pax-utils",
+      "versionDistribuida": "1.3.8-r1",
+      "expresion": "GPL-2.0-only",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://wiki.gentoo.org/wiki/Hardened/PaX_Utilities",
+      "binarios": [
+        "scanelf"
+      ],
+      "artefactos": [
+        "frontend-image"
+      ],
+      "commitAports": "398a5aee3025ec8a4d0d761e448dc86ac777fa09",
+      "construido": "2024-10-05T12:41:08.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/398a5aee3025ec8a4d0d761e448dc86ac777fa09/main/pax-utils/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/398a5aee3025ec8a4d0d761e448dc86ac777fa09/main/pax-utils",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/398a5aee3025ec8a4d0d761e448dc86ac777fa09/main/pax-utils",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.21-stable",
+      "paqueteFuente": "xz",
+      "versionDistribuida": "5.6.3-r1",
+      "expresion": "GPL-2.0-or-later AND 0BSD AND Public-Domain AND LGPL-2.1-or-later",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://tukaani.org/xz/",
+      "binarios": [
+        "xz-libs"
+      ],
+      "artefactos": [
+        "frontend-image"
+      ],
+      "commitAports": "0e019d9722d6d8e51ef4658074b2bc736f60b4dc",
+      "construido": "2025-04-04T21:46:30.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/0e019d9722d6d8e51ef4658074b2bc736f60b4dc/main/xz/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/0e019d9722d6d8e51ef4658074b2bc736f60b4dc/main/xz",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/0e019d9722d6d8e51ef4658074b2bc736f60b4dc/main/xz",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.21-stable",
+      "paqueteFuente": "zstd",
+      "versionDistribuida": "1.5.6-r2",
+      "expresion": "BSD-3-Clause OR GPL-2.0-or-later",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://facebook.github.io/zstd/",
+      "binarios": [
+        "zstd-libs"
+      ],
+      "artefactos": [
+        "frontend-image"
+      ],
+      "commitAports": "5c2ddf18f193dafdd25ae7391d96c7e30766eecd",
+      "construido": "2024-12-25T07:14:12.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/5c2ddf18f193dafdd25ae7391d96c7e30766eecd/main/zstd/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/5c2ddf18f193dafdd25ae7391d96c7e30766eecd/main/zstd",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/5c2ddf18f193dafdd25ae7391d96c7e30766eecd/main/zstd",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.24-stable",
+      "paqueteFuente": "alpine-baselayout",
+      "versionDistribuida": "3.7.2-r1",
+      "expresion": "GPL-2.0-only",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/master/main/alpine-baselayout",
+      "binarios": [
+        "alpine-baselayout",
+        "alpine-baselayout-data"
+      ],
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "commitAports": "60a7585bbab2fa0f762504eb617dbca90216e31f",
+      "construido": "2026-03-24T19:40:54.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/60a7585bbab2fa0f762504eb617dbca90216e31f/main/alpine-baselayout/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/60a7585bbab2fa0f762504eb617dbca90216e31f/main/alpine-baselayout",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/60a7585bbab2fa0f762504eb617dbca90216e31f/main/alpine-baselayout",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.24-stable",
+      "paqueteFuente": "apk-tools",
+      "versionDistribuida": "3.0.6-r0",
+      "expresion": "GPL-2.0-only",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://gitlab.alpinelinux.org/alpine/apk-tools",
+      "binarios": [
+        "apk-tools",
+        "libapk"
+      ],
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "commitAports": "1403ea7a8ae3fb8e5a11207ddb1ff536eb8de912",
+      "construido": "2026-04-13T09:23:00.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/1403ea7a8ae3fb8e5a11207ddb1ff536eb8de912/main/apk-tools/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/1403ea7a8ae3fb8e5a11207ddb1ff536eb8de912/main/apk-tools",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/1403ea7a8ae3fb8e5a11207ddb1ff536eb8de912/main/apk-tools",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.24-stable",
+      "paqueteFuente": "busybox",
+      "versionDistribuida": "1.37.0-r31",
+      "expresion": "GPL-2.0-only",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://busybox.net/",
+      "binarios": [
+        "busybox",
+        "busybox-binsh",
+        "ssl_client"
+      ],
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "commitAports": "c3ef5d10e6ef6528852c51f0564963e2f8c1be19",
+      "construido": "2026-01-10T15:38:28.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/c3ef5d10e6ef6528852c51f0564963e2f8c1be19/main/busybox/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/c3ef5d10e6ef6528852c51f0564963e2f8c1be19/main/busybox",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/c3ef5d10e6ef6528852c51f0564963e2f8c1be19/main/busybox",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.24-stable",
+      "paqueteFuente": "ca-certificates",
+      "versionDistribuida": "20260611-r0",
+      "expresion": "MPL-2.0 AND MIT",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/",
+      "binarios": [
+        "ca-certificates-bundle"
+      ],
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "commitAports": "e41cbd2ae991adfe8df298ba8e8e777e90bd0e03",
+      "construido": "2026-06-13T14:47:22.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/e41cbd2ae991adfe8df298ba8e8e777e90bd0e03/main/ca-certificates/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/e41cbd2ae991adfe8df298ba8e8e777e90bd0e03/main/ca-certificates",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/e41cbd2ae991adfe8df298ba8e8e777e90bd0e03/main/ca-certificates",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.24-stable",
+      "paqueteFuente": "gcc",
+      "versionDistribuida": "15.2.0-r5",
+      "expresion": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://gcc.gnu.org",
+      "binarios": [
+        "libgcc",
+        "libstdc++"
+      ],
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "commitAports": "423a8ad043d07f2c7546c8ec3e2b0384cda360ae",
+      "construido": "2026-05-29T19:59:26.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/423a8ad043d07f2c7546c8ec3e2b0384cda360ae/main/gcc/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/423a8ad043d07f2c7546c8ec3e2b0384cda360ae/main/gcc",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/423a8ad043d07f2c7546c8ec3e2b0384cda360ae/main/gcc",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.24-stable",
+      "paqueteFuente": "musl",
+      "versionDistribuida": "1.2.6-r2",
+      "expresion": "MIT AND BSD-2-Clause AND GPL-2.0-or-later",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://musl.libc.org/",
+      "binarios": [
+        "musl-utils"
+      ],
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "commitAports": "f5640d3a10f664c9119720c60515265d3d6f6d01",
+      "construido": "2026-04-11T09:33:27.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/f5640d3a10f664c9119720c60515265d3d6f6d01/main/musl/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/f5640d3a10f664c9119720c60515265d3d6f6d01/main/musl",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/f5640d3a10f664c9119720c60515265d3d6f6d01/main/musl",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.24-stable",
+      "paqueteFuente": "openssl",
+      "versionDistribuida": "3.5.8-r0",
+      "expresion": "Apache-2.0",
+      "clase": "apache",
+      "proyectoUpstream": "https://www.openssl.org/",
+      "binarios": [
+        "libcrypto3",
+        "libssl3",
+        "openssl"
+      ],
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "commitAports": "013edf8b29199933e8ea34dde460b5584b979042",
+      "construido": "2026-08-25T20:58:57.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/013edf8b29199933e8ea34dde460b5584b979042/main/openssl/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/013edf8b29199933e8ea34dde460b5584b979042/main/openssl",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/013edf8b29199933e8ea34dde460b5584b979042/main/openssl",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    },
+    {
+      "ramaAports": "3.24-stable",
+      "paqueteFuente": "pax-utils",
+      "versionDistribuida": "1.3.9-r1",
+      "expresion": "GPL-2.0-only",
+      "clase": "copyleft",
+      "proyectoUpstream": "https://wiki.gentoo.org/wiki/Hardened/PaX_Utilities",
+      "binarios": [
+        "scanelf"
+      ],
+      "artefactos": [
+        "backend",
+        "migrate"
+      ],
+      "commitAports": "c61801eeacb3ffcd9c2025b09e402153bb93fb39",
+      "construido": "2026-03-27T19:39:10.000Z",
+      "resuelto": true,
+      "apkbuild": "https://gitlab.alpinelinux.org/alpine/aports/-/blob/c61801eeacb3ffcd9c2025b09e402153bb93fb39/main/pax-utils/APKBUILD",
+      "arbolDeAports": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/c61801eeacb3ffcd9c2025b09e402153bb93fb39/main/pax-utils",
+      "espejoOficial": "https://github.com/alpinelinux/aports/tree/c61801eeacb3ffcd9c2025b09e402153bb93fb39/main/pax-utils",
+      "nota": "Commit tomado del campo `c:` de la base de apk del propio artefacto: identifica el codigo con el que se construyo ESTE binario."
+    }
+  ]
+}

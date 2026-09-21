@@ -1,0 +1,184 @@
+{
+  "proposito": "Casos que NO se resuelven leyendo el texto de licencia del artefacto distribuido. Cada entrada declara qué se verificó, qué no, y con qué base se incorpora el aviso. El generador falla si un paquete sin texto no aparece aquí.",
+  "revisado": "2026-09-20",
+  "casos": [
+    {
+      "paquete": "@swc/helpers",
+      "version": "0.3.17",
+      "motivo": "sin-texto-y-sin-origen-verificable",
+      "expresionDeclarada": "MIT",
+      "dondeSeDeclara": "package.json del tarball publicado y metadatos del registro npm",
+      "tarball": "https://registry.npmjs.org/@swc/helpers/-/helpers-0.3.17.tgz",
+      "integridad": "sha512-tb7Iu+oZ+zWJZ3HJqwx8oNwSDIU440hmVMDPhpACWQWnrZHK99Bxs70gT1L2dnr5Hg50ZRWEFkQCAnOVVV0z1Q==",
+      "verificado": [
+        "la versión exacta declara MIT en su manifiesto",
+        "el tarball publicado NO incluye ningún archivo de licencia",
+        "no existe etiqueta `@swc/helpers@0.3.17` en swc-project/swc: la consulta a matching-refs devolvió vacío",
+        "el registro npm no conserva `gitHead` para esta publicación"
+      ],
+      "noVerificado": [
+        "no se identificó commit alguno que corresponda a esta versión publicada"
+      ],
+      "textoIncorporado": "canónico SPDX MIT",
+      "advertencia": "El texto incorporado NO procede del lanzamiento. Es el texto canónico SPDX de la expresión declarada. La rama principal del monorepo contiene hoy un packages/helpers/LICENSE que NO es MIT, de modo que usarla como sustituto sería incorrecto además de improcedente.",
+      "titular": "강동윤 (kdy1997.dev@gmail.com)",
+      "titularNota": "Tomado del campo author del manifiesto publicado, que es un metadato verificable. NO hay aviso de copyright en el artefacto ni texto de licencia del que derivarlo; el titular no se inventa, se cita su origen.",
+      "riesgoResidual": true,
+      "accionPendiente": "Consultar upstream por separado para obtener una concesión con titular verificable.",
+      "aceptadoProvisionalmentePor": "decisión del responsable del proyecto, 2026-09-20",
+      "textoDesde": "canonico",
+      "textoCanonico": "MIT",
+      "titularCanonico": "강동윤 (kdy1997.dev@gmail.com)"
+    },
+    {
+      "paquete": "brotli",
+      "version": "1.3.3",
+      "motivo": "dos-capas-de-licencia",
+      "expresionDeclarada": "MIT",
+      "dondeSeDeclara": "package.json y readme.md del paquete publicado",
+      "verificado": [
+        "el paquete publicado no incluye archivo de licencia",
+        "los archivos distribuidos bajo dec/ y enc/ llevan cabecera: 'Copyright 2013 Google Inc. All Rights Reserved. Licensed under the Apache License, Version 2.0'",
+        "existe etiqueta v1.3.3 en devongovett/brotli.js, commit e36051345f6d27a56e5f39ea70d2f789b8574046, sin archivo de licencia en la raíz"
+      ],
+      "textoIncorporado": "ambas capas: MIT canónico SPDX para el envoltorio publicado, y Apache-2.0 completo más el aviso de Google para el código vendorizado",
+      "titular": "Devon Govett",
+      "avisosConservados": "las cabeceras Apache-2.0 viajan íntegras dentro de los archivos fuente distribuidos en la imagen; no se eliminan ni se alteran",
+      "textoApacheDesde": {
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "nota": "el texto Apache-2.0 completo, idéntico al que ya viaja en el artefacto"
+      },
+      "riesgoResidual": false,
+      "textoDesde": "canonico",
+      "textoCanonico": "MIT",
+      "titularCanonico": "Devon Govett",
+      "capaAdicional": {
+        "tipo": "Apache-2.0",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "titular": "Google Inc."
+      },
+      "titularNota": "Titular del envoltorio MIT, tomado del campo author del manifiesto publicado. El titular del codigo vendorizado es distinto y consta en capaAdicional."
+    },
+    {
+      "paquete": "saxes",
+      "version": "5.0.1",
+      "motivo": "sin-texto-en-tarball-pero-origen-verificable",
+      "expresionDeclarada": "ISC",
+      "verificado": [
+        "el tarball publicado no incluye archivo de licencia",
+        "existe etiqueta v5.0.1 en lddubeau/saxes, commit 6ef6a275b20f19cb67808daf0d8f64e06aaf5b0e",
+        "el LICENSE de esa etiqueta contiene TRES concesiones, no una"
+      ],
+      "textoIncorporado": "el LICENSE de la etiqueta exacta v5.0.1",
+      "advertencia": "El texto canónico SPDX de ISC habría sido INSUFICIENTE: el archivo real cubre ISC de los contribuyentes de saxes, ISC de sax (Isaac Z. Schlueter y colaboradores) y MIT de Mathias Bynens por String.fromCodePoint. Sustituirlo habría borrado dos titulares.",
+      "riesgoResidual": false,
+      "textoDesde": "etiqueta",
+      "sha256": "0fac2374380621b22e6b50451057721a9c52935b02d16d106a9f04897f061d0e"
+    },
+    {
+      "paquete": "abstract-logging",
+      "version": "2.0.1",
+      "motivo": "sin-texto-en-tarball-ni-en-la-etiqueta",
+      "expresionDeclarada": "MIT",
+      "verificado": [
+        "el tarball publicado no incluye archivo de licencia",
+        "existe etiqueta v2.0.1 en jsumners/abstract-logging, commit 80dfaef91ee87008f4ed2b6e78921d383bccd406",
+        "en la raíz de esa etiqueta solo hay Readme.md, index.js, package.json y test.js: ningún archivo de licencia"
+      ],
+      "textoIncorporado": "canónico SPDX MIT",
+      "titular": "James Sumners",
+      "titularNota": "Tomado del campo author del manifiesto publicado, no inventado.",
+      "riesgoResidual": true,
+      "accionPendiente": "Confirmar con upstream un texto de licencia con titular explícito.",
+      "textoDesde": "canonico",
+      "textoCanonico": "MIT",
+      "titularCanonico": "James Sumners"
+    },
+    {
+      "paquete": "dfa",
+      "version": "1.2.0",
+      "motivo": "sin-texto-en-tarball-ni-en-la-etiqueta",
+      "expresionDeclarada": "MIT",
+      "verificado": [
+        "el tarball publicado no incluye archivo de licencia",
+        "existe etiqueta v1.2.0 en devongovett/dfa, commit 3f5e603e5082caedabefefdf53e8a6ca3111e966",
+        "en la raíz de esa etiqueta no hay LICENSE, LICENSE.md ni COPYING"
+      ],
+      "textoIncorporado": "canónico SPDX MIT",
+      "titular": "Devon Govett",
+      "titularNota": "Tomado del campo author del manifiesto publicado, no inventado.",
+      "riesgoResidual": true,
+      "accionPendiente": "Confirmar con upstream un texto de licencia con titular explícito.",
+      "textoDesde": "canonico",
+      "textoCanonico": "MIT",
+      "titularCanonico": "Devon Govett"
+    },
+    {
+      "paquete": "fontkit",
+      "version": "1.9.0",
+      "motivo": "sin-texto-en-tarball-ni-en-la-etiqueta",
+      "expresionDeclarada": "MIT",
+      "verificado": [
+        "el tarball publicado no incluye archivo de licencia",
+        "existe etiqueta v1.9.0 en foliojs/fontkit, commit fc8d99b8f5a8767aba8a8a89e2ada83cd1b099b3",
+        "en la raíz de esa etiqueta no hay LICENSE, LICENSE.md ni COPYING"
+      ],
+      "textoIncorporado": "canónico SPDX MIT",
+      "titular": "Devon Govett",
+      "titularNota": "Tomado del campo author del manifiesto publicado, no inventado.",
+      "riesgoResidual": true,
+      "accionPendiente": "Confirmar con upstream un texto de licencia con titular explícito.",
+      "textoDesde": "canonico",
+      "textoCanonico": "MIT",
+      "titularCanonico": "Devon Govett"
+    },
+    {
+      "paquete": "png-js",
+      "version": "1.1.0",
+      "motivo": "sin-campo-license-pero-con-texto-en-el-artefacto",
+      "expresionDeclarada": null,
+      "verificado": [
+        "el manifiesto publicado NO tiene campo `license`",
+        "el tarball publicado SÍ incluye LICENSE con concesión MIT, 'Copyright (c) 2017 Devon Govett'",
+        "SHA-256 del archivo tal como viaja en la imagen: bdb26a2ec815931ed6a38f3416362566204ee85ecdef96702b636402da4c75c3"
+      ],
+      "textoIncorporado": "el LICENSE que viaja en el artefacto distribuido",
+      "titular": "Devon Govett",
+      "riesgoResidual": false,
+      "nota": "La concesión procede del artefacto instalado, no de la rama actual ni de otra versión.",
+      "textoDesde": "artefacto",
+      "titularNota": "Consta en el propio archivo LICENSE que viaja en el artefacto."
+    }
+  ],
+  "expresionesNoUnicas": [
+    {
+      "paquete": "jszip",
+      "version": "3.10.1",
+      "expresion": "(MIT OR GPL-3.0-or-later)",
+      "tipo": "disyuntiva",
+      "eleccion": "MIT",
+      "justificacion": "Se acoge la rama permisiva. La elección se registra de forma explícita, como exige una expresión disyuntiva.",
+      "nota": "El archivo LICENSE.markdown del paquete contiene ambos textos; el aviso reproduce el archivo completo e indica la rama elegida."
+    },
+    {
+      "paquete": "pako",
+      "version": "1.0.11",
+      "expresion": "(MIT AND Zlib)",
+      "tipo": "conjuntiva",
+      "eleccion": null,
+      "justificacion": "Conjuntiva: NO se elige. Se cumplen ambas licencias a la vez y el aviso reproduce el archivo que contiene las dos."
+    },
+    {
+      "paquete": "tslib",
+      "version": "2.8.1",
+      "expresion": "0BSD",
+      "tipo": "sin-atribucion-exigida",
+      "eleccion": null,
+      "justificacion": "0BSD no exige conservar aviso alguno. Se incluye de todos modos, como política conservadora de cumplimiento."
+    }
+  ],
+  "contratoDeCampos": {
+    "textoDesde": "artefacto = el texto viaja en el paquete instalado; etiqueta = recuperado de la etiqueta exacta del repositorio oficial; canonico = texto canonico SPDX de la expresion declarada, por no existir texto verificable",
+    "nota": "El generador decide por estos campos, no por la prosa. La prosa es para quien revisa."
+  }
+}

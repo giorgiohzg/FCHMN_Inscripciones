@@ -1,0 +1,36 @@
+-- Hallazgo 32 — RETIRADA DE ESQUEMA MUERTO
+--
+-- Dos tablas quedaron sin ningún consumidor y se eliminan antes de la primera
+-- versión, con autorización explícita:
+--
+--   * `password_reset_tokens` — sobrevivía del flujo de auto-recuperación por
+--     correo, eliminado por decisión de diseño: no hay servidor de correo y la
+--     implementación anterior devolvía el token de restablecimiento en la
+--     propia respuesta HTTP. Desde entonces ningún código la lee ni la escribe.
+--     El único camino de restablecimiento es el administrativo
+--     (`POST /persons/:id/credentials/reset` y el equivalente de clubes), que
+--     no usa esta tabla: genera una contraseña temporal y marca
+--     `must_change_password`.
+--
+--   * `system_settings` — dejó de tener parámetros CONSUMIDOS y SEMBRADOS por
+--     la aplicación al retirarse los dos que declaraba:
+--     `LOGIN_MAX_ATTEMPTS`, que nadie leía (el servicio usa la variable de
+--     entorno), y `SWIMMER_SINGLE_CLUB_ACTIVE`, que no configuraba nada porque
+--     el índice único parcial de `club_swimmers` se crea siempre. Qué filas
+--     conservara una base concreta es otra cosa, y no se comprobó.
+--
+-- ES UNA MIGRACIÓN DESTRUCTIVA. Se aplica sabiendo que:
+--   - las dos tablas PUDIERON tener filas históricas; no se inspeccionaron ni
+--     se volcaron, y se descartan deliberadamente porque todos los datos
+--     actuales son de prueba y las bases se recrean antes de la primera versión;
+--   - `DROP TABLE` no se revierte con sus datos: `rollback.sql` devuelve solo
+--     la estructura, y recuperar filas exigiría el respaldo previo;
+--   - las migraciones anteriores NO se editan — por eso esto es una nueva.
+--
+-- Si en el futuro hiciera falta un parámetro que de verdad se configure en
+-- caliente, `system_settings` se vuelve a crear con su propia migración.
+-- Mantener una tabla sin consumidores no aportaba utilidad y sí invitaba a
+-- creer que existía configuración dinámica.
+
+DROP TABLE IF EXISTS "password_reset_tokens";
+DROP TABLE IF EXISTS "system_settings";

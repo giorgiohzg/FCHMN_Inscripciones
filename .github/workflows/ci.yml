@@ -1,0 +1,157 @@
+# =============================================================================
+# Fase 6, hallazgo 31 — INTEGRACIÓN CONTINUA.
+#
+# Hasta ahora no había ninguna: cada comprobación dependía de que alguien se
+# acordara de ejecutarla en su máquina. Los tres pasos que cualquier cambio debe
+# superar —tipos, lint y pruebas— ya existían como script `ci` en los dos
+# paquetes; lo que faltaba era algo que los ejecutara solo.
+#
+# ATENCIÓN, ESTE ARCHIVO NO SE EJECUTA TODAVÍA. El repositorio aún no está
+# versionado (hallazgo 30: `git ls-files` devuelve 3 archivos, y `backend/` y
+# `frontend/` están sin seguimiento), así que GitHub no tiene nada que ejecutar.
+# Queda preparado para cuando se autorice el versionado.
+#
+# NO HAY JOB DE FORMATO, a propósito. `npm run format:check` falla hoy en 64
+# archivos del frontend y 76 del backend: el proyecto nunca pasó Prettier en
+# masa. Un CI que nace en rojo se ignora en una semana, así que ese job se añade
+# DESPUÉS de decidir si se reformatea todo de una vez (un cambio grande y
+# ruidoso, pero de una sola vez) o si se deja como está. Está anotado como
+# pendiente en el informe de la Fase 6.
+#
+# LA BASE DE DATOS DE LAS PRUEBAS DE INTEGRACIÓN es desechable y efímera, igual
+# que en local: se publica en el puerto 55432 —no 5432— y se llama
+# `natacion_test`. Las dos cosas importan, porque `tests/helpers/testDb.ts` se
+# niega a ejecutar si el nombre no termina en `_test`. Es la misma salvaguarda
+# que impide que una corrida toque una base de trabajo, y aquí se respeta igual.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Una corrida por rama: si llegan dos empujes seguidos, la primera se cancela.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # La versión con la que se desarrolla y con la que construyen los Dockerfile.
+  NODE_VERSION: "22"
+
+jobs:
+  backend:
+    name: Backend — tipos, lint y pruebas
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: natacion
+          POSTGRES_PASSWORD: clave-publica-solo-pruebas
+          POSTGRES_DB: natacion_test
+        ports:
+          # Mismo puerto que `docker-compose.test.yml`, a propósito.
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U natacion -d natacion_test"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias
+        working-directory: backend
+        run: npm ci
+
+      - name: Generar el cliente de Prisma
+        working-directory: backend
+        run: npx prisma generate
+
+      # PASOS SEPARADOS, no `npm run ci`. Se midió un SIGSEGV intermitente al
+      # correr las pruebas del backend, de causa no determinada: la forma
+      # ENCADENADA —`lint && test` en la misma invocación— reprodujo el fallo 2
+      # de cada 10 veces, mientras que como sentencias separadas no falló
+      # ninguna de 6. No
+      # demuestra que separarlos lo resuelva, pero evita la forma que sí lo
+      # reprodujo y, sobre todo, deja claro QUÉ etapa falla cuando falle.
+      - name: Tipos (build y comprobación ampliada)
+        working-directory: backend
+        run: npm run typecheck
+
+      - name: Lint
+        working-directory: backend
+        run: npm run lint
+
+      - name: Pruebas unitarias
+        working-directory: backend
+        run: npm run test
+
+      # `.env.test` NO está versionado (`.gitignore`: `.env.*`), y las pruebas de
+      # integración lo cargan explícitamente. El `.example` versionado ya trae los
+      # valores correctos —incluidos el puerto 55432 y la base `natacion_test`—,
+      # así que basta copiarlo. Sus secretos son de prueba y no valen fuera de
+      # este contenedor efímero.
+      - name: Preparar .env.test
+        working-directory: backend
+        run: cp .env.test.example .env.test
+
+      - name: Migraciones sobre la base desechable
+        working-directory: backend
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://natacion:clave-publica-solo-pruebas@localhost:55432/natacion_test?schema=public
+
+      - name: Pruebas de integración
+        working-directory: backend
+        run: npm run test:integration
+
+  frontend:
+    name: Frontend — tipos, lint, pruebas y build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        working-directory: frontend
+        run: npm ci
+
+      - name: Tipos
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Pruebas
+        working-directory: frontend
+        run: npm run test
+
+      # El build es parte de la comprobación: un error que solo aparece al
+      # empaquetar (una importación circular, un activo que falta) no lo detecta
+      # ni `tsc` ni Vitest.
+      - name: Build de producción
+        working-directory: frontend
+        run: npm run build
+        env:
+          VITE_API_URL: http://localhost:3000

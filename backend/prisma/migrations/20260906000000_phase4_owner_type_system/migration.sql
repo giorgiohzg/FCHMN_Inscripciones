@@ -1,0 +1,12 @@
+-- Hallazgo 20 — la excepción del administrador, modelada explícitamente.
+--
+-- Hasta ahora el administrador se guardaba con `owner_type = 'person'` y
+-- `person_id` nulo: una cuenta que declaraba pertenecer a una persona sin
+-- pertenecer a ninguna. Mientras ese estado fuera legítimo, no se podía exigir
+-- en la base la coherencia entre el tipo de dueño y las columnas que lo
+-- señalan.
+--
+-- Va SOLA en su propia migración porque PostgreSQL no permite USAR un valor de
+-- enum en la misma transacción en que se agrega. El respaldo de datos y la
+-- restricción viven en `phase4_user_identity`, la siguiente.
+ALTER TYPE "OwnerType" ADD VALUE IF NOT EXISTS 'system';

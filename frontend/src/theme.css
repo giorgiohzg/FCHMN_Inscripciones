@@ -1,0 +1,324 @@
+/**
+ * Paleta de marca — Federación Chilena Máster de Natación (FCHMN)
+ * Colores extraídos directamente del archivo de logo provisto.
+ */
+:root {
+  /* Colores primarios de marca */
+  --brand-blue: #4FA8CE;       /* celeste del nadador — color principal */
+  --brand-blue-dark: #2E86AB;  /* variante oscura para hover/estados activos */
+  --brand-navy: #31446F;       /* azul marino del texto "FCHMN" — headers, texto fuerte */
+  --brand-navy-dark: #22304F;
+
+  /* Neutros */
+  --brand-white: #FFFFFF;
+  --brand-bg: #F4F8FB;         /* fondo general, celeste muy claro */
+  --brand-gray-100: #EEF2F6;
+  --brand-gray-300: #CBD5DE;
+  --brand-gray-600: #5B6B7D;
+  --brand-text: #1F2937;
+
+  /* Estados (heredados de la paleta funcional ya usada en dashboards) */
+  --state-success: #3E8E5A;
+  --state-warning: #E07A2C;
+  --state-danger: #C0392B;
+  --state-info: var(--brand-blue);
+
+  /* Tipografía */
+  --font-family: "Inter", "Segoe UI", Arial, sans-serif;
+
+  /* Bordes y sombras */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --shadow-card: 0 1px 3px rgba(49, 68, 111, 0.12), 0 1px 2px rgba(49, 68, 111, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  background: var(--brand-bg);
+  color: var(--brand-text);
+}
+
+a {
+  color: var(--brand-blue-dark);
+}
+
+/* ---------- Botón primario reutilizable ---------- */
+button[type="submit"],
+.btn-primary {
+  background: var(--brand-blue);
+  color: var(--brand-white);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 1.25rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+button[type="submit"]:hover,
+.btn-primary:hover {
+  background: var(--brand-blue-dark);
+}
+button[type="submit"]:disabled {
+  background: var(--brand-gray-300);
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--brand-navy);
+  border: 1px solid var(--brand-gray-300);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-secondary:hover {
+  border-color: var(--brand-navy);
+}
+
+.btn-danger {
+  background: var(--state-danger);
+  color: var(--brand-white);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---------- Inputs ---------- */
+input, select, textarea {
+  font-family: var(--font-family);
+  border: 1px solid var(--brand-gray-300);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.75rem;
+  font-size: 0.95rem;
+  width: 100%;
+  color: var(--brand-text);
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--brand-blue);
+  box-shadow: 0 0 0 3px rgba(79, 168, 206, 0.2);
+}
+label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--brand-navy);
+  margin: 0.75rem 0 0.3rem;
+}
+
+/* ---------- Mensajes ---------- */
+.error-message {
+  color: var(--state-danger);
+  font-size: 0.85rem;
+  margin: 0.4rem 0;
+}
+
+/* ---------- Badges de estado ---------- */
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.badge-active { background: #E2EFDA; color: var(--state-success); }
+.badge-locked { background: #FBE5D6; color: var(--state-warning); }
+.badge-disabled { background: #FCE4E4; color: var(--state-danger); }
+
+/* ---------- Layout de autenticación ---------- */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, var(--brand-navy) 0%, var(--brand-blue-dark) 100%);
+  padding: 1.5rem;
+}
+.auth-card {
+  background: var(--brand-white);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 2.25rem 2.5rem;
+  width: 100%;
+  max-width: 400px;
+}
+.auth-logo {
+  display: block;
+  margin: 0 auto 1rem;
+  height: 84px;
+}
+.auth-card h1 {
+  font-size: 1.3rem;
+  color: var(--brand-navy);
+  text-align: center;
+  margin: 0 0 0.25rem;
+}
+.auth-subtitle {
+  text-align: center;
+  color: var(--brand-gray-600);
+  font-size: 0.85rem;
+  margin: 0 0 1.25rem;
+}
+.auth-card button[type="submit"] {
+  width: 100%;
+  margin-top: 1.25rem;
+}
+.auth-card a {
+  display: block;
+  text-align: center;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+
+/* ---------- Layout de aplicación (post-login) ---------- */
+.app-header {
+  background: var(--brand-white);
+  border-bottom: 1px solid var(--brand-gray-100);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1.5rem;
+  box-shadow: var(--shadow-card);
+}
+.app-header img {
+  height: 40px;
+}
+.app-header .app-title {
+  font-weight: 700;
+  color: var(--brand-navy);
+  font-size: 1.05rem;
+  line-height: 1.1;
+}
+.app-header .app-subtitle {
+  font-size: 0.72rem;
+  color: var(--brand-gray-600);
+}
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+.app-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--brand-navy);
+  color: var(--brand-white);
+  padding: 1rem 0;
+  transition: width 0.15s ease;
+  overflow-x: hidden;
+}
+.app-sidebar.collapsed {
+  width: 56px;
+}
+.app-sidebar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  padding: 0.5rem 1.25rem 0.85rem;
+  margin-bottom: 0.35rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.app-sidebar-toggle:hover {
+  color: var(--brand-white);
+}
+.app-sidebar.collapsed .app-sidebar-toggle {
+  padding-left: 1rem;
+}
+.app-sidebar a {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: rgba(255,255,255,0.85);
+  text-decoration: none;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.app-sidebar.collapsed a {
+  padding-left: 1rem;
+}
+.app-sidebar-icon {
+  flex-shrink: 0;
+}
+.app-sidebar.collapsed .app-sidebar-label {
+  display: none;
+}
+.app-sidebar a:hover,
+.app-sidebar a.active {
+  background: rgba(255,255,255,0.08);
+  color: var(--brand-white);
+  border-left: 3px solid var(--brand-blue);
+}
+.app-content {
+  flex: 1;
+  padding: 1.5rem 2rem;
+  min-width: 0;
+}
+
+/* ---------- Tablas de datos ---------- */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--brand-white);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+.data-table th {
+  background: var(--brand-navy);
+  color: var(--brand-white);
+  text-align: left;
+  padding: 0.7rem 1rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.data-table td {
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--brand-gray-100);
+  font-size: 0.9rem;
+}
+.data-table tr:hover td {
+  background: var(--brand-bg);
+}
+
+/*
+  Pie con el aviso de terceros. Discreto pero siempre presente: la atribución
+  debe acompañar al código que se entrega en cada visita, no esconderse.
+*/
+.app-footer {
+  padding: 0.6rem 1.25rem;
+  text-align: right;
+  font-size: 0.78rem;
+  border-top: 1px solid var(--brand-gray-200, #e5e7eb);
+  background: var(--brand-gray-50, #f9fafb);
+}
+
+.app-footer a,
+.auth-avisos a {
+  color: var(--brand-gray-600, #4b5563);
+  text-decoration: underline;
+}
+
+.app-footer a:hover,
+.auth-avisos a:hover {
+  color: var(--brand-blue, #1d4ed8);
+}
+
+.auth-avisos {
+  text-align: center;
+  margin-top: 1rem;
+}

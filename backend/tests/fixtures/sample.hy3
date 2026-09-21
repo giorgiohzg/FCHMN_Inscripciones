@@ -1,0 +1,121 @@
+A102Meet Entries             Hy-Tek, Ltd    Win-TM 8.0De  01032030  9:00 AM EAM MANAGER Lite                                    89
+B1Competencia Sintética de Pruebas             sint                                         010120300102203012312030            70
+B2                                                                                            06  L   0,00LO                    61
+C1SINT Club Sintético de Pruebas                                                                                       MAS      24
+C2                                                                                                      CHI OTH                 71
+C3                                                                                                                              10
+D1M  332Álamo               Persona01                                10000000-1         01011970 56                             89
+E1M  332ÁlamoMM    50D  0109      0,00  6        0L   61,50L                               C                                    77
+E1M  332ÁlamoMM   400A  0109      0,00  8        0L  349,00L                               C                                    97
+E1M  332ÁlamoMM   100A  0109      0,00 10        0L  100,00L                               C                                    97
+E1M  332ÁlamoMM   200E  0109      0,00 16        0L  213,00L                               C                                    08
+D1F  333Bravo               Persona02                                 1000001-4         02021971 55                             29
+E1F  333BravoFF   400A  0109      0,00  7        0L  350,29L                               C                                    37
+E1F  333BravoFF   100A  0109      0,00  9        0L  101,29L                               C                                    27
+E1F  333BravoFF   100B  0109      0,00 11        0L  111,29L                               C                                    47
+D1M  338Ñandú               Persona03                                10000002-K         03031972 54                             70
+E1M  338ÑandúMM   400A  0109      0,00  8        0L  351,00L                               C                                    58
+E1M  338ÑandúMM   100B  0109      0,00 12        0L   95,00L                               C                                    58
+E1M  338ÑandúMM   200E  0109      0,00 16        0L  215,58L                               C                                    88
+D1M  339Delta               Persona04                                10000003-46        04041973 53                             69
+E1M  339DeltaMM   100C  0109      0,00  4        0L  106,87L                               C                                    47
+E1M  339DeltaMM    50D  0109      0,00  6        0L   47,37L                               C                                    27
+E1M  339DeltaMM    50A  0109      0,00 14        0L   45,37L                               C                                    37
+E1M  339DeltaMM   200E  0109      0,00 16        0L  216,87L                               C                                    67
+D1M  341Eco                 Persona05                                 1000004-7         05051974 52                             18
+E1M  341Eco  MM   100C  0109      0,00  4        0L  107,16L                               C                                    16
+E1M  341Eco  MM   400A  0109      0,00  8        0L  353,16L                               C                                    26
+E1M  341Eco  MM   100A  0109      0,00 10        0L   87,16L                               C                                    16
+E1M  341Eco  MM    50A  0109      0,00 14        0L   46,00L                               C                                    16
+D1F  342Foxtrot             Persona06                                10000005-K         06061975 51                             90
+E1F  342FoxtrFF   100C  0109      0,00  3        0L  108,00L                               C                                    37
+E1F  342FoxtrFF   400A  0109      0,00  7        0L  354,00L                               C                                    47
+E1F  342FoxtrFF   100A  0109      0,00  9        0L   88,00L                               C                                    27
+E1F  342FoxtrFF   200E  0109      0,00 15        0L  201,45L                               C                                    57
+D1M  346Golf                Persona07                                10000006-7         07071976 50                             29
+E1M  346Golf MM   100C  0109      0,00  4        0L  109,74L                               C                                    07
+E1M  346Golf MM   100A  0109      0,00 10        0L   89,74L                               C                                    07
+E1M  346Golf MM    50A  0109      0,00 14        0L   48,24L                               C                                    96
+D1M  348Hotel               Persona08                                 1000007-0         08081977 49                             59
+E1M  348HotelMM   100C  0109      0,00  4        0L  110,03L                               C                                    37
+E1M  348HotelMM    50D  0109      0,00  6        0L   51,00L                               C                                    17
+E1M  348HotelMM   100A  0109      0,00 10        0L   90,03L                               C                                    37
+E1M  348HotelMM    50A  0109      0,00 14        0L   49,00L                               C                                    37
+D1F  350India               Persona09                                10000008-K         09091978 48                             69
+E1F  350IndiaFF    50D  0109      0,00  5        0L   52,82L                               C                                    96
+E1F  350IndiaFF   400A  0109      0,00  7        0L  340,00L                               C                                    07
+E1F  350IndiaFF   100A  0109      0,00  9        0L   91,00L                               C                                    96
+D1F  353Julieta             Persona10                                10000009-0         10101979 47                             50
+E1F  353JulieFF   100B  0109      0,00 11        0L  102,61L                               C                                    37
+E1F  353JulieFF    50A  0109      0,00 13        0L   51,11L                               C                                    17
+D1M  354Kilo                Persona11                                 1000010-3         11111980 46                             88
+E1M  354Kilo MM   100C  0109      0,00  4        0L  113,90L                               C                                    07
+E1M  354Kilo MM   400A  0109      0,00  8        0L  342,90L                               C                                    07
+E1M  354Kilo MM   100A  0109      0,00 10        0L   93,90L                               C                                    07
+E1M  354Kilo MM   200E  0109      0,00 16        0L  206,00L                               C                                    27
+D1F  356Lima                Persona12                                10000011-K         12121981 45                             09
+E1F  356Lima FF   100C  0109      0,00  3        0L  114,00L                               C                                    76
+E1F  356Lima FF    50D  0109      0,00  5        0L   55,69L                               C                                    66
+E1F  356Lima FF   200E  0109      0,00 15        0L  207,19L                               C                                    07
+D1M  357Mike                Persona13                                10000012-3         01131982 44                             09
+E1M  357Mike MM   100C  0109      0,00  4        0L  115,48L                               C                                    07
+E1M  357Mike MM    50A  0109      0,00 14        0L   54,98L                               C                                    07
+D1F  358Noviembre           Persona14                                 1000013-62        02141983 43                             71
+E1F  358NovieFF   100A  0109      0,00  9        0L   96,77L                               C                                    27
+E1F  358NovieFF    50A  0109      0,00 13        0L   55,00L                               C                                    27
+D1F  362Oscar               Persona15                                10000014-K         03151984 42                             59
+E1F  362OscarFF    50D  0109      0,00  5        0L   58,56L                               C                                    17
+E1F  362OscarFF   400A  0109      0,00  7        0L  346,00L                               C                                    27
+E1F  362OscarFF   100B  0109      0,00 11        0L  107,00L                               C                                    37
+E1F  362OscarFF   200E  0109      0,00 15        0L  210,06L                               C                                    37
+D1M  365Papa                Persona16                                10000015-6         04161985 41                             09
+E1M  365Papa MM   100C  0109      0,00  4        0L  118,35L                               C                                    96
+D1F  369Quebec              Persona17                                 1000016-9         05171986 40                             00
+E1F  369QuebeFF    50D  0109      0,00  5        0L   60,00L                               C                                    07
+E1F  369QuebeFF   400A  0109      0,00  7        0L  348,64L                               C                                    37
+E1F  369QuebeFF   100B  0109      0,00 11        0L  109,64L                               C                                    47
+E1F  369QuebeFF   200E  0109      0,00 15        0L  212,00L                               C                                    37
+D1F  370Romeo               Persona18                                10000017-K         06181987 39                             79
+E1F  370RomeoFF    50D  0109      0,00  5        0L   61,43L                               C                                    07
+E1F  370RomeoFF   100A  0109      0,00  9        0L  100,00L                               C                                    17
+E1F  370RomeoFF    50A  0109      0,00 13        0L   59,43L                               C                                    27
+D1F  371Sierra              Persona19                                10000018-9         07191988 38                             30
+E1F  371SierrFF   100A  0109      0,00  9        0L  101,22L                               C                                    27
+E1F  371SierrFF    50A  0109      0,00 13        0L   43,72L                               C                                    27
+D1M  372Tango               Persona20                                 1000019-2         08201989 37                             39
+E1M  372TangoMM   100C  0109      0,00  4        0L  105,51L                               C                                    37
+E1M  372TangoMM    50A  0109      0,00 14        0L   44,00L                               C                                    27
+D1F  378Uniforme            Persona21                                10000020-K         09211990 36                             41
+E1F  378UnifoFF   100A  0109      0,00  9        0L   86,00L                               C                                    17
+E1F  378UnifoFF    50A  0109      0,00 13        0L   45,30L                               C                                    27
+D1F  380Victor              Persona22                                10000021-2         10221991 35                             20
+E1F  380VictoFF    50D  0109      0,00  5        0L   48,59L                               C                                    27
+E1F  380VictoFF   100B  0109      0,00 11        0L   97,09L                               C                                    37
+E1F  380VictoFF    50A  0109      0,00 13        0L   46,59L                               C                                    37
+D1F  381Whisky              Persona23                                 1000022-5         11231992 34                             10
+E1F  381WhiskFF   100B  0109      0,00 11        0L   98,38L                               C                                    37
+E1F  381WhiskFF    50A  0109      0,00 13        0L   47,00L                               C                                    27
+D1F  382Xray                Persona24                                10000023-K         12241993 33                             49
+E1F  382Xray FF    50D  0109      0,00  5        0L   50,17L                               C                                    86
+E1F  382Xray FF   400A  0109      0,00  7        0L  355,00L                               C                                    07
+E1F  382Xray FF   100B  0109      0,00 11        0L   99,00L                               C                                    07
+E1F  382Xray FF   200E  0109      0,00 15        0L  202,67L                               C                                    37
+D1M  384Yanqui              Persona25                                10000024-5         01251994 32                             20
+E1M  384YanquMM   100C  0109      0,00  4        0L  110,96L                               C                                    47
+E1M  384YanquMM    50D  0109      0,00  6        0L   51,46L                               C                                    37
+D1M  385Zulu                Persona26                                 1000025-8         02261995 31                             39
+E1M  385Zulu MM   100C  0109      0,00  4        0L  111,25L                               C                                    27
+E1M  385Zulu MM   400A  0109      0,00  8        0L  340,25L                               C                                    37
+E1M  385Zulu MM   100B  0109      0,00 12        0L  101,25L                               C                                    47
+E1M  385Zulu MM    50A  0109      0,00 14        0L   50,00L                               C                                    17
+D1M  387Ambar               Persona27                                10000026-K         03271996 30                             59
+E1M  387AmbarMM    50D  0109      0,00  6        0L   53,04L                               C                                    07
+E1M  387AmbarMM   400A  0109      0,00  8        0L  341,00L                               C                                    27
+E1M  387AmbarMM   100B  0109      0,00 12        0L  102,00L                               C                                    37
+E1M  387AmbarMM    50A  0109      0,00 14        0L   51,04L                               C                                    17
+F1SINT A 160FFF   200A  0109      0,00  1        0L  175,38L                       X                                            76
+F3F  382Xray F1F  342FoxtrF2F  350IndiaF3F  380VictoF4                                                                          34
+F1SINT A 120MMM   200A  0109      0,00  2        0L  175,45L                       X                                            86
+F3M  384YanquF1M  341Eco  F2M  385Zulu F3M  348HotelF4                                                                          43
+F1SINT A 240MMM   200A  0109      0,00  2        0L  180,90L                       X                                            86
+F3M  387AmbarF1M  357Mike F2M  339DeltaF3M  354Kilo F4                                                                          03
