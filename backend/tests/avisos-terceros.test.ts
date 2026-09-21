@@ -476,7 +476,7 @@ describe("avisos de copyright: titulares y textos propios", () => {
       expect(f, `${art}: openssl@${ver} sin entrada propia`).toBeTruthy();
       expect(f!.estado, `${art}: el openssl del sistema debe tener aviso propio`).toBe("encontrado");
       expect(f!.avisos.some((av) => av.archivo === "LICENSE.txt")).toBe(true);
-      expect(f!.avisos[0].url, `${art}: el aviso debe venir de la versión exacta`)
+      expect(f!.avisos[0]!.url, `${art}: el aviso debe venir de la versión exacta`)
         .toContain(ver.replace(/-r\d+$/, ""));
     }
     // Y el de Node sigue estando, como componente distinto.
@@ -572,6 +572,22 @@ describe("avisos de terceros: el generador falla ante divergencias", () => {
     }
   }
 
+  /**
+   * El primer paquete de `node`, con la garantía de que existe.
+   *
+   * Las pruebas que siguen alteran ese primer paquete, pero el inventario que
+   * reciben viene de leer el archivo real: nada asegura de antemano que traiga
+   * alguno. Con `noUncheckedIndexedAccess`, `inv.node[0]` es `PaqueteNode |
+   * undefined`, y taparlo con `!` convertiría un inventario vacío —que sería un
+   * defecto del generador— en un fallo confuso dentro del `mutar`. Aquí se
+   * afirma explícitamente y se falla con un mensaje que dice qué pasó.
+   */
+  function primerPaqueteNode(inv: Inventario): PaqueteNode {
+    const primero = inv.node[0];
+    if (!primero) throw new Error("el inventario no trae ningún paquete node: esta prueba necesita al menos uno");
+    return primero;
+  }
+
   it("falla si se añade un paquete al inventario", () => {
     conInventarioAlterado(
       (inv) => inv.node.push({
@@ -585,7 +601,7 @@ describe("avisos de terceros: el generador falla ante divergencias", () => {
 
   it("falla si cambia la versión de un paquete", () => {
     conInventarioAlterado(
-      (inv) => { inv.node[0].version = "0.0.0-divergente"; },
+      (inv) => { primerPaqueteNode(inv).version = "0.0.0-divergente"; },
       (r) => {
         expect(r.status).toBe(1);
         expect(r.stderr).toContain("DIVERGE");
@@ -595,7 +611,7 @@ describe("avisos de terceros: el generador falla ante divergencias", () => {
 
   it("falla si cambia la expresión de licencia", () => {
     conInventarioAlterado(
-      (inv) => { inv.node[0].expresion = "GPL-3.0-only"; },
+      (inv) => { primerPaqueteNode(inv).expresion = "GPL-3.0-only"; },
       (r) => {
         expect(r.status).toBe(1);
         expect(r.stderr).toContain("DIVERGE");
@@ -605,7 +621,7 @@ describe("avisos de terceros: el generador falla ante divergencias", () => {
 
   it("falla si un paquete se queda sin texto y sin excepción", () => {
     conInventarioAlterado(
-      (inv) => { inv.node[0].licencias = []; },
+      (inv) => { primerPaqueteNode(inv).licencias = []; },
       (r) => {
         expect(r.status).not.toBe(0);
         expect(r.stderr).toMatch(/sin texto de licencia y sin entrada/);
