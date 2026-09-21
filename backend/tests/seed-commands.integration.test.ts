@@ -12,10 +12,11 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { resolve } from "node:path";
-import { readFileSync } from "node:fs";
+import { resolve, delimiter } from "node:path";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { parse as parseEnv } from "dotenv";
 import { prisma } from "../src/shared/prisma.client";
-import { truncateAllTables } from "./helpers/testDb";
+import { checkDisposableDatabaseUrl, truncateAllTables } from "./helpers/testDb";
 
 const ejecutar = promisify(execFile);
 const RAIZ = resolve(__dirname, "..");
@@ -59,20 +60,87 @@ afterAll(async () => {
  * Los comandos documentados se ejecutan a mano, desde la terminal, SIN que
  * `DATABASE_URL` esté en el entorno: es lo que hace quien sigue el instructivo
  * de instalación. Estas pruebas quitan la variable heredada a propósito, porque
- * heredarla ocultaba el defecto: `tsx` NO carga `.env` por su cuenta
+ * heredarla ocultaba el defecto: `tsx` NO carga un `.env` por su cuenta
  * —comprobado— y los scripts fallaban con "environment variable not found".
+ *
+ * Lo que aquí se ejercita es el ENVOLTORIO `dotenv`, no un archivo concreto.
+ * Por eso estas pruebas apuntan a `.env.test`, el archivo de la suite, y NUNCA
+ * a `backend/.env`:
+ *
+ *   - `backend/.env` es el archivo privado de quien desarrolla. Una prueba no
+ *     debe leerlo, copiarlo, respaldarlo ni reemplazarlo, y menos aún escribir
+ *     en la base que ese archivo declare.
+ *   - `backend/.env` tampoco existe en CI, así que una prueba que dependiera de
+ *     él o se saltaría siempre o rompería la recolección del archivo entero.
+ *   - `.env.test` sí está garantizado dondequiera que corra la integración: en
+ *     CI lo crea el flujo copiando `.env.test.example`, y en local la suite no
+ *     arranca sin él (lo cargan `integration.setup.ts` e `integration.env.ts`,
+ *     que acto seguido llaman a `assertDisposableDatabase()`).
+ *
+ * Que el archivo se nombre con `-e` es imprescindible: `dotenv` SIN `-e` carga
+ * `.env` del directorio actual. Omitirlo leería justo el archivo que estas
+ * pruebas no deben tocar.
  */
-describe("los comandos cargan backend/.env por su cuenta", () => {
-  /** Ejecuta un script de npm con el entorno LIMPIO de configuración de base. */
-  async function correrScriptNpm(script: string): Promise<{ code: number; salida: string }> {
+describe("los comandos cargan su archivo de entorno por su cuenta", () => {
+  const RUTA_ENV_PRUEBAS = resolve(RAIZ, ".env.test");
+  /* El ejecutable se toma de la instalación local, por ruta, y se invoca con
+     `node`. Así no interviene `npx` —que ante un paquete ausente intentaría
+     DESCARGARLO— ni ningún shell: `execFile` sin `shell` entrega el arreglo de
+     argumentos tal cual, con el mismo resultado en Windows y en Linux. */
+  const CLI_DOTENV = resolve(RAIZ, "node_modules", "dotenv-cli", "cli.js");
+  const BIN_LOCAL = resolve(RAIZ, "node_modules", ".bin");
+
+  /* `seed-admin` exige estas dos variables y `.env.test.example` no las
+     declara. Se inyectan con `-v`, que `dotenv` aplica DESPUÉS del archivo, de
+     modo que no hace falta crear ni modificar archivo alguno. Son literales
+     sintéticos: no son credenciales de nadie ni se escriben en disco. */
+  const ADMIN_PRUEBAS = { usuario: "admin.pruebas", clave: "Sintetica2030" };
+
+  /** Clave de PATH tal como la escribe el sistema (`Path` en Windows). */
+  function clavePath(entorno: Record<string, string | undefined>): string {
+    return Object.keys(entorno).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+  }
+
+  /**
+   * Guarda fail-closed sobre la URL EFECTIVA del proceso hijo.
+   *
+   * El hijo no toma la URL del entorno —se la quitamos— sino de `.env.test`.
+   * Se valida por tanto ESE valor, con la misma guarda acumulativa que protege
+   * al resto de la suite. `checkDisposableDatabaseUrl` informa host, nombre de
+   * base y puerto, nunca la cadena de conexión completa.
+   */
+  function exigirBaseDesechable(): void {
+    expect(existsSync(RUTA_ENV_PRUEBAS), "falta backend/.env.test: cópielo de backend/.env.test.example").toBe(true);
+    const archivo = parseEnv(readFileSync(RUTA_ENV_PRUEBAS, "utf8"));
+    const veredicto = checkDisposableDatabaseUrl(archivo.DATABASE_URL, archivo.ALLOW_DESTRUCTIVE_TESTS);
+    expect(veredicto.ok, veredicto.ok ? "" : veredicto.reason).toBe(true);
+  }
+
+  /** Corre un script con el envoltorio `dotenv` apuntado a `.env.test`. */
+  async function correrConEnvDePruebas(
+    script: string,
+    inyectadas: Record<string, string> = {}
+  ): Promise<{ code: number; salida: string }> {
+    exigirBaseDesechable();
+
     const entorno = { ...process.env } as Record<string, string | undefined>;
-    // Se elimina lo que vendría del archivo: si el script funciona, es porque
-    // lo cargó él mismo.
+    /* Se elimina lo que vendría del archivo: si el script funciona, es porque
+       lo cargó él mismo. Además es NECESARIO, no solo demostrativo: `dotenv`
+       no pisa una variable ya presente salvo con `--override`, así que una
+       `DATABASE_URL` heredada prevalecería sobre la del archivo. */
     delete entorno.DATABASE_URL;
     delete entorno.JWT_ACCESS_SECRET;
+    /* `dotenv` lanza el comando con cross-spawn, que resuelve `tsx` por PATH.
+       Se antepone el `.bin` local para no depender de que PATH venga de npm. */
+    const clave = clavePath(entorno);
+    entorno[clave] = `${BIN_LOCAL}${delimiter}${entorno[clave] ?? ""}`;
+
+    const argumentos = [CLI_DOTENV, "-e", ".env.test"];
+    for (const [nombre, valor] of Object.entries(inyectadas)) argumentos.push("-v", `${nombre}=${valor}`);
+    argumentos.push("--", "tsx", script);
 
     try {
-      const { stdout, stderr } = await ejecutar("npm", ["run", script], { cwd: RAIZ, shell: true, env: entorno });
+      const { stdout, stderr } = await ejecutar(process.execPath, argumentos, { cwd: RAIZ, env: entorno });
       return { code: 0, salida: stdout + stderr };
     } catch (err) {
       const e = err as { code?: number; stdout?: string; stderr?: string };
@@ -80,43 +148,69 @@ describe("los comandos cargan backend/.env por su cuenta", () => {
     }
   }
 
-  /**
-   * ATENCIÓN: estos dos casos escriben en la base que declare `backend/.env`,
-   * no en `natacion_test`. Por eso solo se ejecutan si ese archivo apunta a una
-   * base desechable; si apunta a otra cosa, la prueba se salta con un aviso en
-   * vez de tocarla.
-   */
-  const envLocal = readFileSync(resolve(RAIZ, ".env"), "utf8");
-  const apuntaABaseDesechable = /DATABASE_URL\s*=\s*"?[^"\n]*_test/i.test(envLocal);
+  it("el envoltorio dotenv se resuelve de la instalación local", () => {
+    // Si no estuviera instalado, `npx` lo descargaría; por ruta, no hay
+    // descarga posible y la prueba falla en vez de traer código de la red.
+    expect(existsSync(CLI_DOTENV), "dotenv-cli debe estar instalado localmente").toBe(true);
+  });
 
-  it.skipIf(!apuntaABaseDesechable)("prisma:seed funciona sin DATABASE_URL en el entorno", async () => {
-    const r = await correrScriptNpm("prisma:seed");
+  it("prisma:seed funciona sin DATABASE_URL en el entorno", async () => {
+    const r = await correrConEnvDePruebas("prisma/seed.ts");
 
     expect(r.code, r.salida).toBe(0);
     expect(r.salida, "no puede quejarse de que falte la configuración").not.toMatch(/environment variable not found/i);
+    expect(await prisma.role.count(), "sembró de verdad, contra la base de pruebas").toBeGreaterThan(0);
   });
 
-  it.skipIf(!apuntaABaseDesechable)("seed:admin funciona sin DATABASE_URL en el entorno", async () => {
-    const r = await correrScriptNpm("seed:admin");
+  it("seed:admin funciona sin DATABASE_URL en el entorno", async () => {
+    await correrConEnvDePruebas("prisma/seed.ts");
+
+    const r = await correrConEnvDePruebas("prisma/seed-admin.ts", {
+      SEED_ADMIN_USERNAME: ADMIN_PRUEBAS.usuario,
+      SEED_ADMIN_PASSWORD: ADMIN_PRUEBAS.clave,
+    });
 
     expect(r.code, r.salida).toBe(0);
+    expect(r.salida).not.toMatch(/environment variable not found/i);
+    expect(await prisma.user.count({ where: { username: ADMIN_PRUEBAS.usuario } })).toBe(1);
   });
 
   /**
    * La comprobación que SÍ se puede hacer siempre, sin tocar ninguna base:
-   * los scripts tienen que invocar `dotenv -e .env`. Sin eso, el comando
+   * los scripts documentados invocan `dotenv -e .env`. Sin eso, el comando
    * documentado no arranca en una instalación limpia.
+   *
+   * Se fija la orden ENTERA, no solo el prefijo: las pruebas de arriba corren
+   * el mismo `tsx prisma/<script>.ts` bajo el mismo envoltorio, cambiando solo
+   * el archivo. Si el script documentado se moviera a otro programa, estas
+   * pruebas dejarían de demostrar nada sobre él y nadie se enteraría.
    */
   it("los scripts declaran la carga explícita del archivo", () => {
-    const pkg = JSON.parse(readFileSync(resolve(RAIZ, "package.json"), "utf8")) as { scripts: Record<string, string> };
+    const pkg = JSON.parse(readFileSync(resolve(RAIZ, "package.json"), "utf8")) as {
+      scripts: Record<string, string>;
+      prisma: { seed: string };
+    };
 
-    expect(pkg.scripts["prisma:seed"], "tsx no carga .env por su cuenta").toContain("dotenv -e .env");
-    expect(pkg.scripts["seed:admin"]).toContain("dotenv -e .env");
+    expect(pkg.scripts["prisma:seed"], "tsx no carga .env por su cuenta").toBe("dotenv -e .env -- tsx prisma/seed.ts");
+    expect(pkg.scripts["seed:admin"]).toBe("dotenv -e .env -- tsx prisma/seed-admin.ts");
     // Dentro del contenedor no hay `.env` y las variables vienen del entorno:
     // ahí `prisma db seed` NO debe depender del archivo.
-    expect((JSON.parse(readFileSync(resolve(RAIZ, "package.json"), "utf8")) as { prisma: { seed: string } }).prisma.seed).toBe(
-      "tsx prisma/seed.ts"
-    );
+    expect(pkg.prisma.seed).toBe("tsx prisma/seed.ts");
+  });
+
+  /**
+   * Estas pruebas no crean, copian ni renombran ningún archivo: por eso no hay
+   * nada que restaurar en un `finally` y una terminación abrupta no deja
+   * residuo. Se comprueba que la lista de archivos de entorno del proyecto sea
+   * la misma antes y después; se miran NOMBRES, nunca contenidos.
+   */
+  it("no crea, copia ni renombra ningún archivo de entorno", async () => {
+    const listar = () => readdirSync(RAIZ).filter((n) => n.startsWith(".env")).sort();
+    const antes = listar();
+
+    await correrConEnvDePruebas("prisma/seed.ts");
+
+    expect(listar()).toEqual(antes);
   });
 });
 

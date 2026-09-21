@@ -331,7 +331,7 @@ describe("importCompetitionFromMeetEventsZip (invocación real)", () => {
     );
   });
 
-  it("los relevos dla exportación real conservan su distancia TOTAL en la base", async () => {
+  it("los relevos del fixture conservan su distancia TOTAL en la base", async () => {
     const resumen = await importCompetitionFromMeetEventsZip(zipConEv3(SAMPLE_EV3), { maxIndividualEventsPerSwimmer: 5 }, SYSTEM_ACTOR);
     expect(resumen.eventsImported).toBeGreaterThan(0);
 

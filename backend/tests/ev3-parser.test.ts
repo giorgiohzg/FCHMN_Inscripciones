@@ -14,8 +14,10 @@ describe("ev3-parser — parseEv3File contra el fixture sintético", () => {
   });
 
   it("lee las fechas de inicio, fin y corte de edad", () => {
+    // Inicio y fin coinciden: la competencia sintética es de un solo día,
+    // porque la importación rechaza los .ev3 que abarcan más de uno.
     expect(result.startDate.toISOString().slice(0, 10)).toBe("2030-01-01");
-    expect(result.endDate.toISOString().slice(0, 10)).toBe("2030-01-02");
+    expect(result.endDate.toISOString().slice(0, 10)).toBe("2030-01-01");
     expect(result.ageCutoffDate.toISOString().slice(0, 10)).toBe("2030-12-31");
   });
 

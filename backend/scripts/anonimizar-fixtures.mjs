@@ -42,6 +42,15 @@ const { computeHy3Checksum, HY3_CONTENT_LENGTH, HY3_LINE_LENGTH } = require(
 const { formatHy3Time_SecondsComma } = require(
   path.join(AQUI, "..", "src", "modules", "team-manager-export", "hy3-writer.ts"),
 );
+/* El .ev3 resultante se vuelve a leer con el parser de produccion y se mide con
+   la MISMA aritmetica que decide si la importacion lo acepta. Asi el guion no
+   puede dejar un fixture que la importacion rechace. */
+const { parseEv3File } = require(
+  path.join(AQUI, "..", "src", "modules", "meet-import", "ev3-parser.ts"),
+);
+const { countDays } = require(
+  path.join(AQUI, "..", "src", "modules", "meet-import", "meet-import.service.ts"),
+);
 
 // ---------------------------------------------------------------------------
 //  IDENTIDAD SINTÉTICA
@@ -77,7 +86,13 @@ const COMPETENCIA = "Competencia Sintética de Pruebas";
 --------------------------------------------------------------------------- */
 const ANIO_SINTETICO = 2030;
 const FECHA_INICIO = "01012030";   // MMDDYYYY, el formato de Hy-Tek
-const FECHA_FIN = "01022030";
+/* La competencia sintética dura UN SOLO DÍA, y por eso el fin coincide con el
+   inicio. No es una preferencia estética: el `.ev3` no dice en qué jornada se
+   nada cada prueba, así que la importación RECHAZA a propósito cualquier
+   archivo que abarque más de un día. Un fixture de dos días no se puede
+   importar, y la prueba que lo intenta falla. El rechazo multidía tiene su
+   propia prueba, con un `.ev3` construido en la propia prueba. */
+const FECHA_FIN = "01012030";
 const FECHA_CORTE = "12312030";
 const FECHA_GENERACION = "01032030";
 const HORA_GENERACION = "9:00 AM ";  // 8 caracteres, como el campo
@@ -260,7 +275,7 @@ const EV3_CAMPOS_FECHA = [2, 3, 4, 12, 16, 23, 33];
 const EV3_CAMPOS_TEXTO = [1, 9, 10, 11, 24, 26, 28, 29];
 const EV3_FECHAS = {
   2: `01/01/${ANIO_SINTETICO}`,
-  3: `01/02/${ANIO_SINTETICO}`,
+  3: `01/01/${ANIO_SINTETICO}`, // mismo día que el inicio: ver FECHA_FIN
   4: `12/31/${ANIO_SINTETICO}`,
 };
 const EV3_CAMPO_HORA_SESION = 24; // en las líneas de prueba, no en el encabezado
@@ -296,8 +311,22 @@ function anonimizarEv3(ruta) {
   }
 
   const texto = lineas.join("\r\n");
+
+  /* AUTOCOMPROBACION: el resultado se relee con el parser de produccion y se
+     exige que abarque UN SOLO DIA. Si no, no se escribe nada: un fixture de dos
+     dias es sintacticamente valido pero la importacion lo rechaza, y el error
+     aparecería mucho mas tarde, en la suite de integracion. */
+  const releido = parseEv3File(texto);
+  const dias = countDays(releido.startDate, releido.endDate);
+  if (dias !== 1) {
+    throw new Error(
+      `${path.basename(ruta)}: la competencia sintetica abarca ${dias} dias y la importacion solo acepta uno. ` +
+        "Revise FECHA_INICIO/FECHA_FIN y EV3_FECHAS.",
+    );
+  }
+
   if (!SOLO_VERIFICAR) fs.writeFileSync(ruta, Buffer.from(texto, "latin1"));
-  return { lineas: lineas.filter((l) => l.trim()).length, bytes: Buffer.from(texto, "latin1").length };
+  return { lineas: lineas.filter((l) => l.trim()).length, bytes: Buffer.from(texto, "latin1").length, dias };
 }
 
 // ---------------------------------------------------------------------------
@@ -310,7 +339,7 @@ for (const nombre of ["sample.hy3", "sample-with-relays.hy3"]) {
   mapas.push([nombre, [...cache.entries()]]);
 }
 const e = anonimizarEv3(path.join(FIXTURES, "sample.ev3"));
-salida += `  ${"sample.ev3".padEnd(26)} ${e.lineas} lineas, ${e.bytes} bytes${NL}`;
+salida += `  ${"sample.ev3".padEnd(26)} ${e.lineas} lineas, ${e.bytes} bytes, ${e.dias} dia${NL}`;
 
 process.stdout.write((SOLO_VERIFICAR ? "VERIFICACION (no se escribio nada)" : "ANONIMIZACION APLICADA") + NL + salida);
 

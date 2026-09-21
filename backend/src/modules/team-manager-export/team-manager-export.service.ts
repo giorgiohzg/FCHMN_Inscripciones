@@ -204,7 +204,7 @@ export async function buildTeamManagerHy3Export(
   for (const reg of registrations) allPeople.set(reg.personId, reg.person);
   for (const relay of relayRegistrations) for (const m of relay.members) allPeople.set(m.personId, m.person);
 
-  // Igual que en el exportación real de Hy-Tek: primero se listan los
+  // Igual que en la exportación real de Hy-Tek: primero se listan los
   // nadadores que SOLO están en relevos (D1 sin ningún E1 después), y
   // después los que tienen pruebas individuales (D1 + sus E1). El id
   // interno (swimmerId) solo necesita ser único y consistente dentro del

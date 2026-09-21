@@ -19,6 +19,8 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { computeHy3Checksum, HY3_LINE_LENGTH } from "../src/modules/team-manager-export/hy3-checksum";
+import { parseEv3File } from "../src/modules/meet-import/ev3-parser";
+import { countDays } from "../src/modules/meet-import/meet-import.service";
 
 const FIXTURES = path.join(__dirname, "fixtures");
 const HY3 = ["sample.hy3", "sample-with-relays.hy3"];
@@ -236,6 +238,26 @@ describe("fixtures Hy-Tek — fechas, marcas y metadatos del evento son sintéti
     const fechas = cab.filter((c) => /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(c.trim()));
     expect(fechas.length).toBeGreaterThanOrEqual(7);
     for (const f of fechas) expect(Number(f.trim().slice(-4))).toBe(ANIO_EVENTO);
+  });
+
+  /**
+   * La competencia sintética tiene que durar UN SOLO DÍA, y esto no es un
+   * detalle del vocabulario sintético: el `.ev3` no dice en qué jornada se nada
+   * cada prueba, así que la importación rechaza a propósito cualquier archivo
+   * que abarque más de uno. Un fixture de dos días queda bien formado y pasa
+   * todas las demás comprobaciones de este archivo, pero vuelve inimportable la
+   * muestra y solo se descubre al correr la suite de integración.
+   *
+   * Se mide con `countDays` de producción, no con una copia de la fórmula.
+   */
+  it("sample.ev3: la competencia sintética abarca un solo día", () => {
+    const meet = parseEv3File(fs.readFileSync(path.join(FIXTURES, "sample.ev3"), "latin1"));
+
+    expect(meet.startDate.getUTCFullYear()).toBe(ANIO_EVENTO);
+    expect(
+      countDays(meet.startDate, meet.endDate),
+      "un fixture de más de un día no se puede importar: el .ev3 no indica la jornada de cada prueba",
+    ).toBe(1);
   });
 
   it("sample.ev3: las horas de sesión vienen del repertorio sintético", () => {
