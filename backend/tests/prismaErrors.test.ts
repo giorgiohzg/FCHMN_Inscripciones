@@ -15,7 +15,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { translatePrismaError, withTranslatedPrismaErrors, uniqueConflictKeys } from "../src/shared/prismaErrors";
-import { ConflictError, NotFoundError, ValidationError } from "../src/shared/errors";
+import { ConflictError, NotFoundError, ServiceUnavailableError, ValidationError } from "../src/shared/errors";
 
 function prismaError(code: string, target?: string[] | string, modelName?: string) {
   const meta = target || modelName ? { ...(target ? { target } : {}), ...(modelName ? { modelName } : {}) } : undefined;
@@ -104,6 +104,60 @@ describe("translatePrismaError", () => {
     const traducido = translatePrismaError(prismaError("P2034"));
     expect(traducido).toBeInstanceOf(ConflictError);
     expect(traducido!.message).toMatch(/vuelva a intentarlo/i);
+  });
+
+  /**
+   * P2028 ES UN CÓDIGO PARAGUAS: el mismo número cubre «no conseguí conexión
+   * para abrir la transacción» y «la transacción abierta expiró o ya estaba
+   * cerrada». Tratarlos igual sería decirle al usuario que reintente cuando
+   * lo que hay es una operación demasiado lenta o un uso indebido del
+   * cliente, y además borraría del registro algo que hay que ir a mirar.
+   */
+  describe("P2028 — un código, situaciones distintas", () => {
+    const mensajeDePlazoAlAbrir = "Transaction API error: Unable to start a transaction in the given time.";
+    const mensajeDeExpirada =
+      "Transaction API error: Transaction already closed: A query cannot be executed on an expired transaction. " +
+      "The timeout for this transaction was 5000 ms, however 5123 ms passed since the start of the transaction.";
+
+    it("el plazo agotado AL ABRIR es indisponibilidad pasajera (503) y no lleva detalles del motor", () => {
+      const traducido = translatePrismaError({ ...prismaError("P2028"), message: mensajeDePlazoAlAbrir });
+      expect(traducido).toBeInstanceOf(ServiceUnavailableError);
+      expect(traducido!.statusCode).toBe(503);
+      expect(traducido!.message).toMatch(/intente nuevamente/i);
+      expect(traducido!.message, "el mensaje del motor no puede llegar al usuario").not.toMatch(/transaction/i);
+    });
+
+    it("una transacción EXPIRADA o cerrada no se traduce: es error interno, no carga del sistema", () => {
+      expect(translatePrismaError({ ...prismaError("P2028"), message: mensajeDeExpirada })).toBeNull();
+    });
+
+    it("tampoco se traduce una transacción desconocida", () => {
+      const mensaje = "Transaction API error: Transaction not found. Transaction ID is invalid, refers to an old closed transaction...";
+      expect(translatePrismaError({ ...prismaError("P2028"), message: mensaje })).toBeNull();
+    });
+
+    it("sin mensaje reconocible, se prefiere el error interno antes que prometer un reintento", () => {
+      expect(translatePrismaError(prismaError("P2028"))).toBeNull();
+    });
+
+    it("lo no traducido termina en 500 genérico y REGISTRADO como error", async () => {
+      const { resolveErrorResponse } = await import("../src/shared/httpErrorResponse");
+      const resuelto = resolveErrorResponse({ ...prismaError("P2028"), message: mensajeDeExpirada });
+      expect(resuelto.status).toBe(500);
+      expect(resuelto.body.error).toBe("INTERNAL_ERROR");
+      expect(resuelto.body.message).not.toMatch(/transaction/i);
+      expect(resuelto.log).toBe("error");
+    });
+
+    it("NO se confunde con P2034: distinto estado y distinto mensaje", () => {
+      const saturacion = translatePrismaError({ ...prismaError("P2028"), message: mensajeDePlazoAlAbrir })!;
+      const conflicto = translatePrismaError(prismaError("P2034"))!;
+
+      expect(conflicto.statusCode, "el conflicto concurrente sigue siendo 409").toBe(409);
+      expect(saturacion.statusCode).not.toBe(conflicto.statusCode);
+      expect(conflicto.message, "solo P2034 afirma que otra operación tocó los mismos datos").toMatch(/al mismo tiempo/i);
+      expect(saturacion.message).not.toMatch(/al mismo tiempo/i);
+    });
   });
 
   it("traduce P2014 (relación obligatoria) como conflicto", () => {

@@ -432,6 +432,24 @@ describe("hallazgo 9 (reapertura) — concurrencia de RELEVOS", () => {
       );
     };
 
+    /**
+     * Los cuatro necesitan una inscripción individual confirmada en la misma
+     * competencia: es la invariante que ahora exige el sistema al formar un
+     * relevo. Sin esto, el montaje crea un escenario que la API ya no permite
+     * y las pruebas de concurrencia fallarían por el motivo equivocado.
+     */
+    for (const personId of nadadores) {
+      const ya = await prisma.registration.findFirst({
+        where: { personId, status: "confirmed", competitionEvent: { competitionId: e.competitionId } },
+      });
+      if (!ya) {
+        await registrationsService.createRegistration(
+          { competitionEventId: e.competitionEventId, clubId: e.clubId, personId },
+          ADMIN_ACTOR
+        );
+      }
+    }
+
     return { e, nadadores, relevoA: await crearPruebaRelevo("Libre relevo"), relevoB: await crearPruebaRelevo("Espalda relevo") };
   }
 

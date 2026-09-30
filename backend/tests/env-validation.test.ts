@@ -37,6 +37,56 @@ const PRODUCCION = {
   PUBLIC_API_URL: "https://api.fchmn.cl",
 };
 
+/**
+ * INTERFAZ DE ESCUCHA.
+ *
+ * `server.ts` tenía `host: "0.0.0.0"` escrito fijo. Se movió a configuración
+ * para que la instancia de revisión visual —que lleva datos de prueba— escuche
+ * solo en loopback, y la condición que estas pruebas protegen es que ese cambio
+ * NO altere el backend principal: sin `HOST` definido, el valor tiene que
+ * seguir siendo exactamente `0.0.0.0`.
+ */
+describe("interfaz de escucha (HOST)", () => {
+  it("sin definir, escucha en todas las interfaces — como antes del cambio", () => {
+    const r = validar({ ...BASE, HOST: undefined });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.env.HOST).toBe("0.0.0.0");
+  });
+
+  it("el valor por omisión tampoco cambia en producción", () => {
+    // Es donde importa de verdad: un despliegue que no defina HOST no puede
+    // quedarse sin escuchar en la interfaz por la que le llegan las peticiones.
+    const r = validar({ ...PRODUCCION, HOST: undefined });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.env.HOST).toBe("0.0.0.0");
+  });
+
+  it("admite restringir a loopback, que es para lo que existe", () => {
+    for (const valor of ["127.0.0.1", "::1", "localhost"]) {
+      const r = validar({ ...BASE, HOST: valor });
+      expect(r.ok, valor).toBe(true);
+      if (r.ok) expect(r.env.HOST).toBe(valor);
+    }
+  });
+
+  it("recorta espacios sobrantes en vez de intentar escuchar en un valor con espacios", () => {
+    const r = validar({ ...BASE, HOST: "  127.0.0.1  " });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.env.HOST).toBe("127.0.0.1");
+  });
+
+  it("RECHAZA un valor vacío en vez de caer en el valor por omisión", () => {
+    // Una cadena vacía es un error de configuración, no "no lo definí": si se
+    // aceptara volviendo a 0.0.0.0, un intento de restringir mal escrito
+    // ampliaría el alcance en silencio, que es justo lo contrario de lo que se
+    // busca.
+    for (const valor of ["", "   "]) {
+      const r = validar({ ...BASE, HOST: valor });
+      expect(r.ok, JSON.stringify(valor)).toBe(false);
+    }
+  });
+});
+
 describe("secretos JWT", () => {
   /**
    * Regresión: el único secreto JWT es el de acceso. Los refresh tokens son

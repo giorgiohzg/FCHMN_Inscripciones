@@ -421,8 +421,19 @@ sesión no viaja.
 | POST | `/persons/:id/block` | Bloquea persona y su cuenta de acceso si tiene | `persons:write` |
 | POST | `/persons/:id/disable` | Inhabilita persona y su cuenta de acceso si tiene | `persons:write` |
 | POST | `/persons/:id/reactivate` | Reactiva persona y su cuenta de acceso si tiene | `persons:write` |
+| PUT | `/persons/:id/admin-access` | Concede o retira permisos de administrador. Exige además el **rol** `admin` | `persons:write` + rol `admin` |
 | POST | `/persons/:id/credentials` | Crea credenciales de acceso (contraseña temporal, un solo uso en la respuesta) | `persons:write` |
 | POST | `/persons/:id/credentials/reset` | Restablece la contraseña (revoca sesiones activas) | `persons:write` |
+
+**Permisos de administrador por persona.** `persons.admin_access` guarda la
+*intención*; quien concede el acceso es la fila de `user_roles` con el rol
+`admin`, que es lo único que la autorización consulta en cada solicitud. La
+marca se puede poner antes de que la persona tenga cuenta —entonces no se crea
+ninguna credencial— y `POST /persons/:id/credentials` la aplica al crearla, sin
+exigir ningún rol funcional. Retirarla quita solo el rol administrativo, revoca
+los refresh tokens de esa cuenta y deja intactos los demás roles. Ninguna
+acción puede dejar el sistema sin un administrador utilizable, contando la
+cuenta `system`.
 
 ### Reglas aplicadas en el Módulo 2
 
@@ -849,7 +860,22 @@ Aquí es donde importa la semántica de la distancia de relevos descrita arriba:
 
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
-| POST | `/competitions/import-meet-events` | Importa el programa (multipart: `file` + `maxIndividualEventsPerSwimmer`) | `competitions:write` |
+| POST | `/competitions/import-meet-events/analyze` | Analiza el archivo **sin crear la competencia** y devuelve sus relevos con las opciones del catálogo (multipart: `file`) | `competitions:write` |
+| POST | `/competitions/import-meet-events` | Importa el programa (multipart: `file` + `maxIndividualEventsPerSwimmer` + `relayDecisions`) | `competitions:write` |
+
+La importación va en **dos pasos** porque ningún formato de Meet Manager indica
+en cuántas postas se divide un relevo: solo trae la distancia total, y 200 m
+pueden ser 4×50 o 2×100. El primer paso analiza el archivo **sin crear la
+competencia ni entradas de catálogo** —lo único que llega a escribir es un
+registro en `audit_logs` si el análisis falla, para no perder el rastro de los
+archivos que no se pudieron leer—; el segundo importa con una decisión
+**explícita por cada prueba de relevo** —la
+decisión va por número de prueba y no por distancia/estilo/género, porque dos
+relevos pueden coincidir en los tres y ser cosas distintas—. `relayDecisions`
+lleva además la huella del archivo analizado: si el archivo cambió entre los dos
+pasos, la importación se rechaza. Un relevo sin decisión no se importa por
+omisión, y uno marcado como «no puedo confirmarlo» queda fuera y se cuenta como
+omitido.
 
 ### Importación masiva de personas
 
@@ -896,7 +922,7 @@ Estas rutas son del administrador, que no necesita proponerse nada a sí mismo:
 
 ## Inventario completo de endpoints
 
-**112 endpoints**, agrupados por el módulo que los declara. Esta lista no está
+**116 endpoints**, agrupados por el módulo que los declara. Esta lista no está
 escrita a mano: `backend/tests/documentacion.test.ts` la compara con las rutas que
 el código declara y **falla si alguna sobra o falta**. Además comprueba que
 ninguna ruta fuera de las públicas se quede sin guardia, y que el permiso exacto
@@ -1001,12 +1027,14 @@ fuera de producción o con `ENABLE_SWAGGER=true`.
 | PUT | `/competitions/:id` |
 | DELETE | `/competitions/:id` |
 | POST | `/competitions/:id/cancel` |
+| GET | `/competitions/:id/capacity` |
 | POST | `/competitions/:id/closeRegistrations` |
 | POST | `/competitions/:id/dates` |
 | POST | `/competitions/:id/duplicate` |
 | GET | `/competitions/:id/events` |
 | POST | `/competitions/:id/events` |
 | POST | `/competitions/:id/finish` |
+| POST | `/competitions/:id/reopenRegistrations` |
 | POST | `/competitions/:id/schedule` |
 | POST | `/competitions/:id/start` |
 
@@ -1020,6 +1048,7 @@ fuera de producción o con `ENABLE_SWAGGER=true`.
 
 | Método | Ruta |
 |---|---|
+| POST | `/competitions/import-meet-events/analyze` |
 | POST | `/competitions/import-meet-events` |
 
 ### `persons`
@@ -1031,6 +1060,7 @@ fuera de producción o con `ENABLE_SWAGGER=true`.
 | GET | `/persons/:id` |
 | PUT | `/persons/:id` |
 | DELETE | `/persons/:id` |
+| PUT | `/persons/:id/admin-access` |
 | POST | `/persons/:id/block` |
 | POST | `/persons/:id/credentials` |
 | POST | `/persons/:id/credentials/reset` |

@@ -27,6 +27,14 @@
 *.hy3 binary
 *.ev3 binary
 
+# `.hyv` es un formato PROPIO de Meet Manager, no otro nombre del `.ev3`:
+# misma familia y misma codificación, pero otra disposición de campos (ver
+# `backend/src/modules/meet-import/hyv-parser.ts`). Va por la misma regla y por
+# la misma razón: es CP1252 y CRLF, y normalizar los finales de línea lo
+# rompería igual que al `.ev3`. Si el archivo resulta ser binario, con más
+# razón.
+*.hyv binary
+
 # Corpus de licencias preservado byte a byte y verificado por hashes.
 #
 # Los textos de `notices/` son copias literales de licencias de terceros, y el

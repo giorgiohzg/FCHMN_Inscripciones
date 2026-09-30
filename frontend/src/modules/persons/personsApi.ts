@@ -29,6 +29,12 @@ export interface Person {
   email: string | null;
   phone?: string | null;
   status: AccountStatus;
+  /**
+   * Casilla «Habilitar permisos de administrador»: la INTENCIÓN, no el acceso.
+   * Quien concede acceso es el rol `admin` de su cuenta; con la marca puesta y
+   * sin cuenta, la persona todavía no puede entrar.
+   */
+  adminAccess: boolean;
   roles: { roleType: PersonRoleType; active: boolean }[];
   user?: { id: string; username: string; status: AccountStatus; mustChangePassword: boolean; lastLoginAt: string | null } | null;
 }
@@ -87,6 +93,17 @@ export function usePersonsApi() {
 
     reactivate: (id: string) =>
       api.post<Person>(`/persons/${id}/reactivate`),
+
+    /**
+     * Concede o retira permisos de administrador. El backend exige el rol
+     * `admin` además del permiso de escritura, así que ocultar la casilla no
+     * es lo que protege esta operación.
+     */
+    setAdminAccess: (id: string, adminAccess: boolean) =>
+      api.put<{ id: string; fullName: string; adminAccess: boolean; tieneCuenta: boolean; sesionesRevocadas: number }>(
+        `/persons/${id}/admin-access`,
+        { adminAccess }
+      ),
 
     createCredentials: (id: string) =>
       api.post<{ username: string; temporaryPassword: string }>(`/persons/${id}/credentials`),

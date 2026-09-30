@@ -336,6 +336,22 @@ export function RelayWorkspacePage() {
   const filledCount = slots.filter(Boolean).length;
 
   const selectedCompetition = competitions.find((c) => c.id === competitionId);
+
+  /**
+   * RELEVOS BLOQUEADOS: solo en el cierre TOTAL, y solo para quien no sea
+   * administrador.
+   *
+   * La diferencia con el panel de inscripciones individuales es el punto
+   * entero de este trabajo: en `individual_closed` —cupo lleno— los relevos
+   * SIGUEN operativos, porque se forman con nadadores que ya ocupan cupo. Solo
+   * `closed` los cierra.
+   *
+   * Ocultar los controles no basta: hay que impedir también seleccionar
+   * pruebas para «Nuevo equipo», con ratón y con teclado. Y aun así el backend
+   * rechaza igual — la interfaz no es una barrera de seguridad.
+   */
+  const relevosBloqueados = selectedCompetition?.status === "closed" && !hasRole("admin");
+
   const combinedAgePreview = useMemo(() => {
     if (!activeEvent || !selectedCompetition?.ageCutoffDate || filledCount !== 4) return null;
     const chosen = slots.map((id) => swimmers.find((s) => s.id === id)).filter((s): s is EligibleSwimmer => Boolean(s));
@@ -429,6 +445,25 @@ export function RelayWorkspacePage() {
               Atajos: <kbd>/</kbd> buscar, <kbd>Esc</kbd> cancelar.
             </span>
           </div>
+
+          {/*
+            Los dos avisos son distintos a propósito: en el cierre parcial este
+            panel SIGUE funcionando, y decirlo aquí es lo que evita que un club
+            crea que ya no puede hacer nada.
+          */}
+          {selectedCompetition?.status === "individual_closed" && !hasRole("admin") && (
+            <div role="status" style={{ border: "1px solid var(--state-success)", borderRadius: 6, padding: "0.5rem 0.8rem", marginBottom: "0.5rem", background: "rgba(34, 197, 94, 0.08)", fontSize: "0.85rem" }}>
+              <strong>Los relevos siguen abiertos.</strong> La competencia alcanzó su cupo de nadadores, así que las inscripciones
+              individuales están cerradas, pero aquí puede seguir creando, editando y cancelando equipos — siempre con nadadores que ya
+              tengan una inscripción individual confirmada en esta competencia.
+            </div>
+          )}
+          {relevosBloqueados && (
+            <div role="status" style={{ border: "1px solid var(--state-warning)", borderRadius: 6, padding: "0.5rem 0.8rem", marginBottom: "0.5rem", background: "rgba(245, 158, 11, 0.08)", fontSize: "0.85rem" }}>
+              <strong>Inscripciones cerradas.</strong> No se pueden crear, editar ni cancelar equipos de relevo. Los equipos ya
+              confirmados se mantienen visibles para consulta.
+            </div>
+          )}
           <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginBottom: "0.5rem" }}>
             Cada columna es un día de la competencia, con sus pruebas de relevo agrupadas por jornada. Haga clic en una prueba para armar o editar su
             equipo — arrastre nadadores desde la izquierda hacia los 4 puestos.
@@ -486,14 +521,41 @@ export function RelayWorkspacePage() {
                             return (
                               <div
                                 key={ce.id}
-                                onClick={() => { if (!isPureSwimmer) selectEvent(ce); }}
+                                /**
+                                 * Con los relevos cerrados, la prueba no se
+                                 * puede seleccionar por ninguna vía.
+                                 *
+                                 * La tarjeta NO lleva `role="button"` ni
+                                 * `tabIndex`, y eso es deliberado. Se probó a
+                                 * ponerlos para gobernar el acceso por teclado
+                                 * y el efecto fue el contrario: ARIA declara
+                                 * PRESENTACIONALES a los descendientes de un
+                                 * `role="button"`, así que los botones que la
+                                 * tarjeta contiene —«Editar», «×», «Confirmar
+                                 * equipo»— desaparecían del árbol de
+                                 * accesibilidad. Un lector de pantalla dejaba
+                                 * de ofrecerlos.
+                                 *
+                                 * Sin `tabIndex` la tarjeta no recibe foco, así
+                                 * que no hay camino de teclado que abrir ni que
+                                 * cerrar; el `onKeyDown` guardado queda por si
+                                 * el foco llegara por otra vía, y
+                                 * `aria-disabled` anuncia el estado.
+                                 */
+                                onClick={() => { if (!isPureSwimmer && !relevosBloqueados) selectEvent(ce); }}
+                                onKeyDown={(e) => {
+                                  if (isPureSwimmer || relevosBloqueados) return;
+                                  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectEvent(ce); }
+                                }}
+                                {...(isPureSwimmer || relevosBloqueados ? { "aria-disabled": true } : {})}
                                 style={{
                                   border: `2px solid ${isActive ? "var(--brand-blue-dark)" : "var(--brand-gray-100)"}`,
                                   borderRadius: 8,
                                   padding: "0.55rem",
-                                  cursor: isPureSwimmer ? "default" : "pointer",
+                                  cursor: isPureSwimmer || relevosBloqueados ? "default" : "pointer",
                                   background: isActive ? "var(--brand-bg)" : "white",
                                   marginBottom: "0.5rem",
+                                  opacity: relevosBloqueados ? 0.75 : 1,
                                 }}
                               >
                                 <strong style={{ fontSize: "0.82rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
@@ -503,7 +565,7 @@ export function RelayWorkspacePage() {
                                 <p style={{ fontSize: "0.7rem", color: "var(--brand-gray-600)", margin: "0.15rem 0" }}>{teamsHere.length} equipo(s)</p>
 
                                 {/* Constructor de equipo — visible al seleccionar esta prueba. Va primero: es la acción en curso. */}
-                                {isActive && (
+                                {isActive && !relevosBloqueados && (
                                   <div style={{ marginTop: "0.4rem", borderTop: "1px solid var(--brand-gray-100)", paddingTop: "0.4rem" }} onClick={(e) => e.stopPropagation()}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                       <strong style={{ fontSize: "0.75rem" }}>{editingTeamId ? "Editando equipo" : "Nuevo equipo"}</strong>
@@ -591,7 +653,7 @@ export function RelayWorkspacePage() {
                                       <div key={t.id} style={{ fontSize: "0.7rem", marginBottom: "0.3rem" }}>
                                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                           <span style={{ color: "var(--brand-gray-600)" }}>{t.category.name} — {formatSwimTimeReadable(t.seedTimeCentiseconds)}</span>
-                                          {!isPureSwimmer && (
+                                          {!isPureSwimmer && !relevosBloqueados && (
                                             <span style={{ display: "flex", gap: "0.2rem" }}>
                                               <button className="btn-secondary" style={{ padding: "0.05rem 0.3rem", fontSize: "0.65rem" }} onClick={() => loadTeamForEdit(t)} disabled={soloLectura}>Editar</button>
                                               <button className="btn-danger" style={{ padding: "0.05rem 0.3rem", fontSize: "0.65rem" }} onClick={() => handleDeleteTeam(t)} disabled={soloLectura}>×</button>
