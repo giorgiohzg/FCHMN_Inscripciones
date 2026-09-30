@@ -256,7 +256,14 @@ if (require.main === module) {
   buildServer()
     .then(async (app) => {
       try {
-        await app.listen({ port: env.PORT, host: "0.0.0.0" });
+        /**
+         * La interfaz sale de la configuración, con `0.0.0.0` por omisión: es
+         * el mismo valor que estaba escrito aquí fijo, así que un despliegue
+         * que no defina `HOST` no cambia de comportamiento. Definirla sirve
+         * para RESTRINGIR —el entorno de revisión visual la pone en
+         * `127.0.0.1`—, nunca para ampliar el alcance sin querer.
+         */
+        await app.listen({ port: env.PORT, host: env.HOST });
       } catch (err) {
         app.log.error({ err }, "no se pudo abrir el puerto");
         process.exit(1);

@@ -124,6 +124,32 @@ const envSchema = z
     LOGIN_LOCKOUT_MINUTES: enteroEnRango(1, 1440, "minutos").default(15),
 
     PORT: enteroEnRango(1, 65535, "puerto").default(3000),
+
+    /**
+     * Interfaz en la que escucha la API.
+     *
+     * El valor por omisión es `0.0.0.0` —todas las interfaces— porque es
+     * EXACTAMENTE lo que el servidor hacía antes, cuando estaba escrito fijo en
+     * `server.ts`. Un despliegue que no defina esta variable se comporta igual
+     * que siempre: la variable existe para poder RESTRINGIR, nunca para ampliar
+     * por descuido.
+     *
+     * Ponerla en `127.0.0.1` limita la API a la máquina local. Es lo que usa el
+     * entorno de revisión visual, donde una instancia con datos de prueba no
+     * tiene por qué ser alcanzable desde la red: en `0.0.0.0`, cualquiera en la
+     * misma red podría hablar con ella.
+     *
+     * OJO CON EL DOBLE STACK: `127.0.0.1` es solo IPv4. Un cliente que resuelva
+     * `localhost` a `::1` y no reintente por IPv4 no conectaría. Los navegadores
+     * y el `fetch` de Node reintentan, pero conviene comprobarlo al arrancar en
+     * vez de darlo por hecho; si hiciera falta, `::1` cubre el caso inverso.
+     */
+    HOST: z
+      .string()
+      .trim()
+      .min(1, "HOST no puede estar vacío")
+      .default("0.0.0.0"),
+
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
     /**
