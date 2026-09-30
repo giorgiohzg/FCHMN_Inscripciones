@@ -57,7 +57,16 @@ interface SessionUser {
  * `resolvePersonClubId(null)`, que devuelve `null` porque no hay persona, no
  * porque se hubiera decidido que un administrador no tiene club.
  */
-async function resolveEffectiveClubId(user: SessionUser): Promise<string | null> {
+async function resolveEffectiveClubId(user: SessionUser, esAdministrador: boolean): Promise<string | null> {
+  /**
+   * Un administrador no pasa por la resolución de club, igual que en
+   * `loadAuthorizationState`. No es una optimización: `resolvePersonClubId`
+   * LANZA si la persona figura como personal de más de un club, y eso dejaría
+   * a un administrador en esa situación sin poder ni iniciar sesión, pese a
+   * que su alcance no depende de ningún club.
+   */
+  if (esAdministrador) return null;
+
   switch (user.ownerType) {
     case "club":
       return user.clubId;
@@ -76,7 +85,7 @@ async function resolveEffectiveClubId(user: SessionUser): Promise<string | null>
  */
 async function issueSession(user: SessionUser, ctx: RequestContext) {
   const { roles, permissions } = await loadRolesAndPermissions(user.id);
-  const effectiveClubId = await resolveEffectiveClubId(user);
+  const effectiveClubId = await resolveEffectiveClubId(user, roles.includes("admin"));
 
   const accessToken = signAccessToken({
     sub: user.id,
@@ -104,12 +113,35 @@ export async function login(input: LoginInput, ctx: RequestContext) {
    * y solo una de ellas está activa. Se busca directamente esa; el rechazo por
    * `deletedAt` de más abajo se conserva por si alguna llegara igual.
    */
-  const user = await prisma.user.findFirst({ where: { username: input.username, deletedAt: null } });
+  const user = await prisma.user.findFirst({
+    where: { username: input.username, deletedAt: null },
+    include: { person: { select: { status: true, deletedAt: true } } },
+  });
 
   // Mensaje genérico: no revelar si el usuario existe o no (evita user enumeration).
   const genericError = () => new UnauthorizedError("Usuario o contraseña incorrectos");
 
   if (!user || user.deletedAt) {
+    throw genericError();
+  }
+
+  /**
+   * El estado de la PERSONA dueña también decide, no solo el de la cuenta.
+   *
+   * `users.status` y `persons.status` son columnas distintas y nada en la
+   * base obliga a que coincidan. Bastaba una incoherencia —una persona
+   * inhabilitada o eliminada cuya cuenta siguiera activa— para que entrara
+   * con normalidad. Los caminos que inhabilitan a una persona ya inhabilitan
+   * su cuenta, así que esto no debería ocurrir; precisamente por eso es una
+   * red de seguridad y no una comprobación de rutina.
+   *
+   * Se responde con el error GENÉRICO, no con «cuenta inhabilitada»: por qué
+   * no puede entrar es asunto de la administración, no de quien lo intenta.
+   *
+   * Las cuentas `system` y `club` no tienen persona, así que para ellas esto
+   * no cambia nada.
+   */
+  if (user.person && (user.person.status !== "active" || user.person.deletedAt !== null)) {
     throw genericError();
   }
 
@@ -229,7 +261,7 @@ export async function refresh(refreshTokenPlain: string, ctx: RequestContext) {
   });
 
   const { roles, permissions } = await loadRolesAndPermissions(user.id);
-  const effectiveClubId = await resolveEffectiveClubId(user);
+  const effectiveClubId = await resolveEffectiveClubId(user, roles.includes("admin"));
   const accessToken = signAccessToken({
     sub: user.id,
     ownerType: user.ownerType,
@@ -322,7 +354,7 @@ export async function changePassword(userId: string, input: ChangePasswordInput,
   // contraseña ya cambió y con todas sus sesiones revocadas — quedaría
   // fuera del sistema sin saber con qué contraseña volver a entrar.
   const { roles, permissions } = await loadRolesAndPermissions(user.id);
-  const effectiveClubId = await resolveEffectiveClubId(user);
+  const effectiveClubId = await resolveEffectiveClubId(user, roles.includes("admin"));
   const { token: refreshToken, tokenHash } = generateOpaqueToken();
   const expiresAt = new Date(Date.now() + env.JWT_REFRESH_EXPIRES_IN_DAYS * 86_400_000);
 

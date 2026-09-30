@@ -5,8 +5,9 @@ import {
   personCreateSchema,
   personUpdateSchema,
   personListQuerySchema,
+  adminAccessSchema,
 } from "./persons.schemas";
-import { requireAuth, requirePermission } from "../auth/rbac.middleware";
+import { requireAuth, requirePermission, requireRole } from "../auth/rbac.middleware";
 import { ValidationError } from "../../shared/errors";
 
 export async function personsRoutes(app: FastifyInstance) {
@@ -60,6 +61,33 @@ export async function personsRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     reply.send(await personsService.reactivatePerson(id, { userId: req.authUser!.sub, ipAddress: req.ip }));
   });
+
+  /**
+   * Casilla «Habilitar permisos de administrador».
+   *
+   * Exige el ROL `admin`, no solo el permiso `persons:write`. Hoy ese permiso
+   * lo tiene únicamente `admin`, así que la comprobación parece redundante —y
+   * no lo es—: el día que alguien conceda `persons:write` a otro rol para que
+   * edite fichas, ese rol podría repartir permisos de administrador sin que
+   * nadie lo advirtiera. Conceder administración es una decisión de otro
+   * orden que editar una ficha, y se comprueba como tal.
+   *
+   * `requirePermission` se mantiene además del rol: los dos guardas son
+   * independientes y quitar uno no debe dejar la ruta abierta.
+   */
+  app.put(
+    "/persons/:id/admin-access",
+    { preHandler: [requirePermission("persons:write"), requireRole("admin")] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const parsed = adminAccessSchema.safeParse(req.body);
+      if (!parsed.success) throw new ValidationError("Datos inválidos", parsed.error.flatten());
+
+      reply.send(
+        await personsService.setAdminAccess(id, parsed.data.adminAccess, { userId: req.authUser!.sub, ipAddress: req.ip })
+      );
+    }
+  );
 
   app.post("/persons/:id/credentials", { preHandler: [requirePermission("persons:write")] }, async (req, reply) => {
     const { id } = req.params as { id: string };

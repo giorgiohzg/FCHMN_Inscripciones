@@ -28,7 +28,19 @@ import * as catalogsCategories from "../src/modules/catalogs/categories.service"
 import * as catalogsEvents from "../src/modules/catalogs/events.service";
 import * as reportsService from "../src/modules/reports/reports.service";
 import { buildTeamManagerHy3Export } from "../src/modules/team-manager-export/team-manager-export.service";
-import { importCompetitionFromMeetEventsZip } from "../src/modules/meet-import/meet-import.service";
+import {
+  importCompetitionFromMeetEventsZip,
+  analizarArchivoDeImportacion,
+  AVISO_DIA_EV3,
+  AVISO_DIA_HYV,
+  AVISO_JORNADA_SIN_ESPECIFICAR,
+  JORNADA_SIN_ESPECIFICAR,
+} from "../src/modules/meet-import/meet-import.service";
+import {
+  AVISO_ARCHIVO_CAMBIADO,
+  AVISO_RELEVOS_SIN_CONFIRMAR_EV3,
+  AVISO_RELEVOS_SIN_CONFIRMAR_HYV,
+} from "../src/modules/meet-import/relay-decisions";
 import { ValidationError } from "../src/shared/errors";
 
 /**
@@ -57,6 +69,29 @@ async function seedCatalogosBase() {
 }
 
 const SAMPLE_EV3 = readFileSync(join(__dirname, "fixtures", "sample.ev3"), "latin1");
+
+/**
+ * Confirma TODOS los relevos del archivo con un mismo tipo del catálogo.
+ *
+ * Desde que la confirmación se exige en los DOS formatos, cualquier prueba que
+ * importe un archivo con relevos tiene que pasar por aquí. Va a nivel de
+ * módulo y no dentro de un `describe` porque la necesitan tanto las pruebas de
+ * `.hyv` como las de `.ev3`.
+ *
+ * Pasa por el análisis real en vez de fabricar la huella: así, de paso,
+ * comprueba que las dos fases encajan.
+ */
+async function confirmarTodo(buffer: Buffer, nombre: string, testTypeId?: string) {
+  const analisis = await analizarArchivoDeImportacion(buffer, SYSTEM_ACTOR, nombre);
+  return {
+    fileHash: analisis.fileHash,
+    decisiones: analisis.relevos.map((r) => ({
+      eventNumber: r.eventNumber,
+      decision: "tipo" as const,
+      testTypeId: testTypeId ?? r.opciones[0]!.testTypeId,
+    })),
+  };
+}
 
 function zipConEv3(contenido: string, nombre = "Meet Events-Copa.ev3"): Buffer {
   const zip = new AdmZip();
@@ -164,26 +199,796 @@ describe("importCompetitionFromMeetEventsZip (invocación real)", () => {
     expect(competencia.competitionEvents).toHaveLength(1);
   });
 
-  it("RECHAZA un archivo de varios días SIN crear nada, y no sugiere importar uno por día", async () => {
+  /**
+   * CAMBIO DE COMPORTAMIENTO (antes esto era un rechazo).
+   *
+   * El `.ev3` no dice en qué día se nada cada prueba. Antes la importación se
+   * rechazaba por eso, y el administrador tenía que cargar decenas de pruebas
+   * a mano. Ahora se importa: todas las pruebas van al primer día y un aviso
+   * explícito pide moverlas. Las demás fechas se crean vacías para que
+   * moverlas sea arrastrarlas a un día que ya existe.
+   */
+  it("una competencia de varios días se importa TODA en el primer día, con aviso", async () => {
     const zip = zipConEv3(ev3Con({ inicio: "03/28/2026", fin: "03/30/2026", lineas: [LINEA_INDIVIDUAL] }));
 
-    await expect(importCompetitionFromMeetEventsZip(zip, { maxIndividualEventsPerSwimmer: 5 }, SYSTEM_ACTOR)).rejects.toThrow(/3 días/);
+    const resumen = await importCompetitionFromMeetEventsZip(zip, { maxIndividualEventsPerSwimmer: 5 }, SYSTEM_ACTOR);
 
-    // Nada escrito: el rechazo ocurre antes de la primera escritura.
-    expect(await prisma.competition.count()).toBe(0);
-    expect(await prisma.competitionDate.count()).toBe(0);
+    expect(resumen.eventsImported).toBe(1);
+    expect(resumen.warnings).toContain(AVISO_DIA_EV3);
+    /**
+     * El aviso NO debe decir que el archivo no trae la información. Un `.ev3`
+     * real de dos días sí la trae: lo que no se puede es saber cuál de sus
+     * campos es el día y cuál el número de sesión. Esta comprobación existe
+     * para que esa redacción no vuelva a colarse.
+     */
+    expect(resumen.warnings.join(" ")).not.toMatch(/el archivo no especifica qué pruebas/i);
 
-    // Y el consejo NO puede ser "importe un archivo por día": eso crearía
-    // tres competencias separadas.
-    const error: Error = await importCompetitionFromMeetEventsZip(zip, { maxIndividualEventsPerSwimmer: 5 }, SYSTEM_ACTOR).then(
-      () => {
-        throw new Error("se esperaba que la importación fallara");
-      },
-      (e: Error) => e
+    const competencia = await prisma.competition.findUniqueOrThrow({
+      where: { id: resumen.competitionId },
+      include: { dates: { include: { sessions: { include: { competitionEvents: true } } } } },
+    });
+
+    // Los TRES días existen, para poder mover las pruebas a su sitio.
+    expect(competencia.dates).toHaveLength(3);
+
+    const porDia = [...competencia.dates]
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .map((d) => d.sessions.reduce((n, s) => n + s.competitionEvents.length, 0));
+
+    // Todas las pruebas en el primero; los otros dos, vacíos.
+    expect(porDia).toEqual([1, 0, 0]);
+  });
+
+  /**
+   * FORMATOS ADMITIDOS — el contenido decide, no la extensión.
+   *
+   * Estas pruebas recorren el camino REAL de importación, no solo el
+   * detector: lo que se comprueba es que un `.ev3` suelto y un `.hyv` con ese
+   * mismo contenido terminan creando la misma competencia con el importador
+   * que ya existía, y que un `.hyv` con contenido ajeno se rechaza.
+   */
+  describe("formatos admitidos", () => {
+    const FIXTURES = join(__dirname, "fixtures");
+
+    it("importa un .ev3 SUELTO, sin comprimir", async () => {
+      const ev3 = Buffer.from(ev3Con({ inicio: "03/28/2026", fin: "03/28/2026", lineas: [LINEA_INDIVIDUAL] }), "latin1");
+
+      const resumen = await importCompetitionFromMeetEventsZip(ev3, { maxIndividualEventsPerSwimmer: 5 }, SYSTEM_ACTOR, "programa.ev3");
+
+      expect(resumen.eventsImported).toBe(1);
+      expect(await prisma.competition.count()).toBe(1);
+    });
+
+    it("importa un .hyv cuyo contenido es un .ev3 — reutiliza el mismo importador", async () => {
+      const hyv = readFileSync(join(FIXTURES, "sample-meet-events.hyv"));
+
+      const resumen = await importCompetitionFromMeetEventsZip(
+        hyv,
+        { maxIndividualEventsPerSwimmer: 5, confirmacionDeRelevos: await confirmarTodo(hyv, "sample-meet-events.hyv") },
+        SYSTEM_ACTOR,
+        "sample-meet-events.hyv"
+      );
+
+      // El fixture sintético trae 14 pruebas y una competencia de un día.
+      expect(resumen.eventsImported).toBe(14);
+      expect(resumen.competitionName).toBe("Competencia Sintética de Pruebas");
+    });
+
+    it("RECHAZA un .hyv cuyo contenido no es importable, SIN crear nada", async () => {
+      const basura = readFileSync(join(FIXTURES, "sample-no-importable.hyv"));
+
+      await expect(
+        importCompetitionFromMeetEventsZip(basura, { maxIndividualEventsPerSwimmer: 5 }, SYSTEM_ACTOR, "sample-no-importable.hyv")
+      ).rejects.toThrow(/no tiene el contenido de una exportación/i);
+
+      expect(await prisma.competition.count()).toBe(0);
+    });
+
+    it("el archivo multidía sintético carga sus 14 pruebas en el primer día de tres", async () => {
+      const multiday = readFileSync(join(FIXTURES, "sample-multiday.ev3"));
+
+      const resumen = await importCompetitionFromMeetEventsZip(
+        multiday,
+        { maxIndividualEventsPerSwimmer: 5, confirmacionDeRelevos: await confirmarTodo(multiday, "sample-multiday.ev3") },
+        SYSTEM_ACTOR,
+        "sample-multiday.ev3"
+      );
+
+      expect(resumen.eventsImported).toBe(14);
+      expect(resumen.warnings).toContain(AVISO_DIA_EV3);
+
+      const competencia = await prisma.competition.findUniqueOrThrow({
+        where: { id: resumen.competitionId },
+        include: { dates: { include: { sessions: { include: { competitionEvents: true } } } } },
+      });
+      expect(competencia.dates).toHaveLength(3);
+      const porDia = [...competencia.dates]
+        .sort((a, b) => a.date.getTime() - b.date.getTime())
+        .map((d) => d.sessions.reduce((n, s) => n + s.competitionEvents.length, 0));
+      expect(porDia[0]).toBe(14);
+      expect(porDia.slice(1)).toEqual([0, 0]);
+    });
+  });
+
+  /**
+   * FORMATO `.hyv` NATIVO.
+   *
+   * El fixture se traduce campo a campo desde `sample.ev3`, así que describe
+   * LA MISMA competencia que el `.ev3`. Eso permite la comprobación que cierra
+   * de verdad el riesgo de tener dos parsers: importar los dos archivos y
+   * exigir que produzcan el mismo conjunto de pruebas. Si alguno se desvía
+   * —un estilo mal mapeado, el género leído de la columna equivocada—, esa
+   * prueba falla aunque las dos importaciones sigan "funcionando".
+   */
+  describe("formato .hyv nativo", () => {
+    const FIXTURES = join(__dirname, "fixtures");
+    const OPCIONES = { maxIndividualEventsPerSwimmer: 5 };
+    const HYV_NATIVO = readFileSync(join(FIXTURES, "sample-hyv-nativo.hyv"));
+
+    async function pruebasImportadas(competitionId: string) {
+      const filas = await prisma.competitionEvent.findMany({
+        where: { competitionId },
+        include: { event: { include: { distance: true, stroke: true, testType: true } } },
+      });
+      return filas
+        .map((f) => `${f.event.testType.swimmersCount > 1 ? "R" : "I"} ${f.event.distance.meters} ${f.event.stroke.name} ${f.event.gender}`)
+        .sort();
+    }
+
+    it("importa un .hyv nativo: 14 pruebas, sin ninguna saltada", async () => {
+      const resumen = await importCompetitionFromMeetEventsZip(
+        HYV_NATIVO,
+        { ...OPCIONES, confirmacionDeRelevos: await confirmarTodo(HYV_NATIVO, "sample-hyv-nativo.hyv") },
+        SYSTEM_ACTOR,
+        "sample-hyv-nativo.hyv"
+      );
+
+      expect(resumen.eventsImported).toBe(14);
+      expect(resumen.eventsSkipped).toBe(0);
+      expect(resumen.competitionName).toBe("Competencia Sintética de Pruebas");
+      expect(resumen.warnings.join(" ")).not.toMatch(/no se pudo importar/i);
+    });
+
+    it("produce EXACTAMENTE las mismas pruebas que el .ev3 del mismo programa", async () => {
+      /**
+       * El tipo de relevo se fija POR IDENTIDAD en las dos importaciones.
+       *
+       * Antes cada una tomaba `opciones[0]` del análisis. Eso vale mientras el
+       * catálogo tenga un solo tipo de relevo, pero hace que la comparación
+       * dependa de un orden en vez de de lo que la prueba quiere medir: que
+       * los dos parsers produzcan las mismas pruebas. Si alguna vez las dos
+       * llamadas eligieran distinto, esta prueba fallaría señalando a los
+       * parsers, que no tendrían la culpa.
+       */
+      const tipoDeRelevo = await prisma.testType.findFirstOrThrow({ where: { swimmersCount: { gt: 1 } } });
+
+      const desdeHyv = await importCompetitionFromMeetEventsZip(
+        HYV_NATIVO,
+        { ...OPCIONES, confirmacionDeRelevos: await confirmarTodo(HYV_NATIVO, "sample-hyv-nativo.hyv", tipoDeRelevo.id) },
+        SYSTEM_ACTOR,
+        "sample-hyv-nativo.hyv"
+      );
+      const ev3 = readFileSync(join(FIXTURES, "sample.ev3"));
+      const desdeEv3 = await importCompetitionFromMeetEventsZip(
+        ev3,
+        { ...OPCIONES, confirmacionDeRelevos: await confirmarTodo(ev3, "sample.ev3", tipoDeRelevo.id) },
+        SYSTEM_ACTOR,
+        "sample.ev3"
+      );
+
+      const porHyv = await pruebasImportadas(desdeHyv.competitionId);
+      const porEv3 = await pruebasImportadas(desdeEv3.competitionId);
+
+      expect(porHyv).toEqual(porEv3);
+      expect(porHyv).toHaveLength(14);
+      // Y que la comparación no sea vacua: los cinco estilos tienen que estar.
+      expect(new Set(porHyv.map((p) => p.split(" ")[2]))).toEqual(
+        new Set(["Libre", "Espalda", "Pecho", "Mariposa", "Combinado"])
+      );
+    });
+
+    it("deja TODAS las pruebas en la jornada sin especificar, y avisa", async () => {
+      const resumen = await importCompetitionFromMeetEventsZip(
+        HYV_NATIVO,
+        { ...OPCIONES, confirmacionDeRelevos: await confirmarTodo(HYV_NATIVO, "sample-hyv-nativo.hyv") },
+        SYSTEM_ACTOR,
+        "sample-hyv-nativo.hyv"
+      );
+
+      const competencia = await prisma.competition.findUniqueOrThrow({
+        where: { id: resumen.competitionId },
+        include: { dates: { include: { sessions: { include: { sessionType: true, competitionEvents: true } } } } },
+      });
+
+      const jornadas = competencia.dates.flatMap((d) => d.sessions);
+      expect(jornadas).toHaveLength(1);
+      expect(jornadas[0]!.sessionType.name).toBe(JORNADA_SIN_ESPECIFICAR);
+      expect(jornadas[0]!.competitionEvents).toHaveLength(14);
+
+      // NUNCA se reparten entre Mañana y Tarde: eso sería inventar el dato.
+      expect(jornadas.map((j) => j.sessionType.name)).not.toContain("Mañana");
+      expect(jornadas.map((j) => j.sessionType.name)).not.toContain("Tarde");
+
+      expect(resumen.warnings.some((w) => w.startsWith(AVISO_JORNADA_SIN_ESPECIFICAR))).toBe(true);
+      expect(resumen.warnings.join(" ")).toMatch(/14 de 14 pruebas importadas/);
+    });
+
+    it("con varios días muestra LOS DOS avisos: falta el día y falta la jornada", async () => {
+      const multiday = readFileSync(join(FIXTURES, "sample-hyv-nativo-multiday.hyv"));
+      const resumen = await importCompetitionFromMeetEventsZip(
+        multiday,
+        { ...OPCIONES, confirmacionDeRelevos: await confirmarTodo(multiday, "sample-hyv-nativo-multiday.hyv") },
+        SYSTEM_ACTOR,
+        "sample-hyv-nativo-multiday.hyv"
+      );
+
+      expect(resumen.warnings).toContain(AVISO_DIA_HYV);
+      expect(resumen.warnings.some((w) => w.startsWith(AVISO_JORNADA_SIN_ESPECIFICAR))).toBe(true);
+      // El aviso del .hyv es el que corresponde, no el del .ev3.
+      expect(resumen.warnings).not.toContain(AVISO_DIA_EV3);
+
+      const competencia = await prisma.competition.findUniqueOrThrow({
+        where: { id: resumen.competitionId },
+        include: { dates: { include: { sessions: { include: { competitionEvents: true } } } } },
+      });
+
+      // Los dos días existen —para poder arrastrar las pruebas— y todas las
+      // pruebas están en el primero.
+      expect(competencia.dates).toHaveLength(2);
+      const porDia = [...competencia.dates]
+        .sort((a, b) => a.date.getTime() - b.date.getTime())
+        .map((d) => d.sessions.reduce((n, s) => n + s.competitionEvents.length, 0));
+      expect(porDia).toEqual([14, 0]);
+    });
+
+    it("con los relevos confirmados NO aparece ningún aviso de tipo elegido sin confirmar", async () => {
+      /**
+       * Esta prueba cambió de sentido a propósito. Antes exigía un aviso que
+       * decía que el importador había elegido el tipo de relevo por su cuenta.
+       * Ese aviso ya no debe existir para un `.hyv`: o el usuario confirma
+       * cada relevo, o no se importa. Un aviso residual de "se eligió por ti"
+       * sería la señal de que quedó un camino que decide solo.
+       */
+      const resumen = await importCompetitionFromMeetEventsZip(
+        HYV_NATIVO,
+        { ...OPCIONES, confirmacionDeRelevos: await confirmarTodo(HYV_NATIVO, "sample-hyv-nativo.hyv") },
+        SYSTEM_ACTOR,
+        "sample-hyv-nativo.hyv"
+      );
+
+      expect(resumen.eventsImported).toBe(14);
+      expect(resumen.warnings.join(" ")).not.toMatch(/no se confirmó/i);
+      expect(resumen.warnings.join(" ")).not.toMatch(/primer tipo del catálogo/i);
+      expect(resumen.warnings.join(" ")).not.toMatch(/no indica el número de postas/i);
+    });
+
+    it("los relevos del .hyv conservan la distancia TOTAL, igual que los del .ev3", async () => {
+      const resumen = await importCompetitionFromMeetEventsZip(
+        HYV_NATIVO,
+        { ...OPCIONES, confirmacionDeRelevos: await confirmarTodo(HYV_NATIVO, "sample-hyv-nativo.hyv") },
+        SYSTEM_ACTOR,
+        "sample-hyv-nativo.hyv"
+      );
+
+      const relevos = await prisma.competitionEvent.findMany({
+        where: { competitionId: resumen.competitionId, event: { testType: { swimmersCount: { gt: 1 } } } },
+        include: { event: { include: { distance: true } } },
+      });
+      expect(relevos).toHaveLength(4);
+      // 200 es el TOTAL de un 4×50, no la distancia por posta.
+      expect(relevos.every((r) => r.event.distance.meters === 200)).toBe(true);
+    });
+
+    /**
+     * SOLO LA VERSIÓN Y LA DISPOSICIÓN VERIFICADAS.
+     *
+     * Lo que se comprueba aquí no es el mensaje —eso ya lo cubren las pruebas
+     * del parser— sino la consecuencia que importa: que NO queda nada escrito.
+     * Un rechazo que dejara una competencia a medio armar sería peor que
+     * haberla importado mal, porque nadie sabría que está incompleta.
+     */
+    describe("un .hyv que no coincide con lo verificado se rechaza sin crear la competencia", () => {
+      const original = () => readFileSync(join(FIXTURES, "sample-hyv-nativo.hyv"), "latin1");
+
+      async function rechazaSinEscribir(contenido: string, patron: RegExp) {
+        const antes = {
+          competencias: await prisma.competition.count(),
+          fechas: await prisma.competitionDate.count(),
+          jornadas: await prisma.competitionSession.count(),
+          pruebas: await prisma.competitionEvent.count(),
+        };
+
+        await expect(
+          importCompetitionFromMeetEventsZip(Buffer.from(contenido, "latin1"), OPCIONES, SYSTEM_ACTOR, "otra-version.hyv")
+        ).rejects.toThrow(patron);
+
+        expect({
+          competencias: await prisma.competition.count(),
+          fechas: await prisma.competitionDate.count(),
+          jornadas: await prisma.competitionSession.count(),
+          pruebas: await prisma.competitionEvent.count(),
+        }).toEqual(antes);
+      }
+
+      it("otra versión del exportador", async () => {
+        const lineas = original().split("\r\n");
+        const cab = lineas[0]!.split(";");
+        cab[8] = "8.1Ab";
+        await rechazaSinEscribir([cab.join(";"), ...lineas.slice(1)].join("\r\n"), /8\.1Ab/);
+      });
+
+      it("un encabezado con un campo de más", async () => {
+        const lineas = original().split("\r\n");
+        await rechazaSinEscribir([lineas[0] + ";extra", ...lineas.slice(1)].join("\r\n"), /encabezado.*12 campos/is);
+      });
+
+      it("una sola línea de prueba con un campo de más", async () => {
+        const lineas = original().split("\r\n");
+        lineas[3] = lineas[3] + ";extra";
+        await rechazaSinEscribir(lineas.join("\r\n"), /línea 4.*19 campos/is);
+      });
+
+      it("el rechazo NO se interpreta por posición: no se importa una competencia parcial", async () => {
+        const lineas = original().split("\r\n");
+        const cab = lineas[0]!.split(";");
+        cab[8] = "8.1Ab";
+        await expect(
+          importCompetitionFromMeetEventsZip(
+            Buffer.from([cab.join(";"), ...lineas.slice(1)].join("\r\n"), "latin1"),
+            OPCIONES,
+            SYSTEM_ACTOR,
+            "otra-version.hyv"
+          )
+        ).rejects.toThrow(/No se importó nada/i);
+      });
+
+      it("deja registro del intento fallido, en la etapa de interpretación", async () => {
+        const lineas = original().split("\r\n");
+        const cab = lineas[0]!.split(";");
+        cab[8] = "8.1Ab";
+
+        await importCompetitionFromMeetEventsZip(
+          Buffer.from([cab.join(";"), ...lineas.slice(1)].join("\r\n"), "latin1"),
+          OPCIONES,
+          SYSTEM_ACTOR,
+          "otra-version.hyv"
+        ).catch(() => undefined);
+
+        const registro = await prisma.auditLog.findFirstOrThrow({
+          where: { action: "COMPETITION_IMPORT_FAILED" },
+          orderBy: { createdAt: "desc" },
+        });
+        const after = registro.after as Record<string, unknown>;
+        expect(after.etapa).toBe("interpretacion-del-archivo");
+        expect(String(after.reason)).toMatch(/8\.1Ab/);
+      });
+    });
+
+    it("el registro de auditoría anota el formato y las pruebas sin jornada", async () => {
+      const resumen = await importCompetitionFromMeetEventsZip(
+        HYV_NATIVO,
+        { ...OPCIONES, confirmacionDeRelevos: await confirmarTodo(HYV_NATIVO, "sample-hyv-nativo.hyv") },
+        SYSTEM_ACTOR,
+        "sample-hyv-nativo.hyv"
+      );
+
+      const registro = await prisma.auditLog.findFirstOrThrow({
+        where: { action: "COMPETITION_IMPORTED_FROM_MEET_EVENTS", entityId: resumen.competitionId },
+      });
+      const after = registro.after as Record<string, unknown>;
+      expect(after.formato).toBe("hyv");
+      expect(after.pruebasSinJornada).toBe(14);
+    });
+
+    /**
+     * CONFIRMACIÓN EXPLÍCITA DEL TIPO DE RELEVO — las dos fases.
+     *
+     * Lo que estas pruebas exigen es que nada se importe sin una decisión
+     * propia, y que cuando algo se rechaza NO quede nada escrito. Por eso casi
+     * todas comprueban el conteo de filas antes y después, no solo el mensaje.
+     */
+    describe("confirmación del tipo de relevo", () => {
+      const GEMELOS = readFileSync(join(FIXTURES, "sample-hyv-relevos-gemelos.hyv"));
+
+      async function conteos() {
+        return {
+          competencias: await prisma.competition.count(),
+          fechas: await prisma.competitionDate.count(),
+          jornadas: await prisma.competitionSession.count(),
+          pruebas: await prisma.competitionEvent.count(),
+        };
+      }
+
+      /** Segundo tipo de relevo, para que haya algo entre lo que elegir. */
+      async function crearRelevoDeDos() {
+        return prisma.testType.upsert({
+          where: { name: "Relevo por parejas" },
+          update: {},
+          create: { name: "Relevo por parejas", swimmersCount: 2 },
+        });
+      }
+
+      // ---- fase 1: analizar sin escribir ---------------------------------
+
+      it("el análisis no crea la competencia ni el catálogo, y describe cada relevo por separado", async () => {
+        const antes = await conteos();
+        const distanciasAntes = await prisma.distance.count();
+        const estilosAntes = await prisma.stroke.count();
+        const jornadasAntes = await prisma.sessionType.count();
+
+        const analisis = await analizarArchivoDeImportacion(HYV_NATIVO, SYSTEM_ACTOR, "sample-hyv-nativo.hyv");
+
+        expect(await conteos()).toEqual(antes);
+        // Tampoco crea catálogo al vuelo, que es lo que sí hace la importación.
+        expect(await prisma.distance.count()).toBe(distanciasAntes);
+        expect(await prisma.stroke.count()).toBe(estilosAntes);
+        expect(await prisma.sessionType.count()).toBe(jornadasAntes);
+
+        expect(analisis.eventsTotal).toBe(14);
+        expect(analisis.relevos).toHaveLength(4);
+        expect(analisis.requiereConfirmacionDeRelevos).toBe(true);
+        expect(analisis.fileHash).toMatch(/^[0-9a-f]{64}$/);
+      });
+
+      it("un análisis que prospera NO deja registro de auditoría; uno que falla SÍ", async () => {
+        /**
+         * La promesa del análisis es acotada, y conviene que la prueba diga
+         * exactamente cuál es: no crea la competencia. "No escribe nada" sería
+         * falso, porque un análisis fallido deja constancia a propósito —si no,
+         * al separar esta fase se habría perdido el rastro de los archivos
+         * ilegibles, que es justo el que sirve para diagnosticarlos—.
+         */
+        const registros = () => prisma.auditLog.count({ where: { action: "COMPETITION_IMPORT_FAILED" } });
+
+        await analizarArchivoDeImportacion(HYV_NATIVO, SYSTEM_ACTOR, "sample-hyv-nativo.hyv");
+        expect(await registros(), "un análisis correcto no escribe nada").toBe(0);
+
+        await expect(
+          analizarArchivoDeImportacion(Buffer.from("esto no es una exportación\r\nde nada\r\n", "latin1"), SYSTEM_ACTOR, "basura.hyv")
+        ).rejects.toThrow();
+
+        expect(await registros(), "un análisis fallido sí deja rastro").toBe(1);
+        const registro = await prisma.auditLog.findFirstOrThrow({ where: { action: "COMPETITION_IMPORT_FAILED" } });
+        expect((registro.after as Record<string, unknown>).fase).toBe("analisis");
+        // Y aun así no se creó ninguna competencia.
+        expect(await prisma.competition.count()).toBe(0);
+      });
+
+      it("el análisis ofrece las opciones del catálogo, ninguna preseleccionada", async () => {
+        await crearRelevoDeDos();
+        const analisis = await analizarArchivoDeImportacion(HYV_NATIVO, SYSTEM_ACTOR, "sample-hyv-nativo.hyv");
+
+        const opciones = analisis.relevos[0]!.opciones;
+        expect(opciones).toHaveLength(2);
+        // La consecuencia de cada opción va junto a ella: 200 m en 2 o en 4.
+        expect(opciones.map((o) => o.etiqueta).sort()).toEqual(["2×100", "4×50"]);
+        // Y no hay ningún campo que marque una como elegida.
+        expect(JSON.stringify(opciones)).not.toMatch(/seleccionad|elegid|default|preferid/i);
+      });
+
+      // ---- el caso que obliga a decidir por prueba -----------------------
+
+      it("dos relevos IDÉNTICOS admiten decisiones distintas, y cada una se respeta", async () => {
+        const dos = await crearRelevoDeDos();
+        const cuatro = await prisma.testType.findFirstOrThrow({ where: { name: "Relevo" } });
+
+        const analisis = await analizarArchivoDeImportacion(GEMELOS, SYSTEM_ACTOR, "gemelos.hyv");
+        const once = analisis.relevos.find((r) => r.eventNumber === 11)!;
+        const trece = analisis.relevos.find((r) => r.eventNumber === 13)!;
+
+        // El fixture cumple su cometido: son indistinguibles salvo por el número.
+        expect(once.distanceMeters).toBe(trece.distanceMeters);
+        expect(once.strokeName).toBe(trece.strokeName);
+        expect(once.gender).toBe(trece.gender);
+
+        const resumen = await importCompetitionFromMeetEventsZip(
+          GEMELOS,
+          {
+            ...OPCIONES,
+            confirmacionDeRelevos: {
+              fileHash: analisis.fileHash,
+              decisiones: analisis.relevos.map((r) => ({
+                eventNumber: r.eventNumber,
+                decision: "tipo" as const,
+                testTypeId: r.eventNumber === 13 ? dos.id : cuatro.id,
+              })),
+            },
+          },
+          SYSTEM_ACTOR,
+          "gemelos.hyv"
+        );
+
+        expect(resumen.eventsImported).toBe(14);
+
+        const relevos = await prisma.competitionEvent.findMany({
+          where: { competitionId: resumen.competitionId, event: { testType: { swimmersCount: { gt: 1 } } } },
+          include: { event: { include: { testType: true, distance: true } } },
+        });
+
+        // Los dos gemelos existen como pruebas DISTINTAS, con distinto tipo.
+        const porPostas = relevos.map((r) => r.event.testType.swimmersCount).sort();
+        expect(porPostas).toEqual([2, 4, 4, 4]);
+        const dePareja = relevos.filter((r) => r.event.testType.swimmersCount === 2);
+        expect(dePareja).toHaveLength(1);
+        expect(dePareja[0]!.event.distance.meters).toBe(200); // el total no cambia
+      });
+
+      // ---- archivo cambiado entre fases ----------------------------------
+
+      it("RECHAZA sin crear la competencia si el archivo cambió entre el análisis y la confirmación", async () => {
+        // Se analiza uno y se confirma sobre OTRO cuyos números de prueba
+        // coinciden: es el caso peligroso, porque las decisiones "encajan".
+        const confirmacion = await confirmarTodo(HYV_NATIVO, "sample-hyv-nativo.hyv");
+        const antes = await conteos();
+
+        await expect(
+          importCompetitionFromMeetEventsZip(GEMELOS, { ...OPCIONES, confirmacionDeRelevos: confirmacion }, SYSTEM_ACTOR, "gemelos.hyv")
+        ).rejects.toThrow(AVISO_ARCHIVO_CAMBIADO);
+
+        expect(await conteos()).toEqual(antes);
+      });
+
+      it("basta un byte distinto para que la huella no valga", async () => {
+        const confirmacion = await confirmarTodo(HYV_NATIVO, "sample-hyv-nativo.hyv");
+        const retocado = Buffer.from(HYV_NATIVO.toString("latin1").replace("Competencia Sintética", "Competencia Sintetica"), "latin1");
+
+        await expect(
+          importCompetitionFromMeetEventsZip(retocado, { ...OPCIONES, confirmacionDeRelevos: confirmacion }, SYSTEM_ACTOR, "x.hyv")
+        ).rejects.toThrow(AVISO_ARCHIVO_CAMBIADO);
+      });
+
+      // ---- elección que ya no existe en el catálogo -----------------------
+
+      it("RECHAZA sin crear la competencia si el tipo elegido ya no existe al importar", async () => {
+        const dos = await crearRelevoDeDos();
+        const confirmacion = await confirmarTodo(HYV_NATIVO, "sample-hyv-nativo.hyv", dos.id);
+
+        // Entre el análisis y la confirmación, alguien borra ese tipo.
+        await prisma.testType.delete({ where: { id: dos.id } });
+        const antes = await conteos();
+
+        await expect(
+          importCompetitionFromMeetEventsZip(HYV_NATIVO, { ...OPCIONES, confirmacionDeRelevos: confirmacion }, SYSTEM_ACTOR, "x.hyv")
+        ).rejects.toThrow(/ya no existe en el catálogo/i);
+
+        expect(await conteos()).toEqual(antes);
+      });
+
+      it("RECHAZA un tipo que existe pero no es de relevo", async () => {
+        const individual = await prisma.testType.findFirstOrThrow({ where: { name: "Individual" } });
+        const confirmacion = await confirmarTodo(HYV_NATIVO, "sample-hyv-nativo.hyv", individual.id);
+        const antes = await conteos();
+
+        await expect(
+          importCompetitionFromMeetEventsZip(HYV_NATIVO, { ...OPCIONES, confirmacionDeRelevos: confirmacion }, SYSTEM_ACTOR, "x.hyv")
+        ).rejects.toThrow(/ya no existe en el catálogo/i);
+
+        expect(await conteos()).toEqual(antes);
+      });
+
+      // ---- decisión faltante ----------------------------------------------
+
+      it("RECHAZA sin crear la competencia si falta la decisión de un solo relevo", async () => {
+        const completa = await confirmarTodo(HYV_NATIVO, "sample-hyv-nativo.hyv");
+        const incompleta = { ...completa, decisiones: completa.decisiones.slice(0, -1) };
+        const antes = await conteos();
+
+        await expect(
+          importCompetitionFromMeetEventsZip(HYV_NATIVO, { ...OPCIONES, confirmacionDeRelevos: incompleta }, SYSTEM_ACTOR, "x.hyv")
+        ).rejects.toThrow(/Faltan decisiones para 1 relevo/);
+
+        expect(await conteos()).toEqual(antes);
+      });
+
+      it("una lista de decisiones VACÍA no equivale a confirmar", async () => {
+        const completa = await confirmarTodo(HYV_NATIVO, "sample-hyv-nativo.hyv");
+        const antes = await conteos();
+
+        await expect(
+          importCompetitionFromMeetEventsZip(
+            HYV_NATIVO,
+            { ...OPCIONES, confirmacionDeRelevos: { fileHash: completa.fileHash, decisiones: [] } },
+            SYSTEM_ACTOR,
+            "x.hyv"
+          )
+        ).rejects.toThrow(/Faltan decisiones para 4 relevo/);
+
+        expect(await conteos()).toEqual(antes);
+      });
+
+      // ---- rechazo temporal sin confirmación ------------------------------
+
+      it("un .hyv con relevos y SIN confirmación se rechaza, en vez de elegir el tipo solo", async () => {
+        const antes = await conteos();
+
+        await expect(
+          importCompetitionFromMeetEventsZip(HYV_NATIVO, OPCIONES, SYSTEM_ACTOR, "sample-hyv-nativo.hyv")
+        ).rejects.toThrow(AVISO_RELEVOS_SIN_CONFIRMAR_HYV);
+
+        expect(await conteos()).toEqual(antes);
+      });
+
+      /**
+       * LA MISMA EXIGENCIA PARA EL `.ev3`, como medida temporal.
+       *
+       * Antes, un `.ev3` con relevos se importaba tomando el primer tipo de
+       * relevo del catálogo y avisando. Eso es elegir sobre un dato que no se
+       * ha leído: el `.ev3` SÍ trae el número de postas en su campo [29], pero
+       * el importador todavía no lo lee. Hasta que esa lectura exista y esté
+       * probada, se exige confirmación también aquí.
+       *
+       * El mensaje es distinto del `.hyv` a propósito: decir que "el archivo
+       * no lo indica" sería falso para el `.ev3` y mandaría a buscar el
+       * problema donde no está.
+       */
+      it("un .ev3 con relevos y SIN confirmación también se rechaza, con SU motivo", async () => {
+        const antes = await conteos();
+
+        await expect(
+          importCompetitionFromMeetEventsZip(Buffer.from(SAMPLE_EV3, "latin1"), OPCIONES, SYSTEM_ACTOR, "sample.ev3")
+        ).rejects.toThrow(AVISO_RELEVOS_SIN_CONFIRMAR_EV3);
+
+        expect(await conteos()).toEqual(antes);
+      });
+
+      it("el motivo del .ev3 NO afirma que el archivo no traiga el dato", async () => {
+        // El `.ev3` lo trae en [29]; lo que falta es leerlo. La redacción
+        // tiene que distinguir "no está" de "no lo leemos todavía".
+        expect(AVISO_RELEVOS_SIN_CONFIRMAR_EV3).toMatch(/sí trae el número de postas/i);
+        expect(AVISO_RELEVOS_SIN_CONFIRMAR_EV3).toMatch(/todavía no lo lee/i);
+        expect(AVISO_RELEVOS_SIN_CONFIRMAR_HYV).toMatch(/no indica en cuántas postas/i);
+      });
+
+      it("un .zip con relevos tampoco se importa sin confirmar", async () => {
+        const antes = await conteos();
+
+        await expect(
+          importCompetitionFromMeetEventsZip(zipConEv3(SAMPLE_EV3), OPCIONES, SYSTEM_ACTOR, "meet.zip")
+        ).rejects.toThrow(AVISO_RELEVOS_SIN_CONFIRMAR_EV3);
+
+        expect(await conteos()).toEqual(antes);
+      });
+
+      it("un .ev3 con relevos SÍ se importa cuando se confirman", async () => {
+        const ev3 = Buffer.from(SAMPLE_EV3, "latin1");
+        const resumen = await importCompetitionFromMeetEventsZip(
+          ev3,
+          { ...OPCIONES, confirmacionDeRelevos: await confirmarTodo(ev3, "sample.ev3") },
+          SYSTEM_ACTOR,
+          "sample.ev3"
+        );
+
+        expect(resumen.eventsImported).toBe(14);
+        expect(resumen.eventsSkipped).toBe(0);
+        // Y sin ningún aviso de "se eligió por ti": ya no queda esa rama.
+        expect(resumen.warnings.join(" ")).not.toMatch(/primer tipo del catálogo/i);
+      });
+
+      it("un .ev3 SIN relevos se sigue importando sin confirmar nada", async () => {
+        // La medida no es un peaje general: solo alcanza a los relevos.
+        const resumen = await importCompetitionFromMeetEventsZip(
+          zipConEv3(ev3Con({ inicio: "03/28/2026", fin: "03/28/2026", lineas: [LINEA_INDIVIDUAL] })),
+          OPCIONES,
+          SYSTEM_ACTOR
+        );
+        expect(resumen.eventsImported).toBe(1);
+      });
+
+      it("un .hyv SIN relevos se importa sin necesidad de confirmar nada", async () => {
+        // La confirmación se exige donde hace falta, no como peaje general.
+        const sinRelevos = Buffer.from(
+          HYV_NATIVO.toString("latin1")
+            .split("\r\n")
+            .filter((l) => l.split(";")[3] !== "R")
+            .join("\r\n"),
+          "latin1"
+        );
+
+        const analisis = await analizarArchivoDeImportacion(sinRelevos, SYSTEM_ACTOR, "sin-relevos.hyv");
+        expect(analisis.relevos).toHaveLength(0);
+        expect(analisis.requiereConfirmacionDeRelevos).toBe(false);
+
+        const resumen = await importCompetitionFromMeetEventsZip(sinRelevos, OPCIONES, SYSTEM_ACTOR, "sin-relevos.hyv");
+        expect(resumen.eventsImported).toBe(10);
+      });
+
+      // ---- omitir --------------------------------------------------------
+
+      it("un relevo omitido NO se importa y se cuenta claramente como omitido", async () => {
+        const confirmacion = await confirmarTodo(HYV_NATIVO, "sample-hyv-nativo.hyv");
+        const conOmision = {
+          ...confirmacion,
+          decisiones: confirmacion.decisiones.map((d) =>
+            d.eventNumber === 11 ? ({ eventNumber: 11, decision: "omitir" } as const) : d
+          ),
+        };
+
+        const resumen = await importCompetitionFromMeetEventsZip(
+          HYV_NATIVO,
+          { ...OPCIONES, confirmacionDeRelevos: conOmision },
+          SYSTEM_ACTOR,
+          "x.hyv"
+        );
+
+        expect(resumen.eventsImported).toBe(13);
+        expect(resumen.eventsSkipped).toBe(1);
+        // Visible en los tres lugares: el aviso destacado, el detalle, y la base.
+        expect(resumen.warnings[0]).toMatch(/IMPORTACIÓN PARCIAL: 13 de 14/);
+        expect(resumen.warnings.some((w) => w.startsWith("Prueba #11") && /no se confirmó en cuántas postas/.test(w))).toBe(true);
+
+        const relevos = await prisma.competitionEvent.findMany({
+          where: { competitionId: resumen.competitionId, event: { testType: { swimmersCount: { gt: 1 } } } },
+        });
+        expect(relevos).toHaveLength(3);
+
+        const registro = await prisma.auditLog.findFirstOrThrow({
+          where: { action: "COMPETITION_IMPORTED_FROM_MEET_EVENTS", entityId: resumen.competitionId },
+        });
+        const after = registro.after as Record<string, unknown>;
+        expect(after.relevosConfirmados).toBe(true);
+        expect(after.relevosOmitidos).toEqual([11]);
+        expect(String(after.skippedDetail)).toMatch(/Prueba #11/);
+      });
+
+      it("si se omiten TODOS los relevos, las individuales se importan igual", async () => {
+        const confirmacion = await confirmarTodo(HYV_NATIVO, "sample-hyv-nativo.hyv");
+        const todasOmitidas = {
+          ...confirmacion,
+          decisiones: confirmacion.decisiones.map((d) => ({ eventNumber: d.eventNumber, decision: "omitir" as const })),
+        };
+
+        const resumen = await importCompetitionFromMeetEventsZip(
+          HYV_NATIVO,
+          { ...OPCIONES, confirmacionDeRelevos: todasOmitidas },
+          SYSTEM_ACTOR,
+          "x.hyv"
+        );
+
+        expect(resumen.eventsImported).toBe(10);
+        expect(resumen.eventsSkipped).toBe(4);
+      });
+
+      it("si el archivo es SOLO relevos y se omiten todos, no se crea la competencia", async () => {
+        // Sin ninguna prueba importada la competencia sería un cascarón: la
+        // guarda existente revierte la transacción entera.
+        const soloRelevos = Buffer.from(
+          HYV_NATIVO.toString("latin1")
+            .split("\r\n")
+            .filter((l, i) => i === 0 || l.split(";")[3] === "R")
+            .join("\r\n"),
+          "latin1"
+        );
+        const analisis = await analizarArchivoDeImportacion(soloRelevos, SYSTEM_ACTOR, "solo-relevos.hyv");
+        const antes = await conteos();
+
+        await expect(
+          importCompetitionFromMeetEventsZip(
+            soloRelevos,
+            {
+              ...OPCIONES,
+              confirmacionDeRelevos: {
+                fileHash: analisis.fileHash,
+                decisiones: analisis.relevos.map((r) => ({ eventNumber: r.eventNumber, decision: "omitir" as const })),
+              },
+            },
+            SYSTEM_ACTOR,
+            "solo-relevos.hyv"
+          )
+        ).rejects.toThrow(/no se pudo importar ninguna/i);
+
+        expect(await conteos()).toEqual(antes);
+      });
+    });
+  });
+
+  it("con una competencia de UN solo día no aparece el aviso de días", async () => {
+    const resumen = await importCompetitionFromMeetEventsZip(
+      zipConEv3(ev3Con({ inicio: "03/28/2026", fin: "03/28/2026", lineas: [LINEA_INDIVIDUAL] })),
+      { maxIndividualEventsPerSwimmer: 5 },
+      SYSTEM_ACTOR
     );
-    expect(error.message).toContain("cree la competencia manualmente");
-    expect(error.message).toContain("competencias distintas");
-    expect(error.message).not.toMatch(/exporte .* un archivo \.ev3 por cada día .* impórtelos/i);
+    expect(resumen.warnings).not.toContain(AVISO_DIA_EV3);
+    expect(resumen.warnings).not.toContain(AVISO_DIA_HYV);
   });
 
   it("RECHAZA un rango de fechas invertido SIN crear nada", async () => {
@@ -247,7 +1052,10 @@ describe("importCompetitionFromMeetEventsZip (invocación real)", () => {
       .catch((e) => e as ValidationError);
 
     // El error de dominio conserva su mensaje: explica el problema real.
-    expect(error!.message).toMatch(/no tiene configurados los tipos de prueba/i);
+    // El archivo de esta prueba trae solo una individual, así que lo que falta
+    // y se nombra es el tipo Individual; la falta de tipos de relevo tiene su
+    // propio mensaje, y solo aparece cuando el archivo trae relevos.
+    expect(error!.message).toMatch(/no tiene configurado el tipo de prueba Individual/i);
     expect(error!.message).not.toContain("ATENCIÓN");
 
     expect(await prisma.competition.count(), "la transacción debe haber revertido la competencia").toBe(0);
@@ -332,7 +1140,12 @@ describe("importCompetitionFromMeetEventsZip (invocación real)", () => {
   });
 
   it("los relevos del fixture conservan su distancia TOTAL en la base", async () => {
-    const resumen = await importCompetitionFromMeetEventsZip(zipConEv3(SAMPLE_EV3), { maxIndividualEventsPerSwimmer: 5 }, SYSTEM_ACTOR);
+    const zip = zipConEv3(SAMPLE_EV3);
+    const resumen = await importCompetitionFromMeetEventsZip(
+      zip,
+      { maxIndividualEventsPerSwimmer: 5, confirmacionDeRelevos: await confirmarTodo(zip, "meet.zip") },
+      SYSTEM_ACTOR
+    );
     expect(resumen.eventsImported).toBeGreaterThan(0);
 
     const pruebasRelevo = await prisma.competitionEvent.findMany({
@@ -423,10 +1236,24 @@ async function montarCompetenciaConInscripciones(opciones: { conPiscina: boolean
     SYSTEM_ACTOR
   );
 
-  await registrationsService.createRegistration(
-    { competitionEventId: ceIndividual.id, clubId: club.id, personId: nadadores[0]!.id, seedTimeCentiseconds: 3012 },
-    ADMIN_ACTOR
-  );
+  /**
+   * LOS CUATRO se inscriben individualmente, no solo el primero.
+   *
+   * Antes solo se inscribía a `nadadores[0]`, porque un relevo se podía formar
+   * con cualquiera. Desde que un integrante necesita una inscripción
+   * individual confirmada en la misma competencia, ese montaje ya no
+   * representa un escenario posible: la API lo rechaza, y con razón.
+   *
+   * Los tiempos distintos por nadador mantienen lo que estas pruebas miran de
+   * verdad —el contenido del reporte y del .HY3—, que necesita datos que no
+   * sean todos iguales.
+   */
+  for (const [i, n] of nadadores.entries()) {
+    await registrationsService.createRegistration(
+      { competitionEventId: ceIndividual.id, clubId: club.id, personId: n.id, seedTimeCentiseconds: 3012 + i },
+      ADMIN_ACTOR
+    );
+  }
   const relevo = await relayService.createRelayRegistration(
     { competitionEventId: ceRelevo.id, clubId: club.id, personIds: nadadores.map((n) => n.id) },
     ADMIN_ACTOR
@@ -472,7 +1299,9 @@ describe("getRegistrationsReport (invocación real)", () => {
     const reporte = await reportsService.getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR);
 
     expect(reporte.competitionName).toBe("Copa Exportación");
-    expect(reporte.individualRows).toHaveLength(1);
+    // Cuatro individuales: desde que un integrante de relevo necesita una
+    // inscripción individual confirmada, el montaje inscribe a los cuatro.
+    expect(reporte.individualRows).toHaveLength(4);
     expect(reporte.relayRows).toHaveLength(1);
     expect(reporte.individualRows[0]!.club).toBe(club.name);
     expect(reporte.relayRows[0]!.integrante1).toContain("Nadador1");
@@ -519,9 +1348,11 @@ describe("getRegistrationsReport (invocación real)", () => {
       .then(() => null)
       .catch((e) => e as ValidationError);
 
-    expect(error, "con 1 individual + 1 relevo y tope 1, el reporte debe rechazarse").toBeInstanceOf(ValidationError);
-    expect(error!.message).toContain("2 inscripciones");
-    expect(error!.message).toContain("1 individuales");
+    expect(error, "con 4 individuales + 1 relevo y tope 1, el reporte debe rechazarse").toBeInstanceOf(ValidationError);
+    // Lo que esta prueba protege sigue igual: el tope cuenta las DOS clases.
+    // Con solo las individuales el mensaje diría 4, no 5.
+    expect(error!.message).toContain("5 inscripciones");
+    expect(error!.message).toContain("4 individuales");
     expect(error!.message).toContain("1 de relevo");
     expect(error!.message).toMatch(/acote el reporte/i);
   });
@@ -540,11 +1371,10 @@ describe("getRegistrationsReport (invocación real)", () => {
    * posterior a la lectura es la que rechaza.
    */
   it("con el conteo obsoleto, la lectura acotada y la verificación posterior atajan el exceso (reportes)", async () => {
-    const { competencia, club, ceIndividual, nadadores } = await montarCompetenciaConInscripciones({ conPiscina: true });
-    for (const nadador of nadadores.slice(1)) {
-      await registrationsService.createRegistration({ competitionEventId: ceIndividual.id, clubId: club.id, personId: nadador.id }, ADMIN_ACTOR);
-    }
-    // Datos reales: 4 individuales + 1 relevo = 5 filas.
+    const { competencia } = await montarCompetenciaConInscripciones({ conPiscina: true });
+    // Datos reales: 4 individuales + 1 relevo = 5 filas. El montaje ya inscribe
+    // a los cuatro —lo exige la invariante de relevos—, así que el bucle que
+    // añadía los tres restantes sobra y ahora fallaría por duplicado.
 
     const conteos = conConteosObsoletos(0);
 
@@ -573,19 +1403,19 @@ describe("getRegistrationsReport (invocación real)", () => {
 
   it("el presupuesto de relevos es el REMANENTE, no otro MAX+1", async () => {
     const { competencia } = await montarCompetenciaConInscripciones({ conPiscina: true });
-    // Datos reales: 1 individual + 1 relevo.
+    // Datos reales: 4 individuales + 1 relevo.
 
     const conteos = conConteosObsoletos(0);
 
     try {
-      // Tope 5: las individuales consumen 1, así que a los relevos les debe
-      // quedar un presupuesto de 4 y pedirse `take: 5` (remanente + 1).
+      // Tope 5: las individuales consumen 4, así que a los relevos les debe
+      // quedar un presupuesto de 1 y pedirse `take: 2` (remanente + 1).
       // Con un tope por consulta se habría pedido 6 (MAX + 1).
       await reportsService.getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR, { maxRows: 5 });
 
       const lecturasRelevo = conteos.lecturasDe("RelayRegistration");
       expect(lecturasRelevo.length).toBeGreaterThan(0);
-      expect(lecturasRelevo[0]!.args.take).toBe(5);
+      expect(lecturasRelevo[0]!.args.take).toBe(2);
       expect(lecturasRelevo[0]!.args.take, "un tope por consulta habría pedido MAX+1 = 6").not.toBe(6);
     } finally {
       conteos.restore();
@@ -603,15 +1433,15 @@ describe("getRegistrationsReport (invocación real)", () => {
   it("rechaza cuando los relevos exceden el presupuesto RESTANTE, con las individuales dentro del límite", async () => {
     const { competencia, agregarSegundoRelevo } = await montarCompetenciaConInscripciones({ conPiscina: true });
     await agregarSegundoRelevo();
-    // Datos reales: 1 individual + 2 relevos = 3 filas.
+    // Datos reales: 4 individuales + 2 relevos = 6 filas.
 
     const conteos = conConteosObsoletos(0);
     try {
-      // Tope 2: la individual (1) cabe; quedan 1 de presupuesto y hay 2
+      // Tope 5: las individuales (4) caben; queda 1 de presupuesto y hay 2
       // relevos, así que el exceso lo aporta exclusivamente la sección de
       // relevos.
       const error = await reportsService
-        .getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR, { maxRows: 2 })
+        .getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR, { maxRows: 5 })
         .then(() => null)
         .catch((e) => e as ValidationError);
 
@@ -621,13 +1451,13 @@ describe("getRegistrationsReport (invocación real)", () => {
       // siguió adelante hasta consultar los relevos.
       const lecturasIndividuales = conteos.lecturasDe("Registration");
       const lecturasRelevo = conteos.lecturasDe("RelayRegistration");
-      expect(lecturasIndividuales[0]!.args.take).toBe(3); // MAX(2) + 1
+      expect(lecturasIndividuales[0]!.args.take).toBe(6); // MAX(5) + 1
       expect(lecturasRelevo.length, "debe haberse consultado la sección de relevos").toBeGreaterThan(0);
-      expect(lecturasRelevo[0]!.args.take, "presupuesto restante (2 - 1) + 1").toBe(2);
+      expect(lecturasRelevo[0]!.args.take, "presupuesto restante (5 - 4) + 1").toBe(2);
 
       // El rechazo procede de la comparación con el remanente, así que la
       // lectura vino truncada.
-      expect(error!.details).toMatchObject({ individualRows: 1, relayRows: 2, totalRows: 3, truncated: true });
+      expect(error!.details).toMatchObject({ individualRows: 4, relayRows: 2, totalRows: 6, truncated: true });
       expect(error!.message).toContain("al menos");
     } finally {
       conteos.restore();
@@ -635,10 +1465,9 @@ describe("getRegistrationsReport (invocación real)", () => {
   });
 
   it("el mensaje dice 'al menos' cuando la lectura vino truncada", async () => {
-    const { competencia, club, ceIndividual, nadadores } = await montarCompetenciaConInscripciones({ conPiscina: true });
-    for (const nadador of nadadores.slice(1)) {
-      await registrationsService.createRegistration({ competitionEventId: ceIndividual.id, clubId: club.id, personId: nadador.id }, ADMIN_ACTOR);
-    }
+    // El montaje ya inscribe individualmente a los cuatro: lo exige la
+    // invariante de relevos, y volver a inscribirlos fallaría por duplicado.
+    const { competencia } = await montarCompetenciaConInscripciones({ conPiscina: true });
 
     const conteos = conConteosObsoletos(0);
 
@@ -665,7 +1494,7 @@ describe("getRegistrationsReport (invocación real)", () => {
     try {
       const reporte = await reportsService.getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR, { maxRows: 50 });
       // Los datos vienen del findMany real, no del count falseado.
-      expect(reporte.individualRows).toHaveLength(1);
+      expect(reporte.individualRows).toHaveLength(4);
       expect(reporte.relayRows).toHaveLength(1);
     } finally {
       conteos.restore();
@@ -675,7 +1504,7 @@ describe("getRegistrationsReport (invocación real)", () => {
   it("con el tope holgado, el mismo reporte se genera sin problema", async () => {
     const { competencia } = await montarCompetenciaConInscripciones({ conPiscina: true });
     const reporte = await reportsService.getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR, { maxRows: 100 });
-    expect(reporte.individualRows.length + reporte.relayRows.length).toBe(2);
+    expect(reporte.individualRows.length + reporte.relayRows.length).toBe(5);
   });
 });
 
@@ -730,10 +1559,9 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
   });
 
   it("con el conteo obsoleto, la lectura acotada del .HY3 ataja el exceso (camino posterior al conteo)", async () => {
-    const { competencia, club, ceIndividual, nadadores } = await montarCompetenciaConInscripciones({ conPiscina: true });
-    for (const nadador of nadadores.slice(1)) {
-      await registrationsService.createRegistration({ competitionEventId: ceIndividual.id, clubId: club.id, personId: nadador.id }, ADMIN_ACTOR);
-    }
+    // El montaje ya inscribe individualmente a los cuatro: lo exige la
+    // invariante de relevos, y repetirlo fallaría por duplicado.
+    const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: true });
     // Datos reales: 4 individuales + 1 relevo.
 
     const conteos = conConteosObsoletos(0);
@@ -757,11 +1585,13 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
   it("el .HY3 rechaza cuando los relevos exceden el presupuesto RESTANTE", async () => {
     const { competencia, club, agregarSegundoRelevo } = await montarCompetenciaConInscripciones({ conPiscina: true });
     await agregarSegundoRelevo();
-    // Datos reales: 1 individual + 2 relevos.
+    // Datos reales: 4 individuales + 2 relevos.
 
     const conteos = conConteosObsoletos(0);
     try {
-      const error = await buildTeamManagerHy3Export(competencia.id, club.id, SYSTEM_ACTOR, { maxRows: 2 })
+      // Tope 5: las cuatro individuales caben y queda 1 de presupuesto para
+      // dos relevos, así que el exceso lo aportan solo ellos.
+      const error = await buildTeamManagerHy3Export(competencia.id, club.id, SYSTEM_ACTOR, { maxRows: 5 })
         .then(() => null)
         .catch((e) => e as ValidationError);
 
@@ -769,11 +1599,11 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
 
       const lecturasIndividuales = conteos.lecturasDe("Registration");
       const lecturasRelevo = conteos.lecturasDe("RelayRegistration");
-      expect(lecturasIndividuales[0]!.args.take).toBe(3); // MAX(2) + 1
+      expect(lecturasIndividuales[0]!.args.take).toBe(6); // MAX(5) + 1
       expect(lecturasRelevo.length, "las individuales cabían: debe haberse leído relevos").toBeGreaterThan(0);
-      expect(lecturasRelevo[0]!.args.take, "presupuesto restante (2 - 1) + 1").toBe(2);
+      expect(lecturasRelevo[0]!.args.take, "presupuesto restante (5 - 4) + 1").toBe(2);
 
-      expect(error!.details).toMatchObject({ individualRows: 1, relayRows: 2, totalRows: 3, truncated: true });
+      expect(error!.details).toMatchObject({ individualRows: 4, relayRows: 2, totalRows: 6, truncated: true });
       expect(error!.message).toContain("al menos");
     } finally {
       conteos.restore();
@@ -788,7 +1618,7 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
     try {
       await buildTeamManagerHy3Export(competencia.id, club.id, SYSTEM_ACTOR, { maxRows: 5 });
       const lecturasRelevo = conteos.lecturasDe("RelayRegistration");
-      expect(lecturasRelevo[0]!.args.take).toBe(5); // (5 - 1) + 1
+      expect(lecturasRelevo[0]!.args.take).toBe(2); // remanente (5 - 4) + 1
       expect(lecturasRelevo[0]!.args.take).not.toBe(6);
     } finally {
       conteos.restore();
@@ -803,8 +1633,10 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
       .catch((e) => e as ValidationError);
 
     expect(error).toBeInstanceOf(ValidationError);
-    expect(error!.message).toContain("2 inscripciones confirmadas");
-    expect(error!.message).toContain("1 individuales");
+    // Lo que esta prueba protege sigue igual: el tope cuenta las DOS clases.
+    // Mirando solo las individuales, el mensaje diría 4 y no 5.
+    expect(error!.message).toContain("5 inscripciones confirmadas");
+    expect(error!.message).toContain("4 individuales");
     expect(error!.message).toContain("1 de relevo");
   });
 

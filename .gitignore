@@ -196,5 +196,16 @@ backend/prisma/migrations/PROPUESTA_*.md
 # Material local y documentos de trabajo no versionables
 /tmp/
 
+# Entorno de revisión visual: vive solo en esta máquina.
+#
+# Rutas exactas y no un patrón como `*-revision.*`: un comodín se tragaría en
+# silencio cualquier archivo futuro con ese nombre que SÍ debiera versionarse.
+# Los dos primeros, además, llevan una contraseña de base local escrita dentro.
+/docker-compose.revision.yml
+/backend/prisma/seed-revision.ts
+/backend/scripts/preflight-revision.mjs
+/backend/scripts/destino-revision.ts
+/backend/scripts/verificar-destino-revision.ts
+
 # Salida regenerable de Graphify
 /graphify-out/

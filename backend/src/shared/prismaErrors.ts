@@ -18,6 +18,12 @@ import { AppError, ConflictError, NotFoundError, ServiceUnavailableError, Valida
 interface PrismaKnownError {
   code: string;
   meta?: { target?: string[] | string; modelName?: string; field_name?: string };
+  /**
+   * El texto del motor. Solo se usa para DISTINGUIR situaciones dentro de un
+   * mismo código —P2028 agrupa varias—, nunca para mostrárselo a nadie.
+   * Opcional porque un error sintético puede no traerlo.
+   */
+  message?: string;
 }
 
 function isPrismaKnownError(err: unknown): err is PrismaKnownError {
@@ -128,6 +134,43 @@ export function translatePrismaError(err: unknown): AppError | null {
       // Conflicto de escritura o interbloqueo bajo aislamiento serializable:
       // dos solicitudes intentaron a la vez algo que no puede coexistir.
       return new ConflictError("Otra operación modificó estos datos al mismo tiempo. Vuelva a intentarlo.");
+
+    /**
+     * P2028 — «Transaction API error». UN SOLO CÓDIGO PARA VARIAS COSAS
+     * DISTINTAS, y por eso no se traduce en bloque.
+     *
+     * Prisma lo emite al menos en estas situaciones:
+     *
+     *   - no se consiguió una conexión libre para ABRIR la transacción dentro
+     *     del plazo de espera (`maxWait`). Es saturación pasajera: nada está
+     *     roto y reintentar tiene sentido;
+     *   - la transacción ya abierta agotó SU plazo (`timeout`) y quedó
+     *     expirada, o se intentó usar una transacción cerrada o desconocida.
+     *     Eso no es carga: es una operación que tardó más de lo previsto o un
+     *     uso indebido del cliente, y reintentarlo a ciegas no lo arregla.
+     *
+     * Solo el primero se reconoce aquí. El resto se deja sin traducir a
+     * propósito, para que caiga en el 500 genérico y quede REGISTRADO como
+     * error: es lo que hay que ir a mirar, no algo que el usuario deba
+     * reintentar. La respuesta al usuario no cambia de forma en ningún caso
+     * —nunca lleva el mensaje del motor—, lo que cambia es la clasificación.
+     *
+     * El plazo agotado al abrir se observó de verdad: al probar la
+     * concurrencia entre la casilla de administrador y la creación de
+     * credenciales, con el conjunto de conexiones todavía frío, la segunda
+     * operación no alcanzaba a abrir su transacción. Salía cruda, como error
+     * interno.
+     *
+     * P2034 sigue siendo el conflicto CONCURRENTE propiamente dicho —dos
+     * transacciones que no pueden coexistir—, y se distingue de esto tanto en
+     * el estado como en el mensaje.
+     */
+    case "P2028":
+      return /unable to start a transaction/i.test(err.message ?? "")
+        ? new ServiceUnavailableError(
+            "El sistema no pudo atender la operación en este momento. Intente nuevamente en unos instantes."
+          )
+        : null;
 
     case "P2000":
       // Valor más largo que la columna. Es un dato del cliente, no una falla

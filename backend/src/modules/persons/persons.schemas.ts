@@ -73,5 +73,23 @@ export const personListQuerySchema = z.object({
 });
 export type PersonListQuery = z.infer<typeof personListQuerySchema>;
 
+/**
+ * Casilla «Habilitar permisos de administrador».
+ *
+ * Va en su propio endpoint y no dentro de `personUpdateSchema` a propósito:
+ * conceder administración exige el ROL `admin`, mientras que editar la ficha
+ * se conforma con el permiso `persons:write`. Mezclarlos obligaría a que un
+ * solo guard cubriera dos niveles de autorización distintos, y la parte más
+ * sensible quedaría protegida por la más laxa.
+ *
+ * El booleano es obligatorio: un campo ausente significaría «no cambiar», y
+ * para una operación cuyo único objeto es cambiarlo eso solo puede ser un
+ * error de quien llama.
+ */
+export const adminAccessSchema = z.object({
+  adminAccess: z.boolean({ errorMap: () => ({ message: "Indique si la persona debe tener permisos de administrador" }) }),
+});
+export type AdminAccessInput = z.infer<typeof adminAccessSchema>;
+
 export const createCredentialsSchema = z.object({}).optional();
 export type CreateCredentialsInput = z.infer<typeof createCredentialsSchema>;

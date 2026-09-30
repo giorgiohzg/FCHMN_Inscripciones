@@ -3,7 +3,16 @@ import { prisma } from "../../shared/prisma.client";
 import { audit, withAudit } from "../audit/audit.service";
 import { ValidationError, NotFoundError } from "../../shared/errors";
 import { computeAge, getDefaultAgeCutoffDate } from "../../shared/age.util";
-import { computeEffectiveStatus, isRegistrationOpen, evaluateRegistrationWindow } from "../competitions/competitions.rules";
+import { computeEffectiveStatus, isRelayRegistrationOpen, evaluateRegistrationWindow } from "../competitions/competitions.rules";
+import { evaluarElegibilidadDeIntegrantes } from "./relay-membership.rules";
+import { evaluateCapacity } from "../competitions/competition-capacity.rules";
+import {
+  readCapacityUsage,
+  contarNuevos,
+  resumirUso,
+  cerrarSiSeAlcanzoElCupo,
+  registrarExcesoDeCupo,
+} from "../competitions/competition-capacity.service";
 import { requiredRelayMembers } from "../../shared/testType.util";
 import { withTranslatedPrismaErrors } from "../../shared/prismaErrors";
 import { activeCategories, assertCompetitionEventCatalogUsable } from "../../shared/catalogAvailability";
@@ -172,12 +181,51 @@ async function validateAndResolveRelayTeam(params: {
     competitionEvent.competition.registrationEndAt,
     new Date()
   );
-  // Hallazgo 10: mismos estados admitidos que en inscripciones individuales
-  // (la excepción post-cierre solo aplica a competencias CERRADAS).
-  const window = evaluateRegistrationWindow(effectiveCompetitionStatus, params.operation ?? "create", actor.canRegisterPostClose);
+  /**
+   * La ventana se evalúa como RELEVO, no como inscripción individual.
+   *
+   * Es lo que hace que en `individual_closed` —cupo lleno— los clubes puedan
+   * seguir armando equipos: los relevos se forman con nadadores que ya ocupan
+   * cupo, así que no consumen ninguno. Antes esta llamada no distinguía el
+   * tipo y el cierre por cupo bloqueaba también los relevos.
+   */
+  const window = evaluateRegistrationWindow(
+    effectiveCompetitionStatus,
+    params.operation ?? "create",
+    actor.canRegisterPostClose,
+    "relay"
+  );
   if (!window.allowed) throw new ValidationError(window.reason!);
-  const competitionIsOpen = isRegistrationOpen(effectiveCompetitionStatus);
+  // `isRelayRegistrationOpen`, no `isRegistrationOpen`: en el cierre parcial
+  // los relevos están abiertos, y tratarlos como cerrados los marcaría a todos
+  // como excepción post-cierre siendo operación corriente.
+  const competitionIsOpen = isRelayRegistrationOpen(effectiveCompetitionStatus);
   const isPostCloseException = window.isPostCloseException;
+
+  /**
+   * INVARIANTE: cada integrante necesita una inscripción individual
+   * confirmada en la MISMA competencia.
+   *
+   * Se lee aquí, dentro de la transacción del alta, y eso no es un detalle:
+   * es la arista que permite a PostgreSQL detectar la carrera contra una
+   * cancelación simultánea de la última individual de alguno de ellos. Esta
+   * transacción LEE `registrations` y ESCRIBE `relay_registrations`; la
+   * cancelación hace lo contrario. Con las dos, hay ciclo y una aborta.
+   *
+   * La comprobación NO distingue el rol: también se aplica al administrador.
+   * Su excepción levanta cupos y estados de cierre, no esto — un relevo cuyos
+   * integrantes no nadan individualmente no es un permiso especial, es un
+   * equipo que no puede competir.
+   */
+  const individualesConfirmadas = await db.registration.findMany({
+    where: {
+      personId: { in: personIds },
+      status: "confirmed",
+      competitionEvent: { competitionId: competitionEvent.competitionId },
+    },
+    select: { personId: true },
+  });
+  const conIndividualConfirmada = new Set(individualesConfirmadas.map((r) => r.personId));
 
   const members: RelayMemberInput[] = personIds.map((personId, idx) => {
     const person = personsById.get(personId);
@@ -215,7 +263,24 @@ async function validateAndResolveRelayTeam(params: {
     throw new ValidationError(result.errors.join(" "), { errors: result.errors });
   }
 
-  return { category, isPostCloseException, competitionEvent };
+  /**
+   * La elegibilidad por inscripción individual se comprueba DESPUÉS de las
+   * demás validaciones del equipo, a propósito.
+   *
+   * Si un integrante ni siquiera pertenece al club o no existe, ese es el
+   * problema que hay que decir primero; anunciarle que «le falta la
+   * inscripción individual» a un nadador que no puede estar en el equipo por
+   * otro motivo mandaría a corregir lo que no toca.
+   */
+  const elegibilidad = evaluarElegibilidadDeIntegrantes(
+    members.map((m) => ({ personId: m.personId, displayName: m.displayName })),
+    conIndividualConfirmada
+  );
+  if (!elegibilidad.ok) throw new ValidationError(elegibilidad.reason!);
+
+  // `clubName` y `effectiveCompetitionStatus` viajan de vuelta para que el
+  // control de cupos no tenga que repetir consultas ya hechas aquí.
+  return { category, isPostCloseException, competitionEvent, clubName: club.name, effectiveCompetitionStatus };
 }
 
 export async function createRelayRegistration(input: CreateRelayRegistrationInput, actor: ActorContext) {
@@ -240,6 +305,36 @@ export async function createRelayRegistration(input: CreateRelayRegistrationInpu
           actor,
           tx,
         });
+
+        /**
+         * CUPOS DE NADADORES — la vía de relevos es la operación POR LOTES de
+         * este sistema: un solo alta incorpora hasta cuatro nadadores a la
+         * competencia de una vez.
+         *
+         * Por eso el cupo no se comprueba "de uno en uno": se cuenta cuántos
+         * integrantes del equipo NO estaban ya inscritos y se exige que el
+         * lote COMPLETO quepa. Un equipo de cuatro con dos cupos libres se
+         * rechaza entero; no se admiten a medias, porque un relevo incompleto
+         * no es una inscripción válida.
+         *
+         * Los integrantes que ya estaban inscritos —por una prueba individual
+         * o por otro relevo— no consumen cupo.
+         */
+        const uso = await readCapacityUsage(tx, validation.competitionEvent.competitionId);
+        const nuevos = contarNuevos(uso, input.clubId, input.personIds);
+        const capacidad = evaluateCapacity(
+          {
+            maxSwimmers: validation.competitionEvent.competition.maxSwimmers,
+            maxSwimmersPerClub: validation.competitionEvent.competition.maxSwimmersPerClub,
+          },
+          resumirUso(uso, input.clubId),
+          { ...nuevos, clubName: validation.clubName },
+          // Un administrador también puede formar un equipo por encima del
+          // cupo. No le exime de la inscripción individual previa de cada
+          // integrante, que ya se comprobó y no admite excepción.
+          { puedeExcederCupos: actor.canRegisterPostClose }
+        );
+        if (!capacidad.allowed) throw new ValidationError(capacidad.reason!);
 
         const creado = await tx.relayRegistration.create({
           data: {
@@ -270,6 +365,27 @@ export async function createRelayRegistration(input: CreateRelayRegistrationInpu
           },
           { tx }
         );
+
+        // Mismo rastro específico que en las individuales: un equipo formado
+        // por encima del cupo queda registrado aparte de la excepción por
+        // cierre, con el conteo y el máximo del momento.
+        if (capacidad.exceededByOverride && validation.competitionEvent.competition.maxSwimmers !== null) {
+          await registrarExcesoDeCupo(
+            tx,
+            {
+              competitionId: validation.competitionEvent.competitionId,
+              entityType: "RelayRegistration",
+              entityId: creado.id,
+              maxSwimmers: validation.competitionEvent.competition.maxSwimmers,
+              totalSwimmersAntes: capacidad.projectedTotal - nuevos.newToCompetition,
+              totalSwimmersDespues: capacidad.projectedTotal,
+              nuevosNadadores: nuevos.newToCompetition,
+            },
+            actor
+          );
+        }
+
+        await cerrarSiSeAlcanzoElCupo(tx, validation.competitionEvent.competitionId, capacidad.projectedTotal, actor);
 
         return creado;
       },
@@ -350,7 +466,7 @@ export async function updateRelayRegistration(id: string, input: UpdateRelayRegi
       competitionEvent.competition.registrationEndAt,
       new Date()
     );
-    const window = evaluateRegistrationWindow(effectiveStatus, "update", actor.canRegisterPostClose);
+    const window = evaluateRegistrationWindow(effectiveStatus, "update", actor.canRegisterPostClose, "relay");
     if (!window.allowed) throw new ValidationError(window.reason!);
 
     return withAudit(
@@ -437,7 +553,7 @@ export async function cancelRelayRegistration(id: string, actor: ActorContext) {
     relayRegistration.competitionEvent.competition.registrationEndAt,
     new Date()
   );
-  const window = evaluateRegistrationWindow(effectiveStatus, "cancel", actor.canRegisterPostClose);
+  const window = evaluateRegistrationWindow(effectiveStatus, "cancel", actor.canRegisterPostClose, "relay");
   if (!window.allowed) throw new ValidationError(window.reason!);
   const isPostCloseException = window.isPostCloseException;
 

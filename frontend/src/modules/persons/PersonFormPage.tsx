@@ -4,6 +4,7 @@ import { AppShell } from "../../shared/AppShell";
 import { usePersonsApi, type Person } from "./personsApi";
 import { formatRun, isValidRun } from "./runValidator";
 import { SwimmerClubSection } from "./SwimmerClubSection";
+import { useAuth } from "../auth/AuthContext";
 
 export function PersonFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +27,67 @@ export function PersonFormPage() {
   const [saving, setSaving] = useState(false);
   const [credentialsMsg, setCredentialsMsg] = useState<string | null>(null);
 
+  const { hasRole, user: usuarioActual, logout, reintentarRestauracion } = useAuth();
+  const esAdministrador = hasRole("admin");
+  /** ¿La ficha abierta es la de quien está usando el sistema? */
+  const esUnoMismo = Boolean(id) && usuarioActual?.personId === id;
+  const [adminAccess, setAdminAccess] = useState(false);
+  const [guardandoAdmin, setGuardandoAdmin] = useState(false);
+  const [adminMsg, setAdminMsg] = useState<string | null>(null);
+
+  /**
+   * Concede o retira los permisos, y hace que la sesión afectada deje de
+   * mostrar acceso administrativo aparente.
+   *
+   * SOBRE LA SESIÓN, con precisión. El backend pierde los permisos en la
+   * SIGUIENTE solicitud, porque recarga roles de la base en cada una; la
+   * revocación de los refresh tokens impide renovar la sesión, pero **no
+   * invalida el access token ya emitido**. Lo que evita que la interfaz siga
+   * enseñando menús de administrador es esto de aquí:
+   *
+   *   - si el administrador se quita el permiso A SÍ MISMO, se cierra su
+   *     sesión: seguir navegando con una interfaz que promete lo que el
+   *     backend ya rechaza es peor que pedirle entrar de nuevo;
+   *   - si se lo quita a otra persona, se refresca la ficha; la sesión de esa
+   *     persona se corrige en su siguiente recarga de sesión, y mientras
+   *     tanto el backend ya la rechaza.
+   */
+  async function handleAdminAccess(valor: boolean) {
+    if (!id) return;
+    setAdminMsg(null);
+    setGuardandoAdmin(true);
+    const anterior = adminAccess;
+    setAdminAccess(valor);
+    try {
+      const resultado = await api.setAdminAccess(id, valor);
+      setPerson((p) => (p ? { ...p, adminAccess: resultado.adminAccess } : p));
+
+      if (!valor && esUnoMismo) {
+        setAdminMsg("Se retiraron sus propios permisos de administrador. Se cerrará su sesión.");
+        await logout();
+        return;
+      }
+
+      // Recarga la sesión desde el backend para que el menú refleje el
+      // cambio sin esperar al próximo refresco automático.
+      if (esUnoMismo) await reintentarRestauracion();
+      setAdminMsg(
+        valor
+          ? resultado.tieneCuenta
+            ? "Permisos de administrador concedidos."
+            : "Marcado. La persona aún no tiene cuenta: use «Crear credenciales» para que el permiso surta efecto."
+          : `Permisos de administrador retirados.${resultado.sesionesRevocadas > 0 ? " Se revocaron sus sesiones." : ""}`
+      );
+    } catch (err) {
+      // La casilla vuelve a su valor real: dejarla como la dejó el clic
+      // afirmaría un cambio que no ocurrió.
+      setAdminAccess(anterior);
+      setAdminMsg(err instanceof Error ? err.message : "No se pudo cambiar el permiso de administrador");
+    } finally {
+      setGuardandoAdmin(false);
+    }
+  }
+
   useEffect(() => {
     if (!isEdit) return;
     api.get(id!).then((p) => {
@@ -39,6 +101,7 @@ export function PersonFormPage() {
       setGender(p.gender);
       setEmail(p.email ?? "");
       setPhone(p.phone ?? "");
+      setAdminAccess(p.adminAccess);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -207,6 +270,64 @@ export function PersonFormPage() {
           </button>
         </div>
       </form>
+
+      {/*
+        PERMISOS DE ADMINISTRADOR.
+        Solo lo ve un administrador. Ocultarlo no es la barrera: el endpoint
+        exige el rol `admin` además del permiso de escritura, así que llamarlo
+        directamente tampoco sirve.
+      */}
+      {isEdit && esAdministrador && (
+        <div style={{ marginTop: "2rem", paddingTop: "1.5rem", borderTop: "1px solid var(--brand-gray-100)", maxWidth: 520 }}>
+          <h2 style={{ fontSize: "1.05rem", color: "var(--brand-navy)" }}>Permisos de administrador</h2>
+
+          <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", fontWeight: "normal", marginTop: "0.5rem" }}>
+            <input
+              type="checkbox"
+              checked={adminAccess}
+              disabled={guardandoAdmin}
+              onChange={(e) => handleAdminAccess(e.target.checked)}
+              style={{ marginTop: "0.2rem", width: "auto" }}
+            />
+            <span style={{ fontSize: "0.9rem" }}>Habilitar permisos de administrador</span>
+          </label>
+
+          {/*
+            Cada estado se explica distinto, y las diferencias importan:
+
+              - con la casilla puesta y sin cuenta NO hay acceso todavía, y
+                nadie debe creer que sí;
+              - el cierre de sesión solo ocurre cuando uno se retira los
+                permisos A SÍ MISMO. Anunciarlo en la ficha de otra persona
+                —o cuando no hay nada que retirar— prometía algo que no pasa.
+          */}
+          <p style={{ fontSize: "0.82rem", color: "var(--brand-gray-600)", marginTop: "0.4rem" }}>
+            {adminAccess && !person?.user ? (
+              <>
+                <strong>Marcado, pero todavía sin acceso.</strong> Esta persona no tiene credenciales, así que aún no puede entrar.
+                Guardar la casilla <em>no</em> crea la cuenta ni genera ninguna contraseña. Use «Crear credenciales» más abajo: la cuenta
+                nacerá con permisos de administrador, con contraseña temporal y cambio obligatorio en el primer ingreso.
+              </>
+            ) : adminAccess ? (
+              <>
+                Su cuenta tiene el rol de administrador. El alcance administrativo prevalece sobre sus demás roles y vínculos con clubes,
+                que se conservan. Al retirarlo se quita <em>solo</em> el rol administrativo.
+                {esUnoMismo && <> Como son sus propios permisos, se cerrará su sesión.</>}
+              </>
+            ) : (
+              <>
+                Esta persona no tiene permisos de administrador. Al concederlos se agrega el rol a su cuenta y conserva los que ya tenga.
+              </>
+            )}
+          </p>
+
+          {adminMsg && (
+            <p style={{ fontSize: "0.85rem", background: "var(--brand-bg)", padding: "0.6rem 0.75rem", borderRadius: 6, marginTop: "0.5rem" }}>
+              {adminMsg}
+            </p>
+          )}
+        </div>
+      )}
 
       {isEdit && (
         <div style={{ marginTop: "2rem", paddingTop: "1.5rem", borderTop: "1px solid var(--brand-gray-100)", maxWidth: 520 }}>
