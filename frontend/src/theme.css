@@ -207,16 +207,52 @@ label {
   min-height: 100vh;
 }
 .app-sidebar {
-  width: 220px;
+  /*
+    El ancho sale de una variable para que el arrastre del manillar solo tenga
+    que cambiarla. `--app-sidebar-width` la fija `AppShell` en línea; este
+    valor es el de reserva si aún no se calculó.
+  */
+  width: var(--app-sidebar-width, 220px);
   flex-shrink: 0;
   background: var(--brand-navy);
   color: var(--brand-white);
   padding: 1rem 0;
-  transition: width 0.15s ease;
   overflow-x: hidden;
+  position: relative;
+}
+/*
+  La transición solo mientras NO se arrastra: durante el arrastre haría que el
+  borde persiguiera al cursor con retraso, que se siente como un tirón.
+*/
+.app-sidebar:not(.resizing) {
+  transition: width 0.15s ease;
 }
 .app-sidebar.collapsed {
   width: 56px;
+}
+
+/* ---------- Manillar de redimensionado ---------- */
+.app-sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+  border: none;
+  padding: 0;
+  /* Por encima del contenido del menú, para que el cursor lo alcance. */
+  z-index: 2;
+}
+.app-sidebar-resizer:hover,
+.app-sidebar-resizer:focus-visible {
+  background: var(--brand-blue);
+  outline: none;
+}
+.app-sidebar.collapsed .app-sidebar-resizer {
+  /* Contraído, el ancho lo manda el modo, no el arrastre. */
+  display: none;
 }
 .app-sidebar-toggle {
   display: flex;
@@ -239,19 +275,37 @@ label {
 }
 .app-sidebar a {
   display: flex;
-  align-items: center;
+  /*
+    `flex-start` y no `center`: cuando la etiqueta ocupa dos líneas —el caso de
+    "Asignación de Nadadores"— centrarla verticalmente descuadra el icono
+    respecto de la primera línea de texto.
+  */
+  align-items: flex-start;
   gap: 0.65rem;
   color: rgba(255,255,255,0.85);
   text-decoration: none;
   padding: 0.65rem 1.25rem;
   font-size: 0.9rem;
-  white-space: nowrap;
+  /*
+    ANTES: `white-space: nowrap` con `overflow-x: hidden` en el contenedor.
+    Eso recortaba "Asignación de Nadadores" sin ningún indicio de que faltaba
+    texto. Ahora la etiqueta se ajusta en varias líneas y se lee entera.
+  */
+  white-space: normal;
+  line-height: 1.25;
+}
+.app-sidebar-label {
+  /* Una palabra más larga que la columna se parte en vez de desbordar. */
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 .app-sidebar.collapsed a {
   padding-left: 1rem;
 }
 .app-sidebar-icon {
   flex-shrink: 0;
+  /* Alineado con la primera línea del texto, no con el bloque entero. */
+  margin-top: 0.1rem;
 }
 .app-sidebar.collapsed .app-sidebar-label {
   display: none;
@@ -266,6 +320,24 @@ label {
   flex: 1;
   padding: 1.5rem 2rem;
   min-width: 0;
+}
+
+/*
+  Vista estrecha: el ancho que el usuario haya arrastrado en el escritorio no
+  puede comerse la pantalla de un teléfono. Se acota a una fracción del ancho
+  visible y se retira el manillar — arrastrar con el dedo en un borde de 6px
+  no es una interacción utilizable, y además chocaría con el desplazamiento.
+*/
+@media (max-width: 768px) {
+  .app-sidebar:not(.collapsed) {
+    width: min(var(--app-sidebar-width, 220px), 45vw);
+  }
+  .app-sidebar-resizer {
+    display: none;
+  }
+  .app-content {
+    padding: 1rem;
+  }
 }
 
 /* ---------- Tablas de datos ---------- */

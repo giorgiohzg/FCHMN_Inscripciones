@@ -1,0 +1,29 @@
+-- Estado nuevo: «Inscripciones individuales cerradas».
+--
+-- QUÉ PROBLEMA RESUELVE
+--
+-- Alcanzar el cupo global de nadadores cerraba la competencia entera. Pero un
+-- cupo lleno solo impide que entren nadadores NUEVOS: los relevos se forman
+-- con nadadores que ya ocupan cupo, así que no consumen ninguno y no hay
+-- motivo para bloquearlos. Con un único 'closed' esa distinción no se podía
+-- expresar, y cerrar por cupo dejaba a los clubes sin poder armar sus equipos.
+--
+-- POR QUÉ UN ESTADO Y NO UNA MARCA
+--
+-- Se podría haber añadido un booleano junto a 'closed'. Un estado propio es
+-- mejor por dos razones: aparece tal cual en la interfaz sin que nadie tenga
+-- que recomponerlo, y hace imposible la combinación sin sentido de una
+-- competencia 'open' con las individuales cerradas.
+--
+-- POR QUÉ ESTA MIGRACIÓN VA SOLA
+--
+-- PostgreSQL no permite USAR un valor de enum en la misma transacción en la
+-- que se añade. La restricción que menciona 'individual_closed' va en la
+-- migración siguiente, que corre en otra transacción y ya lo ve.
+--
+-- `AFTER 'open'` coloca el valor en su lugar lógico dentro del ciclo de vida:
+-- el orden de un enum de PostgreSQL es el de declaración, y cualquier consulta
+-- que ordene por estado mostraría el cierre parcial antes del total.
+--
+-- `IF NOT EXISTS` hace la migración repetible sin error.
+ALTER TYPE "CompetitionStatus" ADD VALUE IF NOT EXISTS 'individual_closed' AFTER 'open';

@@ -5,14 +5,41 @@ import { useSort, sortItems, SortableTh } from "../../shared/sortableTable";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Borrador", scheduled: "Programada", open: "Abierta",
-  closed: "Cerrada", in_progress: "En ejecución", finished: "Finalizada", cancelled: "Cancelada",
+  individual_closed: "Individuales cerradas", closed: "Cerrada", in_progress: "En ejecución", finished: "Finalizada", cancelled: "Cancelada",
 };
 
+/**
+ * Tarjeta del resumen general: el NÚMERO arriba y el texto debajo, ambos
+ * centrados.
+ *
+ * El orden importa para la lectura: en una fila de tarjetas, lo que se
+ * compara de un vistazo son las cifras, así que van primero y alineadas
+ * entre sí. La etiqueta explica la cifra que ya se leyó.
+ *
+ * `justifyContent: center` reparte el espacio sobrante cuando una etiqueta
+ * ocupa dos líneas y otra una: sin él, las cifras de la misma fila quedarían
+ * a distinta altura.
+ */
 function KpiCard({ label, value, accent }: { label: string; value: number; accent: string }) {
   return (
-    <div style={{ background: "var(--brand-bg)", borderRadius: 8, padding: "1rem 1.25rem", flex: 1, minWidth: 160 }}>
-      <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--brand-gray-600)", textTransform: "uppercase" }}>{label}</div>
-      <div style={{ fontSize: "2rem", fontWeight: 700, color: accent, marginTop: "0.2rem" }}>{value}</div>
+    <div
+      style={{
+        background: "var(--brand-bg)",
+        borderRadius: 8,
+        padding: "1rem 1.25rem",
+        flex: 1,
+        minWidth: 160,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+      }}
+    >
+      <div style={{ fontSize: "2rem", fontWeight: 700, color: accent, lineHeight: 1.1 }}>{value}</div>
+      <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--brand-gray-600)", textTransform: "uppercase", marginTop: "0.3rem" }}>
+        {label}
+      </div>
     </div>
   );
 }

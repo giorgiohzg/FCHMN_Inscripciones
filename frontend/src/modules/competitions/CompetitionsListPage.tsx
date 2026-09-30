@@ -9,6 +9,7 @@ const STATUS_LABELS: Record<CompetitionStatus, string> = {
   draft: "Borrador",
   scheduled: "Inscripciones programadas",
   open: "Inscripciones abiertas",
+  individual_closed: "Inscripciones individuales cerradas",
   closed: "Inscripciones cerradas",
   in_progress: "En ejecución",
   finished: "Finalizada",
@@ -18,6 +19,11 @@ const STATUS_BADGE: Record<CompetitionStatus, string> = {
   draft: "badge-locked",
   scheduled: "badge-locked",
   open: "badge-active",
+  // Cierre PARCIAL: ni activa ni inactiva del todo. Se usa la insignia de
+  // AVISO —la misma que 'scheduled'—, no la de deshabilitado: los relevos
+  // siguen abiertos, y pintarla como una competencia cerrada haría que nadie
+  // entrara a armar equipos.
+  individual_closed: "badge-locked",
   closed: "badge-disabled",
   in_progress: "badge-active",
   finished: "badge-disabled",
@@ -41,7 +47,7 @@ export function CompetitionsListPage() {
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: "", description: "", registrationStartAt: "", registrationEndAt: "", ageCutoffDate: "", maxIndividualEventsPerSwimmer: "", maxRelayEventsPerSwimmerPerSession: "1", poolId: "" });
+  const [form, setForm] = useState({ name: "", description: "", registrationStartAt: "", registrationEndAt: "", ageCutoffDate: "", maxIndividualEventsPerSwimmer: "", maxRelayEventsPerSwimmerPerSession: "1", maxSwimmers: "", maxSwimmersPerClub: "", poolId: "" });
 
   useEffect(() => {
     poolsApi.list().then(setPools);
@@ -86,10 +92,14 @@ export function CompetitionsListPage() {
         ...form,
         maxIndividualEventsPerSwimmer: Number(form.maxIndividualEventsPerSwimmer),
         maxRelayEventsPerSwimmerPerSession: Number(form.maxRelayEventsPerSwimmerPerSession || 1),
+        // Vacío = sin cupo. Se envía null, no undefined, para que el campo
+        // quede explícitamente sin límite.
+        maxSwimmers: form.maxSwimmers !== "" ? Number(form.maxSwimmers) : null,
+        maxSwimmersPerClub: form.maxSwimmersPerClub !== "" ? Number(form.maxSwimmersPerClub) : null,
         poolId: form.poolId || undefined,
       });
       setShowCreate(false);
-      setForm({ name: "", description: "", registrationStartAt: "", registrationEndAt: "", ageCutoffDate: "", maxIndividualEventsPerSwimmer: "", maxRelayEventsPerSwimmerPerSession: "1", poolId: "" });
+      setForm({ name: "", description: "", registrationStartAt: "", registrationEndAt: "", ageCutoffDate: "", maxIndividualEventsPerSwimmer: "", maxRelayEventsPerSwimmerPerSession: "1", maxSwimmers: "", maxSwimmersPerClub: "", poolId: "" });
       navigate(`/competencias/${c.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear la competencia");
@@ -148,6 +158,34 @@ export function CompetitionsListPage() {
           <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "0.2rem" }}>
             Cuántos relevos puede nadar una misma persona dentro de una fecha y jornada. Por defecto 1. Use 0 si la competencia no admite relevos. El
             límite por jornada (en la ficha de cada jornada) puede restringirlo más, nunca ampliarlo.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+            <div>
+              <label htmlFor="nuevo-cupo-total">Cupo de nadadores (opcional)</label>
+              <input
+                id="nuevo-cupo-total"
+                type="number"
+                min={1}
+                placeholder="Sin límite"
+                value={form.maxSwimmers}
+                onChange={(e) => setForm({ ...form, maxSwimmers: e.target.value })}
+              />
+            </div>
+            <div>
+              <label htmlFor="nuevo-cupo-club">Cupo por club (opcional)</label>
+              <input
+                id="nuevo-cupo-club"
+                type="number"
+                min={1}
+                placeholder="Sin límite"
+                value={form.maxSwimmersPerClub}
+                onChange={(e) => setForm({ ...form, maxSwimmersPerClub: e.target.value })}
+              />
+            </div>
+          </div>
+          <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "0.2rem" }}>
+            Cuentan <strong>nadadores distintos</strong>, no pruebas. Al llenarse el cupo total, las inscripciones se cierran automáticamente. Deje
+            los campos vacíos para no poner límite.
           </p>
           <label>Piscina (opcional)</label>
           <select value={form.poolId} onChange={(e) => setForm({ ...form, poolId: e.target.value })}>

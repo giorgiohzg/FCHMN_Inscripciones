@@ -21,9 +21,24 @@ export const competitionCreateSchema = z
       .int()
       .min(0, "No puede ser negativo")
       .default(1),
+    /**
+     * Cupos de NADADORES DISTINTOS, ambos opcionales. Omitirlos o enviarlos
+     * nulos significa "sin límite", que es el comportamiento histórico y el
+     * que conservan todas las competencias anteriores a estos campos.
+     *
+     * `nullable` además de `optional` a propósito: el formulario necesita
+     * poder QUITAR un cupo ya puesto, y para eso tiene que enviar null
+     * explícitamente, no limitarse a omitir el campo.
+     */
+    maxSwimmers: z.coerce.number().int().min(1, "El cupo debe ser al menos 1").optional().nullable(),
+    maxSwimmersPerClub: z.coerce.number().int().min(1, "El cupo por club debe ser al menos 1").optional().nullable(),
     // Opcional: si no se selecciona, la exportación a Team Manager usa
     // piscina larga por defecto (comportamiento previo, sin cambios).
     poolId: z.string().uuid().optional().nullable(),
+  })
+  .refine((d) => d.maxSwimmers == null || d.maxSwimmersPerClub == null || d.maxSwimmersPerClub <= d.maxSwimmers, {
+    message: "El cupo por club no puede superar el cupo total de la competencia",
+    path: ["maxSwimmersPerClub"],
   })
   .refine((d) => d.registrationEndAt > d.registrationStartAt, {
     message: "La fecha de fin de inscripción debe ser posterior a la de inicio",
@@ -40,6 +55,11 @@ export const competitionUpdateSchema = z
     ageCutoffDate: z.coerce.date().optional(),
     maxIndividualEventsPerSwimmer: z.coerce.number().int().min(1).optional(),
     maxRelayEventsPerSwimmerPerSession: z.coerce.number().int().min(0).optional(),
+    // Igual que en el alta: null = quitar el cupo. La coherencia entre los
+    // dos cupos se comprueba en el servicio, con los valores ya combinados
+    // con lo guardado — aquí solo llegaría la mitad del par.
+    maxSwimmers: z.coerce.number().int().min(1).optional().nullable(),
+    maxSwimmersPerClub: z.coerce.number().int().min(1).optional().nullable(),
     poolId: z.string().uuid().optional().nullable(),
   })
   /**

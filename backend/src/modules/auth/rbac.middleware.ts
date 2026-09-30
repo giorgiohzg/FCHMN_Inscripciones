@@ -50,9 +50,16 @@ async function authenticate(req: FastifyRequest): Promise<{ mustChangePassword: 
 
   const state = await loadAuthorizationState(payload.sub);
 
-  // Mensaje único para todos los casos: a quien porta un token no se le
-  // informa si la cuenta fue bloqueada, inhabilitada o eliminada.
-  if (!state || state.deletedAt || state.status !== "active") {
+  /**
+   * Mensaje único para todos los casos: a quien porta un token no se le
+   * informa si lo bloqueado fue la cuenta o la persona detrás.
+   *
+   * La condición vive en `loadAuthorizationState.usable`, no aquí: son tres
+   * los sitios que deciden si dejan pasar —este, el login y el refresco— y
+   * antes cada uno repetía su propia versión. Una condición añadida en uno
+   * solo dejaba la puerta abierta en los otros dos.
+   */
+  if (!state || !state.usable) {
     throw new UnauthorizedError("La sesión ya no es válida. Vuelva a iniciar sesión.");
   }
 

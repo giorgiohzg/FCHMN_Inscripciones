@@ -20,6 +20,22 @@ export interface AuthorizationState {
   status: "active" | "locked" | "disabled";
   deletedAt: Date | null;
   mustChangePassword: boolean;
+  /**
+   * ¿La sesión es utilizable AHORA?
+   *
+   * Se calcula aquí, no en cada llamador, porque son tres los que deciden si
+   * dejan pasar —`authenticate`, el login y el refresco— y cada uno repetía
+   * su propia versión de la comprobación. Una condición nueva añadida en uno
+   * solo de ellos deja una puerta abierta en los otros dos.
+   *
+   * Incluye algo que antes no se miraba: el estado de la PERSONA dueña de la
+   * cuenta. `users.status` y `persons.status` son columnas distintas, y
+   * bastaba una incoherencia —una persona inhabilitada cuya cuenta siguiera
+   * activa— para que esa persona entrara con normalidad. Las cuentas `system`
+   * y `club` no tienen persona detrás, así que para ellas esto no cambia
+   * nada.
+   */
+  usable: boolean;
 }
 
 /**
@@ -71,20 +87,61 @@ export async function loadRolesAndPermissions(userId: string): Promise<{ roles: 
 export async function loadAuthorizationState(userId: string): Promise<AuthorizationState | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, ownerType: true, personId: true, clubId: true, status: true, deletedAt: true, mustChangePassword: true },
+    select: {
+      id: true,
+      ownerType: true,
+      personId: true,
+      clubId: true,
+      status: true,
+      deletedAt: true,
+      mustChangePassword: true,
+      // El estado de la PERSONA dueña, para poder denegar aunque la cuenta
+      // figure activa por una incoherencia.
+      person: { select: { status: true, deletedAt: true } },
+    },
   });
   if (!user) return null;
 
   const { roles, permissions } = await loadRolesAndPermissions(user.id);
+  const esAdministrador = roles.includes("admin");
+
   /**
    * El club efectivo se resuelve según el tipo de dueño, ahora de forma
    * exhaustiva: una cuenta `system` (el administrador) no tiene club y
    * tampoco tiene persona de la que derivarlo. Antes caía en la rama de
    * `person` y llamaba a `resolvePersonClubId(null)`, que devolvía `null` por
    * casualidad, no por decisión.
+   *
+   * UN ADMINISTRADOR NO PASA POR LA RESOLUCIÓN DE CLUB.
+   *
+   * La razón es que su alcance no depende de ningún club: `buildActorContext`
+   * le da prioridad a `admin` sobre el club y la persona, así que el valor
+   * resuelto aquí se descartaría de todas formas. Preguntar por él no aporta
+   * nada y sí puede estorbar — `resolvePersonClubId` LANZA cuando la persona
+   * figura como personal de más de un club, y ese error ocurriría antes de
+   * que la prioridad se aplicara, dejando al administrador sin poder
+   * autenticarse.
+   *
+   * Precisión sobre eso último: hoy la base rechaza el segundo vínculo, así
+   * que ese caso solo puede venir de datos anteriores a esa restricción o
+   * insertados por fuera. Es una rama defensiva, no un fallo en curso.
+   *
+   * Para el resto se conserva la validación tal cual: un delegado con
+   * vínculos contradictorios sigue siendo rechazado.
    */
   const clubId =
-    user.ownerType === "club" ? user.clubId : user.ownerType === "system" ? null : await resolvePersonClubId(user.personId);
+    esAdministrador || user.ownerType === "system"
+      ? null
+      : user.ownerType === "club"
+        ? user.clubId
+        : await resolvePersonClubId(user.personId);
+
+  /**
+   * `user.person` es null para las cuentas `system` y `club`, así que la
+   * condición de la persona solo puede denegar a las cuentas de persona.
+   */
+  const personaUtilizable = !user.person || (user.person.status === "active" && user.person.deletedAt === null);
+  const cuentaUtilizable = user.status === "active" && user.deletedAt === null;
 
   return {
     userId: user.id,
@@ -96,5 +153,6 @@ export async function loadAuthorizationState(userId: string): Promise<Authorizat
     status: user.status as "active" | "locked" | "disabled",
     deletedAt: user.deletedAt,
     mustChangePassword: user.mustChangePassword,
+    usable: cuentaUtilizable && personaUtilizable,
   };
 }
