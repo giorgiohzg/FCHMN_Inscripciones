@@ -22,7 +22,7 @@ import { seedRolesAndPermissions, createUser } from "./helpers/seedRbac";
 import { audit } from "../src/modules/audit/audit.service";
 import * as competitionsService from "../src/modules/competitions/competitions.service";
 import * as authService from "../src/modules/auth/auth.service";
-import { importCompetitionFromMeetEventsZip } from "../src/modules/meet-import/meet-import.service";
+import { importCompetitionFromMeetEventsZip, AVISO_DIA_EV3 } from "../src/modules/meet-import/meet-import.service";
 import { TEST_PASSWORD } from "./helpers/seedRbac";
 
 let ADMIN: { userId: string };
@@ -359,16 +359,31 @@ describe("las importaciones fallidas y parciales dejan rastro", () => {
     expect(String(after.reason)).toMatch(/anterior a la de inicio/i);
   });
 
-  it("competencia de varios días: también queda registrada", async () => {
+  /**
+   * Una competencia de varios días YA NO es un fallo.
+   *
+   * Antes se rechazaba porque el `.ev3` no dice en qué día se nada cada
+   * prueba, y esa negativa quedaba registrada como intento fallido. Ahora se
+   * importa con todas las pruebas en el primer día y un aviso que pide
+   * moverlas, así que no hay nada que registrar como fallo.
+   *
+   * Lo que esta prueba conserva es justamente eso: que el registro de
+   * intentos fallidos NO se dispare por algo que ya no falla.
+   */
+  it("competencia de varios días: ya no es un fallo y no deja registro de intento fallido", async () => {
+    // Solo hacen falta los tipos de prueba: distancias, estilos y tipos de
+    // jornada los crea la propia importación si no existen.
+    await conCatalogoDePruebas();
     const encabezado = "Copa Larga;Club Org;03/28/2026;03/30/2026;12/31/2026;S;0;290;0;x;Chile;8.0Gc;02/06";
 
-    await expect(
-      importCompetitionFromMeetEventsZip(zipCon(encabezado, [LINEA]), { maxIndividualEventsPerSwimmer: 5 }, ADMIN)
-    ).rejects.toThrow(/3 días/);
+    const resumen = await importCompetitionFromMeetEventsZip(zipCon(encabezado, [LINEA]), { maxIndividualEventsPerSwimmer: 5 }, ADMIN);
 
-    const registros = await fallidos();
-    expect(registros).toHaveLength(1);
-    expect((registros[0]!.after as Record<string, unknown>).etapa).toBe("validacion");
+    expect(resumen.eventsImported).toBe(1);
+    // El aviso dice que el importador no puede atribuir el día con certeza, no
+    // que el archivo no traiga la información: un `.ev3` real de varios días
+    // SÍ la trae, en campos que todavía no se pueden distinguir entre sí.
+    expect(resumen.warnings).toContain(AVISO_DIA_EV3);
+    expect(await fallidos(), "una importación que prospera no deja intento fallido").toHaveLength(0);
   });
 
   /** El texto de un error interno tal como podría venir de Prisma o del SO. */
@@ -460,7 +475,11 @@ describe("las importaciones fallidas y parciales dejan rastro", () => {
     expect(after.etapa, "el fallo ocurrió ya dentro de la escritura").toBe("escritura");
     expect(after.competitionName).toBe("Copa de Prueba");
     expect(after.eventCount).toBe(1);
-    expect(String(after.reason)).toMatch(/tipos de prueba/i);
+    // El archivo trae una prueba individual, así que lo que falta —y se
+    // nombra— es ese tipo. La ausencia de tipos de RELEVO tiene su propio
+    // mensaje y solo se comprueba cuando el archivo trae relevos.
+    expect(String(after.reason)).toMatch(/tipo de prueba Individual/i);
+    expect(after.fase, "el fallo ocurrió importando, no analizando").toBe("importacion");
   });
 
   it("una importación parcial se registra COMO parcial, con el detalle de lo que quedó fuera", async () => {

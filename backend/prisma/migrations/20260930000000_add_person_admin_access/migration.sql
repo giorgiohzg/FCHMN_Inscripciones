@@ -1,0 +1,34 @@
+-- Permisos de administrador por persona.
+--
+-- QUÉ ES ESTA COLUMNA Y QUÉ NO ES
+--
+-- Es la INTENCIÓN, no el acceso. Quien concede acceso sigue siendo la fila de
+-- `user_roles` que une la cuenta con el rol `admin`, y es lo único que
+-- `loadAuthorizationState` consulta en cada solicitud. Ninguna consulta de
+-- autorización lee esta columna.
+--
+-- Existe por un caso concreto: la marca se puede poner ANTES de que la persona
+-- tenga cuenta, y entonces no hay ningún `user_roles` donde guardarla. Al
+-- crear las credenciales, `createCredentials` la lee y concede el rol.
+--
+-- POR QUÉ NO HAY RESTRICCIÓN DE COHERENCIA
+--
+-- La coherencia deseable —«marca puesta ⇔ la cuenta tiene el rol admin»—
+-- cruza tres tablas (`persons`, `users`, `user_roles`), y un CHECK de
+-- PostgreSQL no puede expresar eso. Un disparador podría, pero movería una
+-- regla de negocio a un lugar donde nadie la busca y donde las pruebas no la
+-- ven. Se mantiene por disciplina en una sola función de servicio, con una
+-- consulta de conciliación en `scripts/auditar-admin-desincronizado.sql` para
+-- comprobarlo cuando se quiera.
+--
+-- ADITIVA Y SIN MIGRACIÓN DE DATOS. Todas las filas existentes quedan en
+-- `false`, que es el estado correcto: hoy ninguna persona tiene el rol admin
+-- —la única cuenta administrativa es `system`, que no tiene persona— así que
+-- el valor por omisión ya es coherente con lo que hay.
+ALTER TABLE "persons" ADD COLUMN "admin_access" BOOLEAN NOT NULL DEFAULT false;
+
+-- Las consultas que importan son «¿cuántos administradores quedan?» y la de
+-- conciliación, y las dos filtran por esta columna en verdadero. Un índice
+-- parcial cuesta casi nada —serán unas pocas filas— y evita recorrer la tabla
+-- entera de personas cada vez que se comprueba el último administrador.
+CREATE INDEX "persons_admin_access_idx" ON "persons" ("admin_access") WHERE "admin_access";

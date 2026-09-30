@@ -85,10 +85,23 @@ describe("competitions.rules — evaluateCompetitionAction", () => {
 });
 
 describe("competitions.rules — recomputeStatusAfterEdit (al editar fechas explícitamente)", () => {
-  it("reabre a 'open' una competencia 'closed' si la nueva fecha de cierre queda en el futuro", () => {
+  /**
+   * CAMBIO DE CONTRATO — antes esta prueba exigía lo contrario.
+   *
+   * Editar una competencia cerrada ya no la reabre, ni siquiera extendiendo
+   * la fecha de cierre a futuro. El motivo salió de dos fallos reales: el
+   * formulario de edición envía SIEMPRE las dos fechas y los dos cupos, se
+   * hayan tocado o no, así que "la solicitud trae fechas" no distinguía una
+   * extensión deliberada de un simple renombrado — y renombrar una
+   * competencia cerrada a mano la reabría.
+   *
+   * Reabrir es ahora una acción propia: `evaluateReopenRegistrations`, que
+   * además comprueba que el cupo no esté alcanzado.
+   */
+  it("NO reabre una competencia 'closed' aunque la nueva fecha de cierre quede en el futuro", () => {
     const now = new Date("2026-07-05T00:00:00Z"); // después del cierre original
     const newEnd = new Date("2026-07-31T23:59:59Z"); // se extiende a futuro
-    expect(recomputeStatusAfterEdit("closed", START, newEnd, now)).toBe("open");
+    expect(recomputeStatusAfterEdit("closed", START, newEnd, now)).toBe("closed");
   });
 
   it("mantiene 'closed' si la nueva fecha de cierre sigue en el pasado", () => {

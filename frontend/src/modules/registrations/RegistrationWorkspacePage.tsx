@@ -112,6 +112,27 @@ export function RegistrationWorkspacePage() {
    */
   const soloLectura = cargandoLaVista || cargaDeEstaVista?.fase === "error";
 
+  /**
+   * INSCRIPCIONES INDIVIDUALES CERRADAS PARA QUIEN NO SEA ADMINISTRADOR.
+   *
+   * Ocurre en los DOS estados de cierre: `individual_closed` —se alcanzó el
+   * cupo— y `closed`. En ambos desaparecen el campo de tiempo y los botones
+   * «Inscribir», «Editar» y «×»; la información de consulta se mantiene, que
+   * es justo lo que un club sigue necesitando ver.
+   *
+   * ESTO NO ES UNA BARRERA DE SEGURIDAD. El backend rechaza igual estas
+   * operaciones, y así tiene que ser: ocultar un botón no impide llamar a la
+   * API. Lo que evita es el camino frustrante de intentar algo que va a
+   * fallar, y el aviso explica por qué.
+   *
+   * Un administrador conserva todos los controles: su excepción se comprueba
+   * en el backend, no aquí.
+   */
+  const esAdministrador = hasRole("admin");
+  const competenciaSeleccionada = competitions.find((c) => c.id === competitionId);
+  const estadoDeCierre = competenciaSeleccionada?.status === "individual_closed" || competenciaSeleccionada?.status === "closed";
+  const individualesBloqueadas = estadoDeCierre && !esAdministrador;
+
   const [search, setSearch] = useState("");
 
   // Nadador "seleccionado" (uno solo, por clic o arrastre): al elegirlo, se
@@ -710,6 +731,41 @@ export function RegistrationWorkspacePage() {
             <span>Inscripciones: <strong>{registrations.length}</strong></span>
             <span>Pruebas: <strong>{events.length}</strong></span>
           </div>
+
+          {/*
+            Al ocultar los controles hay que decir POR QUÉ. Sin este aviso, la
+            pantalla se ve igual que una con un fallo de carga, y la diferencia
+            entre los dos estados de cierre importa: con el cupo lleno los
+            relevos siguen abiertos, y ahí es donde el club puede seguir
+            trabajando.
+          */}
+          {individualesBloqueadas && (
+            <div
+              role="status"
+              style={{
+                border: "1px solid var(--state-warning)",
+                borderRadius: 6,
+                padding: "0.5rem 0.8rem",
+                marginBottom: "0.5rem",
+                background: "rgba(245, 158, 11, 0.08)",
+                fontSize: "0.85rem",
+              }}
+            >
+              {competenciaSeleccionada?.status === "individual_closed" ? (
+                <>
+                  <strong>Inscripciones individuales cerradas.</strong> Esta competencia alcanzó su cupo de nadadores, así que no se
+                  pueden crear, editar ni cancelar inscripciones individuales —tampoco las de nadadores ya inscritos—.{" "}
+                  <strong>Los relevos siguen abiertos</strong> en el Panel de Relevos, con nadadores que ya tengan una inscripción
+                  individual confirmada.
+                </>
+              ) : (
+                <>
+                  <strong>Inscripciones cerradas.</strong> No se pueden crear, editar ni cancelar inscripciones individuales ni relevos.
+                  La información se mantiene visible para consulta.
+                </>
+              )}
+            </div>
+          )}
           <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginBottom: "0.5rem" }}>
             Cada columna es un día de la competencia, con sus pruebas numeradas (el orden se define en la ficha de la competencia). Haga clic en un
             nadador (o arrástrelo sobre una prueba) para seleccionarlo y habilitar el campo de tiempo. Las inscripciones ya confirmadas se pueden
@@ -774,7 +830,8 @@ export function RegistrationWorkspacePage() {
                         {dayEvents.filter((ce) => ce.competitionSession.sessionType.name === sessionName).map((ce) => {
                         const isEligibleTarget = selectedSwimmer?.eligibleEvents.some((e) => e.competitionEventId === ce.id);
                         const isRegisteredTarget = selectedSwimmer?.registeredEventIds.includes(ce.id);
-                        const showTimeInput = Boolean(selectedSwimmer) && isEligibleTarget && !isRegisteredTarget;
+                        const showTimeInput =
+                          Boolean(selectedSwimmer) && isEligibleTarget && !isRegisteredTarget && !individualesBloqueadas;
                         const confirmed = eventRegistrations(ce);
 
                         let borderColor = "var(--brand-gray-100)";
@@ -841,9 +898,14 @@ export function RegistrationWorkspacePage() {
                                       </span>
                                     ) : (
                                       <span style={{ display: "flex", gap: "0.3rem", alignItems: "center", color: "var(--brand-gray-600)" }}>
+                                        {/* El tiempo se sigue viendo: es información de consulta. */}
                                         {formatSwimTimeReadable(r.seedTimeCentiseconds)}
-                                        <button className="btn-secondary" style={{ padding: "0.05rem 0.3rem", fontSize: "0.65rem" }} onClick={() => startEditRegistration(r)} disabled={soloLectura || operacionEnCurso(`registro:${r.id}`)}>Editar</button>
-                                        <button className="btn-danger" style={{ padding: "0.05rem 0.3rem", fontSize: "0.65rem" }} onClick={() => handleRemove(r)} disabled={soloLectura || operacionEnCurso(`registro:${r.id}`)}>×</button>
+                                        {!individualesBloqueadas && (
+                                          <>
+                                            <button className="btn-secondary" style={{ padding: "0.05rem 0.3rem", fontSize: "0.65rem" }} onClick={() => startEditRegistration(r)} disabled={soloLectura || operacionEnCurso(`registro:${r.id}`)}>Editar</button>
+                                            <button className="btn-danger" style={{ padding: "0.05rem 0.3rem", fontSize: "0.65rem" }} onClick={() => handleRemove(r)} disabled={soloLectura || operacionEnCurso(`registro:${r.id}`)}>×</button>
+                                          </>
+                                        )}
                                       </span>
                                     )}
                                   </div>

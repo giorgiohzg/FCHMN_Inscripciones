@@ -240,6 +240,24 @@ model Person {
   phone     String?
   status    AccountStatus @default(active)
 
+  /// ¿Esta persona debe tener permisos de administrador?
+  ///
+  /// ES LA INTENCIÓN, NO EL ACCESO. Quien concede acceso es la fila de
+  /// `user_roles` que une su cuenta con el rol `admin`, y es lo único que
+  /// `loadAuthorizationState` consulta en cada solicitud. Esta columna existe
+  /// porque la intención se puede fijar ANTES de que la persona tenga cuenta:
+  /// entonces no hay ningún `user_roles` donde guardarla.
+  ///
+  /// La coherencia entre ambas se mantiene por disciplina, no por una
+  /// restricción de la base —un CHECK no puede cruzar tablas—:
+  ///   - este campo es el ÚNICO que se escribe a mano, y desde una sola
+  ///     función: `setAdminAccess` en `persons.service.ts`;
+  ///   - esa función ajusta `user_roles` en la MISMA transacción si hay cuenta;
+  ///   - `createCredentials` lo lee al crear la cuenta;
+  ///   - ningún otro camino concede el rol `admin` a una cuenta de persona.
+  /// `scripts/auditar-admin-desincronizado.sql` permite comprobarlo.
+  adminAccess Boolean @default(false) @map("admin_access")
+
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   createdBy String?   @map("created_by")
@@ -521,10 +539,29 @@ model Event {
 // COMPETENCIAS, FECHAS Y JORNADAS (Módulo 6)
 // --------------------------------------------------------------------------
 
+/// Por qué se cerraron las inscripciones de una competencia.
+///
+/// `schedule` lo escribe el cierre automático por vencimiento de la fecha,
+/// que `applyAutoStatus` PERSISTE en la fila; por eso necesita causa propia:
+/// sin ella seguiría generando filas 'closed' sin causa y NULL dejaría de
+/// significar "anterior a este campo".
+enum RegistrationsCloseReason {
+  manual // Un administrador cerró antes de tiempo (acción closeRegistrations)
+  capacity // Se alcanzó el cupo global de nadadores
+  schedule // Venció la fecha de fin de inscripción
+}
+
 enum CompetitionStatus {
   draft // Borrador
   scheduled // Inscripciones programadas
   open // Inscripciones abiertas
+  // Se alcanzó el cupo global de nadadores: las inscripciones INDIVIDUALES
+  // quedan cerradas para quien no sea administrador, y los relevos siguen
+  // abiertos. Es un cierre PARCIAL, y por eso es un estado propio y no un
+  // 'closed' con matices: de un 'closed' no se puede distinguir después qué
+  // seguía permitido. Solo se sale de aquí cerrando del todo (manualmente o
+  // por vencimiento) o reabriendo de forma explícita.
+  individual_closed // Inscripciones individuales cerradas
   closed // Inscripciones cerradas
   in_progress // En ejecución
   finished // Finalizada
@@ -587,6 +624,35 @@ model Competition {
   // sigue existiendo y puede restringir MÁS para una jornada puntual: el
   // límite efectivo es el menor de los dos.
   maxRelayEventsPerSwimmerPerSession Int @default(1) @map("max_relay_events_per_swimmer_per_session")
+
+  // CUPOS DE NADADORES (opcionales, nulos = sin límite).
+  //
+  // Cuentan NADADORES DISTINTOS con inscripción activa, no pruebas: un
+  // nadador con seis inscripciones individuales y un relevo ocupa UN cupo.
+  // Suman tanto las inscripciones individuales confirmadas como la
+  // pertenencia a un equipo de relevo confirmado.
+  //
+  // Nulos por omisión a propósito: las competencias creadas antes de este
+  // campo conservan exactamente el comportamiento anterior, sin tope.
+  //
+  // Al alcanzarse `maxSwimmers`, las inscripciones de la competencia se
+  // cierran automáticamente (status -> 'closed'). Reducir un cupo por debajo
+  // de lo ya inscrito NO borra inscripciones: solo impide altas nuevas.
+  maxSwimmers        Int? @map("max_swimmers")
+  maxSwimmersPerClub Int? @map("max_swimmers_per_club")
+
+  // CAUSA DEL CIERRE DE INSCRIPCIONES.
+  //
+  // `status` por sí solo no distingue un cierre manual de uno por fecha o por
+  // cupo, y esa distinción decide si una edición posterior puede reabrir.
+  //
+  // NULL = cerrada antes de que existiera este campo (causa desconocida), o
+  // simplemente no cerrada. Es un conjunto que no crece: los tres caminos de
+  // cierre escriben su causa, incluido el automático por fecha.
+  //
+  // Se limpian —ambas a la vez— cuando las inscripciones se reabren.
+  registrationsClosedReason RegistrationsCloseReason? @map("registrations_closed_reason")
+  registrationsClosedAt     DateTime?                 @map("registrations_closed_at")
 
   // Opcional a propósito — no bloquea competencias ya creadas antes de este
   // campo. Si no está seleccionada, la exportación a Team Manager sigue

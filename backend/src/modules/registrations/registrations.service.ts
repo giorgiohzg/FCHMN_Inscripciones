@@ -4,6 +4,15 @@ import { ValidationError, NotFoundError, ForbiddenError } from "../../shared/err
 import { assertClubAccess, resolveClubFilter, scopedPersonId, type ActorContext as SharedActorContext } from "../../shared/actorContext";
 import { computeAge, getDefaultAgeCutoffDate } from "../../shared/age.util";
 import { computeEffectiveStatus, isRegistrationOpen, evaluateRegistrationWindow } from "../competitions/competitions.rules";
+import { evaluateCapacity } from "../competitions/competition-capacity.rules";
+import {
+  readCapacityUsage,
+  contarNuevos,
+  resumirUso,
+  cerrarSiSeAlcanzoElCupo,
+  registrarExcesoDeCupo,
+} from "../competitions/competition-capacity.service";
+import { evaluarCancelacionDeIndividual } from "../relay-registrations/relay-membership.rules";
 import { assertTestTypeMatches } from "../../shared/testType.util";
 import { withTranslatedPrismaErrors } from "../../shared/prismaErrors";
 import { activeCategories, assertCompetitionEventCatalogUsable } from "../../shared/catalogAvailability";
@@ -470,6 +479,46 @@ export async function createRegistration(input: CreateRegistrationInput, actor: 
           throw new ValidationError(result.errors.join(" "), { errors: result.errors });
         }
 
+        /**
+         * CUPOS DE NADADORES (global y por club).
+         *
+         * Va después de las reglas por nadador y dentro de la misma
+         * transacción serializable, por el mismo motivo que aquéllas: es una
+         * regla agregada y contar fuera de la transacción dejaría pasar dos
+         * altas simultáneas sobre el último cupo.
+         *
+         * Un nadador que YA está inscrito no consume cupo, así que esta
+         * comprobación no le impide añadir otra prueba aunque la competencia
+         * esté llena.
+         */
+        const uso = await readCapacityUsage(tx, competitionEvent.competitionId);
+        const nuevos = contarNuevos(uso, input.clubId, [input.personId]);
+        const capacidad = evaluateCapacity(
+          {
+            maxSwimmers: competitionEvent.competition.maxSwimmers,
+            maxSwimmersPerClub: competitionEvent.competition.maxSwimmersPerClub,
+          },
+          resumirUso(uso, input.clubId),
+          { ...nuevos, clubName: club.name },
+          // Solo un administrador con permiso de excepción puede exceder.
+          { puedeExcederCupos: actor.canRegisterPostClose }
+        );
+        /**
+         * LA EXCEPCIÓN ADMINISTRATIVA SOBRE EL CUPO, y su rastro.
+         *
+         * `evaluateCapacity` decide si el alta cabe. Un administrador con
+         * permiso post-cierre puede pasar por encima, y cuando eso ocurre
+         * queda constancia con una acción de auditoría PROPIA —distinta de la
+         * excepción por cierre— porque son dos permisos excepcionales
+         * diferentes: «operé con las inscripciones cerradas» y «metí un
+         * nadador más de los que caben». Pueden darse a la vez, y quien
+         * revise después tiene que poder contarlos por separado.
+         */
+        const maxSwimmers = competitionEvent.competition.maxSwimmers;
+        const excedeElCupo = capacidad.exceededByOverride && maxSwimmers !== null;
+
+        if (!capacidad.allowed) throw new ValidationError(capacidad.reason!);
+
         const creada = await tx.registration.create({
           data: {
             competitionEventId: input.competitionEventId,
@@ -497,6 +546,29 @@ export async function createRegistration(input: CreateRegistrationInput, actor: 
           },
           { tx }
         );
+
+        if (excedeElCupo) {
+          await registrarExcesoDeCupo(
+            tx,
+            {
+              competitionId: competitionEvent.competitionId,
+              entityType: "Registration",
+              entityId: creada.id,
+              maxSwimmers: maxSwimmers!,
+              totalSwimmersAntes: capacidad.projectedTotal - nuevos.newToCompetition,
+              totalSwimmersDespues: capacidad.projectedTotal,
+              nuevosNadadores: nuevos.newToCompetition,
+            },
+            actor
+          );
+        }
+
+        // Cierre automático al alcanzar el cupo global: atómico con el alta
+        // que lo provoca, para que nunca exista una competencia llena que
+        // todavía figure abierta. Si ya está en cierre parcial o total, no
+        // hace nada: un alta administrativa por encima del cupo no vuelve a
+        // "cerrar" lo cerrado ni reescribe la marca de tiempo.
+        await cerrarSiSeAlcanzoElCupo(tx, competitionEvent.competitionId, capacidad.projectedTotal, actor);
 
         return creada;
       },
@@ -657,25 +729,90 @@ export async function cancelRegistration(id: string, actor: ActorContext) {
   if (!window.allowed) throw new ValidationError(window.reason!);
   const isPostCloseException = window.isPostCloseException;
 
-  return withAudit(
-    (tx) =>
-      tx.registration.update({
-        where: { id },
-        data: {
-          status: "cancelled",
-          cancelledAt: new Date(),
-          cancelledByUserId: actor.userId,
-          isPostCloseException: registration.isPostCloseException || isPostCloseException,
-        },
-      }),
-    (updated) => ({
-      userId: actor.userId,
-      action: isPostCloseException ? "REGISTRATION_CANCELLED_POST_CLOSE_EXCEPTION" : "REGISTRATION_CANCELLED",
-      entityType: "Registration",
-      entityId: id,
-      ipAddress: actor.ipAddress,
-      before: registration,
-      after: updated,
-    })
+  const competitionId = registration.competitionEvent.competitionId;
+
+  /**
+   * LA INVARIANTE DE RELEVOS SE COMPRUEBA Y SE ESCRIBE EN LA MISMA OPERACIÓN
+   * PROTEGIDA.
+   *
+   * Es una regla agregada —depende de cuántas inscripciones vivas quedan y de
+   * qué relevos existen—, así que comprobar fuera y escribir después deja una
+   * ventana real: entre la comprobación y el `update`, otro usuario crea un
+   * relevo con este nadador y la cancelación se confirma igual, dejando un
+   * relevo con un integrante sin inscripción individual.
+   *
+   * ORDEN DE ACCESO, el mismo que la vía de inscripción:
+   *   1. `registrations`          (contar las otras confirmadas)
+   *   2. `relay_registrations`    (buscar los relevos dependientes)
+   *   3. `registrations` de nuevo (la escritura)
+   *
+   * Y el ciclo que hace que PostgreSQL aborte una de las dos:
+   *   - esta transacción LEE relevos y ESCRIBE inscripciones;
+   *   - la creación de relevo LEE inscripciones y ESCRIBE relevos.
+   * Con las dos aristas hay ciclo, y `Serializable` detecta el conflicto.
+   * `withTranslatedPrismaErrors` lo convierte en un 409 reintentable.
+   */
+  return withTranslatedPrismaErrors(() =>
+    prisma.$transaction(
+      async (tx) => {
+        // 1. ¿Le queda alguna otra inscripción individual confirmada?
+        const otras = await tx.registration.count({
+          where: {
+            personId: registration.personId,
+            status: "confirmed",
+            competitionEvent: { competitionId },
+            id: { not: id },
+          },
+        });
+
+        // 2. ¿Integra algún relevo confirmado de esta competencia?
+        const relevos = await tx.relayRegistration.findMany({
+          where: {
+            status: "confirmed",
+            competitionEvent: { competitionId },
+            members: { some: { personId: registration.personId } },
+          },
+          include: {
+            competitionEvent: { include: { event: { include: { distance: true, stroke: true } } } },
+          },
+        });
+
+        const veredicto = evaluarCancelacionDeIndividual(
+          otras,
+          relevos.map((r) => ({
+            relayRegistrationId: r.id,
+            descripcion: `${r.competitionEvent.event.distance.meters}m ${r.competitionEvent.event.stroke.name}`,
+          }))
+        );
+        if (!veredicto.allowed) throw new ValidationError(veredicto.reason!);
+
+        // 3. Recién ahora se escribe.
+        const updated = await tx.registration.update({
+          where: { id },
+          data: {
+            status: "cancelled",
+            cancelledAt: new Date(),
+            cancelledByUserId: actor.userId,
+            isPostCloseException: registration.isPostCloseException || isPostCloseException,
+          },
+        });
+
+        await audit(
+          {
+            userId: actor.userId,
+            action: isPostCloseException ? "REGISTRATION_CANCELLED_POST_CLOSE_EXCEPTION" : "REGISTRATION_CANCELLED",
+            entityType: "Registration",
+            entityId: id,
+            ipAddress: actor.ipAddress,
+            before: registration,
+            after: updated,
+          },
+          { tx }
+        );
+
+        return updated;
+      },
+      { isolationLevel: "Serializable" }
+    )
   );
 }

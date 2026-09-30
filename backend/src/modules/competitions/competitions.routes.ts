@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { buildActorContext } from "../../shared/actorContext";
 import * as competitionsService from "./competitions.service";
 import * as structureService from "./competition-structure.service";
 import * as competitionEventsService from "./competition-events.service";
@@ -46,6 +47,23 @@ export async function competitionsRoutes(app: FastifyInstance) {
     reply.send(await competitionsService.getCompetitionById(id, !isAdmin));
   });
 
+  /**
+   * Uso de los cupos de nadadores de una competencia.
+   *
+   * Permiso de LECTURA de inscripciones, no de competencias: quien inscribe
+   * necesita ver cuántos cupos quedan, y un usuario de club tiene ese permiso
+   * aunque no pueda administrar competencias.
+   *
+   * El detalle por club se recorta al alcance del actor: un administrador ve
+   * todos los clubes; un usuario de club ve solo el suyo. Sin ese recorte,
+   * este endpoint filtraría a cada club cuántos nadadores lleva inscritos su
+   * competencia rival.
+   */
+  app.get("/competitions/:id/capacity", { preHandler: [requirePermission("registrations:read")] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    reply.send(await competitionsService.getCompetitionCapacity(id, buildActorContext(req)));
+  });
+
   app.post("/competitions", { preHandler: [requirePermission("competitions:write")] }, async (req, reply) => {
     const parsed = competitionCreateSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Datos de competencia inválidos", parsed.error.flatten());
@@ -83,6 +101,17 @@ export async function competitionsRoutes(app: FastifyInstance) {
   }
 
   // ---------- Fechas ----------
+  /**
+   * Reapertura explícita de inscripciones.
+   *
+   * Va aparte del bucle de transiciones porque no es una transición más: su
+   * evaluación necesita la ocupación de cupos, que las demás no miran.
+   */
+  app.post("/competitions/:id/reopenRegistrations", { preHandler: [requirePermission("competitions:write")] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    reply.send(await competitionsService.reopenRegistrations(id, { userId: req.authUser!.sub, ipAddress: req.ip }));
+  });
+
   app.post("/competitions/:id/dates", { preHandler: [requirePermission("competitions:write")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const parsed = addDateSchema.safeParse(req.body);

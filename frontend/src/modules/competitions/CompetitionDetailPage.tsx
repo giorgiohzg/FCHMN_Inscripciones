@@ -1,7 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AppShell } from "../../shared/AppShell";
-import { useCompetitionsApi, type Competition, type CompetitionDate, type CompetitionEventItem, type SessionType } from "./competitionsApi";
+import {
+  useCompetitionsApi,
+  type Competition,
+  type CompetitionCapacity,
+  type CompetitionDate,
+  type CompetitionEventItem,
+  type SessionType,
+} from "./competitionsApi";
+import { CuposPanel } from "./CuposPanel";
 import { useCatalogsApi, type EventItem, type Category, type CategoryGroup } from "../catalogs/catalogsApi";
 import { formatEventLabel } from "../../shared/eventLabel";
 import { formatCalendarDate } from "../../shared/calendarDate";
@@ -51,8 +59,13 @@ export function CompetitionDetailPage() {
     ageCutoffDate: "",
     maxIndividualEventsPerSwimmer: "",
     maxRelayEventsPerSwimmerPerSession: "1",
+    // Cupos de nadadores: vacío = sin límite, que es el valor por omisión y
+    // el que conservan todas las competencias anteriores a estos campos.
+    maxSwimmers: "",
+    maxSwimmersPerClub: "",
     poolId: "",
   });
+  const [capacity, setCapacity] = useState<CompetitionCapacity | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -74,8 +87,14 @@ export function CompetitionDetailPage() {
       ageCutoffDate: c.ageCutoffDate ? c.ageCutoffDate.slice(0, 10) : "",
       maxIndividualEventsPerSwimmer: c.maxIndividualEventsPerSwimmer !== null ? String(c.maxIndividualEventsPerSwimmer) : "",
       maxRelayEventsPerSwimmerPerSession: String(c.maxRelayEventsPerSwimmerPerSession ?? 1),
+      maxSwimmers: c.maxSwimmers !== null ? String(c.maxSwimmers) : "",
+      maxSwimmersPerClub: c.maxSwimmersPerClub !== null ? String(c.maxSwimmersPerClub) : "",
       poolId: c.poolId ?? "",
     });
+    // El uso de cupos se pide aparte: su fallo no debe impedir ver la
+    // competencia (por ejemplo, si el usuario no tiene permiso de lectura de
+    // inscripciones).
+    api.getCapacity(id).then(setCapacity).catch(() => setCapacity(null));
     setSessionTypes(st);
     setEvents(ev.items);
     setCategories(cat.items);
@@ -96,6 +115,21 @@ export function CompetitionDetailPage() {
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo ejecutar la acción");
+    }
+  }
+
+  /**
+   * Reapertura DELIBERADA. No es una transición más ni un efecto de guardar:
+   * el backend comprueba además que las fechas sigan vigentes y que el cupo
+   * no esté alcanzado, y devuelve el motivo concreto si falta alguna cosa.
+   */
+  async function handleReopen() {
+    setError(null);
+    try {
+      await api.reopenRegistrations(id!);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudieron reabrir las inscripciones");
     }
   }
 
@@ -134,6 +168,10 @@ export function CompetitionDetailPage() {
         maxIndividualEventsPerSwimmer: editForm.maxIndividualEventsPerSwimmer ? Number(editForm.maxIndividualEventsPerSwimmer) : undefined,
         maxRelayEventsPerSwimmerPerSession:
           editForm.maxRelayEventsPerSwimmerPerSession !== "" ? Number(editForm.maxRelayEventsPerSwimmerPerSession) : undefined,
+        // Vacío significa "sin límite": se envía null explícito para poder
+        // QUITAR un cupo ya puesto, no `undefined`, que dejaría el anterior.
+        maxSwimmers: editForm.maxSwimmers !== "" ? Number(editForm.maxSwimmers) : null,
+        maxSwimmersPerClub: editForm.maxSwimmersPerClub !== "" ? Number(editForm.maxSwimmersPerClub) : null,
         poolId: editForm.poolId || null,
       });
       setEditing(false);
@@ -197,6 +235,16 @@ export function CompetitionDetailPage() {
               {a.label}
             </button>
           ))}
+          {/*
+            Solo tiene sentido con las inscripciones cerradas. Guardar la
+            competencia NUNCA la reabre: editar y reabrir son actos distintos
+            y se piden por separado.
+          */}
+          {competition?.status === "closed" && (
+            <button className="btn-secondary" onClick={handleReopen}>
+              Reabrir inscripciones
+            </button>
+          )}
           <button className="btn-secondary" onClick={() => setEditing((v) => !v)}>{editing ? "Cancelar edición" : "Editar"}</button>
           <button className="btn-danger" onClick={handleDeleteCompetition}>Eliminar</button>
         </div>
@@ -233,6 +281,18 @@ export function CompetitionDetailPage() {
               "Sin especificar"
             )}
           </p>
+
+          {competition.status === "closed" && (
+            <p style={{ color: "var(--state-warning)", fontSize: "0.9rem" }}>
+              Inscripciones cerradas
+              {competition.registrationsClosedReason === "manual" && " por decisión de un administrador"}
+              {competition.registrationsClosedReason === "capacity" && " porque se alcanzó el cupo de nadadores"}
+              {competition.registrationsClosedReason === "schedule" && " porque venció la fecha de fin de inscripción"}
+              . Editar y guardar no las reabre: use <strong>Reabrir inscripciones</strong>.
+            </p>
+          )}
+
+          <CuposPanel competition={competition} capacity={capacity} />
         </>
       ) : (
         <div style={{ maxWidth: 640, background: "var(--brand-bg)", padding: "1rem", borderRadius: 8, marginTop: "0.75rem" }}>
@@ -271,6 +331,35 @@ export function CompetitionDetailPage() {
             value={editForm.maxIndividualEventsPerSwimmer}
             onChange={(e) => setEditForm({ ...editForm, maxIndividualEventsPerSwimmer: e.target.value })}
           />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginTop: "0.75rem" }}>
+            <div>
+              <label htmlFor="cupo-total">Cupo de nadadores en la competencia</label>
+              <input
+                id="cupo-total"
+                type="number"
+                min={1}
+                placeholder="Sin límite"
+                value={editForm.maxSwimmers}
+                onChange={(e) => setEditForm({ ...editForm, maxSwimmers: e.target.value })}
+              />
+            </div>
+            <div>
+              <label htmlFor="cupo-club">Cupo de nadadores por club</label>
+              <input
+                id="cupo-club"
+                type="number"
+                min={1}
+                placeholder="Sin límite"
+                value={editForm.maxSwimmersPerClub}
+                onChange={(e) => setEditForm({ ...editForm, maxSwimmersPerClub: e.target.value })}
+              />
+            </div>
+          </div>
+          <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "-0.4rem" }}>
+            Cuentan <strong>nadadores distintos</strong>, no pruebas: quien se inscribe en seis pruebas y un relevo ocupa un solo cupo. Deje el campo
+            vacío para no poner límite. Al llenarse el cupo total, las inscripciones se <strong>cierran automáticamente</strong>. Reducir un cupo por
+            debajo de lo ya inscrito <strong>no elimina inscripciones</strong>: solo impide altas nuevas.
+          </p>
           <label>Máximo de relevos por nadador en cada jornada (0 = sin relevos)</label>
           <input
             type="number"

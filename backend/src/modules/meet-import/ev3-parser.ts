@@ -27,10 +27,28 @@
  *   [8] distancia total en metros
  *   [9] código de estilo de una letra: A=Libre, B=Espalda, C=Pecho,
  *       D=Mariposa, E=Combinado — mismo mapeo ya verificado de forma
- *       independiente en el Módulo 11 (exportación HY3) y confirmado de
- *       nuevo aquí por el archivo .hyv complementario (códigos numéricos
- *       1-5 con la misma correspondencia).
- *   [23] hora de la sesión (ej. "09:45AM")
+ *       independiente en el Módulo 11 (exportación HY3) y confirmado
+ *       después, prueba por prueba, contra el `.hyv` del MISMO evento
+ *       exportado por la misma instalación de Meet Manager (ver
+ *       `hyv-parser.ts`): sus códigos numéricos 1-5 alinean con A-E sin
+ *       un solo conflicto en las 24 pruebas.
+ *   [24] hora de la sesión (ej. "09:45AM") — es el campo que lee el código
+ *       más abajo. La documentación anterior decía `[23]`, que está
+ *       desplazado en uno: contra una exportación real, `[23]` es el número
+ *       de sesión y `[24]` la hora.
+ *
+ * CAMPOS QUE ESTE PARSER NO LEE, y por qué importa saberlo:
+ *   [21] y [23] valen 1 para las pruebas del primer día y 2 para las del
+ *       segundo en la exportación real examinada. Es decir, el `.ev3` SÍ
+ *       trae información que separa los días — lo que no se puede decidir
+ *       con esa muestra es cuál de los dos campos es el día y cuál el
+ *       número de sesión, porque la competencia tenía exactamente una
+ *       sesión por día y ambos campos valen lo mismo. Por eso no se usan
+ *       todavía: la importación no puede asignar el día con certeza. No es
+ *       lo mismo que "el archivo no lo trae".
+ *   [29] número de postas de un relevo (vale 4 en los cuatro relevos de la
+ *       muestra). El importador no lo consulta: elige el tipo de relevo del
+ *       catálogo. Ver la nota sobre relevos en `meet-import.service.ts`.
  */
 
 export type ParsedGender = "male" | "female" | "mixed";
@@ -56,6 +74,17 @@ export interface ParsedMeetEvent {
   distanceMeters: number;
   strokeName: string;
   sessionTime: string; // tal como viene en el archivo, ej. "09:45AM"
+  /**
+   * Día concreto en que se nada esta prueba, si el archivo lo declara.
+   *
+   * El formato `.ev3` NO lo trae: sus líneas de prueba solo llevan la hora de
+   * sesión, nunca la fecha. Este campo queda `undefined` para todo `.ev3` y
+   * existe para que un formato que sí distinga los días pueda rellenarlo sin
+   * tocar el importador: cuando viene en TODAS las pruebas y cae dentro del
+   * rango de la competencia, la importación lo respeta; si falta o es
+   * incoherente, todas las pruebas van al primer día con un aviso explícito.
+   */
+  eventDate?: Date;
 }
 
 export interface ParsedMeet {
@@ -67,7 +96,20 @@ export interface ParsedMeet {
   warnings: string[];
 }
 
-function parseUsDate(raw: string): Date | null {
+/**
+ * Fecha en el formato de los archivos Hy-Tek: MM/DD/AAAA.
+ *
+ * Se exporta para que `hyv-parser.ts` use ESTA función y no una copia: los dos
+ * formatos comparten la convención (verificado en el par `.ev3`/`.hyv` del
+ * mismo evento, donde las tres fechas del encabezado coinciden carácter a
+ * carácter), y dos implementaciones podrían divergir en el manejo de un valor
+ * límite sin que ninguna prueba lo notara.
+ *
+ * Que el orden sea mes/día y no día/mes está demostrado por el propio archivo:
+ * la fecha de corte de edad es `12/31/2026`, que como día/mes sería el día 12
+ * del mes 31. La validación de abajo rechaza justamente ese tipo de valor.
+ */
+export function parseUsDate(raw: string): Date | null {
   const match = raw.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (!match) return null;
   const [, mm, dd, yyyy] = match;
