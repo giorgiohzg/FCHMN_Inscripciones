@@ -74,7 +74,41 @@ extraer el inventario de las candidatas finales, se regenera, y
 `node scripts/generar-avisos.mjs --verificar` debe devolver 0. Si cambia algo,
 la pasada 2 alteró lo que la pasada 1 había medido y hay que repetir.
 
-Solo cuando **a** y **b** se cumplen, las candidatas finales pasan a Fases 4 y 5.
+**c) Nada sin versionar viaja dentro.** Una candidata del backend llevaba tres
+documentos internos de `prisma/migrations/` y el seed del entorno de revisión,
+que contiene una credencial local: `COPY prisma ./prisma` los arrastraba desde
+el contexto. El filtro está en `backend/.dockerignore`, pero el filtro se
+comprueba sobre el artefacto, no sobre el archivo de reglas:
+
+```bash
+node scripts/verificar-archivos-de-imagen.mjs \
+  fchmn-backend:candidato-AAAAMMDD-HHMM fchmn-migrate:candidato-AAAAMMDD-HHMM
+```
+
+Exige que **todo** archivo bajo `/app/prisma/` corresponda a una ruta
+versionada en Git. Es una regla positiva a propósito: una lista de archivos
+prohibidos envejecería con el primer documento nuevo.
+
+El contexto lo vigilan otras dos, y conviene saber qué prueba cada una:
+
+| Comprobación | Qué mira | ¿Corre hoy en CI? |
+|---|---|---|
+| `backend/tests/dockerignore-contexto.test.ts` | un **modelo** de las reglas, con archivos sintéticos | **sí** |
+| `scripts/contraprueba-dockerignore.mjs` | el **filtro real** de Docker, con un contexto sintético y una imagen `FROM scratch` | no |
+| `scripts/verificar-archivos-de-imagen.mjs` | lo que **quedó dentro** del artefacto | no |
+
+La limitación, dicha con precisión: **en la integración continua solo se
+comprueba el modelo**, porque el flujo de hoy no construye imágenes. No es que
+allí falte Docker —`ci.yml` levanta PostgreSQL como contenedor de servicio, de
+modo que el ejecutor lo tiene—: es que no hay artefacto que inspeccionar y
+nadie ha añadido todavía la contraprueba del filtro real.
+
+Mientras siga así, un modelo puede estar mal, y por eso las dos comprobaciones
+con Docker son **puertas locales obligatorias** antes de promover, no extras
+opcionales.
+
+Solo cuando **a**, **b** y **c** se cumplen, las candidatas finales pasan a
+Fases 4 y 5.
 
 ## Las dos comprobaciones del frontend son distintas
 
