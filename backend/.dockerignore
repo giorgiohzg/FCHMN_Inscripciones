@@ -13,3 +13,16 @@ tests
 vitest.config.ts
 vitest.integration.config.ts
 eslint.config.*
+
+# Documentos internos que acompañan a las migraciones: auditorías y propuestas
+# no aplicadas. Están fuera del repositorio por la misma razón —registran el
+# proceso, no el producto— y tampoco tienen por qué viajar dentro de la imagen.
+# Se vio en una candidata: `COPY prisma ./prisma` los arrastraba a `runtime` y
+# a `migrate`.
+prisma/migrations/AUDITORIA_MIGRACIONES.md
+prisma/migrations/PROPUESTA_*.md
+
+# Seeds que NO son del producto. `seed.ts` y `seed-admin.ts` sí lo son y se
+# quedan; `seed-revision.ts` pertenece al entorno de revisión visual, vive solo
+# en la máquina de desarrollo y lleva dentro una credencial local.
+prisma/seed-revision.ts
