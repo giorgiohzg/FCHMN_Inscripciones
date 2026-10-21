@@ -67,15 +67,8 @@ services:
       POSTGRES_USER: natacion
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en el .env de la raiz}"
       POSTGRES_DB: natacion
-    # Publicación acotada a LOOPBACK.
-    #
-    # `"5432:5432"` se enlaza a todas las interfaces, así que la base quedaba
-    # alcanzable desde la red local —con las credenciales conocidas que están
-    # escritas unas líneas más arriba, y en el repositorio—. Con `127.0.0.1`
-    # delante, solo este computador puede conectarse. Los contenedores entre sí
-    # no usan este puerto publicado: se hablan por la red interna de Compose.
-    ports:
-      - "127.0.0.1:5432:5432"
+    # La base principal no publica un puerto en el equipo.
+    # Backend y migrate acceden a postgres:5432 por la red interna.
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
