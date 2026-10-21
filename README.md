@@ -55,7 +55,7 @@ cp ../.env.example ../.env
 
 npm install
 npm run verificar:credencial   # confirma que ambas contraseñas coinciden
-docker compose -f ../docker-compose.yml up -d postgres
+docker compose -f ../docker-compose.yml -f ../docker-compose.dev.yml up -d postgres
 
 npx prisma migrate deploy   # aplica las migraciones YA versionadas
 npm run prisma:seed         # roles, permisos, parámetros y catálogos (idempotente)

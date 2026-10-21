@@ -133,7 +133,7 @@ Si te saltas este paso, la base de datos no arrancará y verás un mensaje que d
 2. Verifica que Docker Desktop esté abierto (revisa que el ícono de la ballena esté quieto, no cargando).
 3. Escribe este comando y presiona Enter:
    ```
-   docker compose -f ../docker-compose.yml up -d postgres
+   docker compose -f ../docker-compose.yml -f ../docker-compose.dev.yml up -d postgres
    ```
 4. Vas a ver varias líneas de texto — es normal, es Docker descargando y preparando la base de datos la primera vez (puede tardar 1-3 minutos). Cuando termine, volverás a ver el cursor esperando otro comando.
 
