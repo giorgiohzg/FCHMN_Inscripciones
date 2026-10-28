@@ -92,12 +92,22 @@ ENV NGINX_ENVSUBST_FILTER=PORT
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# AVISOS DE TERCEROS. Llegan por un CONTEXTO DE CONSTRUCCIÓN ADICIONAL llamado
-# `avisos`, porque viven en la raíz del repositorio y el contexto de esta imagen
-# es ./frontend. Así no hay que ampliar el contexto ni duplicar archivos.
+# AVISOS DE TERCEROS. Llegan desde `frontend/avisos/`, que está DENTRO del
+# contexto de esta imagen.
 #
-#   docker compose build frontend
-#   docker buildx build --build-context avisos=./notices ...
+# Antes llegaban por un CONTEXTO DE CONSTRUCCIÓN ADICIONAL llamado `avisos`
+# (`COPY --from=avisos ...`), que apuntaba a `notices/` en la raíz del
+# repositorio. Eso funciona con `docker compose` y con `docker buildx
+# --build-context`, pero NO con las plataformas que construyen desde un
+# repositorio Git: solo ofrecen un contexto —el directorio raíz del servicio— y
+# la construcción se detenía en esta misma línea.
+#
+# `notices/` sigue siendo la única fuente de verdad. `frontend/avisos/` es una
+# copia byte a byte del subconjunto distribuible, escrita y verificada por
+# `scripts/distribuir-avisos.mjs`:
+#
+#   node scripts/distribuir-avisos.mjs             actualiza las copias
+#   node scripts/distribuir-avisos.mjs --verificar falla si divergen
 #
 # Son DOS destinos con dos alcances distintos, y la diferencia importa:
 #
@@ -108,11 +118,11 @@ COPY --from=build /app/dist /usr/share/nginx/html
 #   /usr/share/licenses/...  NO se sirve. Cubre toda la imagen —servidor web,
 #                            módulos y paquetes del sistema— y acompaña a quien
 #                            reciba la imagen, no a quien visita la web.
-COPY --from=avisos frontend-web.txt /usr/share/nginx/html/third-party-notices.txt
-COPY --from=avisos frontend-image.txt /usr/share/licenses/THIRD-PARTY-NOTICES.txt
+COPY avisos/frontend-web.txt /usr/share/nginx/html/third-party-notices.txt
+COPY avisos/frontend-image.txt /usr/share/licenses/THIRD-PARTY-NOTICES.txt
 # El corpus acompana al aviso de la IMAGEN, no al que se sirve por HTTP: el
 # navegador solo recibe el codigo web, no el sistema operativo.
-COPY --from=avisos licencias /usr/share/licenses/licencias
+COPY avisos/licencias /usr/share/licenses/licencias
 
 EXPOSE 80
 

@@ -58,3 +58,23 @@
 # mecanismo de trazabilidad, no una obligación legal en sí: lo que la licencia
 # obliga a conservar son los avisos y los textos aplicables.
 notices/** -text -whitespace
+
+# Las COPIAS de esos avisos dentro de cada contexto de construcción, por la
+# misma razón y con más consecuencias.
+#
+# `backend/avisos/` y `frontend/avisos/` son copias byte a byte de un
+# subconjunto de `notices/`, escritas por `scripts/distribuir-avisos.mjs`, y
+# existen porque un `COPY` no puede salir de su contexto y las plataformas que
+# construyen desde Git no admiten contextos adicionales.
+#
+# Sin estos atributos, `text=auto eol=lf` normalizaría los finales de línea solo
+# en las copias, y entonces en un clon nuevo —el que hace la plataforma al
+# construir— dejarían de coincidir con su origen. Eso rompe DOS cosas a la vez:
+#
+#   - `scripts/distribuir-avisos.mjs --verificar`, que compara bytes, fallaría
+#     en la integración continua sobre un repositorio que nadie tocó;
+#   - la exigencia de igualdad byte a byte entre los avisos del repositorio y
+#     los incorporados a cada imagen (ver `scripts/construir-y-revalidar.md`),
+#     que es lo que demuestra que el aviso distribuido es el verificado.
+backend/avisos/** -text -whitespace
+frontend/avisos/** -text -whitespace

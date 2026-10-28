@@ -75,6 +75,18 @@ const DEBEN_ENTRAR = [
   "package.json",
   ".env.example",
   "src/server.ts",
+  /**
+   * Los avisos de terceros, que desde ahora viajan DENTRO del contexto.
+   *
+   * Antes llegaban por un contexto de construcción adicional (`--from=avisos`),
+   * así que ninguna regla de este archivo podía afectarlos. Ahora sí: una regla
+   * nueva demasiado amplia —un `*.txt`, un `licencias`— los dejaría fuera, el
+   * `COPY` fallaría y, peor, si alguien "arreglara" el fallo quitando el `COPY`,
+   * las imágenes se distribuirían sin sus avisos. Por eso se vigilan aquí.
+   */
+  "avisos/backend.txt",
+  "avisos/migrate.txt",
+  "avisos/licencias/MIT.txt",
 ];
 
 interface Regla {

@@ -10,6 +10,20 @@
 # —que es una dependencia de DESARROLLO— y la imagen de ejecución no debe
 # tenerlo. Compose usa esa etapa para un contenedor efímero que migra y siembra
 # datos de referencia, y luego arranca `runtime`, que solo sabe servir.
+#
+# CÓMO SE ELIGE QUÉ IMAGEN SALE DE AQUÍ:
+#
+#   `--target <etapa>`   lo que usan Compose y el procedimiento de construcción
+#                        y revalidación. Explícito, y gana siempre.
+#   nada                 sale `runtime`, la imagen que SIRVE la API, porque es
+#                        la última etapa del archivo. Es lo que obtiene quien
+#                        construye este archivo tal cual, incluidas las
+#                        plataformas que no ofrecen forma de elegir etapa.
+#
+# Para obtener la imagen de MANTENIMIENTO sin `--target` existe un segundo
+# archivo, `Dockerfile.mantenimiento`, DERIVADO de este por
+# `scripts/generar-dockerfile-mantenimiento.mjs`. No se edita a mano, y una
+# guarda comprueba que no haya divergido.
 # =============================================================================
 
 ARG NODE_VERSION=22-alpine
@@ -146,53 +160,6 @@ RUN node scripts/verificar-arbol-instalado.mjs --raiz /app
 # cliente ya se generó en la etapa `build`, con la versión EXACTA del lockfile;
 # se copia desde allí.
 
-# --- Imagen final ------------------------------------------------------------
-FROM base AS runtime
-WORKDIR /app
-ENV NODE_ENV=production
-
-# AVISOS DE TERCEROS. Llegan por un CONTEXTO DE CONSTRUCCION ADICIONAL llamado
-# `avisos`, porque viven en la raiz del repositorio y el contexto de esta imagen
-# es ./backend. Asi no hay que ampliar el contexto ni duplicar archivos.
-#
-#   docker compose build backend
-#   docker buildx build --build-context avisos=./notices ...
-#
-# El aviso es AUTOSUFICIENTE: cubre las dependencias Node, los paquetes del
-# sistema de la capa base y los componentes que aporta la imagen de Node. No
-# remite a ningun otro archivo.
-COPY --from=avisos backend.txt /usr/share/licenses/THIRD-PARTY-NOTICES.txt
-# El CORPUS de textos. Un identificador SPDX no es un aviso: Alpine no incluye
-# los textos dentro de sus paquetes binarios, asi que se entregan aqui, en la
-# misma ruta a la que remite el aviso.
-COPY --from=avisos licencias /usr/share/licenses/licencias
-
-# `node` es un usuario sin privilegios que la imagen base ya trae.
-COPY --from=deps --chown=node:node /app/node_modules ./node_modules
-
-# El cliente de Prisma generado en `build`, encima de las dependencias de
-# producción. Son los artefactos que `@prisma/client` carga en ejecución: el
-# cliente tipado y el motor de consultas nativo.
-COPY --from=build --chown=node:node /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=build --chown=node:node /app/node_modules/@prisma/client ./node_modules/@prisma/client
-
-COPY --from=build --chown=node:node /app/dist ./dist
-COPY --chown=node:node package.json ./
-COPY --chown=node:node prisma ./prisma
-
-USER node
-EXPOSE 3000
-
-# Vivacidad, no disponibilidad: `/health` no consulta la base a propósito, así
-# que una base caída no provoca el reinicio de un proceso que está sano. La
-# disponibilidad (`/ready`) la mira Compose en su propio healthcheck.
-HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://127.0.0.1:3000/health || exit 1
-
-# Solo sirve. Migrar y sembrar son pasos aparte, deliberadamente: ver el
-# servicio `migrate` en docker-compose.yml.
-CMD ["node", "dist/server.js"]
-
 # --- CLI de Prisma, aislado y con su propio lockfile -------------------------
 #
 # `prisma` es `devOptional` en el lockfile principal, y la etapa `deps` lo
@@ -233,14 +200,14 @@ RUN --mount=type=secret,id=npm_ca \
 FROM base AS migrate
 WORKDIR /app
 
-# AVISOS DE TERCEROS, por el mismo contexto adicional `avisos`.
+# AVISOS DE TERCEROS, desde el mismo `backend/avisos/` en contexto.
 #
 # `migrate.txt` es AUTOSUFICIENTE: reproduce entero el arbol de 239 paquetes que
 # comparte con `runtime`, y ademas los 6 del CLI de Prisma aislado y los
 # paquetes del sistema. NO remite a `backend.txt`. La deduplicacion es una
 # tecnica del generador; el artefacto entregado no depende de otro.
-COPY --from=avisos migrate.txt /usr/share/licenses/THIRD-PARTY-NOTICES.txt
-COPY --from=avisos licencias /usr/share/licenses/licencias
+COPY avisos/migrate.txt /usr/share/licenses/THIRD-PARTY-NOTICES.txt
+COPY avisos/licencias /usr/share/licenses/licencias
 
 COPY --from=deps  /app/node_modules ./node_modules
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
@@ -265,3 +232,80 @@ ENV NODE_ENV=production
 USER node
 
 CMD ["prisma", "migrate", "deploy", "--schema=/app/prisma/schema.prisma"]
+
+# --- Imagen final: la API ----------------------------------------------------
+#
+# ESTA ETAPA VA AL FINAL DEL ARCHIVO A PROPOSITO, y conviene decir por que con
+# precision.
+#
+# Construir un `Dockerfile` sin elegir etapa produce LA ULTIMA. Aqui la ultima
+# era `migrate`, de modo que una plataforma que construye el archivo tal cual
+# —y ninguna de las que construyen desde un repositorio Git ofrece forma de
+# elegir etapa— desplegaba el contenedor de MIGRACIONES en lugar de la API: un
+# servicio cuyo comando es `prisma migrate deploy`, que no contiene `dist/` y
+# que termina en cuanto migra, sin atender una sola peticion. Y el sintoma no
+# es un error de construccion: la construccion funciona.
+#
+# Con `runtime` al final, el valor por omision de este archivo es lo que se
+# despliega. La imagen de mantenimiento se obtiene por un camino explicito y
+# separado: `Dockerfile.mantenimiento`, que este repositorio DERIVA de este
+# archivo con `scripts/generar-dockerfile-mantenimiento.mjs`. No la edite a
+# mano.
+#
+# El orden no afecta a `docker compose`, que elige con `target:`, ni al
+# procedimiento de construccion y revalidacion, que usa `--target`.
+FROM base AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+
+# AVISOS DE TERCEROS. Llegan desde `backend/avisos/`, que esta DENTRO del
+# contexto de esta imagen.
+#
+# Antes llegaban por un CONTEXTO DE CONSTRUCCION ADICIONAL llamado `avisos`
+# (`COPY --from=avisos ...`), que apuntaba a `notices/` en la raiz del
+# repositorio. Eso funciona con `docker compose` y con `docker buildx
+# --build-context`, pero NO con las plataformas que construyen desde un
+# repositorio Git: solo ofrecen un contexto —el directorio raiz del servicio— y
+# la construccion se detenia en esta misma linea.
+#
+# `notices/` sigue siendo la unica fuente de verdad. `backend/avisos/` es una
+# copia byte a byte del subconjunto distribuible, escrita y verificada por
+# `scripts/distribuir-avisos.mjs`:
+#
+#   node scripts/distribuir-avisos.mjs             actualiza las copias
+#   node scripts/distribuir-avisos.mjs --verificar falla si divergen
+#
+# El aviso es AUTOSUFICIENTE: cubre las dependencias Node, los paquetes del
+# sistema de la capa base y los componentes que aporta la imagen de Node. No
+# remite a ningun otro archivo.
+COPY avisos/backend.txt /usr/share/licenses/THIRD-PARTY-NOTICES.txt
+# El CORPUS de textos. Un identificador SPDX no es un aviso: Alpine no incluye
+# los textos dentro de sus paquetes binarios, asi que se entregan aqui, en la
+# misma ruta a la que remite el aviso.
+COPY avisos/licencias /usr/share/licenses/licencias
+
+# `node` es un usuario sin privilegios que la imagen base ya trae.
+COPY --from=deps --chown=node:node /app/node_modules ./node_modules
+
+# El cliente de Prisma generado en `build`, encima de las dependencias de
+# producción. Son los artefactos que `@prisma/client` carga en ejecución: el
+# cliente tipado y el motor de consultas nativo.
+COPY --from=build --chown=node:node /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build --chown=node:node /app/node_modules/@prisma/client ./node_modules/@prisma/client
+
+COPY --from=build --chown=node:node /app/dist ./dist
+COPY --chown=node:node package.json ./
+COPY --chown=node:node prisma ./prisma
+
+USER node
+EXPOSE 3000
+
+# Vivacidad, no disponibilidad: `/health` no consulta la base a propósito, así
+# que una base caída no provoca el reinicio de un proceso que está sano. La
+# disponibilidad (`/ready`) la mira Compose en su propio healthcheck.
+HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1:3000/health || exit 1
+
+# Solo sirve. Migrar y sembrar son pasos aparte, deliberadamente: ver el
+# servicio `migrate` en docker-compose.yml.
+CMD ["node", "dist/server.js"]
