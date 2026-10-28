@@ -77,6 +77,12 @@ const ENCABEZADO = `# ==========================================================
 # lo hace terminar en \`${ETAPA}\` en lugar de \`runtime\`. Así, construirlo sin
 # elegir etapa produce la imagen de MIGRACIONES Y SEEDS.
 #
+# Esa etapa final ademas sustituye el comando por omision por uno INOCUO: la
+# imagen, ejecutada sin comando, imprime una linea y termina con codigo 0 SIN
+# TOCAR LA BASE DE DATOS. Migrar y sembrar exigen un comando explicito. Es lo
+# que impide que un servicio programado aplique migraciones por calendario.
+# Compose no se ve afectado: usa \`target: ${ETAPA}\` sobre el archivo fuente.
+#
 # PARA QUÉ. Las plataformas que construyen desde un repositorio Git no admiten
 # \`--target\`, pero sí señalar otro archivo. En Railway, el servicio de
 # mantenimiento declara:
@@ -101,14 +107,52 @@ const ENCABEZADO = `# ==========================================================
 
 `;
 
+/**
+ * Mensaje del comando por omisión. Va en forma EXEC (una lista), que no pasa
+ * por un shell: no hay expansión, no hay comillas que interpretar mal y no
+ * depende de que el campo del proveedor se parsee de una u otra manera.
+ *
+ * `/bin/echo` existe en la imagen (es un enlace a busybox), así que el comando
+ * funciona sin shell.
+ */
+const MENSAJE_EN_REPOSO =
+  "Mantenimiento en reposo: sin accion. Las migraciones y los seeds se ejecutan solo con un comando explicito.";
+
 const PIE = `
-# --- Alias que hace de esta la última etapa ----------------------------------
+# --- Alias final, con un comando por omisión que NO TOCA LA BASE -------------
 #
-# NO AGREGA NI QUITA NADA: \`FROM <etapa>\` sin instrucciones detrás hereda la
-# configuración del origen —\`CMD\`, \`USER\`, \`WORKDIR\`, \`ENV\` y \`PATH\`— y sus
-# mismas capas. Su único efecto es ser la última etapa del archivo, que es la
-# que se construye cuando nadie elige una.
+# Esta etapa hace dos cosas, y las dos importan.
+#
+# 1. SER LA ÚLTIMA. Construir un archivo sin elegir etapa produce la última, así
+#    que esto es lo que hace que de aquí salga \`${ETAPA}\` y no \`runtime\`.
+#
+# 2. CAMBIAR EL COMANDO POR OMISIÓN por uno inocuo.
+#
+# El segundo punto es el endurecimiento, y conviene explicarlo entero.
+#
+# La etapa \`${ETAPA}\` tiene como comando \`prisma migrate deploy\`, que es lo
+# correcto para Compose: ahí el contenedor de migraciones se invoca a propósito
+# y se espera que migre. Pero en una plataforma donde este archivo alimenta un
+# servicio PROGRAMADO, ese mismo comando por omisión significa que el calendario
+# acabaría aplicando migraciones sin que nadie lo decidiera. No es destructivo
+# —migrar lo ya migrado no hace nada—, pero es una operación sobre la base de
+# producción que nadie pidió, y basta con que el operador deje el campo del
+# comando vacío para que ocurra.
+#
+# Con este \`CMD\`, el valor por omisión de la imagen es NO HACER NADA: imprime
+# una línea y termina con código 0. Para migrar o sembrar hay que dar el comando
+# de forma explícita, que es justo lo que se quiere que sea un acto deliberado.
+#
+# ESTO NO AFECTA A COMPOSE. \`docker-compose.yml\` construye con
+# \`target: ${ETAPA}\` sobre \`backend/Dockerfile\`, que es la fuente: su servicio
+# de migraciones conserva \`prisma migrate deploy\` como comando. Lo mismo vale
+# para \`--target ${ETAPA}\` en el procedimiento de construcción y revalidación.
+#
+# TAMPOCO CAMBIA EL CONTENIDO DE LA IMAGEN. \`CMD\` es configuración, no una capa:
+# los archivos, el usuario, el \`PATH\` y los avisos de terceros son exactamente
+# los de \`${ETAPA}\`.
 FROM ${ETAPA} AS mantenimiento
+CMD ["/bin/echo", "${MENSAJE_EN_REPOSO}"]
 `;
 
 if (!existsSync(FUENTE)) {
