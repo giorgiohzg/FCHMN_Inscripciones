@@ -43,6 +43,45 @@ env:
   NODE_VERSION: "22"
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Avisos de terceros: que las copias en contexto no se queden atrás.
+  #
+  # Los avisos se generan en `notices/`, que es la única fuente de verdad, y se
+  # copian a `backend/avisos/` y `frontend/avisos/` porque un `COPY` no puede
+  # salir de su contexto de construcción y las plataformas que construyen desde
+  # Git no admiten contextos adicionales.
+  #
+  # Esa copia es derivada, y toda copia derivada puede quedar obsoleta: si
+  # alguien regenera los avisos y no los redistribuye, las imágenes se
+  # construirían con una descripción vieja de sí mismas y nada lo diría. Este
+  # job lo dice.
+  #
+  # No necesita dependencias ni base de datos: es Node puro sobre archivos.
+  # ---------------------------------------------------------------------------
+  derivados:
+    name: Derivados — avisos y Dockerfile de mantenimiento al día
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Los avisos publicados coinciden con el generador
+        run: node scripts/generar-avisos.mjs --verificar
+
+      - name: Las copias de backend/avisos y frontend/avisos están al día
+        run: node scripts/distribuir-avisos.mjs --verificar
+
+      # `backend/Dockerfile.mantenimiento` se deriva de `backend/Dockerfile`.
+      # Si divergen, el servicio de mantenimiento se construiría sobre una base
+      # distinta de la de la API —otro digest, otras banderas de `npm ci`— y los
+      # avisos de licencias de ambas dejarían de describir lo que se distribuye.
+      - name: El Dockerfile de mantenimiento coincide con su fuente
+        run: node scripts/generar-dockerfile-mantenimiento.mjs --verificar
+
   backend:
     name: Backend — tipos, lint y pruebas
     runs-on: ubuntu-latest

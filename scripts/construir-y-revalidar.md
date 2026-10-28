@@ -16,13 +16,27 @@ promocionan.
 **Nunca se promocionan.** Solo sirven para saber qué contienen de verdad.
 
 ```bash
-docker buildx build --build-context avisos=./notices \
-  --target runtime --tag fchmn-backend:descubrimiento ./backend
-docker buildx build --build-context avisos=./notices \
-  --target migrate --tag fchmn-migrate:descubrimiento ./backend
-docker buildx build --build-context avisos=./notices \
-  --target runtime --tag fchmn-frontend:descubrimiento ./frontend
+node scripts/distribuir-avisos.mjs
+docker buildx build --target runtime --tag fchmn-backend:descubrimiento ./backend
+docker buildx build --target migrate --tag fchmn-migrate:descubrimiento ./backend
+docker buildx build --target runtime --tag fchmn-frontend:descubrimiento ./frontend
 ```
+
+> **Ya no se pasa `--build-context avisos=./notices`.** Los avisos viajan ahora
+> dentro de cada contexto, en `backend/avisos/` y `frontend/avisos/`, porque un
+> contexto adicional no existe en las plataformas que construyen desde un
+> repositorio Git. `notices/` sigue siendo la única fuente de verdad y
+> `scripts/distribuir-avisos.mjs` mantiene las copias byte a byte; de ahí que la
+> distribución sea el primer comando de cada pasada.
+>
+> **Aquí se sigue usando `--target` sobre `backend/Dockerfile`**, que es la
+> fuente. `backend/Dockerfile.mantenimiento` es un archivo DERIVADO que existe
+> solo para las plataformas sin `--target`; no se usa en este procedimiento, pero
+> sí hay que mantenerlo al día:
+>
+> ```bash
+> node scripts/generar-dockerfile-mantenimiento.mjs --verificar
+> ```
 
 Las bases van fijadas por digest en los `Dockerfile`. Al fijar nginx a un digest
 distinto del anterior **cambiarán versiones de paquetes del sistema**: es
@@ -47,18 +61,23 @@ interno, pero queda registrado y la entrega externa sigue prohibida.
 Se construyen **con los avisos ya definitivos**:
 
 ```bash
-docker buildx build --build-context avisos=./notices \
-  --target runtime --tag fchmn-backend:candidato-v4 ./backend
-docker buildx build --build-context avisos=./notices \
-  --target migrate --tag fchmn-migrate:candidato-v4 ./backend
-docker buildx build --build-context avisos=./notices \
-  --target runtime --tag fchmn-frontend:candidato-v4 ./frontend
+node scripts/distribuir-avisos.mjs
+docker buildx build --target runtime --tag fchmn-backend:candidato-v4 ./backend
+docker buildx build --target migrate --tag fchmn-migrate:candidato-v4 ./backend
+docker buildx build --target runtime --tag fchmn-frontend:candidato-v4 ./frontend
 ```
 
 ### Las dos exigencias que cierran el círculo
 
 **a) Igualdad byte a byte** entre los avisos del repositorio y los incorporados
-a cada imagen:
+a cada imagen. Primero, que las copias en contexto no se hayan quedado atrás:
+
+```bash
+node scripts/distribuir-avisos.mjs --verificar
+```
+
+Debe devolver 0. Si diverge, la imagen se construyó con un aviso viejo y hay que
+redistribuir y reconstruir. Después, contra el artefacto:
 
 ```bash
 docker run --rm --network none --entrypoint sha256sum fchmn-backend:candidato-v4 \

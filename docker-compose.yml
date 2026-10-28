@@ -35,6 +35,21 @@
 # Si una migración o un seed termina con ERROR, NO arranque el backend: corrija
 # la causa y repita el paso antes de continuar.
 #
+# AVISOS DE TERCEROS: ya no hacen falta contextos adicionales.
+#
+# Antes los tres servicios declaraban `additional_contexts: avisos: ./notices`,
+# porque los avisos viven en la raíz y los contextos son ./backend y ./frontend.
+# Eso impedía construir estas mismas imágenes en cualquier plataforma que
+# construya desde un repositorio Git —solo ofrecen UN contexto—, así que el
+# subconjunto distribuible se copia ahora a `backend/avisos/` y
+# `frontend/avisos/`, que sí están en contexto.
+#
+# `notices/` sigue siendo la única fuente de verdad. Tras regenerar los avisos,
+# hay que redistribuirlos ANTES de construir:
+#
+#   node scripts/distribuir-avisos.mjs             actualiza las copias
+#   node scripts/distribuir-avisos.mjs --verificar falla si divergen
+#
 # Para apuntar la web a otro backend hay que RECONSTRUIRLA: la URL queda
 # incrustada en el bundle (ver frontend/Dockerfile).
 #   docker compose build --build-arg VITE_API_URL=https://api.ejemplo.cl frontend
@@ -85,11 +100,6 @@ services:
     build:
       context: ./backend
       target: migrate
-      # Los avisos de terceros viven en la raiz del repositorio; este
-      # contexto adicional los hace alcanzables sin ampliar el contexto
-      # principal ni duplicar archivos.
-      additional_contexts:
-        avisos: ./notices
     env_file:
       - ./backend/.env
     environment:
@@ -108,12 +118,11 @@ services:
     restart: unless-stopped
     build:
       context: ./backend
+      # `target` es EXPLÍCITO: aquí se dice qué imagen se quiere, no se hereda
+      # del orden de las etapas del Dockerfile. Por eso Compose no necesita
+      # `backend/Dockerfile.mantenimiento`, que existe solo para las plataformas
+      # que no admiten `--target`.
       target: runtime
-      # Los avisos de terceros viven en la raiz del repositorio; este
-      # contexto adicional los hace alcanzables sin ampliar el contexto
-      # principal ni duplicar archivos.
-      additional_contexts:
-        avisos: ./notices
     env_file:
       - ./backend/.env
     environment:
@@ -140,11 +149,6 @@ services:
     build:
       context: ./frontend
       target: runtime
-      # Los avisos de terceros viven en la raiz del repositorio; este
-      # contexto adicional los hace alcanzables sin ampliar el contexto
-      # principal ni duplicar archivos.
-      additional_contexts:
-        avisos: ./notices
       args:
         # Se resuelve al CONSTRUIR. Cambiarla aquí sin reconstruir no tiene
         # ningún efecto sobre una imagen ya creada.
