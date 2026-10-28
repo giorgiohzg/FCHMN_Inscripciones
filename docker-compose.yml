@@ -153,6 +153,18 @@ services:
         # Se resuelve al CONSTRUIR. Cambiarla aquí sin reconstruir no tiene
         # ningún efecto sobre una imagen ya creada.
         VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    # Destino del proxy de `/api`, que sirve la API bajo el mismo origen que la
+    # web. Aquí coincide con el valor por omisión de la imagen; se declara igual
+    # para que quede a la vista que es configuración del despliegue y no algo
+    # escrito dentro de la imagen.
+    #
+    # EL USO LOCAL NO CAMBIA: la web se sigue construyendo con
+    # `VITE_API_URL=http://localhost:3000`, así que el navegador llama a la API
+    # por el puerto publicado, igual que siempre. El proxy queda disponible en
+    # http://localhost:8080/api/... para comprobarlo, y es el camino que se usa
+    # en la nube.
+    environment:
+      API_INTERNA: backend:3000
     # Ídem: la web solo se sirve a este computador.
     ports:
       - "127.0.0.1:8080:80"

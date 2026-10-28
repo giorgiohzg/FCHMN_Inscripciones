@@ -22,6 +22,23 @@
 # devuelve 404, porque esas rutas solo existen dentro de React Router y no hay
 # ningún archivo con ese nombre en disco.
 
+# ESQUEMA ORIGINAL DE LA PETICIÓN.
+#
+# Detrás del borde de un proveedor, el TLS termina allí y hasta este Nginx llega
+# una petición en texto claro: `$scheme` vale `http` y reenviarlo tal cual le
+# diría a la API que el usuario navega sin cifrar, que es falso.
+#
+# El borde ya declara el esquema real en `X-Forwarded-Proto`. Este mapa lo
+# conserva cuando existe y vale algo razonable, y cae a `$scheme` cuando no hay
+# ningún proxy por delante (el caso de Docker Compose en la máquina local).
+#
+# `map` vive en el contexto `http`, no dentro de `server`: por eso está aquí
+# arriba. Este archivo se incluye dentro de `http`.
+map $http_x_forwarded_proto $esquema_original {
+    default            $scheme;
+    "~^(http|https)$"  $http_x_forwarded_proto;
+}
+
 server {
     listen ${PORT};
     server_name _;
@@ -30,6 +47,103 @@ server {
 
     # No anunciar la versión de Nginx.
     server_tokens off;
+
+    # ------------------------------------------------------------------------
+    # LA API, BAJO EL MISMO ORIGEN QUE LA WEB.
+    #
+    # POR QUÉ EXISTE ESTE BLOQUE. Si la web y la API viven en direcciones
+    # distintas, la cookie de sesión que emite la API es una COOKIE DE TERCEROS
+    # para el navegador, y hay navegadores —Safari por omisión desde 2020, y
+    # cualquiera con el bloqueo activado— que sencillamente no la guardan. El
+    # síntoma es cruel: el usuario inicia sesión, entra, y al recargar vuelve al
+    # login, sin ningún error que lo explique.
+    #
+    # Sirviendo la API desde este mismo origen, en `/api`, el navegador ve UNA
+    # sola dirección. No hay cookies de terceros, así que no hay nada que
+    # bloquear, y además `AUTH_COOKIE_SAMESITE` puede volver a `lax`, que es más
+    # seguro que `none`.
+    #
+    # ESTE BLOQUE VA ANTES DE `location /`, pero no por el orden en el archivo:
+    # en Nginx, el prefijo más largo gana, así que `/api/` tiene prioridad sobre
+    # `/` para cualquier ruta que empiece por `/api/`. Está aquí arriba para que
+    # se lea primero, no porque haga falta.
+    # ------------------------------------------------------------------------
+    location /api/ {
+        # EL DESTINO ES UNA VARIABLE, no un nombre escrito en el archivo.
+        #
+        # `${API_INTERNA}` lo completa `envsubst` al arrancar con el valor del
+        # entorno (ver el Dockerfile), de modo que el nombre del servicio de la
+        # API es configuración del despliegue y no código. Cambiarlo no exige
+        # reconstruir la imagen.
+        #
+        # Y se pasa a `proxy_pass` a través de `$destino_api` —una variable de
+        # Nginx— a propósito: con un nombre literal, Nginx resuelve el DNS UNA
+        # VEZ al arrancar y conserva esa IP indefinidamente; con una variable,
+        # resuelve en cada petición y sigue al backend si cambia de dirección.
+        # Esa forma exige una directiva `resolver`, que escribe al arrancar
+        # /docker-entrypoint.d/25-resolver.sh leyendo /etc/resolv.conf.
+        set $destino_api "${API_INTERNA}";
+
+        # Se quita el prefijo `/api` ANTES de reenviar: la API no sabe nada de
+        # él y sirve en `/auth/...`, `/persons/...`, etc.
+        #
+        # Se hace con `rewrite ... break` y un `proxy_pass` SIN ruta, en vez de
+        # con la sustitución automática de `proxy_pass http://destino/`. El
+        # motivo es que esa sustitución automática no se aplica igual cuando el
+        # destino es una variable; así el comportamiento es explícito y no
+        # depende de ese matiz. La cadena de consulta se conserva sola.
+        rewrite ^/api/(.*)$ /$1 break;
+        proxy_pass http://$destino_api;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+
+        # CABECERAS REENVIADAS.
+        #
+        # `Host` conserva el dominio público: es lo que la API ve como destino.
+        #
+        # `X-Forwarded-For` AÑADE la dirección de quien nos habla a la cadena ya
+        # existente (eso hace `$proxy_add_x_forwarded_for`). Detrás del borde de
+        # un proveedor, la cadena que llega trae la IP real del usuario y aquí se
+        # le suma la del borde. Es lo que permite que la API identifique al
+        # usuario para la auditoría y el límite de tasa, y por eso
+        # `TRUST_PROXY_HOPS` debe declarar DOS saltos cuando se usa este proxy:
+        # el borde del proveedor y este Nginx. Ni uno más —cada salto de más es
+        # una IP que el cliente puede inventar— ni uno menos.
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $esquema_original;
+        proxy_set_header X-Forwarded-Host  $host;
+
+        # TAMAÑO DEL CUERPO. El límite por omisión de Nginx es 1 MB, y la API
+        # acepta archivos de hasta 15 MB (importación de competencias y carga
+        # masiva de personas). Sin esta línea, una importación mediana moriría
+        # con un 413 de Nginx que la aplicación nunca llegaría a ver.
+        #
+        # Se deja un margen sobre los 15 MB porque el cuerpo multipart pesa algo
+        # más que el archivo: los límites de parte y las cabeceras van dentro.
+        # Quien rechaza por tamaño debe seguir siendo la API, con su mensaje.
+        client_max_body_size 20m;
+
+        # TIEMPOS. Generar un PDF o un Excel grande, o procesar una importación,
+        # tarda más que los 60 s por omisión. Un corte aquí se vería como una
+        # descarga que falla a medias.
+        proxy_connect_timeout 10s;
+        proxy_send_timeout    120s;
+        proxy_read_timeout    120s;
+
+        # RUTA DE LAS COOKIES DE SESIÓN. Esta línea es imprescindible y es el
+        # detalle que, omitido, reproduce exactamente el problema que el proxy
+        # venía a resolver.
+        #
+        # La API emite sus cookies con `Path=/auth` (ver
+        # `backend/src/modules/auth/session.cookie.ts`). Pero el navegador ve
+        # estas rutas bajo `/api/auth/...`, que NO empieza por `/auth`, así que
+        # nunca devolvería la cookie: la sesión no se mantendría. Aquí se
+        # reescribe el `Path` de `Set-Cookie` al que el navegador sí usará.
+        proxy_cookie_path /auth /api/auth;
+    }
 
     # Los archivos con hash en el nombre (los que emite Vite) son inmutables:
     # cambia el nombre en cada build, así que se pueden cachear indefinidamente.

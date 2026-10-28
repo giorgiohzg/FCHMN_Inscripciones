@@ -7,146 +7,182 @@ tu computador esté prendido.
 
 **Tiempo estimado:** 60-90 minutos la primera vez.
 
-> **Última revisión de esta guía contra el repositorio:** 27 de octubre de 2026.
-> Se revisó el código, las dependencias, los `Dockerfile`, `docker-compose.yml`,
-> las variables de entorno, los seeds y las migraciones; se contrastó con la
-> documentación oficial de Railway vigente a esa fecha; y el procedimiento de
-> migraciones, seeds y arranque se **ensayó de principio a fin** con las imágenes
-> reales contra una base de datos desechable. Lo que no se pudo probar está
-> declarado en la última sección.
-
-> **Sobre el proveedor.** El repositorio **no impone** ningún proveedor de nube:
-> no hay archivos de configuración de Railway, Render, Fly, Cloud Run ni AWS. Lo
-> único que el código da por supuesto es que el proveedor **inyecta la variable
-> `PORT`** y que la aplicación debe escuchar ahí (así está escrito en
-> `frontend/nginx/default.conf.template`, que menciona Railway, Heroku y Cloud
-> Run como ejemplos). Esta guía elige **Railway** por ser la opción más simple
-> para quien no programa, pero es una **decisión de la guía**, no un requisito
-> del proyecto.
-
-**Sobre el costo (verificado en la documentación de precios de Railway):**
-
-| Plan | Suscripción | Uso incluido | RAM máx. | Volumen máx. |
-|---|---|---|---|---|
-| Trial (cuenta nueva) | — | **US$5 una sola vez**, no renovable | 1 GB | **0,5 GB** |
-| Free | US$0/mes | US$1 de crédito **al mes** | 0,5 GB | 0,5 GB |
-| Hobby | **US$5/mes** | US$5 de uso incluido al mes | 48 GB | 5 GB |
-
-Las **construcciones no se cobran** (ni CPU, ni memoria, ni almacenamiento de
-imágenes). Se cobra el uso de RAM, CPU, egreso de red y almacenamiento del
-volumen de la base de datos.
-
-> **Dos advertencias que la versión anterior de esta guía no daba:**
+> ## ⚠️ Lee esto antes que nada: qué está probado y qué no
 >
-> 1. **Railway exige una tarjeta de pago** (modalidad *post-paid*) desde el 30 de
->    marzo. No está documentado que el Trial se pueda crear sin ninguna tarjeta,
->    así que **no cuentes con eso**.
-> 2. **Si se agota el crédito, no es solo una pausa.** La documentación dice que
->    la suscripción se cancela y Railway **detiene todas las cargas de trabajo**;
->    los datos del volumen se **eliminan 30 días después** del vencimiento en
->    Trial/Free (60 días tras cancelar Hobby). Es decir: *los datos sí se pierden*
->    si se deja pasar el plazo. Haz copias de seguridad (Paso 9) y no dependas del
->    crédito de prueba para datos reales.
+> **Nada de lo que ocurre dentro del panel de Render se ha ejecutado todavía.**
+> No se creó ninguna cuenta, ningún servicio ni ninguna base de datos. Todos los
+> pasos 4 en adelante están escritos a partir de la **documentación oficial de
+> Render**, consultada el 28 de octubre de 2026, y pueden diferir en detalles de
+> la interfaz (nombres de botones, orden de los campos).
+>
+> **Lo que sí está probado**, con las imágenes reales y contra una base de datos
+> desechable, es todo lo que depende del repositorio: que las imágenes se
+> construyen, que son las correctas, que las migraciones y los seeds funcionan y
+> que la aplicación arranca y permite iniciar sesión. El detalle está en la
+> sección «Qué se comprobó y qué no», al final.
+>
+> Si un paso del panel no coincide con lo que ves, **no improvises**: anótalo y
+> consúltalo. Esta guía se corrige con lo que encuentres.
 
 ---
 
-## Sección 0 — Qué se cambió en el repositorio para que esto funcione
+## Por qué Render y no Railway
 
-**No necesitas hacer nada de esta sección.** Está aquí para que sepas qué pasó y
-para que, si algo falla, entiendas dónde mirar. Si solo quieres desplegar, salta
-al Paso 1.
+La versión anterior de esta guía usaba **Railway**. Dejó de servir por dos
+motivos, en este orden de importancia:
 
-Una versión anterior de esta guía no se podía ejecutar de principio a fin: el
-despliegue **fallaba durante la construcción**. Las imágenes del proyecto estaban
-hechas para construirse con `docker compose`, que les daba dos cosas que ninguna
-plataforma que construya desde un repositorio Git ofrece. Las dos están
-resueltas, y el entorno local con Docker Compose sigue funcionando igual.
+1. **Railway sufrió un incidente de seguridad el 21 de octubre de 2026** en el
+   que un intruso pudo acceder a secretos de clientes, y pidió rotar
+   credenciales. Este sistema va a guardar la contraseña de la base de datos, la
+   llave que firma las sesiones y datos personales de nadadores (RUT, nombres,
+   clubes).
+2. **Railway tiene las altas de cuentas nuevas suspendidas** desde ese incidente
+   —`Sign ups are currently disabled`— y su página de estado, al 27 de octubre,
+   no da fecha de reapertura.
 
-### Problema 1 — Las imágenes pedían un "contexto adicional"
+**Render** cumple lo mismo que necesitábamos de Railway y, en dos puntos, mejor:
+permite elegir el archivo `Dockerfile` y el directorio de contexto desde el
+panel, y permite **descargar** copias de seguridad de la base de datos.
 
-Los avisos de licencias de terceros viven en `notices/`, en la raíz del
-repositorio, pero los contextos de construcción son `backend/` y `frontend/`, y
-una instrucción `COPY` no puede salir de su contexto. Eso se resolvía con un
-**contexto de construcción con nombre** (`COPY --from=avisos …`), que
-`docker-compose.yml` proveía con `additional_contexts`.
+> **El repositorio no impone ningún proveedor.** No hay archivos de configuración
+> de Render, Railway ni ningún otro. Lo único que el código da por supuesto es
+> que el proveedor inyecta la variable `PORT` y que hay que escuchar ahí. Render
+> lo hace (por omisión `10000`) y además exige escuchar en `0.0.0.0`, que es
+> justo lo que la aplicación ya hace.
 
-Lo que dice la documentación oficial de Railway, y lo que no:
+---
 
-| | |
-|---|---|
-| **Confirmado en la documentación** | Su página de Dockerfiles cubre la detección del archivo, `RAILWAY_DOCKERFILE_PATH`, las variables por `ARG` y los montajes de caché. **No menciona contextos de construcción adicionales en ninguna parte**, ni en esa página ni en la referencia de configuración. |
-| **Solo en hilos de comunidad** | Casos de usuarios con el mismo fallo, a quienes se les responde cambiando el directorio raíz o el `RAILWAY_DOCKERFILE_PATH`. Son indicios, no una afirmación de Railway. |
+## Lo que cuesta, con los números confirmados
 
-**Cómo quedó:** el subconjunto de avisos que viaja dentro de las imágenes se
-copia ahora a `backend/avisos/` y `frontend/avisos/`, que **sí** están en
-contexto, y los `Dockerfile` los toman de ahí. `notices/` sigue siendo la única
+Render cobra **dos cosas**: el plan del espacio de trabajo (*workspace*) y el
+cómputo de cada servicio por separado.
+
+**Plan del espacio de trabajo: Hobby, US$0 al mes.** Es suficiente: incluye
+dominios propios, *point-in-time recovery* de 3 días, infraestructura como
+código y hasta 25 servicios.
+
+| Componente | Plan elegido | US$/mes |
+|---|---|---|
+| Espacio de trabajo | Hobby | **0** |
+| API (backend), **servicio privado** | 0,5 CPU / 512 MB | **7** |
+| Web (frontend), servicio web | 0,5 CPU / 512 MB | **7** |
+| PostgreSQL | 256 MB RAM, 1 GB SSD incluido | **6** |
+| Mantenimiento (cron job) | **mínimo mensual por servicio** | **1** |
+| | **Total estimado** | **US$21** |
+
+> **La corrección del cron job.** Su documentación dice: *«There is a minimum
+> monthly charge of $1 per cron job service»*. El cobro por tiempo de ejecución
+> es insignificante —US$0,00016 por minuto en el plan de 0,5 CPU—, pero **ese
+> mínimo de US$1 se cobra igual aunque no se ejecute nunca**. Por eso está en la
+> tabla como una línea fija y no como «céntimos».
+
+**Lo que se cobra aparte si te pasas** (todas son holguras amplias para este uso):
+
+| Concepto | Incluido en Hobby | Excedente |
+|---|---|---|
+| Almacenamiento de la base | **1 GB SSD** | US$0,30 por GB |
+| Tráfico de salida | 5 GB al mes | US$0,15 por GB |
+| Minutos de construcción | 500 al mes | US$5 por cada 1.000 |
+| Dominios propios | 2 | US$0,25 por dominio al mes |
+| Discos persistentes | — | US$0,25 por GB al mes (**este proyecto no usa ninguno**) |
+
+> **Qué se puede abaratar para un ensayo, y qué no.** El plan **Free** existe
+> para servicios web, PostgreSQL y Key Value, pero **no** para servicios
+> privados ni para cron jobs. En esta configuración:
+>
+> | Componente | ¿Se puede ensayar en Free? |
+> |---|---|
+> | Web | Sí, pero **se apaga tras 15 min sin tráfico** y arrastra a la API, porque todo pasa por ella |
+> | API | **No.** Es un servicio privado (Paso 6) y no hay versión gratuita |
+> | PostgreSQL | Sí, pero **caduca a los 30 días**, 1 GB fijo y **sin ninguna copia de seguridad** |
+> | Mantenimiento | **No.** Los cron jobs no admiten Free |
+>
+> Es decir: un ensayo cuesta como mínimo **US$8/mes** (la API y el cron job), y
+> **Free no sirve para datos reales** en ningún caso.
+
+---
+
+## Sección 0 — Qué se preparó en el repositorio
+
+**No necesitas hacer nada de esta sección.** Está aquí para que, si algo falla,
+sepas dónde mirar. Si solo quieres desplegar, salta al Paso 1.
+
+Las imágenes de este proyecto estaban hechas para construirse con
+`docker compose`, que ofrece dos cosas que **ninguna** plataforma que construya
+desde un repositorio Git ofrece. Las dos se resolvieron, y el entorno local con
+Docker Compose sigue funcionando exactamente igual.
+
+### Los avisos de licencias viajan dentro de cada contexto
+
+Los avisos de terceros viven en `notices/`, en la raíz, pero los contextos de
+construcción son `backend/` y `frontend/`, y una instrucción `COPY` no puede
+salir de su contexto. Antes eso se resolvía con un contexto adicional con nombre
+(`COPY --from=avisos`), que solo existe en `docker compose` y en `docker buildx`.
+
+Ahora el subconjunto distribuible se copia a `backend/avisos/` y
+`frontend/avisos/`, que sí están en contexto. `notices/` sigue siendo la única
 fuente de verdad: `scripts/distribuir-avisos.mjs` mantiene las copias byte a
-byte y, con `--verificar`, falla si divergen. Esa verificación corre ahora en la
-integración continua, así que una copia desactualizada no puede pasar inadvertida.
+byte y, con `--verificar`, falla si divergen. Esa verificación corre en la
+integración continua.
 
-Tampoco servía apuntar el directorio raíz del servicio a la raíz del
-repositorio: los `Dockerfile` hacen `COPY package.json package-lock.json ./`
-esperando estar dentro de `backend/` o `frontend/`, y en la raíz **no hay ningún
-`package.json`**.
+### Cada imagen sale de su propio archivo
 
-### Problema 2 — Se construía la etapa equivocada del backend
-
-`backend/Dockerfile` produce dos imágenes distintas desde el mismo archivo: la
-que **sirve** la API (`runtime`) y la que trae las herramientas de **migración y
-seeds** (`migrate`). Compose elige cuál quiere con `target:`. Pero la última
-etapa escrita en el archivo era `migrate`, y construir un `Dockerfile` sin elegir
-etapa produce **la última**.
-
-| | |
-|---|---|
-| **Confirmado en la documentación** | Railway usa el `Dockerfile` que encuentre en el directorio raíz del servicio, y **"siempre construirá con un Dockerfile si encuentra uno"**. Ninguna página ni la referencia de configuración ofrece una opción de etapa. |
-| **Solo en hilos de comunidad** | Una petición abierta para admitir `--target`, con una respuesta de soporte diciendo que no había planes de añadirlo, y informes de que Railway construye siempre la última etapa. Coherente con la documentación, pero no está escrito allí. |
-
-**Cómo quedó:** sin depender de ningún comportamiento no documentado. Dos cosas
-que Railway **sí** documenta se combinan:
-
-- construir un `Dockerfile` sin elegir etapa produce **la última**, y
-- `RAILWAY_DOCKERFILE_PATH` permite señalar **otro archivo**.
-
-Así que ahora hay dos archivos, y cada uno termina en la etapa que corresponde:
+`backend/Dockerfile` produce dos imágenes distintas: la que **sirve** la API
+(`runtime`) y la que trae las herramientas de **migración y seeds** (`migrate`).
+Construir un `Dockerfile` sin elegir etapa produce **la última**, y la última era
+`migrate`: se habría desplegado el contenedor de migraciones en lugar de la API.
 
 | Archivo | Termina en | Qué sale |
 |---|---|---|
-| `backend/Dockerfile` | `runtime` | la **API** — es lo que Railway usa por omisión |
-| `backend/Dockerfile.mantenimiento` | `migrate` | las **herramientas de migración** — se pide con `RAILWAY_DOCKERFILE_PATH` |
+| `backend/Dockerfile` | `runtime` | la **API** |
+| `backend/Dockerfile.mantenimiento` | `migrate` | las **herramientas de mantenimiento** |
 
 El segundo **no se escribió a mano**: lo deriva
 `scripts/generar-dockerfile-mantenimiento.mjs` del primero, añadiéndole una sola
-etapa al final. Si fueran dos archivos independientes, bastaría subir el digest
-de la imagen base en uno y no en el otro para que las dos imágenes dejaran de
-ser las que describen sus avisos de licencias. La derivación lo hace imposible, y
-la integración continua comprueba que no haya divergido.
+etapa al final. Dos archivos independientes habrían divergido —un digest distinto
+en uno— y entonces los avisos de licencias de ambas imágenes habrían dejado de
+describir lo que se distribuye. La integración continua comprueba que no hayan
+divergido.
 
-> Se verificó que la imagen que sale del archivo derivado es **idéntica capa por
-> capa y configuración por configuración** a la que sale de
-> `docker build --target migrate` sobre el archivo fuente: la etapa añadida es un
-> alias y no agrega ni quita nada.
+**Esa etapa final hace algo más, y es importante:** sustituye el comando por
+omisión de la imagen por un `echo`. Es decir, **la imagen de mantenimiento
+ejecutada sin un comando explícito no hace nada y no toca la base de datos**. Es
+lo que permite que el servicio programado del Paso 6.b sea inofensivo en reposo.
 
-`docker compose` no usa el archivo derivado: sigue eligiendo con `target:`, que es
-más directo y no se vio afectado por nada de esto.
+`docker compose` **no se ve afectado**: construye con `target: migrate` sobre el
+archivo fuente, cuyo servicio de migraciones conserva `prisma migrate deploy`
+como comando, exactamente como siempre.
 
-### Problema 3 — Dónde corren las migraciones y los seeds
+### La web sirve también la API, bajo el mismo origen
+
+El Nginx del frontend tiene un bloque `/api` que reenvía a la API por la red
+privada del proveedor. Es lo que hace que el navegador vea **una sola
+dirección**, y con ello desaparece el problema de las cookies de terceros.
+
+Tres detalles que no son obvios y están resueltos en
+`frontend/nginx/default.conf.template`:
+
+- **La ruta de las cookies se reescribe.** La API las emite con `Path=/auth`,
+  pero el navegador las ve bajo `/api/auth`, que no empieza por `/auth`: sin
+  `proxy_cookie_path`, no las devolvería nunca y la sesión no se mantendría.
+- **El límite de tamaño del cuerpo sube a 20 MB.** El de Nginx por omisión es
+  1 MB, y la API acepta archivos de hasta 15 MB: sin esto, una importación
+  mediana moriría con un 413 que la aplicación nunca vería.
+- **El destino es una variable de Nginx, no un nombre fijo.** Así se resuelve el
+  DNS en cada petición y la web sigue a la API cuando cambia de dirección al
+  redesplegarse. Esa forma exige una directiva `resolver`, que
+  `frontend/nginx/25-resolver.sh` escribe al arrancar leyendo `/etc/resolv.conf`.
+
+La dirección de la API se configura con la variable `API_INTERNA`: **el nombre
+del servicio no está escrito en ningún archivo del repositorio.**
+
+### La API no puede migrar, y el mantenimiento no puede servir
 
 La imagen de la API **a propósito no trae** el CLI de Prisma ni `tsx`: se
-excluyen con `npm ci --omit=dev --omit=optional` para que no viajen 46 MiB de
-herramientas en un servicio que solo sirve. Por eso **estos comandos no
-funcionan en el servicio de la API**, y no se usan en esta guía:
+excluyen para que no viajen 46 MiB de herramientas en un servicio que solo sirve.
+Y la imagen de mantenimiento **no trae `dist/`**: no puede atender peticiones.
 
-```
-npx prisma migrate deploy      ← intentaría descargar Prisma del registro npm
-npm run prisma:seed            ← necesita tsx, que no está en la imagen
-npm run seed:admin             ← necesita tsx, que no está en la imagen
-```
-
-**Cómo quedó:** hay un **tercer servicio** en Railway, construido desde la misma
-carpeta pero con `RAILWAY_DOCKERFILE_PATH=Dockerfile.mantenimiento`, que sí trae
-`prisma` en el `PATH` y los dos seeds compilados a JavaScript. Es el Paso 6.b de
-esta guía. Sus tres comandos, los únicos que existen, son:
+Los tres comandos del mantenimiento, los únicos que existen, son:
 
 ```
 prisma migrate deploy --schema=/app/prisma/schema.prisma
@@ -154,852 +190,1253 @@ node dist-seed/prisma/seed.js
 node dist-seed/prisma/seed-admin.js
 ```
 
-**Nada de esto ocurre solo.** El arranque de la API no migra ni siembra; el
-servicio de migraciones no crea usuarios al migrar; y el seed del entorno de
-revisión visual —el que carga datos de prueba— **no existe dentro de ninguna
-imagen**: `tsconfig.seed.json` compila únicamente `seed.ts` y `seed-admin.ts`, y
-`backend/.dockerignore` excluye `prisma/seed-revision.ts` del contexto.
+**Nada de esto ocurre solo.** El arranque de la API no migra ni siembra, y el
+seed del entorno de revisión visual —el que carga datos de prueba— **no existe
+dentro de ninguna imagen**: `tsconfig.seed.json` compila únicamente `seed.ts` y
+`seed-admin.ts`, y `backend/.dockerignore` excluye `prisma/seed-revision.ts`.
 
 ---
 
 ## Antes de empezar: ¿qué vamos a hacer?
 
-A diferencia de la instalación local (que corre en tu computador), aquí vamos a:
-
-1. Instalar **Git** (una herramienta para subir el código a internet).
-2. Crear una cuenta en **GitHub** (donde va a "vivir" el código).
-3. Subir el proyecto a GitHub usando el propio VS Code (con botones, sin escribir comandos raros).
-4. Crear una cuenta en **Railway** (la plataforma que va a ejecutar la aplicación).
+1. Instalar **Git** *(ya hecho, si seguiste la guía anterior)*.
+2. Crear una cuenta en **GitHub** *(ya hecho)*.
+3. Subir el proyecto a GitHub *(ya hecho)*.
+4. Crear una cuenta en **Render**.
 5. Crear el proyecto y la base de datos PostgreSQL.
 6. Configurar el servicio del **backend** (la API).
-   6.b. Crear el servicio de **mantenimiento** y correr migraciones y datos iniciales.
+   - 6.b. Crear el servicio de **mantenimiento** y correr migraciones y datos iniciales.
 7. Configurar el servicio del **frontend** (la web).
 8. Comprobar que funciona.
-9. Activar **copias de seguridad** de la base de datos.
+9. Activar y practicar las **copias de seguridad**.
 10. Saber cómo **volver atrás** si un despliegue sale mal.
 
 **Arquitectura que resulta** (es la que el repositorio confirma, no una
-suposición): **cuatro servicios** — PostgreSQL, la API, la web y el de
-mantenimiento—, con dominio público solo para la API y la web. El de
-mantenimiento no atiende nada: existe para migrar y sembrar, y está apagado el
-resto del tiempo. **Una sola instancia de la API**: el límite de tasa
-se cuenta *en la memoria del proceso* (`RATE_LIMIT_GLOBAL_MAX`,
-`RATE_LIMIT_AUTH_MAX`), así que con dos o más réplicas el límite deja de valer lo
-que dice. No subas el número de réplicas.
+suposición): **cuatro servicios** —PostgreSQL, la API, la web y el de
+mantenimiento—.
+
+**El navegador solo conoce UNA dirección: la de la web.** El Nginx que sirve la
+web reenvía a la API todo lo que llegue a `/api`, por la red privada de Render.
+Esa decisión es el eje de esta guía y resuelve de raíz el problema de las
+cookies de terceros, que de otro modo impediría mantener la sesión abierta en
+Safari y en cualquier navegador con el bloqueo activado.
+
+```
+navegador ──► web (Nginx)  ──┬──► archivos de la aplicación
+                             └──► /api  ──► API ──► PostgreSQL
+                                  (red privada, sin salida a internet)
+```
+
+**La API no tiene dirección pública.** Va como *Private Service*: el único
+camino hasta ella es ese proxy. No es solo un detalle de orden — es lo que
+impide que alguien falsee su dirección IP y anule el límite de intentos de
+ingreso. El Paso 6 lo explica con las mediciones.
+
+**Una sola instancia de la API.** El límite de tasa se cuenta *en la memoria del
+proceso* (`RATE_LIMIT_GLOBAL_MAX`, `RATE_LIMIT_AUTH_MAX`), así que con dos o más
+instancias el límite deja de valer lo que dice. No escales horizontalmente.
 
 **Persistencia de archivos: no hace falta ninguna.** Se revisó el código del
 backend y **no escribe archivos a disco** en ningún punto: las importaciones
 (`.hyv`, Excel) se procesan en memoria con un límite de 15 MB por archivo, y los
 PDF y Excel que genera se envían en la respuesta. El **único** dato que hay que
-conservar es la base de datos. Por eso no se configura ningún volumen para la API
-ni para la web.
+conservar es la base de datos. Por eso no se configura ningún disco persistente,
+que además se cobraría aparte.
 
 ---
 
-## Paso 1 — Instalar Git
+## Pasos 1 a 3 — Git, GitHub y el código subido
 
-1. Ve a **https://git-scm.com/downloads**
-2. Descarga la versión para tu sistema operativo.
-3. Instala igual que cualquier programa: **Next / Siguiente** en todas las pantallas, dejando las opciones por defecto, hasta el final.
+Si seguiste la versión anterior de esta guía, **ya está hecho**: el repositorio
+`FCHMN_Inscripciones` está en GitHub, en la rama `main`.
 
-**Verificar que quedó instalado:**
+**Una comprobación que ahora importa más.** El repositorio está configurado como
+**público**, así que cualquiera puede leer su contenido y su historial completo.
+Se revisaron las cuatro ramas y todo el historial y **no hay ningún secreto**:
+solo las cuatro plantillas `.env.example`, con valores de relleno. Pero de aquí
+en adelante no hay margen de error:
 
-1. Abre VS Code.
-2. Abre una terminal (**Terminal → New Terminal**).
-3. Escribe:
-   ```
-   git --version
-   ```
-4. Debería aparecer algo como `git version 2.4x.x`. Si no, cierra y vuelve a abrir VS Code y prueba de nuevo.
+- **Nunca** subas un archivo `.env` real, un volcado de la base, un registro de
+  despliegue ni una captura con variables a la vista.
+- Si alguna vez ocurre, borrar el archivo **no lo quita del historial**: hay que
+  rotar de inmediato los secretos afectados y pedir ayuda para limpiarlo.
 
----
-
-## Paso 2 — Crear una cuenta en GitHub
-
-1. Ve a **https://github.com** y haz clic en **Sign up**.
-2. Sigue los pasos (correo, contraseña, nombre de usuario). Es gratis.
-3. Confirma tu correo cuando te llegue el email de verificación.
+A favor: en los repositorios públicos GitHub activa gratis el *escaneo de
+secretos* y la *protección de empuje*, que bloquean un empujón que parezca
+contener una credencial antes de que salga.
 
 ---
 
-## Paso 3 — Subir el proyecto a GitHub desde VS Code
+## Paso 4 — Crear una cuenta en Render
 
-1. Abre VS Code y abre la **carpeta principal del proyecto** (**File → Open Folder**): la que contiene directamente `backend`, `frontend` y `docker-compose.yml`. Si seguiste la guía local, es la carpeta que renombraste a `natacion`.
-2. En la barra vertical de íconos de la izquierda, busca el ícono que parece una rama de árbol con puntos (**Source Control** / **Control de código fuente**). Haz clic ahí.
-3. Vas a ver un botón que dice **"Publish to GitHub" / "Publicar en GitHub"**. Haz clic.
-4. VS Code te va a pedir permiso para conectarse a tu cuenta de GitHub — acepta y sigue el proceso de inicio de sesión que se abre en el navegador.
-5. Te va a preguntar el nombre del repositorio y si quiere ser **público o privado**. Elige **Private / Privado** (así nadie más puede ver el código sin tu permiso).
-6. Espera a que termine de subir (verás una barra de progreso abajo). Cuando termine, tu código ya está en GitHub.
+1. Ve a **https://render.com** y haz clic en **Get Started**.
+2. Elige registrarte **con GitHub** — así Render puede leer tu repositorio.
+3. Acepta los permisos que pida. Puedes darle acceso **solo** al repositorio
+   `FCHMN_Inscripciones` en vez de a todos; es lo recomendable.
+4. Cuando te pregunte por el plan del espacio de trabajo, elige **Hobby**
+   (US$0 al mes).
 
-> **Importante — la estructura del repositorio.** Dentro del repositorio,
-> `backend` y `frontend` quedan **en la raíz**, no dentro de ninguna carpeta
-> `app`. Esto importa en los pasos 6 y 7: el *directorio raíz* de cada servicio
-> en Railway es **`backend`** y **`frontend`**, sin prefijo.
+> **🔑 Credenciales.** Aquí ingresas las de **tu cuenta de GitHub**, en la
+> ventana de GitHub. No las escribas en ningún otro lado ni se las pases a nadie.
+> Lo mismo valdrá para todas las contraseñas que definas más adelante.
 
-**Antes de continuar — comprueba que ningún secreto se subió.** El proyecto lo
-previene solo (`.gitignore` ignora `.env` y `.env.*`, con la excepción explícita
-de `.env.example` y `.env.test.example`), pero conviene confirmarlo. Abre tu
-repositorio en github.com y comprueba que **no aparece**:
-
-- un archivo `.env` en la **raíz** del repositorio (el que tiene `POSTGRES_PASSWORD`),
-- un archivo `.env` dentro de **`backend`** (el que tiene `JWT_ACCESS_SECRET` y las credenciales del administrador).
-
-Sí es normal y correcto ver `.env.example`, `backend/.env.example` y
-`backend/.env.test.example`: son plantillas sin secretos.
-
----
-
-## Paso 4 — Crear una cuenta en Railway
-
-1. Ve a **https://railway.com**
-2. Haz clic en **Login** o **Start a New Project**.
-3. Elige **"Login with GitHub"** — así conectas Railway con la cuenta de GitHub que creaste antes. Acepta los permisos que te pida.
-4. Ten presente lo del recuadro de costos de arriba: Railway pide una tarjeta de pago y el crédito del Trial es **uno solo de US$5**, no mensual.
+> **💳 Dinero.** Crear la cuenta y el espacio Hobby no cuesta nada. El primer
+> cobro aparece cuando creas un servicio con un plan de cómputo de pago. El
+> **cron job del Paso 6.b es el único que no tiene plan Free**, así que es el
+> primer US$1 que vas a gastar.
 
 ---
 
 ## Paso 5 — Crear el proyecto y la base de datos
 
-1. Dentro de Railway, haz clic en **"New Project"**.
-2. Elige **"Deploy from GitHub repo"** y selecciona el repositorio que subiste en el Paso 3.
-3. Railway va a intentar detectar el proyecto automáticamente. **Es esperable que falle o quede con errores**: en la raíz del repositorio no hay nada que construir (ni `package.json` ni `Dockerfile`). Este primer servicio lo vamos a reconfigurar en el Paso 6 como **backend**.
-4. Dentro del mismo proyecto, haz clic en **"+ New"** (o **"Create"**) y elige **"Database" → "Add PostgreSQL"**.
+1. En el panel de Render, crea un **Project** (proyecto) para agrupar todo. Llámalo, por ejemplo, `fchmn-inscripciones`.
+2. Dentro del proyecto, haz clic en **New** → **Postgres**.
+3. Rellena:
+   - **Name**: `fchmn-postgres`
+   - **Region**: elige una y **anótala**. Los demás servicios tienen que ir en
+     la **misma región** para poder hablar por la red interna.
+   - **PostgreSQL Version**: **16** (es la que usa el entorno local y contra la
+     que se probaron las migraciones).
+   - **Instance Type**: `256 MB RAM` (US$6/mes) para uso real, o **Free** si
+     solo vas a ensayar — recordando que caduca a los 30 días y no tiene copias.
+4. Créala y espera a que su estado pase a **Available**.
 
-**Qué queda creado:** un servicio PostgreSQL de **un solo nodo**, desde la
-imagen con SSL que mantiene Railway. Expone las variables `PGHOST`, `PGPORT`,
-`PGUSER`, `PGPASSWORD`, `PGDATABASE` y **`DATABASE_URL`**, accesibles desde los
-demás servicios del mismo proyecto por la red privada.
+**Lo que vas a necesitar después:** en la página de la base, Render muestra dos
+direcciones de conexión.
 
-> **No habilites el acceso público de la base de datos.** Railway la deja privada
-> por omisión; abrirla crea un *TCP Proxy*, llena `DATABASE_PUBLIC_URL` y además
-> se factura el egreso de red. Nuestra API habla con ella por la red interna del
-> proyecto.
+| | Para qué sirve |
+|---|---|
+| **Internal Database URL** | La que usan los otros servicios de Render en la misma región. **Es la que vamos a usar.** |
+| **External Database URL** | Para conectarse desde fuera de Render. Solo la usarás para restaurar un respaldo (Paso 9). |
 
-> **Ojo con el plan y el tamaño.** En Trial y Free el volumen está limitado a
-> **0,5 GB**. Es suficiente para empezar, pero es un techo real: si la base crece,
-> hay que pasar a Hobby (5 GB).
+> **🔑 Las dos contienen la contraseña de la base.** Trátalas como una
+> credencial: no las pegues en un correo, en un chat ni en un archivo del
+> repositorio. En el Paso 6 no vas a copiarla a mano: Render permite enlazarla.
 
 ---
 
 ## Paso 6 — Configurar el servicio del backend (la API)
 
-1. Haz clic sobre el servicio que Railway creó desde tu repositorio (el que va a ser el backend). Conviene renombrarlo a algo claro, por ejemplo `backend`.
-2. Ve a la pestaña **"Settings"**.
-3. En la sección **Source**, busca **"Root Directory"** y escribe exactamente:
-   ```
-   backend
-   ```
-   > **Era `app/backend` en la versión anterior de esta guía, y estaba mal.** En
-   > el repositorio no existe ninguna carpeta `app`: `backend` y `frontend` están
-   > en la raíz. Con la ruta anterior, Railway no encuentra nada que construir.
+> ### 🔒 La API va como **Private Service**, no como Web Service
+>
+> Es la decisión de seguridad más importante de esta guía, y no es una
+> precaución teórica: **está medida**.
+>
+> Un *Private Service* de Render **no recibe subdominio `onrender.com` y no es
+> alcanzable desde internet**. Solo le hablan los otros servicios del proyecto,
+> por la red privada. Como la web llega a la API por ese camino (Paso 7), la API
+> no necesita dirección pública para nada.
+>
+> **Qué pasaría si la dejáramos pública.** La API confía en dos saltos de
+> proxy (`TRUST_PROXY_HOPS=2`), porque ese es el recorrido real cuando se entra
+> por la web. Pero alguien que entrara **directamente por la dirección pública
+> de la API** solo tendría un proxy por delante, y ese salto de más se lo
+> quedaría él: podría inventar su propia dirección IP con una cabecera
+> `X-Forwarded-For`.
+>
+> *Comprobado en un entorno local que reproduce el recorrido:*
+>
+> | Camino | IP que queda auditada |
+> |---|---|
+> | Directo a la API, inyectando `203.0.113.66` | **`203.0.113.66`** — la inventada |
+> | Por la web, a través del proxy | `198.51.100.9` — la real |
+>
+> *Y el efecto sobre el límite de tasa de `/auth`, que son 20 intentos por
+> minuto y por IP:*
+>
+> | 30 intentos de ingreso | Procesados | Bloqueados |
+> |---|---|---|
+> | Directos, **rotando** la IP inventada | **30** | **0** |
+> | Directos, con una IP fija | 20 | 10 |
+> | Por el proxy, rotando la IP inventada | 20 | 10 |
+>
+> Es decir: con la API pública, **la protección contra el ensayo masivo de
+> contraseñas se puede anular por completo** rotando una cabecera, y el registro
+> de auditoría queda envenenado. Como servicio privado, ese camino no existe.
+>
+> **El esquema y el host no son un problema** por separado: se revisó el código
+> y la aplicación no usa en ningún punto el protocolo ni el nombre de dominio de
+> la petición. Lo único que depende de las cabeceras reenviadas es la IP.
 
-4. **No configures nada más para construir. Deja "Build Command" y "Start Command" vacíos.**
+1. En el proyecto, **New** → **Private Service**.
+2. Conecta el repositorio `FCHMN_Inscripciones`, rama `main`.
+3. Rellena la configuración:
 
-   Railway encuentra `backend/Dockerfile` y lo usa automáticamente — avisa en los
-   registros con `Using detected Dockerfile!`. De ese archivo sale, por omisión,
-   la imagen que **sirve** la API, y esa imagen ya sabe arrancar sola
-   (`node dist/server.js`). Si escribes comandos en esos dos campos, los de
-   construcción **se ignoran** (son de Railpack, el otro constructor) y el de
-   arranque **reemplazaría** el de la imagen, que es justo lo que no quieres.
+   | Campo | Valor |
+   |---|---|
+   | **Name** | `fchmn-api` |
+   | **Region** | **la misma** que la base de datos |
+   | **Language** | **Docker** |
+   | **Root Directory** | `backend` |
+   | **Dockerfile Path** | `Dockerfile` |
+   | **Docker Build Context Directory** | `.` |
+   | **Instance Type** | `0.5 CPU / 512 MB` (US$7/mes) |
 
-   > **Cómo confirmar que salió la imagen correcta.** En la pestaña
-   > **"Deployments"**, abre el despliegue y mira los registros: debe aparecer
-   > `Using detected Dockerfile!`, la última etapa construida debe ser `runtime`,
-   > y al arrancar el servicio debe quedar escuchando. Si en cambio ves que el
-   > servicio ejecuta `prisma migrate deploy` y termina, revisa que este servicio
-   > **no** tenga la variable `RAILWAY_DOCKERFILE_PATH` (esa va solo en el
-   > servicio del Paso 6.b).
-
-   > **Los comandos de la versión anterior de esta guía ya no sirven, y conviene
-   > saber por qué.** Decían:
+   > **Los *private services* no admiten plan Free.** El plan gratuito de Render
+   > solo existe para servicios web, PostgreSQL y Key Value. Aquí **no hay
+   > versión de ensayo**: son US$7/mes desde el primer día. El precio es el mismo
+   > que el de un servicio web equivalente, así que **esto no cambia el
+   > presupuesto**, solo quita la posibilidad de probar gratis esta pieza.
    >
-   > ```
-   > Build Command: npm install && npx prisma generate && npm run build
-   > Start Command: npx prisma migrate deploy && npm run start
-   > ```
-   >
-   > Dos problemas. Primero, esos campos son de **Railpack**, el constructor por
-   > omisión; en presencia de un `Dockerfile` —que ahora existe— Railway usa el
-   > `Dockerfile` y los ignora. Segundo, migrar **en el arranque** es exactamente
-   > lo que `docker-compose.yml` dejó de hacer a propósito: si la migración falla,
-   > el servicio entra en un ciclo de reinicios, y cada reinicio reintenta migrar.
-   > Migrar es un **paso previo de operación**, no un requisito de arranque.
+   > Da igual: un servicio web Free tampoco habría servido, porque **los
+   > servicios web gratuitos no reciben tráfico por la red privada**.
 
-5. Ve a la pestaña **"Variables"** y agrega las de la tabla, una por una con **"+ New Variable"**. Están verificadas contra `backend/src/shared/env.schema.ts`, que es lo que la aplicación valida **al arrancar**: si algo falta o está mal, el servicio **no levanta** y lo dice en los registros.
+   > **No hay campo *Health Check Path*.** Render solo ofrece comprobaciones de
+   > salud HTTP a los servicios web; a los privados les aplica una comprobación
+   > TCP, que mira si el puerto está abierto y nada más. Es una pérdida real y
+   > conviene saberla: Render **no** sabrá si la API responde mal, solo si está
+   > escuchando. La comprobación de verdad la sigues teniendo a mano en
+   > `/api/ready` (Paso 8), y la web sí conserva su propia comprobación HTTP.
+
+   > **Estos tres campos son relativos al *Root Directory*.** Su documentación lo
+   > dice expresamente: el comando de construcción, el de arranque, el previo al
+   > despliegue, el *Dockerfile path* y el *Docker build context directory*
+   > operan todos a partir de él. Por eso `Dockerfile` y `.` bastan, sin
+   > prefijos.
+
+   > **Deja vacío el *Docker Command*** (está en **Advanced**). La imagen ya sabe
+   > arrancar sola (`node dist/server.js`). Poner algo ahí lo **reemplazaría**.
+
+   > **Por qué `/health` y no `/ready`.** El proyecto expone las dos sondas a
+   > propósito: `/health` responde sin consultar la base (vivacidad) y `/ready`
+   > consulta PostgreSQL y devuelve **503** si no contesta. Render consulta la
+   > ruta hasta recibir un 2xx antes de enviar tráfico al despliegue nuevo. Con
+   > `/ready`, un despliegue perfectamente bueno fallaría solo porque la base
+   > tardó en estar lista. Usa `/ready` a mano para diagnosticar (Paso 8).
+
+4. **Variables de entorno.** Están verificadas contra
+   `backend/src/shared/env.schema.ts`, que es lo que la aplicación valida **al
+   arrancar**: si algo falta o está mal, el servicio **no levanta** y lo dice en
+   los registros nombrando la variable.
 
    **Obligatorias — sin estas no arranca:**
 
    | Nombre | Valor |
    |---|---|
-   | `DATABASE_URL` | **Por referencia, no escrita a mano.** Usa el botón de referencia (ícono de enchufe/variable) y elige la base Postgres, o escribe `${{Postgres.DATABASE_URL}}` sustituyendo `Postgres` por el nombre real del servicio de base de datos. |
-   | `JWT_ACCESS_SECRET` | Un valor propio de **al menos 32 caracteres** (ver el recuadro de abajo). Se rechaza en producción si empieza con `reemplazar`, `replace`, `cambiar`, `change`, `example`, `ejemplo`, `secret` o `test`. |
+   | `DATABASE_URL` | **Enlazada, no escrita a mano.** Render ofrece añadir la base del proyecto; elige la **Internal Database URL** de `fchmn-postgres`. |
+   | `JWT_ACCESS_SECRET` | Un valor propio de **al menos 32 caracteres** (ver abajo cómo generarlo). Se rechaza en producción si empieza por `reemplazar`, `replace`, `cambiar`, `change`, `example`, `ejemplo`, `secret` o `test`. |
    | `NODE_ENV` | `production` |
-   | `CORS_ORIGINS` | La dirección pública del **frontend**, exacta y **sin barra final**, p. ej. `https://inscripciones.up.railway.app`. Se completa en el Paso 7.6, cuando ya exista. |
+   | `CORS_ORIGINS` | La dirección pública del **frontend**, exacta y **sin barra final**. Se completa en el Paso 7, cuando ya exista. |
 
-   **Necesarias para este despliegue (frontend y API en dominios distintos):**
+   **Necesarias para este despliegue:**
 
    | Nombre | Valor |
    |---|---|
-   | `AUTH_COOKIE_SAMESITE` | `none` (ver el recuadro "Por qué `none`") |
-   | `TRUST_PROXY_HOPS` | `1` (ver el recuadro "El proxy de Railway") |
+   | `AUTH_COOKIE_SAMESITE` | `lax` (ver el recuadro de abajo) |
+   | `TRUST_PROXY_HOPS` | `2` (ver el recuadro de abajo) |
+   | `PORT` | `3000` |
+
+   > **Por qué aquí sí se declara `PORT`.** En un servicio web, Render inyecta
+   > `PORT` y enruta por él, y lo correcto es no tocarlo. En un **servicio
+   > privado** no hay enrutador: la web se conecta al puerto que le digas. La
+   > documentación de Render no describe el comportamiento de `PORT` para
+   > servicios privados, así que lo fijamos nosotros y dejamos de depender de un
+   > detalle no documentado. Este valor tiene que coincidir con el que pongas en
+   > `API_INTERNA` (Paso 7).
+
+   > ### Por qué `lax` y por qué `2`
+   >
+   > Las dos salen de la misma decisión: **el navegador accede a la web y a la
+   > API desde el mismo origen**, porque el Nginx del frontend sirve la API en
+   > `/api` (Paso 7). El recorrido real de una petición es:
+   >
+   > ```
+   > navegador  →  borde de Render  →  Nginx del frontend  →  API
+   > ```
+   >
+   > **`AUTH_COOKIE_SAMESITE=lax`**, porque con un solo origen la cookie de
+   > sesión **no es una cookie de terceros**: no hay nada que un navegador pueda
+   > bloquear. `lax` es además más seguro que `none`, porque el navegador no
+   > manda la cookie en peticiones nacidas en otro sitio.
+   >
+   > **`TRUST_PROXY_HOPS=2`**, porque hay exactamente **dos** proxies por
+   > delante: el borde de Render y el Nginx del frontend. Con ese número, la API
+   > toma como dirección del usuario la que declaró el borde, y descarta
+   > cualquier dirección que el propio cliente haya intentado inyectar. De ahí
+   > dependen el registro de auditoría y el límite de tasa por IP.
+   >
+   > **Ni uno más ni uno menos.** Con `1`, la API creería que el usuario es el
+   > Nginx del frontend: todas las IP de la auditoría serían la misma y el
+   > límite de tasa sería común a todo el mundo. Con `3`, un cliente podría
+   > inventar una IP y la API se la creería.
+   >
+   > *Comprobado en un entorno local que reproduce ese recorrido: con `2`, una
+   > petición en la que el borde declara `190.44.12.77` queda auditada con esa
+   > IP; y una en la que el cliente intenta colar `9.9.9.9` por delante queda
+   > auditada igualmente con `190.44.12.77`, descartando la inventada.*
 
    **Deja estas SIN DEFINIR — ponerlas causa problemas:**
 
    | Nombre | Por qué |
    |---|---|
    | `AUTH_COOKIE_SECURE` | En producción se activa sola. Ponerla en `false` **detiene el arranque a propósito**: la cookie de sesión viajaría sin cifrar. |
-   | `PORT` | Railway **la inyecta** y la usa también para el *healthcheck*. La API la obedece (`app.listen({ port: env.PORT })`). Fijarla a mano puede dejar el servicio escuchando donde el enrutador no busca. |
-   | `HOST` | Por omisión es `0.0.0.0`, que es lo que Railway necesita. **No la pongas en `127.0.0.1`**: el servicio quedaría inalcanzable, sin ningún error que lo explique. |
-   | `PUBLIC_API_URL` | Solo hace falta si publicas la documentación interactiva (ver abajo). |
+   | `HOST` | Por omisión es `0.0.0.0`, que es lo que hace falta. **No la pongas en `127.0.0.1`**: el servicio quedaría inalcanzable incluso desde la red privada. |
+   | `PUBLIC_API_URL` | Solo hace falta si publicas la documentación interactiva. |
    | `ENABLE_SWAGGER` | Sin definir, la documentación en `/docs` queda **apagada en producción**, que es lo correcto. Si la pones en `true`, `PUBLIC_API_URL` pasa a ser **obligatoria** o el arranque falla. |
 
-   **Opcionales — tienen valor por omisión y solo se tocan si hace falta:**
-   `JWT_ACCESS_EXPIRES_IN` (`15m`), `JWT_REFRESH_EXPIRES_IN_DAYS` (`7`),
-   `LOGIN_MAX_ATTEMPTS` (`5`), `LOGIN_LOCKOUT_MINUTES` (`15`),
-   `RATE_LIMIT_GLOBAL_MAX` (`300`), `RATE_LIMIT_AUTH_MAX` (`20`).
+   **Opcionales — tienen valor por omisión:** `JWT_ACCESS_EXPIRES_IN` (`15m`),
+   `JWT_REFRESH_EXPIRES_IN_DAYS` (`7`), `LOGIN_MAX_ATTEMPTS` (`5`),
+   `LOGIN_LOCKOUT_MINUTES` (`15`), `RATE_LIMIT_GLOBAL_MAX` (`300`),
+   `RATE_LIMIT_AUTH_MAX` (`20`).
 
-   **No pongas `SEED_ADMIN_USERNAME` ni `SEED_ADMIN_PASSWORD` aquí.** El servidor
-   no las lee: las lee el comando que crea el administrador, y ese comando vive en
-   el servicio del **Paso 6.b**. Puestas aquí no harían nada, y serían un secreto
-   guardado donde no hace falta.
+   **No pongas aquí `SEED_ADMIN_USERNAME` ni `SEED_ADMIN_PASSWORD`.** El servidor
+   no las lee: las lee el comando que crea el administrador, en el Paso 6.b.
+   Puestas aquí no harían nada y serían un secreto guardado donde no hace falta.
 
-   **Para generar `JWT_ACCESS_SECRET`:** en VS Code, abre una terminal y ejecuta este comando una vez (igual que en la guía local):
+   **Para generar `JWT_ACCESS_SECRET`:** en VS Code, abre una terminal y ejecuta
+   este comando una vez:
    ```
    node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
    ```
 
-   > ### El proxy de Railway: por qué `TRUST_PROXY_HOPS=1`
-   >
-   > Esta variable **faltaba por completo** en la versión anterior de esta guía, y
-   > su valor por omisión es `0`.
-   >
-   > Todo el tráfico público de Railway entra por su red de borde, así que entre
-   > internet y la API hay **exactamente un proxy**. Con `0`, Fastify **ignora**
-   > la cabecera `X-Forwarded-For`: el registro de auditoría y el límite de tasa
-   > por IP verían la dirección del proxy en lugar de la del usuario — una sola IP
-   > para todo el mundo, que es tanto una auditoría inútil como un límite de tasa
-   > compartido por todos.
-   >
-   > **No pongas un número mayor que la cantidad real de proxies.** Cada salto de
-   > más es una IP que el cliente puede inventar para falsear la auditoría y
-   > escaparse del límite. Si algún día pones Cloudflare por delante de Railway,
-   > serán dos.
+   > **⚠️ Cuidado con las variables y la construcción.** Render convierte
+   > automáticamente las variables del servicio en *build arguments* disponibles
+   > durante la construcción de la imagen, y su documentación advierte: **no
+   > referencies en el `Dockerfile` ningún argumento con un valor sensible**,
+   > porque quedaría dentro de la imagen. Los `Dockerfile` de este proyecto no lo
+   > hacen —solo declaran `VITE_API_URL`, `NODE_VERSION` y los digests—, así que
+   > no hay nada que cambiar. Pero si alguien añade un `ARG JWT_ACCESS_SECRET`,
+   > estaría filtrando el secreto a la imagen.
 
-   > ### Por qué `AUTH_COOKIE_SAMESITE=none` en Railway
+   > ### El problema que este despliegue ya NO tiene
    >
-   > La sesión del usuario viaja en una cookie que el navegador guarda para el
-   > dominio del **backend**. En Railway el frontend y el backend reciben
-   > **dominios distintos** (`…-frontend.up.railway.app` y
-   > `…-backend.up.railway.app`), así que para el navegador son **sitios
-   > distintos** y, con el valor por omisión `lax`, sencillamente **no enviaría
-   > la cookie**: nadie podría mantener la sesión abierta.
+   > Conviene saberlo, porque explica por qué la configuración es así.
    >
-   > `none` le dice al navegador que sí la envíe. A cambio exige dos cosas, que
-   > el sistema comprueba al arrancar y rechaza si faltan:
+   > Si la web y la API estuvieran en direcciones distintas —que es lo que pasa
+   > si cada una usa su propia dirección `…onrender.com`—, la cookie de sesión
+   > sería una **cookie de terceros** para el navegador. Y hay navegadores que
+   > las bloquean: Safari por omisión desde 2020, y cualquiera con el bloqueo
+   > activado. El síntoma sería cruel: el usuario inicia sesión, entra, y al
+   > recargar vuelve al login, sin ningún error que lo explique.
    >
-   > 1. **`AUTH_COOKIE_SECURE` activo** (automático en producción). Sin él, los
-   >    navegadores descartan la cookie **sin avisar**: la sesión se cerraría
-   >    sola en cada recarga y no habría ningún error que lo explicara.
-   > 2. **`CORS_ORIGINS` con la dirección exacta del frontend.** Sin la lista, la
-   >    API aceptaría peticiones con la sesión del usuario desde *cualquier*
-   >    sitio web.
+   > *(Dos direcciones `…onrender.com` son sitios distintos de verdad:
+   > `onrender.com` figura en la Public Suffix List, que es la lista con la que
+   > los navegadores deciden qué cuenta como «mismo sitio».)*
    >
-   > **Si más adelante pones ambos servicios bajo un mismo dominio** (por
-   > ejemplo `app.fchmn.cl` y `app.fchmn.cl/api`), cambia esta variable a `lax`:
-   > es más seguro y no requiere nada más.
-   >
+   > **El Paso 7 lo elimina de raíz**, no lo mitiga: el Nginx de la web sirve
+   > también la API, bajo `/api`. El navegador ve **una sola dirección**, así
+   > que no existe ninguna cookie de terceros y no hay nada que ningún
+   > navegador pueda bloquear. Por eso aquí `AUTH_COOKIE_SAMESITE` va en `lax`
+   > y no en `none`.
+
    > ### La protección CSRF: no hay que configurar nada
    >
    > La comprobación **está activa siempre**, con cualquier valor de
    > `AUTH_COOKIE_SAMESITE`. Funciona sola, pero conviene saber cómo por si algún
-   > día aparece el mensaje *"Comprobación de seguridad fallida"*:
+   > día aparece el mensaje *«Comprobación de seguridad fallida»*:
    >
    > 1. Al iniciar sesión —y en `GET /auth/csrf` tras recargar la página— la API
    >    devuelve un **código de un solo uso en el cuerpo de la respuesta**.
    > 2. La aplicación web lo guarda **en memoria** y lo reenvía en la cabecera
    >    `X-CSRF-Token` de cada operación de sesión.
-   > 3. La API comprueba que ese código coincida con el que guardó en una cookie
-   >    propia.
+   > 3. La API comprueba que coincida con el que guardó en una cookie propia.
    >
    > Un sitio malicioso puede provocar la petición, pero **no puede leer el
    > cuerpo de ninguna respuesta de la API** —`CORS_ORIGINS` se lo impide—, así
-   > que nunca conoce el código. Por eso el código viaja por la respuesta y no
-   > por una cookie legible: entre dominios distintos, el JavaScript del
-   > frontend **no puede leer** las cookies del backend.
+   > que nunca conoce el código.
    >
    > **Si ves ese mensaje**, casi siempre es que `CORS_ORIGINS` no coincide
    > exactamente con la dirección del frontend (sobra una barra final, o dice
-   > `http` en vez de `https`). La aplicación lo reintenta una vez por su cuenta
-   > antes de mostrarlo, así que si aparece es que el problema persiste.
+   > `http` en vez de `https`).
 
-6. **Dominio público y HTTPS.** En **"Settings" → "Networking" → "Public Networking"**, haz clic en **"Generate Domain"**. Railway asigna una dirección `…up.railway.app` y **provisiona y renueva el certificado SSL automáticamente**: la dirección queda en `https://` sin que configures nada. **Cópiala y guárdala**, la necesitas en el Paso 7.
-
-   > **Sobre el puerto de destino** (*target port*): cuando generas el dominio,
-   > Railway detecta el puerto en el que la aplicación escucha y lo fija solo. Si
-   > te ofrece una lista, elige el que corresponde a `PORT`. Puedes cambiarlo
-   > después con el ícono de edición junto al dominio.
-
-7. **Comprobación de salud.** En **Settings → Deploy**, pon en **"Healthcheck Path"**:
-   ```
-   /health
-   ```
-   Railway consulta esa ruta hasta recibir un 2xx antes de enviarle tráfico al
-   nuevo despliegue, y así los despliegues no dejan la web caída. El tiempo límite
-   por omisión es de 300 segundos.
-
-   > **Por qué `/health` y no `/ready`.** El proyecto expone las dos sondas a
-   > propósito: `/health` responde sin consultar la base (vivacidad) y `/ready`
-   > consulta PostgreSQL y devuelve **503** si no contesta (disponibilidad).
-   > Railway solo mira la ruta **al inicio del despliegue**, no de forma continua.
-   > Con `/ready`, un despliegue perfectamente bueno fallaría solo porque la base
-   > tardó en estar lista. Usa `/ready` a mano para diagnosticar (Paso 8).
-
-8. **Evita reconstruir todos los servicios en cada cambio.** Salen del mismo repositorio, así que **cada empujón a GitHub los dispara a todos**. En **Settings → Build → "Watch Paths"**, pon en este servicio:
+5. **Build Filters**, para que un cambio en el frontend no reconstruya la API.
+   En **Settings → Build & Deploy → Build Filters**, añade como *Included Path*:
    ```
    backend/**
    ```
+   > Los *build filters* son siempre relativos a la **raíz del repositorio**,
+   > aunque hayas puesto un *Root Directory*.
 
-9. **Opcional, pero recomendado: activa "Wait for CI"** (**Settings**, junto a la
-   fuente de GitHub). El repositorio trae un flujo de GitHub Actions que corre en
-   cada empujón a `main`, y con esta opción Railway **espera** a que termine bien
-   antes de desplegar. Entre otras cosas, ese flujo comprueba que los avisos de
-   licencias dentro de `backend/avisos` y `frontend/avisos` estén al día: sin la
-   espera, un empujón con esas copias desactualizadas se desplegaría igual.
+6. **Crea el servicio.** Render construirá la imagen y la desplegará. La primera
+   vez tarda varios minutos.
 
-10. Railway desplegará el servicio automáticamente. Puedes ver el progreso en la pestaña **"Deployments"**. La primera vez puede tardar varios minutos.
+   > **El primer despliegue va a quedar «sano» pero la aplicación no funcionará
+   > todavía**, y es normal: faltan las tablas. Eso es el Paso 6.b.
 
-    > **El primer despliegue va a quedar "sano" pero la aplicación no funcionará
-    > todavía**, y es normal: faltan las tablas. Eso es el Paso 6.b. Si consultas
-    > `/ready` ahora, responderá que la base está accesible; lo que aún no existe
-    > es su contenido.
+7. **Anota la dirección INTERNA**, que es la que necesitarás en el Paso 7. Un
+   servicio privado la muestra como su **Service Address**, y también está en el
+   menú **Connect**. Con `PORT=3000` será algo como `fchmn-api:3000`.
+
+   > **Este servicio no tiene dirección pública, y eso es el objetivo.** Render
+   > no da subdominio `onrender.com` a los servicios privados. Si buscas una
+   > dirección pública aquí y no la encuentras, está bien: no debe haberla.
 
 ---
 
-## Paso 6.b — Crear el servicio de mantenimiento (migraciones y datos iniciales)
+## Paso 6.b — El servicio de mantenimiento (migraciones y datos iniciales)
 
-Este es un **tercer servicio**, en el mismo proyecto y desde el mismo
-repositorio. No atiende peticiones, no tiene dirección pública y **solo corre
-cuando tú lo haces correr**. Existe porque las herramientas de migración no
-viajan en la imagen de la API, y eso es deliberado (Sección 0, Problema 3).
+Este es un **cuarto servicio**, en el mismo proyecto y desde el mismo
+repositorio. No atiende peticiones y no tiene dirección pública. Existe porque
+las herramientas de migración no viajan en la imagen de la API, y eso es
+deliberado.
 
-1. **"+ New" → "GitHub Repo"** y selecciona otra vez el mismo repositorio.
-   Renómbralo a algo inequívoco, por ejemplo `mantenimiento`.
-2. **Settings → Source → Root Directory**:
-   ```
-   backend
-   ```
-   (el mismo que el backend: es el mismo `Dockerfile`)
-3. **Variables.** Solo estas:
+### Esto es un servicio PROGRAMADO. Dilo en voz alta.
+
+En Render, el tipo de servicio que sabe «ejecutar un comando y terminar» es el
+**Cron Job**, y **un cron job exige un calendario**. No existe un servicio que
+solo se ejecute a mano: **este servicio se va a ejecutar solo, en la fecha que
+le pongas, y eso no se puede desactivar.**
+
+No vamos a fingir lo contrario con un truco de calendario. Lo que hacemos es que
+**esa ejecución automática no pueda hacer daño**, porque lo que se ejecuta por
+omisión no toca la base de datos.
+
+> ### 🔒 La propiedad en la que se apoya todo
+>
+> **La imagen de mantenimiento, ejecutada sin un comando explícito, imprime una
+> línea y termina bien, sin abrir ninguna conexión a la base de datos.**
+>
+> Está así por construcción: `backend/Dockerfile.mantenimiento` sustituye el
+> comando por omisión por un `echo`. Migrar o sembrar **exige escribir el
+> comando**, que es justo lo que debe ser un acto deliberado.
+>
+> *Comprobado: ejecutada sin red alguna y con `DATABASE_URL` definida, termina
+> con código 0; el mismo contenedor con el comando de migraciones falla con
+> `P1001: Can't reach database server`. Y ejecutada contra una base vacía, la
+> deja con las mismas cero tablas.*
+
+Sobre esa base se apoyan dos cosas más, en este orden:
+
+1. **El comando por omisión de la imagen no toca la base.** Es la única capa que
+   protege de verdad, y no depende de que nadie se acuerde de nada.
+2. **El campo *Docker Command* se deja vacío en reposo**, para que se use ese
+   comando por omisión. Si prefieres verlo escrito en el panel, puedes poner el
+   `echo` a mano (más abajo se indica cómo); el efecto es el mismo.
+3. **Cada ejecución real es un acto explícito**: escribir el comando, lanzarlo,
+   leer el registro y **vaciar el campo otra vez**.
+
+> **Lo que esto NO promete.** Si dejas un comando real escrito en el campo y el
+> servicio se ejecuta —por el calendario, o por alguna otra causa que la
+> documentación de Render no detalla—, ese comando se ejecutará. Por eso el
+> último paso del procedimiento, vaciar el campo, no es opcional.
+>
+> Lo comprobado es más acotado: **la imagen, ejecutada sin comando, no toca la
+> base**. Mientras el campo esté vacío, una ejecución inesperada es inofensiva.
+> Mientras no lo esté, no lo es.
+
+### Crear el servicio
+
+1. En el proyecto, **New** → **Cron Job**.
+2. Conecta el mismo repositorio, rama `main`.
+3. Rellena:
+
+   | Campo | Valor |
+   |---|---|
+   | **Name** | `fchmn-mantenimiento` |
+   | **Region** | **la misma** que la base de datos |
+   | **Language** | **Docker** |
+   | **Root Directory** | `backend` |
+   | **Dockerfile Path** | `Dockerfile.mantenimiento` |
+   | **Docker Build Context Directory** | `.` |
+   | **Instance Type** | `0.5 CPU / 512 MB` (los cron jobs **no** admiten Free) |
+   | **Schedule** | `0 6 1 1 *` |
+   | **Docker Command** (en *Advanced*) | **déjalo vacío** |
+
+   > **`Dockerfile.mantenimiento` es lo único que distingue este servicio de la
+   > API.** Los dos apuntan a la misma carpeta del mismo repositorio; lo que
+   > cambia es qué archivo se construye.
+
+   > **Sobre el calendario: `0 6 1 1 *` significa «el 1 de enero a las 06:00
+   > UTC», una vez al año.** Es una expresión **válida y real**: ese día el
+   > servicio **se va a ejecutar**, sin que nadie lo pida.
+   >
+   > Y no pasa nada, porque lo que se ejecutará es el comando por omisión de la
+   > imagen, que solo imprime una línea. En el registro de ese día verás
+   > exactamente eso y nada más.
+   >
+   > **Por qué una fecha real y no un truco.** Existe la costumbre de poner
+   > fechas imposibles —el 30 de febrero— para que «nunca» se dispare. Es una
+   > mala idea: depende de cómo interprete la expresión cada plataforma, no está
+   > documentado que Render la acepte, y sobre todo **oculta** que el servicio es
+   > programado, de modo que el día que alguien herede esto creerá que no puede
+   > ejecutarse solo. Prefiero una fecha honesta y una ejecución inofensiva.
+   >
+   > Si prefieres otra cadencia, cualquiera sirve. Lo que no debe cambiar es que
+   > el estado en reposo sea inofensivo.
+
+4. **Docker Command: déjalo vacío.**
+
+   Vacío, Render ejecuta el comando por omisión de la imagen, que es el `echo`
+   inofensivo. No hay nada que escribir ni que recordar.
+
+   > **Esto es nuevo, y es la diferencia con cualquier versión anterior de esta
+   > guía.** Antes, el comando por omisión de esta imagen era
+   > `prisma migrate deploy`, así que dejar el campo vacío significaba «migra en
+   > cada ejecución programada». Ahora el archivo `Dockerfile.mantenimiento`
+   > sustituye ese comando por omisión, y **vacío es el estado seguro**.
+
+   > **Si prefieres verlo escrito en el panel**, puedes poner a mano:
+   > ```
+   > echo "Mantenimiento en reposo: sin accion."
+   > ```
+   > Escríbelo **así**, sin `/bin/sh -c` delante. Se probó en la imagen real:
+   > `/bin/sh -c echo "…"` **imprime una línea vacía** —el texto se toma como
+   > nombre del programa, no como argumento de `echo`—, con lo que el registro no
+   > diría nada. La forma de arriba funciona tanto si Render ejecuta el comando
+   > directamente como si lo pasa por un shell, porque `echo` existe como
+   > programa en la imagen. Si tu panel exigiera un shell, la forma correcta es
+   > `/bin/sh -c 'echo "Mantenimiento en reposo: sin accion."'`, **con comillas
+   > simples alrededor de todo**.
+
+5. **Variables de entorno.** Solo estas tres:
 
    | Nombre | Valor |
    |---|---|
-   | `RAILWAY_DOCKERFILE_PATH` | `Dockerfile.mantenimiento` |
-   | `DATABASE_URL` | **Por referencia** a la base Postgres, igual que en el Paso 6.5 |
+   | `DATABASE_URL` | **Enlazada** a `fchmn-postgres` (Internal Database URL), igual que en el Paso 6 |
    | `SEED_ADMIN_USERNAME` | El **nombre de usuario** del administrador (no es un correo), p. ej. `admin.fchmn` |
-   | `SEED_ADMIN_PASSWORD` | Una contraseña propia y secreta: **mínimo 10 caracteres, con mayúscula, minúscula y número** (la misma política que para cualquier usuario) |
+   | `SEED_ADMIN_PASSWORD` | Una contraseña propia y secreta: **mínimo 10 caracteres, con mayúscula, minúscula y número** |
 
-   > **`RAILWAY_DOCKERFILE_PATH` es lo único que distingue este servicio del
-   > backend.** Los dos apuntan a la misma carpeta del mismo repositorio; lo que
-   > cambia es qué archivo se construye. `backend/Dockerfile` da la API;
-   > `backend/Dockerfile.mantenimiento` —derivado del anterior, ver Sección 0— da
-   > las herramientas de migración. **No pongas esta variable en el servicio del
-   > Paso 6.**
-   >
-   > **Si la construcción dice que no encuentra el archivo**, prueba con la ruta
-   > completa desde la raíz del repositorio: `/backend/Dockerfile.mantenimiento`.
-   > La documentación de Railway muestra las dos formas —un nombre suelto y una
-   > ruta con barra inicial— sin decir cuál rige cuando hay un directorio raíz
-   > configurado; la primera es la que corresponde a ese directorio.
-
-   > **Estas dos credenciales son obligatorias en todos los entornos.** Si falta
-   > cualquiera de las dos —o queda **definida pero vacía**, que cuenta como
+   > **🔑 Estas dos credenciales son obligatorias y no tienen valor por omisión.**
+   > Si falta cualquiera —o queda **definida pero vacía**, que cuenta como
    > ausente—, el comando que crea el administrador **se niega a ejecutarse** y
-   > dice cuál falta: no existen credenciales por omisión. Elige valores propios y
-   > no los copies de ninguna plantilla ni de ningún ejemplo. La variable se llama
-   > `SEED_ADMIN_USERNAME`; `SEED_ADMIN_EMAIL` no existe y el sistema la ignora. El
-   > comando **no imprime** el usuario, la contraseña ni su hash: la salida de un
-   > despliegue queda registrada.
+   > dice cuál falta. *(Comprobado: termina con código de salida 1.)* Elige
+   > valores propios, no los copies de ninguna plantilla, y **no los escribas en
+   > ningún chat ni correo**. La variable se llama `SEED_ADMIN_USERNAME`;
+   > `SEED_ADMIN_EMAIL` no existe. El comando **no imprime** el usuario, la
+   > contraseña ni su hash: la salida de un despliegue queda registrada.
 
-4. **Settings → Deploy → Restart Policy**: ponla en **`NEVER`**.
+6. **Auto-Deploy: ponlo en `Off`** (**Settings**, sección *Auto-Deploy*). Las
+   opciones son `On Commit` (la de fábrica), `After CI Checks Pass` y `Off`.
 
-   > **Por qué.** Este servicio termina en cuanto acaba su trabajo. Con la
-   > política por omisión, Railway interpretaría cada salida como una caída y lo
-   > reintentaría hasta diez veces: diez migraciones seguidas en lugar de una.
+   > **Por qué `Off` aquí y no en los otros servicios.** Este servicio no sirve
+   > tráfico: no necesita estar al día con cada empujón. Con `Off`, nada de lo que
+   > pase en GitHub lo toca, y tú decides cuándo reconstruirlo —antes de un
+   > mantenimiento que use código nuevo, con **Manual Deploy**—. Es una
+   > protección documentada, a diferencia de suspender el servicio, que la
+   > documentación de Render no explica para cron jobs y que por eso esta guía
+   > no usa.
 
-5. **No le generes dominio público y no le pongas "Healthcheck Path".** No sirve
-   nada por HTTP; un *healthcheck* no encontraría nada escuchando y marcaría el
-   despliegue como fallido.
+7. **Build Filters**: *Included Path* `backend/**`. (Con `Auto-Deploy: Off` es
+   redundante, pero no estorba si algún día lo vuelves a encender.)
 
-6. **Desactiva el despliegue automático.** En **Settings**, en la sección de la
-   fuente de GitHub, haz clic en **Disable** (junto a los despliegues
-   automáticos).
+### El procedimiento de mantenimiento
 
-   > **Esto es lo más importante de todo el paso.** Un servicio ligado a GitHub
-   > se despliega solo con cada empujón a la rama conectada, y desplegar este
-   > servicio **ejecuta su comando**: cada cambio del backend aplicaría
-   > migraciones sin que nadie lo pidiera. Desactivado, este servicio **solo
-   > corre cuando tú lo lanzas**, que es exactamente lo que se quiere de una
-   > herramienta de mantenimiento.
+**Cada ejecución sigue estos seis pasos. Sin saltarse ninguno.**
 
-   A partir de ahora, para lanzarlo: abre la **paleta de comandos** (`Ctrl+K` /
-   `Cmd+K`) y elige **"Deploy Latest Commit"**.
+1. **Confirma contra qué base vas a trabajar.** En **Environment**, que
+   `DATABASE_URL` esté **enlazada a `fchmn-postgres`** y no escrita a mano.
+2. Ve a **Settings** y escribe en **Docker Command** el comando que toca.
+3. Guarda.
+4. Ve a la pestaña **Runs** y pulsa **Trigger Run**.
+5. **Lee el registro**: confirma primero **qué comando se ejecutó** y después el
+   mensaje de éxito que se indica abajo.
+6. **Vuelve a Settings y vacía el campo Docker Command.**
 
-### Los tres comandos, en este orden
+> **El paso 6 no es opcional.** Mientras un comando real esté escrito ahí, una
+> ejecución programada lo ejecutaría. Vacíalo en cuanto termines, y compruébalo.
 
-El **Start Command** de este servicio (**Settings → Deploy**) decide cuál de los
-tres corre. Para cada uno: escribe el comando, lánzalo con `Ctrl+K` →
-**"Deploy Latest Commit"**, y **lee los registros** antes de pasar al siguiente.
+> ### Cuidado: guardar un cambio puede desencadenar un despliegue
+>
+> Esto está documentado para las **variables de entorno**: al guardarlas, Render
+> *«kicks off a deploy»* **salvo que elijas la opción «Save only»**, que las
+> guarda sin desplegar. Si alguna vez cambias `SEED_ADMIN_PASSWORD` o
+> `DATABASE_URL` aquí, usa **Save only** si no quieres que se reconstruya en ese
+> momento.
+>
+> **Para el campo *Docker Command*, la documentación de Render no dice** si
+> guardarlo dispara un despliegue, ni si un despliegue de un cron job provoca una
+> ejecución. Se buscó expresamente y **no hay respuesta oficial**. Indicios de
+> terceros sugieren que un despliegue no inicia una ejecución, pero **no son
+> documentación y esta guía no se apoya en ellos**.
+>
+> **Qué significa en la práctica, dicho sin adornos:** entre el momento en que
+> guardas un comando real (paso 3) y el momento en que lo vacías (paso 6), **ese
+> comando podría ejecutarse sin que tú pulses nada**. No es una hipótesis
+> descartada: es una incógnita. Los tres comandos son, por suerte, tolerables en
+> ese escenario —migrar lo ya migrado no hace nada, el seed de referencia es
+> idempotente y el de administrador no modifica uno existente—, pero **eso no es
+> lo mismo que decir que no puede pasar nada**.
+>
+> Por eso: ten la ventana abierta, haz los pasos 3 a 6 seguidos, y en el paso 5
+> mira **cuántas ejecuciones** aparecen en la pestaña *Runs*, no solo la última.
+>
+> **PENDIENTE DE COMPROBAR EN EL PRIMER ENSAYO.** Guarda un cambio del *Docker
+> Command* y anota si aparece un despliegue, si aparece una ejecución, y en qué
+> orden. Es el dato que falta para cerrar este punto, y esta guía se corrige con
+> él.
 
-**1) Aplicar las migraciones** (crea y actualiza las tablas). Es el comando que
-la imagen trae por omisión, así que para este paso puedes dejar el Start Command
-**vacío**:
+**Los tres comandos, en este orden.** Son los únicos que existen en esta imagen.
 
+**1) Aplicar las migraciones** (crea y actualiza las tablas):
 ```
 prisma migrate deploy --schema=/app/prisma/schema.prisma
 ```
-
 Termina diciendo `All migrations have been successfully applied.`
 
 **2) Sembrar los datos de referencia** (roles, permisos, parámetros y catálogos).
 Es **idempotente**: se puede repetir sin problema y **no crea usuarios**.
-
 ```
 node dist-seed/prisma/seed.js
 ```
 
-**3) Crear el administrador inicial. Una sola vez.** Usa `SEED_ADMIN_USERNAME` y
-`SEED_ADMIN_PASSWORD`. Si el administrador ya existe, el comando lo detecta y
-**no lo modifica** —lo dice: *«ya existe y es un administrador válido: no se
-modifica»*—, así que un redespliegue accidental no rompe nada:
-
+**3) Crear el administrador inicial. Una sola vez.**
 ```
 node dist-seed/prisma/seed-admin.js
 ```
-
 Termina diciendo `Administrador inicial creado. Debe cambiar la contraseña en el
-primer ingreso.`
-
-**Cuando los tres hayan terminado bien**, deja el Start Command en el comando 1
-(o vacío) para que el próximo lanzamiento sea el inocuo, y no lo vuelvas a lanzar
-hasta la próxima actualización con migraciones. Si quieres que no consuma nada,
-puedes además quitar su despliegue (**Deployments → tres puntos → Remove**); el
-servicio y sus variables se conservan.
-
-> **Nunca dejes el comando 3 escrito en el Start Command.** Es el único que no es
-> repetible por naturaleza, y aunque hoy se niega a modificar un administrador
-> existente, dejarlo ahí convierte cualquier lanzamiento accidental en un intento
-> de crear credenciales.
+primer ingreso.` Si el administrador ya existe, el comando lo detecta y **no lo
+modifica** —lo dice: *«ya existe y es un administrador válido: no se modifica»*—,
+así que una ejecución accidental no rompe nada.
 
 > **Si una migración o un seed termina con ERROR, no sigas:** corrige la causa y
-> repite el paso. Es la misma regla que encabeza `docker-compose.yml`. En
-> particular, **no uses la API** hasta que el comando 1 haya terminado bien: sin
-> tablas, todo falla.
+> repite el paso. Y **no uses la API** hasta que el comando 1 haya terminado
+> bien: sin tablas, todo falla.
 
-> **Alternativa: una consola interactiva.** Si prefieres ejecutar los tres
-> comandos seguidos sin cambiar el Start Command, instala el CLI de Railway, usa
-> `railway link` para conectar la carpeta al proyecto y `railway ssh` para abrir
-> una consola dentro del contenedor de este servicio. La versión anterior de esta
-> guía mandaba buscar una "consola/shell" o un "Run Command" en el panel: **eso
-> no está documentado así**; lo documentado es `railway ssh`.
+> **La alternativa rigurosa, si alguna vez quieres eliminar hasta el último
+> resquicio.** Render ofrece **one-off jobs**: procesos de una sola vez que usan
+> la última construcción de un servicio existente y reciben el comando en la
+> propia invocación. Con ellos el *Docker Command* del cron job **nunca** cambia
+> —se queda inocuo para siempre— y el riesgo de calendario desaparece por
+> construcción. El inconveniente es que **solo se crean por la API de Render**,
+> con una clave de API y un comando en terminal, así que no encaja con el
+> objetivo de administrar esto sin programar. Queda documentado por si en algún
+> momento hay alguien que pueda hacerlo así.
 
 > **Por qué son tres comandos y no uno.** Antes el arranque del servicio sembraba
 > todo en cada reinicio, incluida la creación del administrador. Eso mezclaba
 > operaciones repetibles con una que no lo es, y hacía que un despliegue sin
 > variables definidas creara en silencio una cuenta con credenciales conocidas.
-> Ahora el tercero se ejecuta a mano, una vez, y falla si faltan las variables.
-
-> **Y por qué no un "Pre-deploy Command".** Railway puede ejecutar un comando
-> entre la construcción y el despliegue, y sería cómodo para las migraciones.
-> Pero lo ejecuta **a partir de la misma imagen de la aplicación**, que no trae
-> estas herramientas; y correría en **cada** despliegue, lo que es correcto para
-> el comando 1 pero inadmisible para el 3, que no es repetible por naturaleza.
 
 ---
 
 ## Paso 7 — Configurar el servicio del frontend (la web)
 
-1. En el mismo proyecto de Railway, haz clic en **"+ New" → "GitHub Repo"** y selecciona **el mismo repositorio otra vez**. Esto crea un segundo servicio dentro del mismo proyecto. Conviene renombrarlo a `frontend`.
-2. Entra a este nuevo servicio → **"Settings"**.
-3. **Root Directory**:
-   ```
-   frontend
-   ```
-   > Igual que antes: **no** `app/frontend`.
+1. En el proyecto, **New** → **Web Service**, mismo repositorio y rama.
+2. Rellena:
 
-4. **Constructor.** Railway usará `frontend/Dockerfile` automáticamente por estar en el directorio raíz del servicio — no hay que elegir nada. Compila con Node y sirve el resultado con **Nginx**.
+   | Campo | Valor |
+   |---|---|
+   | **Name** | `fchmn-web` |
+   | **Region** | la misma |
+   | **Language** | **Docker** |
+   | **Root Directory** | `frontend` |
+   | **Dockerfile Path** | `Dockerfile` |
+   | **Docker Build Context Directory** | `.` |
+   | **Instance Type** | `0.5 CPU / 512 MB`, o **Free** para ensayar |
+   | **Health Check Path** | `/` |
 
-   > **Este servicio no necesita `RAILWAY_DOCKERFILE_PATH`.** La última etapa de
+   > **Este servicio no necesita `Dockerfile Path` especial.** La última etapa de
    > `frontend/Dockerfile` ya es la correcta (la de Nginx). El segundo archivo
    > existe solo en `backend/`, que produce dos imágenes distintas.
 
-   > **Por qué Dockerfile y no `npx serve dist -s -p $PORT`.** Esa era la
-   > instrucción anterior y tenía dos problemas: `serve` **no está declarado como
-   > dependencia** del proyecto, así que cada arranque dependía de que `npx` lo
-   > descargara del registro npm —si el registro falla o cambia el paquete, el
-   > servicio no levanta—, y no es un servidor pensado para producción. La imagen
-   > Nginx ya incluye el *fallback* de SPA, sin el cual recargar el navegador en
-   > `/competencias` devuelve 404.
+   > **Deja vacío el *Docker Command*.** La imagen ya sabe arrancar sola.
 
-5. **Start Command**: déjalo **vacío**. La imagen ya sabe arrancar sola.
+   > **Sobre el puerto:** Render inyecta `PORT` y espera que el servicio escuche
+   > ahí. La imagen del frontend ya lo obedece: su configuración de Nginx es una
+   > plantilla (`nginx/default.conf.template`) que se completa al arrancar con el
+   > valor de `PORT`. **No agregues una variable `PORT` a mano.**
 
-   > **Sobre el puerto:** Railway inyecta la variable `PORT` y espera que el
-   > servicio escuche **ahí**. La imagen del frontend ya lo obedece: su
-   > configuración de Nginx es una plantilla (`nginx/default.conf.template`) que
-   > se completa al arrancar con el valor de `PORT`, y el `Dockerfile` le deja
-   > `80` como valor por omisión para uso local. **No agregues una variable `PORT`
-   > a mano.** Si el servicio quedara con un puerto fijo distinto del que busca el
-   > enrutador, la página no cargaría sin ningún error en los registros que lo
-   > explicara.
-
-6. Ve a **"Variables"** y agrega:
+3. **Variables de entorno**, dos, y las dos importan:
 
    | Nombre | Valor |
    |---|---|
-   | `VITE_API_URL` | La dirección pública del backend del Paso 6.6, p. ej. `https://tu-backend-production.up.railway.app`, **sin barra final** |
+   | `VITE_API_URL` | `/api` |
+   | `API_INTERNA` | La **dirección interna** de la API, con su puerto: `fchmn-api:3000` |
 
-   > **Importante: esta variable se aplica al CONSTRUIR, no al ejecutar.** Vite
-   > escribe la dirección **dentro** de los archivos JavaScript al compilar. Si la
-   > cambias después, **hay que volver a desplegar** (*Redeploy*) para que tenga
-   > efecto: cambiarla y reiniciar el servicio no modifica los archivos ya
-   > generados.
+   > ### Estas dos variables son el corazón de la configuración
    >
-   > **No hace falta marcarla de ninguna forma especial.** La versión anterior de
-   > esta guía decía que había que marcarla como *build variable* y pasarla como
-   > `--build-arg`: eso no es así en Railway. Railway inyecta las variables del
-   > servicio también durante la construcción, y basta con que el `Dockerfile` las
-   > declare con `ARG` — `frontend/Dockerfile` ya trae `ARG VITE_API_URL`.
-
-   > **Si no la defines**, la web queda compilada apuntando a
-   > `http://localhost:3000` (el valor por omisión de `apiClient.ts` y del
-   > `Dockerfile`), y en internet no funcionará: el navegador del usuario buscaría
-   > la API en *su propio* computador.
-
-7. Ve a **"Settings" → "Networking"** y haz clic en **"Generate Domain"** para este servicio también. Esta es la dirección que vas a compartir con los usuarios finales (clubes, delegados, etc.), y también llega por HTTPS con certificado automático.
-
-   > **Ahora vuelve al backend y completa `CORS_ORIGINS`.** Copia esta dirección
-   > del frontend, entra al servicio del **backend** → **"Variables"**, y pon ese
-   > valor en `CORS_ORIGINS`. Escríbelo **exactamente** como aparece, con
-   > `https://` y **sin barra final**:
+   > Hacen que **el navegador vea una sola dirección**. La web pide la API a
+   > `/api/…`, que es su propio origen; este Nginx recoge esa petición y la
+   > reenvía por la **red privada** de Render al servicio de la API. El
+   > navegador nunca habla con la API directamente, así que no hay cookies de
+   > terceros y no hay nada que pueda bloquear.
    >
-   > | Bien | Mal |
-   > |---|---|
-   > | `https://inscripciones.up.railway.app` | `https://inscripciones.up.railway.app/` (barra final) |
-   > | | `http://inscripciones.up.railway.app` (http en vez de https) |
-   > | | `inscripciones.up.railway.app` (sin esquema) |
+   > **`VITE_API_URL=/api`** se aplica al **CONSTRUIR**, no al ejecutar: Vite
+   > escribe ese valor dentro de los archivos JavaScript al compilar. Si la
+   > cambias después, **hay que volver a desplegar**. No hace falta marcarla de
+   > ninguna forma especial: Render convierte las variables del servicio en
+   > *build arguments*, y `frontend/Dockerfile` ya declara `ARG VITE_API_URL`.
    >
-   > La aplicación valida el formato al arrancar y **rechaza** un origen con ruta
-   > final. Hasta que esta variable esté puesta, **nadie podrá iniciar sesión**:
-   > el backend rechazará las peticiones de la web por venir de un origen no
-   > declarado. Es a propósito — sin esa lista, cualquier sitio de internet podría
-   > usar la sesión de tus usuarios.
+   > **`API_INTERNA`** se aplica al **ARRANCAR**. Su valor lo da Render: es la
+   > **Service Address** del servicio privado de la API, y el puerto es el que
+   > fijaste con `PORT` en el Paso 6 (`3000`). Si Render te muestra algo
+   > distinto, usa lo que te muestre.
    >
-   > Guarda y espera a que el backend se vuelva a desplegar.
+   > El nombre del servicio **no está escrito en ningún archivo del
+   > repositorio**: vive solo en esta variable. Si algún día renombras la API,
+   > se cambia aquí y basta.
 
-8. **Watch Paths** de este servicio, en **Settings → Build**:
-   ```
-   frontend/**
-   ```
+   > ### Requisitos de la red privada — léelos antes
+   >
+   > - **La API y la web deben estar en la MISMA región y el MISMO espacio de
+   >   trabajo.** Es lo que Render exige para que compartan red privada.
+   > - **La API está en un plan de pago**, porque los *private services* no
+   >   admiten Free (Paso 6). La web sí podría estar en Free para un ensayo, pero
+   >   entonces se apagaría por inactividad y arrastraría a la API con ella,
+   >   porque todo el tráfico pasa por aquí.
+   > - **La API no tiene dirección pública en absoluto.** Es un servicio
+   >   privado: el único camino hasta ella es este proxy. Esa es la razón por la
+   >   que `TRUST_PROXY_HOPS=2` es seguro (ver el recuadro del Paso 6).
 
-9. Espera a que termine el despliegue (pestaña "Deployments", ícono verde).
+4. **Build Filters**: *Included Path* `frontend/**`.
+
+5. **Crea el servicio** y anota su dirección pública (p. ej.
+   `https://fchmn-web.onrender.com`). **Esta es la que compartirás con los
+   usuarios finales.**
+
+6. **Ahora vuelve a la API y completa `CORS_ORIGINS`.** Entra a `fchmn-api` →
+   **Environment**, y pon ahí esa dirección **exactamente** como aparece, con
+   `https://` y **sin barra final**:
+
+   | Bien | Mal |
+   |---|---|
+   | `https://fchmn-web.onrender.com` | `https://fchmn-web.onrender.com/` (barra final) |
+   | | `http://fchmn-web.onrender.com` (http en vez de https) |
+   | | `fchmn-web.onrender.com` (sin esquema) |
+
+   La aplicación valida el formato al arrancar y **rechaza** un origen con ruta
+   final. Hasta que esta variable esté puesta, **nadie podrá iniciar sesión**.
+   Guarda y espera a que la API se vuelva a desplegar.
 
 ---
 
 ## Paso 8 — Comprobar que todo funciona
 
-Hazlo en este orden: cada comprobación supone que la anterior pasó.
+En este orden; cada comprobación supone que la anterior pasó.
 
-**1) La API está viva.** Abre en el navegador la dirección del backend con `/health` al final:
-```
-https://TU-BACKEND.up.railway.app/health
-```
-Debe responder algo como `{"status":"ok","uptime":12}`. Si no responde, el
-problema está en el servicio del backend (mira sus registros, pestaña
-**"Deployments"** → el despliegue → *Logs*).
+**Todas las direcciones son la de la WEB.** Es lo propio de esta configuración:
+la API se alcanza por `/api` del mismo sitio, así que no hay una segunda
+dirección que comprobar. Sustituye `fchmn-web.onrender.com` por la tuya.
 
-**2) La API alcanza la base de datos.** Ahora con `/ready`:
-```
-https://TU-BACKEND.up.railway.app/ready
-```
-Debe responder `{"status":"ready","database":"ok"}`. Si devuelve **503** con
-`"database":"unreachable"`, la API está viva pero no habla con PostgreSQL: revisa
-que `DATABASE_URL` esté puesta **por referencia** al servicio de Postgres.
+**1) La web carga.** Abre la dirección del frontend. Deberías ver la pantalla de
+ingreso con el logo de la FCHMN.
 
-**3) La web carga.** Abre la dirección pública del **frontend** (Paso 7.7). Deberías ver la pantalla de ingreso con el logo de la FCHMN.
-
-**4) El *fallback* de SPA funciona.** Escribe directamente una ruta interna, por ejemplo:
+**2) El *fallback* de SPA funciona.** Escribe directamente una ruta interna:
 ```
-https://TU-FRONTEND.up.railway.app/competencias
+https://fchmn-web.onrender.com/competencias
 ```
 Debe cargar la aplicación (y pedirte ingresar), **no** un 404 de Nginx.
 
-**5) Se puede iniciar sesión.** Ingresa con el **nombre de usuario** y la contraseña que definiste en `SEED_ADMIN_USERNAME` / `SEED_ADMIN_PASSWORD`. No es un correo.
-   - Si el login falla con un error de conexión o de seguridad, el sospechoso es `CORS_ORIGINS` o `VITE_API_URL` (ver "Problemas comunes").
-   - Si dice que las credenciales no existen, probablemente falta ejecutar el comando 3 del Paso 6.b.
+**3) El proxy llega a la API.** Esta es la comprobación propia de esta
+configuración, y la primera que falla si algo está mal:
+```
+https://fchmn-web.onrender.com/api/health
+```
+Debe responder algo como `{"status":"ok","uptime":12}`.
 
-**6) Cambia la contraseña.** El sistema te pedirá cambiarla en el primer ingreso — hazlo y guarda la nueva en un lugar seguro.
+- **502 o 504** → el proxy no alcanza la API. Revisa `API_INTERNA` (nombre y
+  puerto exactos, los del menú **Connect → Internal** de la API), que ambos
+  servicios estén en la **misma región**, y que la API sea un **Private
+  Service** en marcha (su *Service Address* y su `PORT` deben coincidir con
+  `API_INTERNA`).
+- **404 con el aspecto de una página de Nginx** → la petición no entró al
+  bloque `/api/`; revisa que la ruta lleve la barra final del prefijo.
 
-**7) Recién entonces, comparte la dirección del frontend** con quien necesite usar el sistema.
+**4) La API alcanza la base de datos.**
+```
+https://fchmn-web.onrender.com/api/ready
+```
+Debe responder `{"status":"ready","database":"ok"}`. Si devuelve **503** con
+`"database":"unreachable"`, la API está viva pero no habla con PostgreSQL:
+revisa que `DATABASE_URL` esté **enlazada** y que ambos estén en la misma región.
+
+**5) La documentación está apagada.**
+```
+https://fchmn-web.onrender.com/api/docs
+```
+Debe devolver **404**. Si responde, `NODE_ENV` no es `production` o alguien puso
+`ENABLE_SWAGGER=true`.
+
+**6) Se puede iniciar sesión.** Con el **nombre de usuario** y la contraseña que
+definiste en `SEED_ADMIN_USERNAME` / `SEED_ADMIN_PASSWORD`. No es un correo.
+- Si falla con error de conexión o de seguridad, el sospechoso es `CORS_ORIGINS`
+  o `VITE_API_URL`.
+- Si dice que las credenciales no existen, falta ejecutar el comando 3 del Paso 6.b.
+
+**7) Cambia la contraseña.** El sistema te la pedirá en el primer ingreso.
+Guárdala en un lugar seguro.
+
+**8) La sesión sobrevive a una recarga.** Con la sesión abierta, pulsa **F5**.
+Debes seguir dentro. Si vuelves a la pantalla de ingreso, la cookie de sesión no
+se está guardando: revisa la reescritura de `Path` (recuadro del Paso 7).
+
+**9) La misma prueba en Safari**, o en un navegador con el bloqueo de cookies de
+terceros activado (Brave, un modo privado, un perfil con protección reforzada).
+
+**Debería seguir funcionando**, porque con el proxy la cookie **no es de
+terceros**: web y API comparten origen y no hay nada que bloquear. Esta prueba
+ya no busca un fallo previsible, sino **confirmar que el proxy hace lo que se
+espera** en el navegador más estricto.
+
+> **Si no tienes a mano un Mac o un iPhone**, actívalo a propósito en Chrome:
+> *Configuración → Privacidad y seguridad → Cookies de terceros → Bloquear*.
+
+Si aun así te expulsa, el proxy no está sirviendo la API desde el mismo origen:
+comprueba en las herramientas de desarrollo (pestaña **Red**) que las llamadas
+van a `…/api/…` de **tu misma dirección**, y no a una dirección `…onrender.com`
+distinta. Si van a otra, `VITE_API_URL` no quedó en `/api` al construir.
+
+**10) Una descarga y una importación.** Entra a una ficha de personas y descarga
+la **plantilla de carga masiva**; luego intenta importar un archivo de varios
+MB. Son las dos operaciones que pasan por el proxy con un cuerpo o una respuesta
+grandes, y las que delatarían un límite mal puesto (un `413` al subir, o una
+descarga cortada a medias).
+
+**11) Recién entonces, comparte la dirección del frontend.**
 
 ---
 
-## Paso 9 — Copias de seguridad de la base de datos
+## Paso 9 — Copias de seguridad
 
-**Esto no venía en la versión anterior de esta guía, y es lo que separa una
-instalación de prueba de una que puede perder datos de verdad.** Railway **no
-hace copias automáticas por omisión**: hay que activarlas.
+Render ofrece **dos mecanismos distintos**, y conviene no confundirlos porque
+protegen de cosas distintas.
 
-1. Entra al servicio **PostgreSQL** → pestaña **"Backups"**.
-2. Activa al menos un calendario. Puedes tener varios a la vez:
+### A. Recuperación a un punto en el tiempo (PITR) — automática
 
-   | Calendario | Frecuencia | Se conserva |
-   |---|---|---|
-   | Diario | cada 24 h | 6 días |
-   | Semanal | cada 7 días | 27 días |
-   | Mensual | cada 30 días | 89 días |
+Render **respalda continuamente** las bases de pago y permite restaurarlas a un
+momento concreto del pasado. **No hay que activarla**, pero sí conocer su límite:
 
-   Para datos de inscripciones reales, **el diario es lo mínimo razonable**, y
-   conviene sumar el mensual.
+| Plan del espacio de trabajo | Ventana de recuperación |
+|---|---|
+| **Hobby** | los últimos **3 días** |
+| Pro o superior | los últimos **7 días** |
 
-**Cómo restaurar una copia** (es un proceso con confirmación, no un botón que
-borra lo actual):
+**Las bases en plan Free no tienen PITR en absoluto.**
 
-1. En la pestaña **"Backups"**, busca la copia por su fecha y haz clic en **Restore**. Tarda entre segundos y unos minutos.
-2. Revisa los cambios preparados con **Details**, arriba en el lienzo del proyecto.
-3. La restauración crea un **volumen nuevo** con la fecha de la copia, montado donde estaba el original. **El volumen original no se borra**: queda en el proyecto, desmontado.
-4. Haz clic en **Deploy** para aplicar y redesplegar el servicio.
+**Para restaurar:** en la página **Recovery** de la base → sección *Point-in-Time
+Recovery* → **Restore Database**. Render **crea una instancia nueva** con el
+estado de ese momento; la original **no se toca**. Eso te deja comprobar la copia
+antes de cambiar nada. Si está bien, apuntas los servicios a la nueva; si no, la
+borras y pruebas con otra hora. No puedes restaurar a un momento de los últimos
+diez minutos.
 
-**Límites que conviene saber de antemano:**
+### B. Respaldo lógico descargable — tu copia fuera de Render
 
-- Una copia **manual** no puede superar el **50 %** del tamaño total del volumen.
-- Una copia solo se puede restaurar **en el mismo proyecto y entorno**.
-- **Vaciar un volumen borra todas sus copias.**
-- Las copias más recientes que el punto restaurado se quedan en el volumen original: no se copian al nuevo.
+Esto es lo que resuelve el hueco que esta guía tenía abierto: **una copia que no
+vive en el proveedor**.
 
-> **Una copia dentro de Railway no es una copia fuera de Railway.** Si el riesgo
-> que te preocupa es perder la cuenta (crédito agotado, cierre, error de
-> facturación), una copia que vive en el mismo proveedor no te protege. Para eso
-> hace falta un respaldo externo con `pg_dump` contra la base. **El repositorio no
-> trae ninguna herramienta ni script para esto**, así que es una decisión
-> pendiente (ver la última sección).
+**Crear y descargar:**
+
+1. Página **Recovery** de la base → **Create export**.
+2. Cuando esté listo aparece en la tabla de esa misma página, como un archivo
+   comprimido `.dir.tar.gz` con la fecha en el nombre (p. ej.
+   `2026-10-28T19_21Z.dir.tar.gz`).
+3. Pulsa el enlace de descarga y guárdalo en tu computador.
+
+> **Render los conserva solo 7 días**, en cualquier plan. Si no lo descargas,
+> desaparece. Y **no genera respaldos lógicos para bases en plan Free**.
+
+**Custodia — qué hacer con el archivo descargado:**
+
+- **Contiene todos los datos personales del sistema**: RUT, nombres, clubes,
+  inscripciones. Trátalo como el documento más sensible que maneja la federación.
+- Guárdalo en **al menos dos sitios** y que uno **no** sea tu computador: un
+  disco externo, o el almacenamiento en la nube de la federación con la carpeta
+  restringida a quien corresponda.
+- **No lo subas al repositorio** ni lo mandes por correo o chat.
+- **Ponle fecha en el nombre** y mantén una cadencia: uno antes de cada
+  actualización con migraciones, y uno mensual que se conserve.
+- Decide y escribe **cuánto tiempo** se conservan y **quién** puede acceder.
+
+**Restaurar un respaldo descargado.** Lee esto antes:
+
+> **El procedimiento borra y recrea los objetos de la base de destino.** No lo
+> uses sobre una base con datos importantes del mismo esquema. Si lo que quieres
+> es recuperar datos perdidos, usa **PITR** (opción A): casi siempre recupera
+> información más reciente que tu última exportación.
+
+1. Descarga el `.dir.tar.gz` desde la página **Recovery**.
+2. Consigue la **External Database URL** de la base de destino.
+3. Descomprime y restaura. Como tienes Docker Desktop, puedes hacerlo **sin
+   instalar nada**, desde la carpeta donde dejaste el archivo:
+
+   ```
+   tar -zxvf 2026-10-28T19_21Z.dir.tar.gz
+   ```
+
+   ```
+   docker run --rm -v "${PWD}:/respaldo" postgres:16-alpine pg_restore --dbname="PEGA_AQUI_LA_EXTERNAL_DATABASE_URL" --verbose --clean --if-exists --no-owner --no-privileges --format=directory "/respaldo/2026-10-28T19:21Z/NOMBRE_DE_LA_BASE"
+   ```
+
+   > **🔑 Ese comando lleva la contraseña de la base dentro de la URL.** No lo
+   > guardes en un archivo ni lo pegues en ningún chat. Bórralo del historial de
+   > la terminal cuando termines.
+
+   > **Si `tar` no te funciona**, descomprime con la misma imagen, sin instalar
+   > nada: `docker run --rm -v "${PWD}:/respaldo" postgres:16-alpine tar -zxvf /respaldo/2026-10-28T19_21Z.dir.tar.gz -C /respaldo`
+   >
+   > *Comprobado: la imagen `postgres:16-alpine` trae `pg_restore` 16.15,
+   > `pg_dump` y `tar`.*
+
+4. Comprueba la aplicación antes de dar por buena la restauración (Paso 8).
+
+**Practica esto una vez, antes de que haya datos reales.** Un respaldo que nunca
+se restauró no es un respaldo: es un archivo.
 
 ---
 
 ## Paso 10 — Si el despliegue falla: cómo recuperar el servicio
 
-Todo esto está en la pestaña **"Deployments"** del servicio, en los **tres puntos**
-al final de un despliegue anterior.
+**El despliegue nuevo falló o rompió algo → *Rollback*.**
+En la página del servicio, en su lista de despliegues, puedes volver a un
+despliegue anterior. El plan Hobby **conserva los 5 últimos**.
 
-**El despliegue nuevo falló y la web dejó de funcionar → *Rollback*.**
-Vuelve al despliegue anterior que sí funcionó. Restaura **la imagen y las
-variables** de ese momento, sin reconstruir nada. Tiene un plazo: Railway guarda
-las imágenes **24 h** en Trial/Free, **72 h** en Hobby, **120 h** en Pro. Pasado
-el plazo, la opción no aparece.
+**Quieres repetir el último intento → *Redeploy*.**
+Vuelve a construir desde el mismo código.
 
-**Pasó el plazo del rollback → *Redeploy*.**
-Vuelve a construir desde el mismo código y con las variables originales de ese
-despliegue. Tarda lo que tarde una construcción, pero no depende de la imagen
-guardada.
+**El servicio no arranca.** Mira los registros del despliegue. Si el problema es
+la configuración, la API lo dice explícitamente nombrando la variable:
+`Configuración inválida. Revise las variables de entorno:` seguido de la lista.
 
-**El despliegue quedó en *Crashed*.**
-El proceso terminó con código distinto de cero. Railway reintenta solo hasta 10
-veces según la política de reinicios y luego avisa por correo. Puedes usar el
-botón **"Restart"** que aparece en línea sobre el despliegue: restaura la imagen
-exacta de esa construcción.
+**Perdiste o corrompiste datos → PITR o un respaldo descargado** (Paso 9).
 
-**La construcción se está demorando y quieres detenerla → *Abort deployment*.**
-
-**Perdiste o corrompiste datos → restaura una copia** (Paso 9).
-
-> **Un reinicio no arregla una migración a medias.** Si el fallo fue en
+> **Un rollback no deshace una migración.** Si el fallo fue en
 > `prisma migrate deploy`, volver atrás la imagen **no deshace** lo que la
-> migración ya escribió en la base. Ese caso se resuelve restaurando una copia de
-> seguridad anterior a la migración, y por eso el Paso 9 va antes que cualquier
-> actualización con migraciones.
+> migración ya escribió en la base. Ese caso se resuelve con PITR a un momento
+> anterior a la migración, y por eso el Paso 9 va antes que cualquier
+> actualización.
 
 ---
 
 ## Actualizar la aplicación en el futuro
 
-Cuando quieras subir cambios (por ejemplo, si te comparten una versión nueva del
-proyecto):
-
-1. **Antes de nada, haz una copia de seguridad manual** de la base (Paso 9), sobre todo si la versión nueva trae migraciones.
+1. **Primero, crea y descarga un respaldo** (Paso 9B), sobre todo si la versión nueva trae migraciones.
 2. Reemplaza los archivos en tu carpeta local por los nuevos.
-3. En VS Code, ve al ícono de **Source Control**.
-4. Vas a ver la lista de archivos que cambiaron. Escribe un mensaje corto describiendo el cambio (ej. "actualización") en el cuadro de texto de arriba.
-5. Haz clic en el botón de **"Commit"** (el ✓) y luego en **"Sync Changes" / "Sincronizar cambios"**.
-6. Railway detecta el cambio en GitHub y vuelve a desplegar los servicios cuyos *watch paths* coincidan.
-7. **Si la versión nueva trae migraciones**, aplícalas con el comando 1 del servicio de mantenimiento (Paso 6.b). El arranque de la API **no migra solo**, a propósito. El comando 3 —el administrador— **no se repite nunca**.
-8. Comprueba con el Paso 8. Si algo salió mal, Paso 10.
+3. En VS Code, **Source Control** → mensaje corto → **Commit** → **Sync Changes**.
+4. Render detecta el cambio y vuelve a desplegar los servicios cuyos *build filters* coincidan.
+5. **Si la versión nueva trae migraciones**, ejecútalas con el comando 1 del Paso 6.b. El arranque de la API **no migra solo**, a propósito. El comando 3 —el administrador— **no se repite nunca**.
+6. Comprueba con el Paso 8. Si algo salió mal, Paso 10.
 
-> **Si usas la Opción B** (imágenes prearmadas), este flujo no aplica: hay que
-> reconstruir y volver a publicar las imágenes a mano, y luego actualizar el tag
-> en Railway.
+> **Si cambian los avisos de licencias**, hay que redistribuirlos antes de subir:
+> `node scripts/distribuir-avisos.mjs`. La integración continua lo comprueba y
+> falla si las copias quedaron desactualizadas.
 
 ---
 
 ## Problemas comunes y solución
 
-**La construcción falla con un error en una línea `COPY avisos/…`**
-→ Falta la copia de los avisos dentro del contexto. En tu computador, ejecuta
-`node scripts/distribuir-avisos.mjs` en la carpeta del proyecto, y sube el
-resultado a GitHub (Source Control → Commit → Sync Changes). La integración
-continua también lo avisa con `node scripts/distribuir-avisos.mjs --verificar`.
+**La construcción falla en una línea `COPY avisos/…`**
+→ Falta la copia de los avisos dentro del contexto. En tu computador ejecuta
+`node scripts/distribuir-avisos.mjs` y sube el resultado a GitHub.
 
-**El servicio del backend construye bien, pero "arranca y termina" sin servir nada**
-→ Se construyó la imagen de mantenimiento en lugar de la API. Revisa que el
-servicio del Paso 6 **no** tenga la variable `RAILWAY_DOCKERFILE_PATH`: esa va
-únicamente en el servicio del Paso 6.b.
+**El servicio de la API construye bien, pero «arranca y termina» sin servir nada**
+→ Se construyó la imagen de mantenimiento. Revisa que `fchmn-api` tenga
+**Dockerfile Path** = `Dockerfile`, no `Dockerfile.mantenimiento`.
 
-**El servicio de mantenimiento arranca una API en vez de migrar**
-→ Lo contrario: no está usando el archivo derivado. Comprueba que
-`RAILWAY_DOCKERFILE_PATH=Dockerfile.mantenimiento` esté en *ese* servicio,
-escrita exactamente así.
+**El servicio de mantenimiento levanta una API en vez de ejecutar el comando**
+→ Lo contrario: su **Dockerfile Path** debe ser `Dockerfile.mantenimiento`.
 
-**La construcción del servicio de mantenimiento dice que no encuentra el Dockerfile**
-→ Prueba con la ruta completa: `/backend/Dockerfile.mantenimiento`. Y confirma
-que el archivo esté en GitHub: lo genera
-`node scripts/generar-dockerfile-mantenimiento.mjs` y tiene que estar subido.
+**El cron job se ejecutó solo**
+→ **Es lo esperado**: es un servicio programado y el calendario lo dispara una
+vez al año. Abre el registro de esa ejecución y mira **qué comando corrió**. Si
+dice `Mantenimiento en reposo: sin accion.`, no pasó nada y no hay nada que
+hacer. Si corrió otra cosa, significa que **no se vació el campo *Docker Command*
+tras el último mantenimiento**: es el paso 6 del procedimiento. Vacíalo ahora y
+comprueba en qué estado quedó la base.
 
-**El servicio de mantenimiento se redespliega una y otra vez**
-→ Le falta **Restart Policy = `NEVER`** (Paso 6.b.4). Railway está tomando su
-salida normal por una caída.
+**Tras iniciar sesión, al recargar vuelvo a la pantalla de ingreso**
+→ El navegador no está devolviendo la cookie de sesión. Con el proxy, la causa
+más probable es la **ruta** de la cookie: en las herramientas de desarrollo,
+pestaña **Red**, mira la respuesta del login y comprueba que `Set-Cookie` diga
+`Path=/api/auth`. Si dice `Path=/auth`, falta la reescritura `proxy_cookie_path`
+en la plantilla de Nginx, y la cookie nunca se enviará de vuelta.
+→ Comprueba también que las llamadas van a `…/api/…` **de tu misma dirección**.
+Si van a otra dirección `…onrender.com`, `VITE_API_URL` no quedó en `/api` al
+construir y vuelves a tener cookies de terceros.
 
-**El despliegue del backend falla con un error sobre la base de datos**
-→ Revisa que `DATABASE_URL` esté conectada **por referencia** al servicio de
-Postgres (Paso 6.5), no escrita a mano.
+**La web carga pero todo da error 502 o 504**
+→ El proxy no alcanza la API. Las tres causas, por orden de frecuencia:
+`API_INTERNA` con un nombre o puerto equivocado (cópialos del menú **Connect →
+Internal** de la API); los dos servicios en **regiones distintas**; o la **API en
+plan Free**, que no recibe tráfico por la red privada.
 
-**El backend no arranca y en los registros hay una lista de variables con errores**
-→ Es la validación de configuración, que corre al arrancar y falla a propósito en
-vez de levantar mal configurado. El mensaje dice **qué variable y por qué**. Los
-cuatro casos más frecuentes: `CORS_ORIGINS` vacía en producción, `CORS_ORIGINS`
-con una barra final, `AUTH_COOKIE_SECURE=false` en producción, y
+**Una importación falla con «413» o «Request Entity Too Large»**
+→ El archivo supera el límite del proxy (20 MB). La API acepta hasta 15 MB, así
+que un archivo entre 15 y 20 MB lo rechazará la aplicación con su propio
+mensaje, y por encima de 20 MB lo corta Nginx. Si de verdad hacen falta archivos
+mayores, hay que subir los dos límites, no solo uno.
+
+**Después de redesplegar la API, la web da 502 un rato**
+→ Es esperable mientras la API arranca. Si persiste más de un minuto, mira los
+registros de la API: lo más probable es que no esté arrancando (ver la entrada
+de variables con errores).
+
+**El despliegue de la API falla con un error sobre la base de datos**
+→ Revisa que `DATABASE_URL` esté **enlazada** a `fchmn-postgres`, no escrita a
+mano, y que ambos estén en la **misma región**.
+
+**La API no arranca y los registros listan variables con errores**
+→ Es la validación de configuración, que falla a propósito en vez de levantar mal
+configurado. Los casos más frecuentes: `CORS_ORIGINS` vacía en producción,
+`CORS_ORIGINS` con barra final, `AUTH_COOKIE_SECURE=false` en producción, y
 `JWT_ACCESS_SECRET` demasiado corto o con aspecto de valor de ejemplo.
 
 **El frontend carga pero el login da error de conexión**
-→ Revisa que `VITE_API_URL` (Paso 7.6) tenga exactamente la dirección pública del
-backend del Paso 6.6, sin `/` al final — y recuerda que **hay que volver a
-desplegar** el frontend después de cambiarla.
+→ `VITE_API_URL` debe tener exactamente la dirección de la API, sin `/` final — y
+**hay que volver a desplegar** el frontend después de cambiarla.
 
-**Aparece "Comprobación de seguridad fallida" al iniciar sesión**
-→ Casi siempre `CORS_ORIGINS` no coincide exactamente con la dirección del
-frontend. Ver el recuadro de CSRF en el Paso 6.
+**Aparece «Comprobación de seguridad fallida» al iniciar sesión**
+→ Casi siempre `CORS_ORIGINS` no coincide exactamente con la dirección de la web.
 
 **La sesión se cierra sola en cada recarga**
-→ El navegador está descartando la cookie. Comprueba que `AUTH_COOKIE_SAMESITE`
-sea `none` y que **no** hayas definido `AUTH_COOKIE_SECURE=false`.
+→ Comprueba que `AUTH_COOKIE_SAMESITE` sea `lax` y que **no** hayas definido
+`AUTH_COOKIE_SECURE=false` (en producción el arranque lo rechaza).
 
 **Recargar la página en una ruta interna devuelve 404**
 → El servicio del frontend no está sirviendo la imagen de Nginx del proyecto.
-Revisa el Paso 7.4.
 
 **Todas las IP del registro de auditoría son la misma**
-→ Falta `TRUST_PROXY_HOPS=1` en el backend (Paso 6.5).
+→ Falta `TRUST_PROXY_HOPS=1` en la API.
 
-**`/ready` devuelve 503 pero `/health` responde bien**
-→ La API está viva y PostgreSQL no contesta. Mira el estado del servicio de base
-de datos y `DATABASE_URL`.
+**La primera visita del día tarda muchísimo**
+→ Estás en plan **Free**: el servicio se apagó tras 15 minutos sin tráfico y
+tiene que arrancar de nuevo. Es la razón principal para no usar Free en
+producción.
 
-**Me quedé sin crédito y la aplicación dejó de responder**
-→ Según la documentación de Railway, cuando el crédito llega a cero **la
-suscripción se cancela y se detienen las cargas de trabajo**. Entra a Railway →
-**Settings del proyecto → Billing** y contrata un plan. **No te confíes:** los
-datos del volumen se eliminan **30 días después del vencimiento** en Trial/Free.
-Si llevas tiempo sin entrar, restaura primero una copia de seguridad.
-
-**No sé si el archivo `.env` se subió a GitHub por error**
-→ Entra a tu repositorio en github.com y revisa la **raíz** y la carpeta
-**`backend`**. Si ves un archivo llamado `.env` (no `.env.example`), bórralo desde
-ahí mismo y **cambia de inmediato** los secretos que contenía: el
-`JWT_ACCESS_SECRET`, la contraseña de la base y las credenciales del
-administrador. Borrarlo del repositorio **no lo quita del historial**: pide ayuda
-a quien te compartió el proyecto para limpiarlo.
-
-**Quiero usar mi propio dominio (ej. www.mifederacion.cl)**
-→ En el servicio del frontend, ve a **Settings → Networking → + Custom Domain**.
-Railway te dará **dos registros DNS: un `CNAME` y un `TXT`**, y **los dos son
-obligatorios** — si falta el `TXT`, el dominio no se verifica y las peticiones
-devuelven 404 aunque el `CNAME` resuelva. El certificado SSL (Let's Encrypt) se
-emite solo, normalmente dentro de la hora siguiente a que el DNS esté correcto, y
-se renueva automáticamente. Dos límites de plan: **Trial permite 1 dominio
-propio** (así que no puedes tener `midominio.cl` y `www.midominio.cl` a la vez) y
-**Hobby permite 2 por servicio**. Si pones también el backend en tu dominio
-(p. ej. `api.midominio.cl`), acuérdate de actualizar `CORS_ORIGINS` y
-`VITE_API_URL`, y de volver a desplegar el frontend.
+**La base dejó de existir**
+→ Si era **Free**, caducó a los 30 días. Hay 14 días de gracia para pasarla a un
+plan de pago antes de perderla.
 
 ---
 
+## Un dominio propio: mejora posterior, no requisito
+
+Con el proxy del Paso 7, **el problema de las cookies de terceros no existe**:
+el navegador ve una sola dirección y no hay nada que ningún navegador pueda
+bloquear. Un dominio propio deja de ser una necesidad técnica y pasa a ser lo
+que siempre debió ser: una decisión de imagen y de continuidad.
+
+**Qué aportaría, cuando lo tengas:**
+
+- Una dirección presentable para una federación nacional, en vez de
+  `…onrender.com`.
+- Independencia del nombre del proveedor: si algún día se cambia de plataforma,
+  la dirección que conocen los clubes no cambia.
+
+**Qué costaría:** el dominio. Un `.cl` ronda los **CLP 10.000 + IVA al año**
+(conviene confirmarlo en nic.cl o con un registrador: no verifiqué la tarifa
+vigente). En Render, **US$0 extra**: el plan Hobby incluye 2 dominios propios y
+emite los certificados HTTPS solo.
+
+**Qué habría que hacer:** añadir el dominio al servicio de la **web** —solo a
+ese: la API ya no necesita dirección pública—, crear en el DNS el `CNAME` **y**
+el `TXT` que indique Render (**los dos son obligatorios**; sin el `TXT` el
+dominio devuelve 404 aunque el `CNAME` resuelva), y luego cambiar
+`CORS_ORIGINS` en la API por la dirección nueva y volver a desplegar la web.
+`VITE_API_URL` sigue siendo `/api` y no se toca, porque es una ruta relativa:
+esa es otra ventaja del proxy.
+
+**Qué habría que mantener:** renovar el dominio cada año. Si caduca, el sistema
+deja de ser accesible. Conviene dejar escrito quién controla el registro y el
+DNS.
+
+**Cuándo hacerlo:** cuando haya un dominio confirmado y alguien responsable de
+renovarlo. No hay ninguna urgencia técnica.
+
 ## Qué se comprobó y qué no
 
-### Comprobado con las imágenes reales
+### Comprobado, con las imágenes reales
 
-Todo esto se ejecutó en una máquina de desarrollo con Docker, contra una **base
-de datos desechable** creada y destruida para la prueba (nunca contra datos
-reales):
+Ejecutado en una máquina de desarrollo con Docker, contra una **base de datos
+desechable** creada y destruida para la prueba (nunca contra datos reales):
 
 - `docker build ./backend` **sin elegir etapa** produce la imagen de la API
   (`CMD` = `node dist/server.js`, con `dist/server.js` dentro y **sin** el CLI de
-  Prisma). Antes producía la de migraciones.
+  Prisma).
 - `docker build -f backend/Dockerfile.mantenimiento ./backend` produce la de
   mantenimiento (`CMD` = `prisma migrate deploy …`), con `prisma` en el `PATH`,
   solo `seed.js` y `seed-admin.js` compilados —**ningún seed de datos de
-  prueba**— y **sin** `dist/`: no puede servir la API, y la API no puede migrar.
-  La separación entre las dos sigue intacta.
-- Esa imagen derivada es **idéntica capa por capa y configuración por
-  configuración** a la de `docker build --target migrate ./backend`: la etapa que
-  añade el archivo derivado es un alias y no agrega ni quita nada.
-- El archivo derivado **no construye la etapa `runtime`**: se comprobó que no
-  aparece en el registro de construcción, porque la etapa final no depende de ella.
-- `node scripts/generar-dockerfile-mantenimiento.mjs --verificar` confirma que el
-  archivo derivado coincide con su fuente, y detecta la divergencia si no.
-- `docker build ./frontend` produce la imagen de Nginx, y el contenedor obedece
-  `PORT`: con `PORT=8099` sirve `/`, devuelve `index.html` en `/competencias`
-  (*fallback* de SPA) y 404 en un activo inexistente.
-- Los avisos de terceros están dentro de las cuatro rutas esperadas y son
-  **idénticos byte a byte** a `notices/backend.txt`, `notices/migrate.txt`,
-  `notices/frontend-web.txt` y `notices/frontend-image.txt`.
-- Las guardas del proyecto siguen conformes: `verificar-archivos-de-imagen.mjs`,
-  `contraprueba-dockerignore.mjs`, los 852 tests unitarios del backend y la
-  comprobación de tipos.
-- `docker compose build` y `docker compose --profile mantenimiento build migrate`
-  siguen produciendo cada uno su imagen correcta: **el entorno local no cambió**.
+  prueba**— y **sin `dist/`**.
+- La imagen derivada es **idéntica capa por capa y configuración por
+  configuración** a `docker build --target migrate ./backend`.
+- Los avisos de terceros están en las cuatro rutas esperadas y son **idénticos
+  byte a byte** a los de `notices/`.
 - La secuencia completa del Paso 6.b: migraciones aplicadas, datos de referencia
-  sembrados, el administrador creado, y repetir ese último comando **no** lo
-  modifica. Sin `SEED_ADMIN_*`, se niega a ejecutarse (código de salida 1).
+  sembrados, administrador creado; repetir ese último comando **no** lo modifica;
+  sin `SEED_ADMIN_*` termina con **código de salida 1**.
 - La API arranca en modo producción y responde `/health` y `/ready`; `/docs`
-  devuelve 404 (apagada en producción); y **se inició sesión con éxito** con el
-  administrador creado. Con `CORS_ORIGINS` ausente o `AUTH_COOKIE_SECURE=false`,
-  el arranque se detiene nombrando la variable.
+  devuelve 404; **se inició sesión con éxito**. Con `CORS_ORIGINS` ausente o
+  `AUTH_COOKIE_SECURE=false`, el arranque se detiene nombrando la variable.
+- El frontend obedece `PORT`, sirve `/`, devuelve `index.html` en `/competencias`
+  y 404 en un activo inexistente.
+- La integración continua pasa en limpio sobre GitHub (commit `48bdeb9`).
+- `onrender.com` figura en la *Public Suffix List*, lo que confirma que dos
+  direcciones `…onrender.com` son **sitios distintos** para el navegador — el
+  motivo por el que existe el proxy del Paso 7.
+
+### El proxy de mismo origen: pruebas HTTP
+
+Con el entorno completo levantado en local (PostgreSQL desechable, la API en
+modo producción con `TRUST_PROXY_HOPS=2` y `AUTH_COOKIE_SAMESITE=lax`, y la web
+construida con `VITE_API_URL=/api`), **con una herramienta de línea de
+comandos**:
+
+- **Rutas de la web:** `/`, `/competencias` y `/clubes` devuelven **200** y
+  entregan `index.html`; `/third-party-notices.txt` **200**; un activo
+  inexistente **404**.
+- **La API bajo el mismo origen:** `/api/health` **200**, `/api/ready` **200**
+  con `database: ok`, `/api/docs` **404** (apagada en producción).
+- **Reescritura de la ruta de las cookies:** el login devuelve las dos cookies
+  con `Path=/api/auth`, `HttpOnly; Secure; SameSite=Lax`. Sin la directiva
+  `proxy_cookie_path` llegarían con `Path=/auth` y el navegador no las
+  devolvería nunca.
+- **Ciclo de sesión completo:** login **200** → cambio de contraseña **200** →
+  renovación **200** con un token nuevo y la cookie rotada → cierre de sesión
+  **204**, que borra ambas cookies (también con el `Path` reescrito).
+- **Descarga:** la plantilla Excel de carga masiva llega con su
+  `Content-Type` de hoja de cálculo, su `Content-Disposition` intacto y una
+  firma de archivo válida.
+- **Importación y tamaño del cuerpo:** un archivo de **5 MB** —que el límite por
+  omisión de Nginx, 1 MB, habría cortado— llega entero y lo rechaza **la
+  aplicación** por su contenido; uno de **25 MB** lo corta Nginx con **413**. El
+  límite actúa donde debe.
+- **Dirección del usuario con dos saltos:** con `TRUST_PROXY_HOPS=2`, una
+  petición en la que el borde declara `190.44.12.77` queda auditada con esa IP;
+  y otra en la que el cliente intenta colar `9.9.9.9` por delante queda auditada
+  igualmente con `190.44.12.77`. La IP inventada se descarta.
+- **El resolutor DNS** se genera al arrancar a partir de `/etc/resolv.conf`, y
+  `envsubst` sustituye la dirección de la API dejando intactas las variables de
+  Nginx.
+
+### Por qué la API va como servicio privado: la prueba
+
+Mismo entorno local, con la API expuesta además en un puerto propio para
+reproducir qué pasaría si tuviera dirección pública. En los dos casos el
+atacante inyecta `X-Forwarded-For: 203.0.113.66` y el borde le añade su IP real
+`198.51.100.9`:
+
+| Camino | IP auditada |
+|---|---|
+| **Directo a la API** | **`203.0.113.66`** — la inventada |
+| Por la web, a través del proxy | `198.51.100.9` — la real |
+
+Y el efecto sobre el límite de `/auth` (20 por minuto y por IP), con 30 intentos
+contra un usuario inexistente para aislarlo del bloqueo de cuenta:
+
+| 30 intentos | Procesados (401) | Bloqueados (429) |
+|---|---|---|
+| **Directos, rotando la IP inventada** | **30** | **0** |
+| Directos, con IP fija | 20 | 10 |
+| Por el proxy, rotando la IP inventada | 20 | 10 |
+
+Con la API pública, la defensa contra el ensayo masivo de contraseñas **se anula
+por completo**. Por el proxy, el ataque no cambia nada. De ahí que la API vaya
+como *Private Service*.
+
+- También se revisó el código: la aplicación **no usa** el protocolo ni el
+  nombre de dominio de la petición en ningún punto (`req.protocol`,
+  `req.hostname`). Lo único que depende de las cabeceras reenviadas es `req.ip`,
+  que alimenta la auditoría y el límite de tasa.
+
+### El proxy de mismo origen: prueba en un navegador real
+
+Esto **sí es una prueba de navegador**, y es distinta de las anteriores. En un
+navegador de verdad, contra ese mismo entorno local:
+
+- Se **inició sesión desde la interfaz** y se llegó al panel de administración.
+- Se **recargó la página** navegando directamente a `/dashboard` y a `/clubes`:
+  **la sesión se mantuvo** en ambos casos.
+- En el registro de red del navegador, **todas** las llamadas van a
+  `/api/…` **del mismo origen** que la web. No hay ni una sola petición entre
+  sitios.
+- La renovación automática tras recargar devuelve **200** (en la primera visita,
+  sin sesión, devuelve 401 y la aplicación muestra el login, que es lo correcto).
+
+Es exactamente el flujo que falla cuando la cookie es de terceros, y aquí
+funciona.
+
+### Lo local sigue igual
+
+- `docker compose config` y `docker compose build` correctos; la imagen de la
+  web conserva `VITE_API_URL=http://localhost:3000` compilado dentro, así que el
+  uso local no cambia: el navegador sigue llamando a la API por su puerto
+  publicado. El proxy queda además disponible en `/api` para comprobarlo.
+- El servicio `migrate` de Compose conserva `prisma migrate deploy` como
+  comando.
+- **El comando por omisión de la imagen de mantenimiento no toca la base.**
+  Ejecutada **sin red alguna** (`--network none`) y con `DATABASE_URL` definida,
+  imprime su mensaje y termina con **código 0**: ni siquiera intenta conectar. El
+  mismo contenedor, con el comando de migraciones y en las mismas condiciones,
+  falla con `P1001: Can't reach database server`. Y ejecutada contra una base
+  vacía, la deja con **las mismas cero tablas**.
+- **Los tres comandos explícitos siguen funcionando** sobre esa misma imagen: 31
+  tablas tras migrar, 17 permisos tras el seed de referencia, 1 usuario tras el
+  de administrador, y **código de salida 1** sin `SEED_ADMIN_*`.
+- **Regenerar el `Dockerfile` de mantenimiento conserva el comportamiento**: el
+  generador es idempotente y su `--verificar` queda conforme; una prueba
+  automática (`backend/tests/dockerfile-mantenimiento.test.ts`) vigila que la
+  fuente siga terminando en `runtime`, que conserve `prisma migrate deploy` para
+  Compose, y que el comando por omisión del derivado **no** nombre `prisma`,
+  `migrate`, `dist-seed` ni `seed-admin`. Se comprobó que esa prueba **falla**
+  si se devuelve el comando peligroso al archivo derivado.
+- También se comprobó que la variante `/bin/sh -c echo "…"` imprime una línea
+  vacía, por lo que el instructivo no la usa.
+- **Inicio y renovación de sesión, contra la API real** y con un origen cruzado
+  declarado en `CORS_ORIGINS`:
+  - `POST /auth/login` → **200**, con `Set-Cookie` de las dos cookies marcadas
+    `HttpOnly; Secure; SameSite=None`, `Path=/auth`, y
+    `Access-Control-Allow-Credentials: true`.
+  - `POST /auth/refresh` con la cookie y la cabecera `X-CSRF-Token` → **200**,
+    con un token de acceso **nuevo y distinto** del anterior y la cookie de
+    refresco rotada. La renovación funciona.
+  - La misma renovación **sin la cookie** → **401**, *«No hay una sesión activa
+    en este navegador»*.
+  - La misma renovación **sin la cabecera CSRF** → **403**, *«Comprobación de
+    seguridad fallida»*: la protección sigue activa.
+
+  > **Estas cuatro son pruebas HTTP, no pruebas de navegador.** Describen lo que
+  > hace el servidor ante una petición con o sin cookie, hecha con una
+  > herramienta de línea de comandos. **No demuestran** cómo se comportará
+  > ningún navegador real: ni si enviará la cookie, ni si la guardará, ni qué
+  > hará su política de cookies de terceros. Eso solo se sabe con el sistema
+  > desplegado y un navegador delante.
+- **Las herramientas de restauración del Paso 9** existen en `postgres:16-alpine`
+  (`pg_restore` 16.15, `pg_dump`, `tar`), así que el respaldo se puede restaurar
+  sin instalar nada en el computador.
 
 ### No comprobado
 
-- **Nada se desplegó en Railway.** No se creó cuenta, proyecto ni servicio, y no
-  se contrató nada. Todos los pasos que ocurren dentro del panel de Railway están
-  escritos a partir de su documentación oficial, no de una ejecución.
-- **Si `RAILWAY_DOCKERFILE_PATH` se interpreta relativo al directorio raíz del
-  servicio o a la raíz del repositorio.** Su documentación muestra las dos formas
-  —`Dockerfile.origin` y `/build/Dockerfile`— sin decir cuál rige cuando hay un
-  directorio raíz configurado. El Paso 6.b indica la primera, que es la coherente
-  con «buscamos un archivo llamado Dockerfile en el directorio raíz», y da la
-  segunda como alternativa si la construcción no encuentra el archivo. Las dos
-  están documentadas: el riesgo es un intento fallido, no un camino sin salida.
-- **Que no exista alguna forma no documentada** de pasar contextos adicionales o
-  de elegir la etapa en Railway. Se revisaron su documentación de Dockerfiles, de
-  construcciones y su referencia de configuración, y no aparece en ninguna.
-- **El consumo real y, por tanto, el costo mensual.** Depende del uso.
+- **Nada se desplegó en Render.** No se creó cuenta, proyecto ni servicio, y no
+  se contrató nada. **Todos los pasos 4 a 10 vienen de la documentación oficial**,
+  no de una ejecución. Los nombres exactos de campos y botones pueden diferir.
+- **Si guardar el campo *Docker Command* dispara un despliegue o una ejecución.**
+  La documentación de Render no lo dice. Para las **variables de entorno** sí
+  está documentado que guardar lanza un despliegue salvo que se elija *Save only*.
+  El procedimiento del Paso 6.b está escrito para que esa incógnita no importe.
+- **Si suspender un cron job impide sus ejecuciones programadas.** La
+  documentación de Render no lo dice, así que esta guía **no** se apoya en ello:
+  usa `Auto-Deploy: Off`, que sí está documentado.
+- **Que Render permita a un servicio web hacer de proxy hacia otro por la red
+  privada.** Su documentación dice que los servicios de la misma región y
+  espacio de trabajo pueden hablar entre sí por esa red, y que los servicios web
+  Free **no la reciben**, pero **no describe este uso concreto**. Es el supuesto
+  central del Paso 7 y **el primero que hay que comprobar al desplegar**: es el
+  paso 3 del Paso 8.
+- **El valor y el formato exactos de la dirección interna de un servicio
+  privado.** La guía indica `fchmn-api:3000` porque fija `PORT=3000` en el
+  propio servicio, en vez de depender del comportamiento de `PORT` para
+  servicios privados, que Render no documenta. El valor que muestre su *Service
+  Address* manda sobre eso.
+- **Que un servicio privado con comprobación TCP se considere sano** con esta
+  imagen. La documentación dice que a los privados solo se les aplica esa
+  comprobación; la API abre su puerto al arrancar, así que debería bastar, pero
+  no está probado.
+- **El comportamiento en Safari del sistema desplegado.** Con el proxy *no
+  debería* haber problema, porque no hay cookies de terceros, y en un navegador
+  real contra el entorno local la sesión se mantuvo. Pero eso fue con un solo
+  origen en `localhost`: **confirmarlo en el despliegue real sigue siendo el
+  paso 9 del Paso 8**.
+- **El comportamiento con HTTPS real.** Las pruebas locales corrieron sobre
+  `http://localhost`, que los navegadores tratan como contexto seguro y por eso
+  aceptan cookies `Secure`. En Render habrá HTTPS de verdad; no se espera
+  diferencia, pero no está probado.
+- **Si 512 MB le bastan a la API.** Es una estimación; el salto siguiente es
+  US$25/mes.
+- **El consumo real** de tráfico, almacenamiento y minutos de construcción, y por
+  tanto si habrá excedentes sobre el estimado de US$21.
+
+---
 
 ## Qué falta decidir antes de desplegar
 
-Son decisiones que el repositorio no toma por ti.
-
-1. **Qué plan se contrata**: el Trial no sirve para datos reales (un solo crédito
-   de US$5, volumen de 0,5 GB, y las imágenes para *rollback* solo duran 24 h).
-2. **Respaldo fuera del proveedor**: el repositorio **no trae** ningún script de
-   `pg_dump` ni procedimiento de respaldo externo. Si los datos importan, hay que
-   definirlo.
-3. **Dominio propio**: si se va a usar uno, conviene decidirlo **antes**, porque
-   cambia `CORS_ORIGINS`, `VITE_API_URL` y —si backend y frontend quedan bajo el
-   mismo sitio— permite volver `AUTH_COOKIE_SAMESITE` a `lax`, que es más seguro.
-4. **Quién recibe los avisos de caída**: Railway solo comprueba la salud **al
-   desplegar**, no de forma continua. No hay ninguna monitorización configurada en
-   este proyecto.
+1. **Plan Free para ensayar, o de pago desde el principio.** Free sirve para
+   comprobar que todo funciona; no sirve para datos reales (se apaga solo, caduca
+   a los 30 días y no tiene ninguna copia de seguridad).
+2. **La política de respaldos externos**: con qué cadencia se descargan, dónde se
+   guardan, cuánto se conservan y quién puede acceder (Paso 9B).
+3. **Nada: lo de las cookies ya está decidido.** El proxy del Paso 7 lo
+   resuelve, y no hace falta dominio propio para ello. Un dominio sigue siendo
+   deseable por imagen y continuidad, pero puede esperar: ver «Un dominio
+   propio: mejora posterior, no requisito».
+4. **Quién recibe los avisos de caída.** Render comprueba la salud **al
+   desplegar**, no de forma continua. No hay ninguna monitorización configurada.

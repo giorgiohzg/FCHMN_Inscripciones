@@ -84,12 +84,37 @@ FROM nginx:${NGINX_VERSION}@${NGINX_DIGEST} AS runtime
 
 # La plantilla se procesa con `envsubst` al arrancar (mecanismo propio de la
 # imagen oficial de Nginx: todo lo que esté en /etc/nginx/templates/*.template).
-# `NGINX_ENVSUBST_FILTER` restringe la sustitución a PORT; sin él, `envsubst`
-# vaciaría también `$uri`, `$host` y demás variables de Nginx.
+# `NGINX_ENVSUBST_FILTER` restringe la sustitución a las DOS variables que la
+# plantilla espera; sin él, `envsubst` vaciaría también `$uri`, `$host`,
+# `$proxy_add_x_forwarded_for` y demás variables de Nginx.
+#
+# El filtro es una expresión regular que se compara con el NOMBRE de cada
+# variable del entorno. Va anclada (`^...$`) para que no alcance por accidente a
+# cualquier otra que contenga esas palabras.
 ENV PORT=80
-ENV NGINX_ENVSUBST_FILTER=PORT
+ENV NGINX_ENVSUBST_FILTER="^(PORT|API_INTERNA)$"
+
+# DIRECCIÓN INTERNA DE LA API, para el proxy de `/api`.
+#
+# El valor por omisión es el del entorno local con Docker Compose, donde la API
+# es el servicio `backend` y escucha en 3000. En la nube se sobrescribe con la
+# dirección interna que dé el proveedor, como variable del servicio: el nombre
+# no está escrito en ningún archivo del repositorio.
+#
+# No lleva esquema: la plantilla antepone `http://`. El tráfico entre servicios
+# va por la red privada del proveedor, donde no hay TLS que terminar.
+ENV API_INTERNA=backend:3000
 
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
+
+# Escribe la directiva `resolver` al arrancar, leyendo /etc/resolv.conf. Hace
+# falta porque el destino del proxy se pasa por una variable de Nginx, que es lo
+# que permite seguir al backend cuando cambia de dirección. El propio guion
+# explica el porqué con detalle.
+#
+# La imagen oficial ejecuta /docker-entrypoint.d/*.sh en orden; el `25-` lo deja
+# después del `20-` que completa la plantilla.
+COPY --chmod=0755 nginx/25-resolver.sh /docker-entrypoint.d/25-resolver.sh
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # AVISOS DE TERCEROS. Llegan desde `frontend/avisos/`, que está DENTRO del
