@@ -31,6 +31,11 @@ tu computador esté prendido.
 > las del commit, 38 claves foráneas sin una sola fila huérfana. El Paso 9B trae
 > el procedimiento exacto, con dos trampas que conviene leer antes de improvisar.
 >
+> **Pero ensayar no es tener respaldos.** La rutina es **manual** —exportar desde
+> Render, descargar y conservar 30 días—, ya tiene responsable, y **todavía le
+> faltan suplente y una cadencia confirmada**. Nada avisa si se deja de hacer. Es
+> el primer punto de «Qué falta decidir».
+>
 > **Lo que sigue sin comprobar** está reunido en «Qué se comprobó y qué no», al
 > final, junto con el detalle de cada prueba.
 >
@@ -83,6 +88,12 @@ código y hasta 25 servicios.
 | PostgreSQL, almacenamiento | 1 GB | **0,30** |
 | Mantenimiento (cron job) | **mínimo mensual por servicio** | **1** |
 | | **Total estimado** | **US$21,30** |
+
+> **El respaldo externo no añade costo**, porque se hace a mano: las
+> exportaciones de Render están incluidas en el plan de la base y se descargan
+> al equipo del responsable. Se evaluó automatizarlo —habría costado **US$1 más
+> al mes**— y se decidió aplazarlo; el Paso 9B explica qué se gana y qué se
+> pierde con cada vía.
 
 > **El almacenamiento de la base se cobra APARTE del cómputo**, y esto hay que
 > verlo venir. El formulario de PostgreSQL propone **15 GB por omisión**, que
@@ -1108,26 +1119,49 @@ cubre **3 días**. Eso significa que cualquier pérdida descubierta más tarde
 puede reparar con un archivo que esté fuera de Render**. Esta rutina existe para
 que ese archivo exista siempre.
 
-> ## ⚠️ Lo que sigue es una PROPUESTA, no una rutina vigente
+> ## ⚠️ Esta rutina es MANUAL, y eso tiene consecuencias
 >
-> **Las frecuencias y los plazos de retención de abajo están sin aprobar.** Son
-> una recomendación técnica: quién decide es la federación, porque la retención
-> de datos personales y el esfuerzo que se le dedica a esto son decisiones suyas,
-> no del instructivo.
+> **Decidido el 2026-10-29.** Las exportaciones se crean a mano en el panel de
+> Render, se descargan a mano y las copias externas se conservan **30 días**.
 >
-> **Hasta que se aprueben, no hay rutina de respaldo externo.** Lo único que hay
-> es lo que Render hace solo: PITR de 3 días y respaldos lógicos que se borran a
-> los 7. Eso no cubre una pérdida descubierta tarde.
+> **Se evaluó automatizarlo y se descartó por ahora** (ver «El respaldo
+> automático: evaluado y aplazado», más abajo). No hay ningún servicio nuevo, ni
+> cuenta de almacenamiento externo, ni vigilante.
+>
+> **Lo que eso significa, dicho sin adornos:** una rutina manual **no avisa
+> cuando no se hace**. Si pasa un mes sin que nadie descargue una copia, nada
+> falla, nada se pone rojo y nadie recibe un correo. El sistema sigue
+> funcionando igual de bien, y la protección simplemente deja de existir sin que
+> se note. Es el riesgo que se acepta al elegir esta vía, y la única defensa es
+> la disciplina de la persona responsable.
 
-#### Pendientes explícitos, sin los cuales nada de esto funciona
+#### Quién responde, y qué sigue pendiente
 
-| Pendiente | Estado | Por qué bloquea |
-|---|---|---|
-| **Responsable** | ⬜ **SIN ASIGNAR** | Una rutina sin una persona con nombre no se ejecuta. No vale «la federación» ni «la secretaría» |
-| **Suplente** | ⬜ **SIN ASIGNAR** | Sin suplente, la rutina se detiene en vacaciones, licencias o cualquier ausencia |
-| **Frecuencia** | ⬜ **POR APROBAR** | Ver la propuesta y la pérdida máxima que cubre cada opción |
-| **Retención** | ⬜ **POR APROBAR** | Afecta a datos personales: la decisión tiene consecuencias legales |
-| **Ubicación** | ⬜ **POR CONFIRMAR** | Hay que verificar que la carpeta elegida admite permisos restringidos reales |
+| | Estado |
+|---|---|
+| **Responsable** | ✅ **ASIGNADO** — el administrador del sistema, titular de la cuenta de Render y de este repositorio |
+| **Suplente** | ⬜ **PENDIENTE** |
+| **Frecuencia comprometida** | ⬜ **PENDIENTE DE CONFIRMAR** |
+| **Retención** | ✅ **DECIDIDA** — ventana móvil de 30 días |
+| **Quién revisa que se hizo** | ⬜ **PENDIENTE** |
+
+> **El nombre del responsable no se escribe aquí a propósito.** Este repositorio
+> es **público**: un nombre o un correo escrito en este archivo queda publicado y
+> en el historial de Git para siempre. El cargo identifica al responsable sin
+> exponer datos personales; el nombre va en la planilla interna de respaldos,
+> junto con el del suplente cuando se designe.
+
+> **Los tres pendientes no son del mismo tipo, y conviene no confundirlos.**
+>
+> - **El suplente** es lo más urgente de los tres. Hoy la rutina se detiene por
+>   completo en cualquier ausencia del responsable —vacaciones, una licencia, un
+>   viaje— y nada lo señala.
+> - **La frecuencia** es la pérdida máxima que se acepta. Está sin confirmar a
+>   propósito: la tabla siguiente dice qué cubre cada opción, y la elección es
+>   del responsable, no del instructivo.
+> - **Quién revisa** sustituye a la alarma que una rutina manual no tiene, y
+>   tiene que ser alguien **distinto** del responsable: nadie audita bien su
+>   propia disciplina.
 
 #### Qué pérdida cubre cada frecuencia
 
@@ -1138,7 +1172,7 @@ Esta es la pregunta que hay que responder para elegir, y no es técnica: es
 |---|---|
 | Mensual | **hasta un mes** de inscripciones, altas y cambios |
 | Semanal | **hasta una semana** |
-| **Diaria** | **hasta un día** |
+| Diaria | **hasta un día** |
 
 > **Atención: esa pérdida solo se materializa si la copia externa es el único
 > recurso.** Mientras Render esté disponible y el problema se descubra **dentro
@@ -1146,39 +1180,128 @@ Esta es la pregunta que hay que responder para elegir, y no es técnica: es
 > nada. La copia externa es el recurso para los otros dos casos: un problema
 > descubierto **después** de esos 3 días, o que no se pueda contar con Render.
 
-#### La propuesta
+#### La frecuencia: pendiente de confirmar
 
-| | Propuesta | Estado |
+**Ninguna cadencia está comprometida todavía.** Lo que sigue son opciones para
+que el responsable elija; hasta que lo haga, este instructivo **no afirma** que
+exista una frecuencia acordada.
+
+| Período | Opciones a considerar |
+|---|---|
+| Con inscripciones abiertas | diaria · cada dos días · semanal |
+| Resto del año | mensual · trimestral |
+| Ocasiones puntuales | **antes** de cada actualización con migraciones · al **cerrar** las inscripciones de cada competencia |
+
+> **Las ocasiones puntuales son las de mejor rendimiento por esfuerzo
+> invertido**, y por eso aparecen aparte: cubren exactamente los dos momentos en
+> que algo puede salir mal de forma masiva. Son dos copias al año por
+> competencia, no una rutina de calendario, y conviene decidirlas aunque la
+> cadencia regular quede en lo mínimo.
+
+> **Una rutina manual tiene la frecuencia que de verdad se cumple, no la que se
+> escribe.** Comprometerse a una copia diaria a mano, todos los días del año
+> incluidos domingos y vacaciones, no se sostiene — y una cadencia escrita que
+> no se cumple es peor que una modesta que sí: induce a creer que hay una
+> protección que no existe. Conviene elegir la más frecuente que se pueda
+> sostener de verdad, no la más frecuente que suene bien.
+
+#### La retención de 30 días, y cómo se cumple a mano
+
+**La retención es decisión tomada: ventana móvil de 30 días.**
+
+| | |
+|---|---|
+| **Retención** | **30 días** desde la descarga |
+| **Quién borra** | el responsable, **a mano**, en las dos ubicaciones |
+| **Cuándo** | en la misma sesión que la copia nueva, **y solo después de comprobarla** |
+
+> ### ⚠️ El orden importa: primero la copia nueva, después el borrado
+>
+> **Nunca se borra una copia vencida antes de tener la nueva comprobada.** Si se
+> borra primero y la descarga de hoy falla a medias, se queda sin la vieja y sin
+> la nueva — y el fallo puede no notarse hasta el día que haga falta restaurar.
+>
+> Los cuatro pasos, en este orden y sin adelantar ninguno:
+>
+> | | Paso |
+> |---|---|
+> | **1** | Crear la exportación en Render y **descargarla** |
+> | **2** | **Comprobar la descarga** (ver abajo) |
+> | **3** | Copiarla a la **segunda ubicación** y anotarla en la planilla |
+> | **4** | **Solo entonces**, borrar las que pasen de 30 días, en las dos ubicaciones |
+>
+> **Cómo comprobar la descarga**, sin necesidad de base de datos ni de
+> restaurar nada. Que el archivo exista y pese algo no basta: una descarga
+> cortada produce un `.tar.gz` perfectamente plausible que no se puede abrir.
+> Esto lo verifica de verdad:
+>
+> ```bash
+> docker run --rm -v "${PWD}:/respaldo:ro" postgres:16-alpine sh -c 'mkdir -p /tmp/x && cd /tmp/x && tar -zxf /respaldo/NOMBRE_DEL_ARCHIVO.dir.tar.gz && pg_restore --list "$(find . -mindepth 2 -maxdepth 2 -type d | head -1)" | tail -5'
+> ```
+>
+> Si lista entradas, el archivo está completo y es legible. Si falla, **la
+> descarga no sirve**: repítela, y **no borres nada** mientras no tengas una
+> copia que pase esta comprobación.
+>
+> Esto son unos segundos y es lo único que separa «tengo un archivo» de «tengo un
+> respaldo». No sustituye al ensayo de restauración completo, que sigue siendo
+> semestral.
+
+**Dónde se guardan las copias descargadas.** Dos sitios, y que uno no sea el
+computador del responsable:
+
+| | Recomendación | Estado |
 |---|---|---|
-| **Frecuencia ordinaria** | mensual, primer día hábil | por aprobar |
-| **Frecuencia con inscripciones abiertas** | **diaria** | por aprobar |
-| **Siempre, además** | antes de cada actualización con migraciones, y al cerrar las inscripciones de cada competencia | por aprobar |
-| **Ubicación principal** | carpeta en la nube de la federación, con acceso restringido al responsable y su suplente | por confirmar |
-| **Segunda copia** | disco externo cifrado, bajo llave y no conectado de forma permanente | por aprobar |
-| **Retención de las diarias** | 30 días | por aprobar |
-| **Retención de las mensuales** | 12 meses | por aprobar |
-| **Cierre de cada temporada** | **un** respaldo conservado **5 años**, revisable | por aprobar |
-| **Ensayo de restauración** | cada 6 meses, y obligatorio tras cualquier cambio del esquema | por aprobar |
+| **Principal** | carpeta del almacenamiento en la nube de la federación, con acceso restringido al responsable y su suplente | ⬜ por confirmar que admite permisos restringidos reales |
+| **Segunda copia** | disco externo cifrado, bajo llave y **no conectado de forma permanente** | ⬜ por confirmar |
 
-> **Por qué se propone DIARIA durante las inscripciones y no semanal.** En ese
-> período el sistema recibe el trabajo de muchos clubes en pocos días y los
-> plazos son infranqueables: perder una semana de inscripciones a dos días del
-> cierre no se puede rehacer. Fuera de ese período el sistema casi no cambia y
-> una copia mensual basta.
+> **Por qué dos, y por qué una desconectada.** La copia en la nube protege de
+> que se dañe o se pierda el equipo; la desconectada protege de que algo —un
+> programa malicioso, un borrado que se sincroniza— alcance también a la copia en
+> la nube. Son dos riesgos distintos y hacen falta las dos.
+>
+> **Cifrar el disco externo es lo que sustituye al cifrado que haría la
+> automatización.** Al descargarse de Render, el archivo **no está cifrado**:
+> contiene RUT, nombres y fechas de nacimiento en claro. Un disco perdido o
+> robado sin cifrar entrega todo eso. En Windows eso es BitLocker; en un disco
+> que vaya a viajar, conviene además que no quede nunca desbloqueado.
 
-> **Por qué NO se propone conservación indefinida.** Guardar respaldos para
-> siempre acumula datos personales —RUT, nombres, fechas de nacimiento— de
-> personas que pueden haber dejado la federación hace años, y cada copia es una
-> superficie más que proteger. Por eso la propuesta pone un plazo a todo, incluso
-> al respaldo de cierre de temporada: **5 años y revisable**, no «indefinidamente».
-> Si hace falta conservar resultados históricos, lo correcto es **exportar los
-> resultados** —que son públicos— y no guardar la base completa con sus datos
-> personales.
+> **El borrado también es manual, y por eso va atado a la copia nueva** —como
+> paso 4, nunca antes—. Atarlo a una acción que ya se está haciendo es lo único
+> que evita que se olvide; si se deja «para después», se acumulan datos
+> personales sin que nadie lo decida.
+>
+> No hay nada que lo imponga. **La retención efectiva será la que resulte de la
+> disciplina de quien la aplique**, y esto el instructivo no puede resolverlo.
 
-> **Por qué dos copias y por qué una desconectada.** Un respaldo en la nube
-> protege de que se dañe el equipo; uno desconectado protege de que algo —un
-> programa malicioso, un borrado sincronizado— alcance también a la copia en la
-> nube. Son dos riesgos distintos y hacen falta las dos.
+> ### ⚠️ La ventana de 7 días: el plazo que de verdad aprieta
+>
+> **Render borra sus propias exportaciones a los 7 días**, en cualquier plan. La
+> copia solo existe fuera de Render cuando está **descargada en tu equipo**.
+>
+> Crear la exportación y no descargarla **no es un respaldo**: es una copia que
+> desaparece sola la semana siguiente. Por eso los dos pasos —crear y
+> descargar— van siempre en la misma sesión, nunca en días distintos.
+
+#### El respaldo automático: evaluado y aplazado
+
+Se diseñó, se preparó y se probó en local una automatización completa
+—exportación diaria, cifrado antes de salir del servidor, almacenamiento fuera
+de Render con borrado automático a los 30 días, y alarma si el respaldo falla
+**o si no ocurre**— y **se decidió no implementarla por ahora**.
+
+Queda anotado para cuando se quiera retomar, porque la evaluación ya está hecha:
+
+| | |
+|---|---|
+| **Costo** | **US$1 al mes** (el mínimo mensual de un cron job de Render; el almacenamiento y la vigilancia resultaban gratuitos a este tamaño) |
+| **Qué añadiría** | la copia ocurre sin que nadie se acuerde, y **alguien recibe un correo si deja de ocurrir** |
+| **Qué exigiría definir** | destinatarios de las alertas y **custodia de la clave de descifrado** —que, si se pierde, deja todos los respaldos ilegibles para siempre |
+
+> **Lo que se gana automatizando no es el esfuerzo ahorrado: es la alarma.** Una
+> rutina manual bien llevada protege igual de bien. La diferencia aparece el día
+> en que deja de llevarse bien, porque entonces la automatizada avisa y la
+> manual no.
 
 #### Custodia: qué cuidado merece el archivo
 
@@ -1195,6 +1318,23 @@ Esta es la pregunta que hay que responder para elegir, y no es técnica: es
 - **Da de baja los vencidos**: cuando un respaldo pasa su retención, bórralo de
   las dos ubicaciones. Guardar datos personales más de lo necesario es un riesgo
   sin beneficio.
+
+#### La planilla de respaldos
+
+Al no haber ningún sistema que registre lo que se hizo, **la planilla es el único
+rastro**. Una hoja de cálculo basta, con una fila por copia:
+
+| Fecha | Nombre del archivo | ¿Comprobada? | Ubicación 1 | Ubicación 2 | Vencidas borradas | Quién |
+|---|---|---|---|---|---|---|
+
+La columna **«¿Comprobada?»** es la que no se puede dejar en blanco: es el paso 2
+del orden de arriba, y sin ella la fila solo dice que alguien descargó un
+archivo, no que ese archivo sirva.
+
+> **Para qué sirve de verdad esta planilla.** Para que quien revise —esa tercera
+> persona pendiente de designar— pueda ver en diez segundos si falta alguna copia,
+> y para que dentro de un año se pueda responder «¿teníamos respaldo en tal
+> fecha?» sin tener que adivinar.
 
 #### Qué hacer cuando toque el ensayo periódico
 
@@ -1859,10 +1999,16 @@ segunda base desechable y se levantaron la API y la web **construidas desde
 
 ### No comprobado
 
+- **La rutina de respaldo como rutina.** El **procedimiento** está ensayado de
+  principio a fin —crear la exportación, descargarla, restaurarla y levantar la
+  aplicación encima—, pero **se ha ejecutado una sola vez, a mano, el 29 de
+  octubre**. No hay todavía una rutina que se repita, ni responsable asignado,
+  ni ninguna copia conservada bajo la retención de 30 días. **Saber restaurar no
+  es lo mismo que tener respaldos.**
 - **La restauración sobre una base de Render.** El **ensayo sí está hecho** (ver
-  abajo): el archivo descargado se restauró completo en una base desechable y se
-  verificó. Lo que no se ha hecho es apuntar `pg_restore` a una base de Render
-  con `--clean --if-exists`, que es el camino de la recuperación real. Es
+  más arriba): el archivo descargado se restauró completo en una base desechable
+  y se verificó. Lo que no se ha hecho es apuntar `pg_restore` a una base de
+  Render con `--clean --if-exists`, que es el camino de la recuperación real. Es
   deliberado: ese camino reemplaza objetos y no se ensaya contra la base
   operativa.
 - **Un respaldo con datos reales.** El ensayo se hizo con una base que solo tiene
@@ -1908,20 +2054,24 @@ Las dos decisiones que había antes de desplegar —plan de pago y cookies— es
 tomadas: todo va en planes de pago y el proxy del Paso 7 resolvió las cookies.
 Lo que queda abierto es esto, por orden de urgencia:
 
-1. **Aprobar la rutina de respaldo externo, y asignarle un responsable.** El
-   Paso 9B trae una **propuesta** —frecuencias, ubicaciones, retención y ensayo
-   periódico— con el procedimiento ya ensayado, pero **nada de eso está
-   aprobado** y **responsable y suplente siguen sin asignar**. Mientras eso siga
-   así, la única protección es lo que Render hace solo: **PITR de 3 días**. La
-   propuesta indica qué pérdida máxima cubre cada frecuencia, para que la
-   decisión se tome sabiendo qué se está eligiendo.
-3. **El tamaño del almacenamiento de la base.** Está en **1 GB**, que sobra para
+1. **Designar al suplente del respaldo, y confirmar la frecuencia.** La vía está
+   decidida —**exportaciones manuales desde Render, descargadas y conservadas 30
+   días**—, el **responsable ya está asignado** y el procedimiento está escrito y
+   ensayado en el Paso 9B. Faltan tres cosas:
+   - **El suplente.** Es lo más urgente: hoy la rutina se detiene por completo
+     en cualquier ausencia del responsable, y nada lo señala.
+   - **La frecuencia.** El Paso 9B indica qué pérdida máxima cubre cada opción,
+     para que la elección se haga sabiendo qué se está eligiendo.
+   - **Quién revisa que se hizo**, alguien distinto del responsable. Al ser
+     manual, **nada avisa si se deja de hacer**, y esa revisión es lo único que
+     sustituye al aviso automático.
+2. **El tamaño del almacenamiento de la base.** Está en **1 GB**, que sobra para
    empezar porque solo guarda texto, pero **se puede subir y no se puede
    bajar**. Hay que mirarlo antes de cargar varios años de histórico. Cada GB son
    US$0,30 al mes.
-4. **Quién recibe los avisos de caída.** Render comprueba la salud **al
+3. **Quién recibe los avisos de caída.** Render comprueba la salud **al
    desplegar**, no de forma continua. No hay ninguna monitorización configurada.
-5. **Quitar la dependencia del espacio de nombres interno de Render.** Hoy
+4. **Quitar la dependencia del espacio de nombres interno de Render.** Hoy
    `API_INTERNA` lleva el nombre completo `…svc.cluster.local` porque el
    resolutor de Nginx no aplica las *search domains* (Paso 7). Funciona, pero
    incorpora un detalle de la infraestructura de Render que ellos no garantizan.
@@ -1932,6 +2082,10 @@ Lo que queda abierto es esto, por orden de urgencia:
    cuando cambia de dirección; habría que evaluar cuál de los dos problemas pesa
    más. **No es urgente**: el síntoma, si algún día aparece, es un 502 con el
    error exacto en los registros y el arreglo es cambiar una variable.
-6. **Un dominio propio**: deseable por imagen y continuidad, pero ya no hace
+5. **Un dominio propio**: deseable por imagen y continuidad, pero ya no hace
    falta para nada técnico. Ver «Un dominio propio: mejora posterior, no
    requisito».
+6. **Si en algún momento se automatiza el respaldo.** Se evaluó, se preparó y se
+   probó; se decidió aplazarlo. Costaría **US$1 más al mes** y lo que aportaría
+   no es ahorro de esfuerzo sino **una alarma cuando el respaldo deja de
+   ocurrir**. Ver «El respaldo automático: evaluado y aplazado» en el Paso 9B.
