@@ -7,19 +7,32 @@ tu computador esté prendido.
 
 **Tiempo estimado:** 60-90 minutos la primera vez.
 
-> ## ⚠️ Lee esto antes que nada: qué está probado y qué no
+> ## ✅ Lee esto antes que nada: esta guía YA SE EJECUTÓ
 >
-> **Nada de lo que ocurre dentro del panel de Render se ha ejecutado todavía.**
-> No se creó ninguna cuenta, ningún servicio ni ninguna base de datos. Todos los
-> pasos 4 en adelante están escritos a partir de la **documentación oficial de
-> Render**, consultada el 28 de octubre de 2026, y pueden diferir en detalles de
-> la interfaz (nombres de botones, orden de los campos).
+> **El 28 de octubre de 2026 se recorrió completa en Render, de principio a fin,
+> desde el commit `bffc69b`.** Los cuatro servicios quedaron en marcha, la base
+> migrada y sembrada, el administrador creado, y el inicio de sesión, su
+> renovación al recargar y el cierre de sesión comprobados en un navegador real.
 >
-> **Lo que sí está probado**, con las imágenes reales y contra una base de datos
-> desechable, es todo lo que depende del repositorio: que las imágenes se
-> construyen, que son las correctas, que las migraciones y los seeds funcionan y
-> que la aplicación arranca y permite iniciar sesión. El detalle está en la
-> sección «Qué se comprobó y qué no», al final.
+> Eso significa que los pasos de abajo **no son una interpretación de la
+> documentación**: son el camino que funcionó. Donde el panel no se comportó como
+> la documentación hacía esperar, el texto lo dice y explica qué hacer; hay dos
+> puntos así, y los dos cuestan tiempo si se descubren a ciegas:
+>
+> - **El almacenamiento de PostgreSQL se cobra aparte** y el formulario propone
+>   15 GB (ver «Lo que cuesta»).
+> - **`API_INTERNA` no acepta el nombre corto del servicio** que muestra Render;
+>   hace falta el nombre completo (ver el recuadro del Paso 7). Saltarse esto da
+>   un 502 sin explicación evidente.
+>
+> **El respaldo también está ensayado.** El 29 de octubre se descargó una copia,
+> se restauró completa en una base desechable y se verificó estructura,
+> relaciones y datos: 31 tablas, 26 migraciones con su suma SHA-256 idéntica a
+> las del commit, 38 claves foráneas sin una sola fila huérfana. El Paso 9B trae
+> el procedimiento exacto, con dos trampas que conviene leer antes de improvisar.
+>
+> **Lo que sigue sin comprobar** está reunido en «Qué se comprobó y qué no», al
+> final, junto con el detalle de cada prueba.
 >
 > Si un paso del panel no coincide con lo que ves, **no improvises**: anótalo y
 > consúltalo. Esta guía se corrige con lo que encuentres.
@@ -66,9 +79,22 @@ código y hasta 25 servicios.
 | Espacio de trabajo | Hobby | **0** |
 | API (backend), **servicio privado** | 0,5 CPU / 512 MB | **7** |
 | Web (frontend), servicio web | 0,5 CPU / 512 MB | **7** |
-| PostgreSQL | 256 MB RAM, 1 GB SSD incluido | **6** |
+| PostgreSQL, cómputo | 0,1 CPU / 256 MB (*Basic 256 MB*) | **6** |
+| PostgreSQL, almacenamiento | 1 GB | **0,30** |
 | Mantenimiento (cron job) | **mínimo mensual por servicio** | **1** |
-| | **Total estimado** | **US$21** |
+| | **Total estimado** | **US$21,30** |
+
+> **El almacenamiento de la base se cobra APARTE del cómputo**, y esto hay que
+> verlo venir. El formulario de PostgreSQL propone **15 GB por omisión**, que
+> son **US$4,50 al mes** que se suman al cómputo: el total que muestra el panel
+> pasa de US$6,30 a US$10,50 sin que nada lo anuncie. **Comprobado en el panel
+> el 2026-10-28**: bajar el campo *Storage* a **1 GB** dejó el total de la base
+> en **US$6,30**.
+>
+> Se eligió 1 GB porque esta base guarda texto —personas, clubes, competencias,
+> inscripciones—, no archivos. **El campo se puede subir después** sin recrear
+> la base; lo que no se puede es bajarlo. Hay que vigilarlo antes de cargar
+> varios años de histórico (ver «Qué falta decidir»).
 
 > **La corrección del cron job.** Su documentación dice: *«There is a minimum
 > monthly charge of $1 per cron job service»*. El cobro por tiempo de ejecución
@@ -80,7 +106,7 @@ código y hasta 25 servicios.
 
 | Concepto | Incluido en Hobby | Excedente |
 |---|---|---|
-| Almacenamiento de la base | **1 GB SSD** | US$0,30 por GB |
+| Almacenamiento de la base | **nada incluido** | US$0,30 por GB al mes (ya contado arriba) |
 | Tráfico de salida | 5 GB al mes | US$0,15 por GB |
 | Minutos de construcción | 500 al mes | US$5 por cada 1.000 |
 | Dominios propios | 2 | US$0,25 por dominio al mes |
@@ -557,6 +583,10 @@ direcciones de conexión.
    servicio privado la muestra como su **Service Address**, y también está en el
    menú **Connect**. Con `PORT=3000` será algo como `fchmn-api:3000`.
 
+   > **Pero ese nombre corto NO es el que va en `API_INTERNA`.** Nginx no lo
+   > resuelve, y el síntoma es un 502. El Paso 7 explica por qué y cómo obtener
+   > el nombre completo: recuadro «El nombre corto no sirve».
+
    > **Este servicio no tiene dirección pública, y eso es el objetivo.** Render
    > no da subdominio `onrender.com` a los servicios privados. Si buscas una
    > dirección pública aquí y no la encuentras, está bien: no debe haberla.
@@ -725,35 +755,44 @@ Sobre esa base se apoyan dos cosas más, en este orden:
 > **El paso 6 no es opcional.** Mientras un comando real esté escrito ahí, una
 > ejecución programada lo ejecutaría. Vacíalo en cuanto termines, y compruébalo.
 
-> ### Cuidado: guardar un cambio puede desencadenar un despliegue
+> ### Qué ocurre al guardar — medido en el ensayo del 2026-10-28
 >
-> Esto está documentado para las **variables de entorno**: al guardarlas, Render
-> *«kicks off a deploy»* **salvo que elijas la opción «Save only»**, que las
-> guarda sin desplegar. Si alguna vez cambias `SEED_ADMIN_PASSWORD` o
-> `DATABASE_URL` aquí, usa **Save only** si no quieres que se reconstruya en ese
-> momento.
+> Esto era una incógnita y el primer ensayo la resolvió **en parte**. Lo que se
+> observó, separando lo comprobado de lo que sigue abierto:
 >
-> **Para el campo *Docker Command*, la documentación de Render no dice** si
-> guardarlo dispara un despliegue, ni si un despliegue de un cron job provoca una
-> ejecución. Se buscó expresamente y **no hay respuesta oficial**. Indicios de
-> terceros sugieren que un despliegue no inicia una ejecución, pero **no son
-> documentación y esta guía no se apoya en ellos**.
+> **Lo comprobado.**
 >
-> **Qué significa en la práctica, dicho sin adornos:** entre el momento en que
-> guardas un comando real (paso 3) y el momento en que lo vacías (paso 6), **ese
-> comando podría ejecutarse sin que tú pulses nada**. No es una hipótesis
-> descartada: es una incógnita. Los tres comandos son, por suerte, tolerables en
-> ese escenario —migrar lo ya migrado no hace nada, el seed de referencia es
-> idempotente y el de administrador no modifica uno existente—, pero **eso no es
-> lo mismo que decir que no puede pasar nada**.
+> - **Desplegar el cron job NO lo ejecuta.** Al crearlo, el despliegue terminó
+>   en *Deploy succeeded* y la pestaña **Runs** quedó **vacía**: no apareció
+>   ninguna ejecución. La pestaña *Logs* solo mostró las líneas del despliegue.
+> - **Las dos pestañas guardan de forma distinta**, y esto conviene conocerlo:
 >
-> Por eso: ten la ventana abierta, haz los pasos 3 a 6 seguidos, y en el paso 5
-> mira **cuántas ejecuciones** aparecen en la pestaña *Runs*, no solo la última.
+>   | Dónde guardas | Qué te ofrece Render |
+>   |---|---|
+>   | **Environment** (variables) | Un menú con **tres** opciones: *Save, rebuild, and deploy* · *Save and apply on next run* · *Save only* |
+>   | **Settings** (incluido *Docker Command*) | Un único botón **Save changes**, sin opciones |
 >
-> **PENDIENTE DE COMPROBAR EN EL PRIMER ENSAYO.** Guarda un cambio del *Docker
-> Command* y anota si aparece un despliegue, si aparece una ejecución, y en qué
-> orden. Es el dato que falta para cerrar este punto, y esta guía se corrige con
-> él.
+>   Es decir: en *Settings* **no hay** un «Save only» que elegir. No es un error
+>   tuyo si no lo encuentras.
+> - **A lo largo de cuatro cambios del *Docker Command* seguidos de *Trigger
+>   Run*, la pestaña *Runs* nunca mostró una ejecución que no hubiéramos
+>   lanzado.** Cada guardado produjo exactamente las ejecuciones pulsadas, ni una
+>   más.
+>
+> **Lo que sigue abierto.** Las cuatro observaciones anteriores son **evidencia
+> de este despliegue, no documentación de Render**. Render no publica qué hace al
+> guardar *Settings* en un cron job, y un comportamiento observado cuatro veces
+> puede cambiar con una actualización del panel. Por eso el **paso 6 del
+> procedimiento sigue siendo obligatorio**: vaciar el campo no depende de esta
+> incógnita, la vuelve irrelevante.
+>
+> **Para las variables de entorno sí hay documentación**: guardarlas *«kicks off
+> a deploy»* salvo que elijas **Save only**. Si cambias `SEED_ADMIN_PASSWORD` o
+> `DATABASE_URL` aquí y no quieres que se reconstruya en ese momento, usa
+> **Save only** o **Save and apply on next run**.
+>
+> Y en todo caso: haz los pasos 3 a 6 seguidos, y en el paso 5 mira **cuántas
+> ejecuciones** aparecen en *Runs*, no solo la última.
 
 **Los tres comandos, en este orden.** Son los únicos que existen en esta imagen.
 
@@ -831,7 +870,7 @@ así que una ejecución accidental no rompe nada.
    | Nombre | Valor |
    |---|---|
    | `VITE_API_URL` | `/api` |
-   | `API_INTERNA` | La **dirección interna** de la API, con su puerto: `fchmn-api:3000` |
+   | `API_INTERNA` | El **nombre completo** de la API, con su puerto. **No basta `fchmn-api:3000`**: lee el recuadro «El nombre corto no sirve» antes de escribirlo |
 
    > ### Estas dos variables son el corazón de la configuración
    >
@@ -847,14 +886,56 @@ así que una ejecución accidental no rompe nada.
    > ninguna forma especial: Render convierte las variables del servicio en
    > *build arguments*, y `frontend/Dockerfile` ya declara `ARG VITE_API_URL`.
    >
-   > **`API_INTERNA`** se aplica al **ARRANCAR**. Su valor lo da Render: es la
-   > **Service Address** del servicio privado de la API, y el puerto es el que
-   > fijaste con `PORT` en el Paso 6 (`3000`). Si Render te muestra algo
-   > distinto, usa lo que te muestre.
+   > **`API_INTERNA`** se aplica al **ARRANCAR**, y su valor no es el que parece.
+   > Lee el recuadro siguiente: este punto costó un 502 en el primer ensayo.
    >
    > El nombre del servicio **no está escrito en ningún archivo del
    > repositorio**: vive solo en esta variable. Si algún día renombras la API,
    > se cambia aquí y basta.
+
+   > ### ⚠️ El nombre corto no sirve — comprobado el 2026-10-28
+   >
+   > Render muestra la **Service Address** del servicio privado como
+   > `fchmn-api:3000`, y ese nombre **funciona** desde una terminal del
+   > contenedor de la web (`getent hosts fchmn-api` responde). Pero **Nginx
+   > devuelve 502** con este error en su registro:
+   >
+   > ```
+   > fchmn-api could not be resolved (3: Host not found)
+   > ```
+   >
+   > **Por qué.** El nombre corto resuelve gracias a las *search domains* de
+   > `/etc/resolv.conf`, que Render rellena con su espacio de nombres interno:
+   >
+   > ```
+   > search own-XXXXXXXXXXXXXXXXXXXX.svc.cluster.local svc.cluster.local cluster.local
+   > ```
+   >
+   > El resolutor del sistema —el que usan `getent`, `wget` o `curl`— prueba esos
+   > sufijos uno a uno. **El resolutor propio de Nginx no los usa**: consulta el
+   > nombre tal cual, y `fchmn-api` a secas no existe en el DNS. Es una diferencia
+   > conocida de Nginx, no un fallo de Render ni de esta configuración.
+   >
+   > **Qué escribir, entonces.** El nombre completo, que son tres partes:
+   >
+   > ```
+   > <nombre-del-servicio>.<espacio-de-nombres>.svc.cluster.local:<puerto>
+   > ```
+   >
+   > Para obtener el espacio de nombres, abre la **Shell** del servicio de la web
+   > y mira la línea `search` de `/etc/resolv.conf`: el primer sufijo es el que
+   > toca. Compruébalo con `getent hosts <nombre-corto>` y
+   > `getent hosts <nombre-completo>` desde esa misma Shell: **deben devolver la
+   > misma dirección**. Así se confirma que no se está hablando con otro
+   > servicio, sino con el mismo, nombrado de forma que Nginx sí puede resolver.
+   > (En el despliegue del 28 de octubre coincidieron.)
+   >
+   > **Esto es frágil y conviene saberlo**: el valor incorpora el espacio de
+   > nombres interno de Render, que es un detalle de su infraestructura y no algo
+   > que Render documente como estable. **Si un redespliegue de la web vuelve a
+   > dar 502**, el primer sitio donde mirar es esta variable, repitiendo la
+   > consulta de `/etc/resolv.conf`. Queda anotado como mejora pendiente en «Qué
+   > falta decidir».
 
    > ### Requisitos de la red privada — léelos antes
    >
@@ -914,11 +995,14 @@ https://fchmn-web.onrender.com/api/health
 ```
 Debe responder algo como `{"status":"ok","uptime":12}`.
 
-- **502 o 504** → el proxy no alcanza la API. Revisa `API_INTERNA` (nombre y
-  puerto exactos, los del menú **Connect → Internal** de la API), que ambos
-  servicios estén en la **misma región**, y que la API sea un **Private
-  Service** en marcha (su *Service Address* y su `PORT` deben coincidir con
-  `API_INTERNA`).
+- **502 o 504** → el proxy no alcanza la API. **La causa más probable, y la que
+  ocurrió en el primer ensayo, es que `API_INTERNA` lleve el nombre corto.**
+  Abre **fchmn-web → Logs** y busca la línea del error: si dice
+  `… could not be resolved (3: Host not found)`, es exactamente eso; vuelve al
+  recuadro «El nombre corto no sirve» del Paso 7. Si el error es otro, revisa
+  que ambos servicios estén en la **misma región** y que la API sea un
+  **Private Service** en marcha, con su `PORT` coincidiendo con el puerto de
+  `API_INTERNA`.
 - **404 con el aspecto de una página de Nginx** → la petición no entró al
   bloque `/api/`; revisa que la ruta lleve la barra final del prefijo.
 
@@ -1016,49 +1100,256 @@ vive en el proveedor**.
 > **Render los conserva solo 7 días**, en cualquier plan. Si no lo descargas,
 > desaparece. Y **no genera respaldos lógicos para bases en plan Free**.
 
-**Custodia — qué hacer con el archivo descargado:**
+### La rutina de respaldo externo
+
+Render conserva los respaldos lógicos **solo 7 días** y el PITR del plan Hobby
+cubre **3 días**. Eso significa que cualquier pérdida descubierta más tarde
+—un borrado que nadie notó, una temporada que había que recuperar— **solo se
+puede reparar con un archivo que esté fuera de Render**. Esta rutina existe para
+que ese archivo exista siempre.
+
+> ## ⚠️ Lo que sigue es una PROPUESTA, no una rutina vigente
+>
+> **Las frecuencias y los plazos de retención de abajo están sin aprobar.** Son
+> una recomendación técnica: quién decide es la federación, porque la retención
+> de datos personales y el esfuerzo que se le dedica a esto son decisiones suyas,
+> no del instructivo.
+>
+> **Hasta que se aprueben, no hay rutina de respaldo externo.** Lo único que hay
+> es lo que Render hace solo: PITR de 3 días y respaldos lógicos que se borran a
+> los 7. Eso no cubre una pérdida descubierta tarde.
+
+#### Pendientes explícitos, sin los cuales nada de esto funciona
+
+| Pendiente | Estado | Por qué bloquea |
+|---|---|---|
+| **Responsable** | ⬜ **SIN ASIGNAR** | Una rutina sin una persona con nombre no se ejecuta. No vale «la federación» ni «la secretaría» |
+| **Suplente** | ⬜ **SIN ASIGNAR** | Sin suplente, la rutina se detiene en vacaciones, licencias o cualquier ausencia |
+| **Frecuencia** | ⬜ **POR APROBAR** | Ver la propuesta y la pérdida máxima que cubre cada opción |
+| **Retención** | ⬜ **POR APROBAR** | Afecta a datos personales: la decisión tiene consecuencias legales |
+| **Ubicación** | ⬜ **POR CONFIRMAR** | Hay que verificar que la carpeta elegida admite permisos restringidos reales |
+
+#### Qué pérdida cubre cada frecuencia
+
+Esta es la pregunta que hay que responder para elegir, y no es técnica: es
+«¿cuánto trabajo estamos dispuestos a repetir?».
+
+| Frecuencia de la copia externa | Pérdida máxima si hay que recurrir a ella |
+|---|---|
+| Mensual | **hasta un mes** de inscripciones, altas y cambios |
+| Semanal | **hasta una semana** |
+| **Diaria** | **hasta un día** |
+
+> **Atención: esa pérdida solo se materializa si la copia externa es el único
+> recurso.** Mientras Render esté disponible y el problema se descubra **dentro
+> de 3 días**, el PITR recupera hasta el minuto y no se pierde prácticamente
+> nada. La copia externa es el recurso para los otros dos casos: un problema
+> descubierto **después** de esos 3 días, o que no se pueda contar con Render.
+
+#### La propuesta
+
+| | Propuesta | Estado |
+|---|---|---|
+| **Frecuencia ordinaria** | mensual, primer día hábil | por aprobar |
+| **Frecuencia con inscripciones abiertas** | **diaria** | por aprobar |
+| **Siempre, además** | antes de cada actualización con migraciones, y al cerrar las inscripciones de cada competencia | por aprobar |
+| **Ubicación principal** | carpeta en la nube de la federación, con acceso restringido al responsable y su suplente | por confirmar |
+| **Segunda copia** | disco externo cifrado, bajo llave y no conectado de forma permanente | por aprobar |
+| **Retención de las diarias** | 30 días | por aprobar |
+| **Retención de las mensuales** | 12 meses | por aprobar |
+| **Cierre de cada temporada** | **un** respaldo conservado **5 años**, revisable | por aprobar |
+| **Ensayo de restauración** | cada 6 meses, y obligatorio tras cualquier cambio del esquema | por aprobar |
+
+> **Por qué se propone DIARIA durante las inscripciones y no semanal.** En ese
+> período el sistema recibe el trabajo de muchos clubes en pocos días y los
+> plazos son infranqueables: perder una semana de inscripciones a dos días del
+> cierre no se puede rehacer. Fuera de ese período el sistema casi no cambia y
+> una copia mensual basta.
+
+> **Por qué NO se propone conservación indefinida.** Guardar respaldos para
+> siempre acumula datos personales —RUT, nombres, fechas de nacimiento— de
+> personas que pueden haber dejado la federación hace años, y cada copia es una
+> superficie más que proteger. Por eso la propuesta pone un plazo a todo, incluso
+> al respaldo de cierre de temporada: **5 años y revisable**, no «indefinidamente».
+> Si hace falta conservar resultados históricos, lo correcto es **exportar los
+> resultados** —que son públicos— y no guardar la base completa con sus datos
+> personales.
+
+> **Por qué dos copias y por qué una desconectada.** Un respaldo en la nube
+> protege de que se dañe el equipo; uno desconectado protege de que algo —un
+> programa malicioso, un borrado sincronizado— alcance también a la copia en la
+> nube. Son dos riesgos distintos y hacen falta las dos.
+
+#### Custodia: qué cuidado merece el archivo
 
 - **Contiene todos los datos personales del sistema**: RUT, nombres, clubes,
-  inscripciones. Trátalo como el documento más sensible que maneja la federación.
-- Guárdalo en **al menos dos sitios** y que uno **no** sea tu computador: un
-  disco externo, o el almacenamiento en la nube de la federación con la carpeta
-  restringida a quien corresponda.
-- **No lo subas al repositorio** ni lo mandes por correo o chat.
-- **Ponle fecha en el nombre** y mantén una cadencia: uno antes de cada
-  actualización con migraciones, y uno mensual que se conserve.
-- Decide y escribe **cuánto tiempo** se conservan y **quién** puede acceder.
+  inscripciones. Es el documento más sensible que maneja la federación y le
+  corresponde el mismo trato que a un registro de socios.
+- **No lo subas al repositorio** ni lo mandes por correo, WhatsApp o chat. Si hay
+  que entregarlo a alguien, se comparte la carpeta restringida, no el archivo.
+- **Conserva el nombre con fecha que le pone Render** (`2026-10-29T12_30Z…`). No
+  lo renombres: la fecha y hora en UTC son la única forma de saber a qué momento
+  corresponde.
+- **Anota cada descarga** en una planilla simple: fecha, quién la hizo, dónde
+  quedó. Sin ese registro, dentro de un año nadie sabrá si falta alguno.
+- **Da de baja los vencidos**: cuando un respaldo pasa su retención, bórralo de
+  las dos ubicaciones. Guardar datos personales más de lo necesario es un riesgo
+  sin beneficio.
 
-**Restaurar un respaldo descargado.** Lee esto antes:
+#### Qué hacer cuando toque el ensayo periódico
 
-> **El procedimiento borra y recrea los objetos de la base de destino.** No lo
-> uses sobre una base con datos importantes del mismo esquema. Si lo que quieres
-> es recuperar datos perdidos, usa **PITR** (opción A): casi siempre recupera
-> información más reciente que tu última exportación.
+Seguir los cinco pasos del ensayo seguro de más abajo, con el respaldo **más
+reciente**, y anotar en la planilla la fecha y el resultado. Si el ensayo falla,
+**eso es una emergencia**: significa que los respaldos acumulados pueden no
+servir, y hay que resolverlo antes de la siguiente competencia.
 
-1. Descarga el `.dir.tar.gz` desde la página **Recovery**.
-2. Consigue la **External Database URL** de la base de destino.
-3. Descomprime y restaura. Como tienes Docker Desktop, puedes hacerlo **sin
-   instalar nada**, desde la carpeta donde dejaste el archivo:
+**Restaurar un respaldo descargado.** Hay **dos cosas distintas** aquí, y
+conviene no mezclarlas:
 
+| | Para qué | Riesgo |
+|---|---|---|
+| **El ensayo** (más abajo) | Comprobar que el archivo sirve | **Ninguno**: base desechable en tu equipo, sin costo |
+| **La restauración real** | Recuperar el servicio tras un desastre | **Alto**: reemplaza los objetos de la base de destino |
+
+**Haz el ensayo ahora y la restauración real solo cuando haga falta.** Lo que
+sigue está comprobado de principio a fin el 2026-10-29.
+
+> ### ⚠️ No descomprimas el archivo en Windows — comprobado el 2026-10-29
+>
+> Dentro del `.tar.gz` hay **dos niveles** de carpeta, y el primero lleva la hora
+> en el nombre con **dos puntos**:
+>
+> ```
+> 2026-10-29T12:30Z/            ← los dos puntos son ilegales en Windows
+>   fchmn_postgres/             ← aqui estan toc.dat y los 31 archivos .dat
+> ```
+>
+> Windows **no admite `:` en un nombre de archivo**, así que descomprimirlo con
+> el Explorador, con 7-Zip o con `tar` desde PowerShell falla o renombra la
+> carpeta, y entonces `pg_restore` no encuentra nada. Por eso **todos los
+> comandos de abajo descomprimen DENTRO del contenedor**, donde el nombre es
+> perfectamente válido.
+>
+> Y ojo con la ruta: `toc.dat` está en el **segundo** nivel. Apuntar
+> `pg_restore` al primero da *«does not appear to be a valid archive»*.
+
+**Primero, comprueba las versiones.** Si el servidor de origen es más nuevo que
+tu `pg_restore`, la restauración puede fallar o perder cosas. Esto lo lee del
+propio archivo, sin tocar los datos ni necesitar la base:
+
+```bash
+docker run --rm -v "${PWD}:/respaldo:ro" postgres:16-alpine sh -c 'mkdir -p /tmp/x && cd /tmp/x && tar -zxf /respaldo/NOMBRE_DEL_ARCHIVO.dir.tar.gz && pg_restore --list "$(find . -mindepth 2 -maxdepth 2 -type d | head -1)" | head -8'
+```
+
+Busca estas dos líneas y compáralas con `pg_restore --version`:
+
+```
+;     Dumped from database version: 16.15
+;     Dumped by pg_dump version: 16.15
+```
+
+> **Comprobado el 2026-10-29**: origen `16.15`, `pg_dump` `16.15` y el
+> `pg_restore` de `postgres:16-alpine` **`16.15`**. Coinciden las tres. Si algún
+> día Render sube de versión mayor, usa la imagen que corresponda
+> (`postgres:17-alpine`) — descargarla no cuesta nada.
+
+#### El ensayo seguro: una base desechable, sin costo y sin riesgo
+
+**Así se practica sin acercarse a la base operativa.** Es la forma recomendada, y
+es la que está comprobada de principio a fin.
+
+1. **Levanta una base desechable.** `--tmpfs` hace que los datos vivan en memoria:
+   **no se crea ningún volumen** y al borrar el contenedor no queda rastro.
+
+   ```bash
+   docker run -d --name fchmn-ensayo-restauracion -e POSTGRES_USER=ensayo -e POSTGRES_PASSWORD=desechable_no_reutilizar -e POSTGRES_DB=ensayo_restauracion --tmpfs /var/lib/postgresql/data:rw -v "${PWD}:/respaldo:ro" postgres:16-alpine
    ```
-   tar -zxvf 2026-10-28T19_21Z.dir.tar.gz
+
+   > **`:ro` en el montaje no es decorativo**: deja el archivo descargado como
+   > solo lectura, así que el ensayo no puede alterar tu copia. Compruébalo si
+   > quieres: `docker exec fchmn-ensayo-restauracion touch /respaldo/x` responde
+   > *«Read-only file system»*.
+
+2. **Restaura.** `--exit-on-error` es importante: sin él, `pg_restore` sigue
+   adelante tras un fallo y termina diciendo que «hubo errores» sin más.
+
+   ```bash
+   docker exec fchmn-ensayo-restauracion sh -c 'mkdir -p /tmp/x && cd /tmp/x && tar -zxf /respaldo/NOMBRE_DEL_ARCHIVO.dir.tar.gz && pg_restore --dbname="postgresql://ensayo:desechable_no_reutilizar@127.0.0.1:5432/ensayo_restauracion" --no-owner --no-privileges --exit-on-error --verbose --format=directory "$(find /tmp/x -mindepth 2 -maxdepth 2 -type d | head -1)"'
    ```
 
-   ```
-   docker run --rm -v "${PWD}:/respaldo" postgres:16-alpine pg_restore --dbname="PEGA_AQUI_LA_EXTERNAL_DATABASE_URL" --verbose --clean --if-exists --no-owner --no-privileges --format=directory "/respaldo/2026-10-28T19:21Z/NOMBRE_DE_LA_BASE"
+   > **`--verbose` escribe en la salida de ERROR, no en la estándar.** Verás
+   > cientos de líneas `pg_restore: creating ...` que **no son fallos**: son el
+   > progreso. Lo que indica éxito es el **código de salida 0**. En el ensayo del
+   > 2026-10-29 fueron 211 líneas —1 de conexión, 179 creando objetos y 31
+   > procesando datos de tabla— y **ni un solo `error` ni `warning`**.
+
+3. **Verifica.** El conteo de filas no basta. Lo mínimo que hay que mirar:
+
+   ```bash
+   docker exec fchmn-ensayo-restauracion psql -U ensayo -d ensayo_restauracion -c "SELECT (SELECT count(*) FROM pg_tables WHERE schemaname='public') AS tablas, (SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL) AS migraciones_ok, (SELECT count(*) FROM pg_constraint c JOIN pg_class r ON r.oid=c.conrelid JOIN pg_namespace n ON n.oid=r.relnamespace WHERE c.contype='f' AND n.nspname='public' AND NOT c.convalidated) AS fk_sin_validar;"
    ```
 
-   > **🔑 Ese comando lleva la contraseña de la base dentro de la URL.** No lo
-   > guardes en un archivo ni lo pegues en ningún chat. Bórralo del historial de
-   > la terminal cuando termines.
+   Debe dar **31 tablas**, **26 migraciones** y **0 claves foráneas sin validar**.
 
-   > **Si `tar` no te funciona**, descomprime con la misma imagen, sin instalar
-   > nada: `docker run --rm -v "${PWD}:/respaldo" postgres:16-alpine tar -zxvf /respaldo/2026-10-28T19_21Z.dir.tar.gz -C /respaldo`
+   > **La comprobación más fuerte, si quieres ir a fondo:** `_prisma_migrations`
+   > guarda la **suma SHA-256** de cada `migration.sql`. Comparar esas 26 sumas
+   > con las de los archivos del repositorio demuestra que el esquema restaurado
+   > es byte a byte el del commit desplegado. **Comprobado: coincidencia total
+   > contra `bffc69b`.**
    >
-   > *Comprobado: la imagen `postgres:16-alpine` trae `pg_restore` 16.15,
-   > `pg_dump` y `tar`.*
+   > Si lo haces en Windows, calcula las sumas sobre lo que Git tiene
+   > **almacenado** (`git cat-file -p :<ruta> | sha256sum`), no sobre los
+   > archivos del disco: dos de las 26 migraciones están en el disco con saltos
+   > de línea de Windows (CRLF) y su suma no coincide, aunque el contenido sea el
+   > mismo. Es un efecto de la copia local, no un problema del respaldo.
 
-4. Comprueba la aplicación antes de dar por buena la restauración (Paso 8).
+4. **Levanta la aplicación contra esa base** — este paso es el que convierte el
+   ensayo en una prueba de verdad. Una base que restaura bien pero sobre la que
+   el sistema no arranca no sirve de nada.
+
+   Hay que construir las imágenes desde el commit desplegado, crear una red
+   aislada y conectar las tres piezas. El procedimiento completo, con los
+   comandos y lo que debe responder cada uno, está en **«La aplicación
+   funcionando sobre el respaldo restaurado»**, en la sección «Qué se comprobó».
+   Lo mínimo que hay que ver:
+
+   - la API arranca **sana** y `/api/ready` responde `"database":"ok"`;
+   - se puede **iniciar sesión** y **consultar los catálogos**, y los valores son
+     los que esperabas;
+   - `refresh` renueva la sesión y `logout` la termina.
+
+   > **Para probar el inicio de sesión, crea una cuenta aparte en la base
+   > desechable** con `seed-admin.js` y una contraseña de un solo uso. **No uses
+   > la contraseña real del administrador**: no hace falta, y así no circula por
+   > ningún archivo ni terminal.
+
+5. **Borra todo y comprueba que no quedó nada.**
+
+   ```bash
+   docker rm -f fchmn-ensayo-web fchmn-ensayo-api fchmn-ensayo-db; docker network rm fchmn-ensayo-red; docker volume ls
+   ```
+
+   Con `--tmpfs` la lista de volúmenes debe quedar **igual que antes de empezar**.
+   Borra también los archivos temporales y la copia de trabajo del respaldo —el
+   original, nunca.
+
+#### Restaurar de verdad, sobre una base de Render
+
+Solo cuando haga falta recuperar el servicio, y después de haber practicado:
+
+1. Consigue la **External Database URL** de la base de destino.
+2. El mismo comando del punto 2, cambiando el `--dbname` por esa URL y
+   **añadiendo `--clean --if-exists`** para que reemplace los objetos existentes.
+3. Comprueba la aplicación antes de dar por buena la restauración (Paso 8).
+
+> **🔑 Ese comando lleva la contraseña de la base dentro de la URL.** No lo
+> guardes en un archivo ni lo pegues en ningún chat. Bórralo del historial de la
+> terminal cuando termines.
+
+> **`--clean --if-exists` borra y recrea los objetos del destino.** Confirma dos
+> veces contra qué base apuntas. Si lo que quieres es recuperar datos perdidos,
+> **usa PITR** (opción A): casi siempre recupera información más reciente que tu
+> última exportación.
 
 **Practica esto una vez, antes de que haya datos reales.** Un respaldo que nunca
 se restauró no es un respaldo: es un archivo.
@@ -1384,59 +1675,263 @@ funciona.
   (`pg_restore` 16.15, `pg_dump`, `tar`), así que el respaldo se puede restaurar
   sin instalar nada en el computador.
 
+### Comprobado en el despliegue real de Render — 28 de octubre de 2026
+
+Esta sección es el resultado de recorrer la guía completa. **Es la parte más
+importante del documento**, porque cierra supuestos que antes estaban abiertos.
+
+**El despliegue.** Proyecto `fchmn-inscripciones`, entorno `Production`, región
+**Oregon (US West)**, los cuatro servicios desde el commit **`bffc69b`**:
+
+| Servicio | Tipo | Dirección | US$/mes |
+|---|---|---|---|
+| `fchmn-postgres` | PostgreSQL 16, 0,1 CPU / 256 MB, 1 GB | interna | 6,30 |
+| `fchmn-api` | **Private Service**, 0,5 CPU / 512 MB | `fchmn-api:3000`, **sin URL pública** | 7 |
+| `fchmn-web` | Web Service, 0,5 CPU / 512 MB | `https://fchmn-web.onrender.com` | 7 |
+| `fchmn-mantenimiento` | Cron Job, calendario `0 6 1 1 *` | sin dirección | 1 (mínimo) |
+
+**Supuestos que quedaron confirmados**, y que antes figuraban como incógnitas:
+
+- **Un servicio web de Render puede hacer de proxy hacia otro por la red
+  privada.** Era el supuesto central del Paso 7 y el que no estaba documentado
+  para este uso. Funciona: `/api/health` responde a través del proxy.
+- **Un servicio privado con comprobación TCP se considera sano** con esta imagen.
+  El despliegue terminó en *Deploy succeeded* y el registro muestra la API
+  escuchando en el puerto 3000.
+- **Un servicio privado no tiene URL pública**, tal como dice la documentación.
+  No hay subdominio `onrender.com` que buscar.
+- **Desplegar un cron job no lo ejecuta** (ver el recuadro del Paso 6.b).
+- **El guardián de la contraseña del administrador funciona en producción.** Un
+  primer intento de `seed-admin.js` **falló a propósito** porque la contraseña no
+  tenía mayúscula, y **no creó ninguna cuenta**. Es exactamente lo que debe
+  pasar.
+
+**Las comprobaciones HTTP, a través del proxy** (son pruebas de servidor, no de
+navegador):
+
+| Petición | Resultado |
+|---|---|
+| `GET /api/health` | **200** |
+| `GET /api/ready` | **200**, `"database":"ok"` |
+| `GET /api/docs` | **404** — la documentación interactiva no se expone |
+| `GET /api/auth/csrf` | **200**, entrega el testigo |
+| `POST /api/auth/login` con credenciales falsas | **401** con mensaje genérico, sin revelar si el usuario existe |
+| Cabecera `Access-Control-Allow-Origin` | presente **solo** para el origen declarado en `CORS_ORIGINS` |
+
+**Las pruebas de navegador, hechas por el administrador** (estas sí son pruebas
+de navegador, y son las que importan para las cookies):
+
+1. La web carga por **HTTPS** con candado válido.
+2. **Inicio de sesión** desde la interfaz: correcto.
+3. **Cambio de contraseña obligatorio** en el primer ingreso: correcto.
+4. **Recarga con F5: la sesión se mantuvo.** ← *la prueba decisiva del proxy*
+5. **Ruta interna escrita directamente** (`/clubes`): carga, sin 404 de Nginx.
+6. **Cierre de sesión**: vuelve al ingreso, y recargar **no** devuelve adentro.
+7. **La misma secuencia en una ventana de incógnito y con las cookies de
+   terceros BLOQUEADAS**: inicio de sesión correcto y **la sesión se mantuvo al
+   recargar**. ← *esta es la prueba que cierra el motivo del proxy*
+
+> **Por qué el punto 7 es el que vale.** Era el fallo que había que evitar: con
+> la web y la API en direcciones distintas, la cookie de sesión es **de
+> terceros** y hay navegadores que no la guardan; el usuario entra, recarga y
+> vuelve al login sin ningún mensaje que lo explique. Sirviendo la API bajo
+> `/api` del mismo origen **no hay ninguna cookie de terceros que bloquear**, y
+> bloquearlas expresamente ya no cambia nada. Comprobado en un navegador real,
+> no por HTTP.
+>
+> Esto también significa que `AUTH_COOKIE_SAMESITE` puede quedarse en `lax`, que
+> es más estricto —y por tanto más seguro— que `none`.
+
+**La base de datos.** Antes de migrar se confirmó, en el propio registro de la
+ejecución, que el destino era `fchmn_postgres` y que tenía **26 migraciones
+pendientes**, es decir, que estaba **vacía**. Después: migraciones aplicadas,
+datos de referencia sembrados y administrador creado, cada cosa con su comando
+explícito y su ejecución manual.
+
+> **Un detalle del panel que confunde.** `prisma migrate status` **termina con
+> código 1** cuando hay migraciones pendientes, así que esa ejecución aparece en
+> *Runs* **en rojo** aunque haya funcionado perfectamente. No es un fallo de
+> conexión: hay que leer el registro, donde se ve la base identificada y la lista
+> de migraciones. Es la forma de comprobar contra qué base se va a trabajar.
+
+### El ensayo de restauración — 29 de octubre de 2026
+
+Se creó un respaldo lógico en Render, se descargó y **se restauró completo en una
+base desechable** en el equipo del administrador, sin tocar la base operativa y
+sin costo. Resultado: **25 veredictos, todos conformes, y ningún error**.
+
+| Qué se comprobó | Esperado | Encontrado |
+|---|---|---|
+| Versión de origen / `pg_dump` / `pg_restore` | que coincidan | **16.15** las tres |
+| Código de salida de `pg_restore` (con `--exit-on-error`) | 0 | **0**, sin un solo `error` ni `warning` |
+| Tablas | 31 | **31**, y ninguna de más ni de menos por nombre |
+| Migraciones aplicadas, terminadas y sin revertir | 26 | **26** |
+| **Suma SHA-256 de cada migración vs. el commit `bffc69b`** | idénticas | **coincidencia total** |
+| Claves foráneas, y cuántas sin validar | 38 / 0 | **38 / 0** |
+| **Barrido explícito de huérfanos**, relación por relación | 0 filas | **0 en las 38** |
+| Índice único **parcial** de la invariante RB-06 | presente | `club_swimmers_unique_active_person` |
+| Tipos enumerados, con sus valores | 12 | **12** |
+| Catálogos: distancias, estilos, jornadas, tipos de prueba | los valores literales del seed | **exactos**, no solo la cantidad |
+| Matriz RBAC por rol | 17/8/8/8/8/6 | **idéntica** |
+| Columnas con valor por omisión | — | 46 |
+| Tablas operativas | vacías | **0 filas** (no hay datos reales aún) |
+
+**Además se comprobó que las restricciones no solo existen, sino que RECHAZAN lo
+que deben**, con inserciones de prueba dentro de transacciones revertidas: una
+clave foránea inválida, un duplicado en un catálogo único, un valor fuera de un
+tipo enumerado y una clave primaria compuesta repetida fueron **las cuatro
+rechazadas**; una inserción válida fue aceptada y no dejó rastro tras revertir.
+
+**Y un dato que confirma que el respaldo es del sistema vivo**, no de una base
+recién creada: la cuenta de administrador aparece con el cambio de contraseña
+**ya realizado**, el que se hizo en la prueba de navegador antes de exportar.
+
+> **Dos trampas que costaron tiempo y están documentadas en el Paso 9B:**
+>
+> 1. **La carpeta interna del respaldo lleva `:` en el nombre** (`2026-10-29T12:30Z`),
+>    que Windows no admite. Hay que descomprimir **dentro del contenedor**.
+> 2. **`toc.dat` está en el segundo nivel** de carpetas, no en el primero.
+>    Apuntar `pg_restore` al primero da *«does not appear to be a valid archive»*.
+>
+> También conviene saber que **`--verbose` escribe en la salida de error**: las
+> 211 líneas `pg_restore: creating ...` son progreso, no fallos.
+
+#### La aplicación funcionando sobre el respaldo restaurado
+
+El ensayo anterior demostró que la **base** se restaura bien. Esto demuestra que
+**el sistema funciona encima de ella**. Se restauró el mismo respaldo en una
+segunda base desechable y se levantaron la API y la web **construidas desde
+`bffc69b`**, en una red Docker aislada, sin ninguna conexión con Render.
+
+| Prueba | Resultado |
+|---|---|
+| Arranque de la API | **sana** (`Up … (healthy)`), escuchando en el puerto 3000 |
+| Arranque de la web y resolución del proxy | **sana**; `25-resolver.sh` configuró el resolutor |
+| `GET /api/health` a través del proxy | **200** |
+| `GET /api/ready` a través del proxy | **200**, `{"status":"ready","database":"ok"}` ← *la API habla con la base restaurada* |
+| `GET /` y `GET /clubes` | **200** y **200** (el *fallback* de SPA entrega `index.html`) |
+| `GET /api/auth/csrf` | **200**, entrega el testigo |
+| Inicio de sesión con clave **incorrecta** | **401** |
+| Inicio de sesión con clave **correcta** | **200**, con `roles:["admin"]` |
+| **Ruta de las cookies tras el proxy** | `fchmn_refresh` y `fchmn_csrf` llegaron con **`Path=/api/auth`**, no `/auth`, y ambas `HttpOnly` |
+| Catálogos **antes** del cambio de contraseña obligatorio | **403** — el sistema bloquea todo hasta cambiarla |
+| Cambio de contraseña | **200**, y la respuesta trae **sesión nueva** porque revoca las anteriores |
+| `GET /api/catalogs/…` con sesión válida | **200**: distancias **6**, estilos **4**, tipos de prueba **2** |
+| Los **valores** devueltos por la API | `50 100 200 400 800 1500` y `Espalda Libre Mariposa Pecho` — los del respaldo |
+| `POST /api/auth/refresh` (lo que hace F5) | **200**, con un token **distinto** del anterior, y ese token sirve en `/api/auth/me` |
+| `POST /api/auth/logout` | **204**, y el `refresh` posterior da **401** |
+| Auditoría | la base restaurada **registró** los ingresos, fallos, cambios de clave y cierres |
+
+> **Dos cosas que este ensayo demostró de paso, y vale anotarlas:**
+>
+> 1. **El guardián de producción funciona.** Con `NODE_ENV=production` y
+>    `AUTH_COOKIE_SECURE=false`, la API **se niega a arrancar**: *«no se admite en
+>    producción»*. Es el comportamiento correcto, y obliga a usar HTTPS.
+> 2. **La cuenta que venía del respaldo no se tocó.** Para probar el inicio de
+>    sesión se creó una cuenta aparte **solo en la base desechable**, con una
+>    contraseña generada al azar que no se mostró en ningún momento. Se verificó
+>    después que la cuenta restaurada seguía sin modificar.
+
+**Limitaciones de este ensayo, dichas claramente:**
+
+- **Corrió en modo `development`, y eso fue una decisión del ensayo, no un
+  límite del sistema.** En `production` la API exige cookies `Secure`, que a su
+  vez exigen HTTPS, y **el equipo local no tenía HTTPS configurado**. Sí se
+  puede: basta terminar TLS delante de la web con un certificado propio —uno
+  autofirmado o emitido por `mkcert`, confiado en el equipo— y ajustar el Nginx
+  del ensayo para escuchar en 443. **Simplemente no se hizo en este ensayo**, y
+  por eso el inicio de sesión se probó con la configuración de desarrollo. Queda
+  como una comprobación posible y pendiente, no como algo imposible.
+  Independiente de eso, la configuración de producción **sí está probada donde
+  importa**: en el propio despliegue de Render, con HTTPS real (Paso 8 y las
+  pruebas de navegador).
+- **Fueron pruebas HTTP, no de navegador.** Describen lo que hace el servidor.
+  Las de navegador, con cookies reales, están más arriba y se hicieron contra
+  Render.
+- **El respaldo no tiene datos reales**: esquema, catálogos y una cuenta. No
+  prueba el rendimiento ni el tiempo de restauración con miles de inscripciones.
+- **Los catálogos extensibles salieron vacíos** (`category-groups`, `events`,
+  `pools`) porque el seed no los crea: los llena el administrador. Que devuelvan
+  **200 con 0 elementos** es lo correcto, no un fallo.
+- **No se probó el sistema completo**: se comprobaron autenticación y catálogos,
+  no la importación de competencias, la carga masiva de personas ni los
+  informes.
+
 ### No comprobado
 
-- **Nada se desplegó en Render.** No se creó cuenta, proyecto ni servicio, y no
-  se contrató nada. **Todos los pasos 4 a 10 vienen de la documentación oficial**,
-  no de una ejecución. Los nombres exactos de campos y botones pueden diferir.
+- **La restauración sobre una base de Render.** El **ensayo sí está hecho** (ver
+  abajo): el archivo descargado se restauró completo en una base desechable y se
+  verificó. Lo que no se ha hecho es apuntar `pg_restore` a una base de Render
+  con `--clean --if-exists`, que es el camino de la recuperación real. Es
+  deliberado: ese camino reemplaza objetos y no se ensaya contra la base
+  operativa.
+- **Un respaldo con datos reales.** El ensayo se hizo con una base que solo tiene
+  esquema, catálogos y una cuenta. Un respaldo con miles de inscripciones pesará
+  mucho más y tardará más, aunque el procedimiento sea el mismo.
+- **El sistema completo sobre el respaldo.** Se levantó la aplicación contra la
+  base restaurada y se comprobaron arranque, sesión y catálogos (ver más
+  arriba), pero **no** la importación de competencias, la carga masiva de
+  personas ni los informes.
+- **La autoridad que emite el certificado HTTPS.** El candado aparece válido en
+  el navegador, pero **no se registró el emisor**. En la red desde la que se
+  probó hay inspección TLS corporativa, así que el certificado que el navegador
+  muestra ahí **es el de la autoridad corporativa, no el de Render**. Para ver el
+  verdadero hay que repetir la comprobación desde una red sin inspección.
+- **El comportamiento en otros navegadores.** Lo de las cookies de terceros **ya
+  está comprobado** (punto 7 de arriba), pero en **un solo navegador**, el del
+  administrador. No se registró cuál era, así que tampoco se puede afirmar qué
+  motor se probó. Safari, en particular, aplica sus propias reglas. Con el proxy
+  no debería haber diferencia, porque la cookie es **de primera parte** y
+  ninguna política de terceros la alcanza; aun así, conviene que alguien con Mac
+  o iPhone repita la secuencia del Paso 8 y lo confirme.
 - **Si guardar el campo *Docker Command* dispara un despliegue o una ejecución.**
-  La documentación de Render no lo dice. Para las **variables de entorno** sí
-  está documentado que guardar lanza un despliegue salvo que se elija *Save only*.
-  El procedimiento del Paso 6.b está escrito para que esa incógnita no importe.
+  Observado cuatro veces que no añade ejecuciones, pero **no está documentado**
+  (ver el recuadro del Paso 6.b). El procedimiento está escrito para que esa
+  incógnita no importe.
 - **Si suspender un cron job impide sus ejecuciones programadas.** La
   documentación de Render no lo dice, así que esta guía **no** se apoya en ello:
   usa `Auto-Deploy: Off`, que sí está documentado.
-- **Que Render permita a un servicio web hacer de proxy hacia otro por la red
-  privada.** Su documentación dice que los servicios de la misma región y
-  espacio de trabajo pueden hablar entre sí por esa red, y que los servicios web
-  Free **no la reciben**, pero **no describe este uso concreto**. Es el supuesto
-  central del Paso 7 y **el primero que hay que comprobar al desplegar**: es el
-  paso 3 del Paso 8.
-- **El valor y el formato exactos de la dirección interna de un servicio
-  privado.** La guía indica `fchmn-api:3000` porque fija `PORT=3000` en el
-  propio servicio, en vez de depender del comportamiento de `PORT` para
-  servicios privados, que Render no documenta. El valor que muestre su *Service
-  Address* manda sobre eso.
-- **Que un servicio privado con comprobación TCP se considere sano** con esta
-  imagen. La documentación dice que a los privados solo se les aplica esa
-  comprobación; la API abre su puerto al arrancar, así que debería bastar, pero
-  no está probado.
-- **El comportamiento en Safari del sistema desplegado.** Con el proxy *no
-  debería* haber problema, porque no hay cookies de terceros, y en un navegador
-  real contra el entorno local la sesión se mantuvo. Pero eso fue con un solo
-  origen en `localhost`: **confirmarlo en el despliegue real sigue siendo el
-  paso 9 del Paso 8**.
-- **El comportamiento con HTTPS real.** Las pruebas locales corrieron sobre
-  `http://localhost`, que los navegadores tratan como contexto seguro y por eso
-  aceptan cookies `Secure`. En Render habrá HTTPS de verdad; no se espera
-  diferencia, pero no está probado.
+- **Que el calendario del cron job se dispare como se espera.** El próximo
+  `0 6 1 1 *` es el 1 de enero. Lo que correrá entonces es el comando inocuo de
+  la imagen, pero eso **tampoco está observado todavía**: conviene mirar *Runs*
+  el 1 de enero y confirmar que lo que se ejecutó fue el mensaje en reposo.
 - **Si 512 MB le bastan a la API.** Es una estimación; el salto siguiente es
   US$25/mes.
 - **El consumo real** de tráfico, almacenamiento y minutos de construcción, y por
-  tanto si habrá excedentes sobre el estimado de US$21.
+  tanto si habrá excedentes sobre el estimado de US$21,30.
 
 ---
 
-## Qué falta decidir antes de desplegar
+## Qué falta decidir, ya desplegado
 
-1. **Plan Free para ensayar, o de pago desde el principio.** Free sirve para
-   comprobar que todo funciona; no sirve para datos reales (se apaga solo, caduca
-   a los 30 días y no tiene ninguna copia de seguridad).
-2. **La política de respaldos externos**: con qué cadencia se descargan, dónde se
-   guardan, cuánto se conservan y quién puede acceder (Paso 9B).
-3. **Nada: lo de las cookies ya está decidido.** El proxy del Paso 7 lo
-   resuelve, y no hace falta dominio propio para ello. Un dominio sigue siendo
-   deseable por imagen y continuidad, pero puede esperar: ver «Un dominio
-   propio: mejora posterior, no requisito».
+Las dos decisiones que había antes de desplegar —plan de pago y cookies— están
+tomadas: todo va en planes de pago y el proxy del Paso 7 resolvió las cookies.
+Lo que queda abierto es esto, por orden de urgencia:
+
+1. **Aprobar la rutina de respaldo externo, y asignarle un responsable.** El
+   Paso 9B trae una **propuesta** —frecuencias, ubicaciones, retención y ensayo
+   periódico— con el procedimiento ya ensayado, pero **nada de eso está
+   aprobado** y **responsable y suplente siguen sin asignar**. Mientras eso siga
+   así, la única protección es lo que Render hace solo: **PITR de 3 días**. La
+   propuesta indica qué pérdida máxima cubre cada frecuencia, para que la
+   decisión se tome sabiendo qué se está eligiendo.
+3. **El tamaño del almacenamiento de la base.** Está en **1 GB**, que sobra para
+   empezar porque solo guarda texto, pero **se puede subir y no se puede
+   bajar**. Hay que mirarlo antes de cargar varios años de histórico. Cada GB son
+   US$0,30 al mes.
 4. **Quién recibe los avisos de caída.** Render comprueba la salud **al
    desplegar**, no de forma continua. No hay ninguna monitorización configurada.
+5. **Quitar la dependencia del espacio de nombres interno de Render.** Hoy
+   `API_INTERNA` lleva el nombre completo `…svc.cluster.local` porque el
+   resolutor de Nginx no aplica las *search domains* (Paso 7). Funciona, pero
+   incorpora un detalle de la infraestructura de Render que ellos no garantizan.
+   **La mejora**: en `default.conf.template`, pasar el destino a `proxy_pass` de
+   forma literal en vez de por variable, para que resuelva el sistema operativo
+   —que sí aplica los sufijos— y el nombre corto baste. El precio es perder la
+   reresolución en cada petición, que es justo lo que hoy permite seguir a la API
+   cuando cambia de dirección; habría que evaluar cuál de los dos problemas pesa
+   más. **No es urgente**: el síntoma, si algún día aparece, es un 502 con el
+   error exacto en los registros y el arreglo es cambiar una variable.
+6. **Un dominio propio**: deseable por imagen y continuidad, pero ya no hace
+   falta para nada técnico. Ver «Un dominio propio: mejora posterior, no
+   requisito».
