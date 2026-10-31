@@ -304,8 +304,19 @@ model Club {
   username String
   code     String @map("code") // sigla o abreviación, máx. 5 caracteres (validado en Zod)
 
-  hasLegalStatus Boolean @default(false) @map("has_legal_status")
-  rut            String? @map("rut") // obligatorio solo si hasLegalStatus=true (RB-02)
+  /// TRES estados, no dos:
+  ///   `true`  — tiene personalidad jurídica. Exige RUT (RB-02).
+  ///   `false` — se verificó que NO la tiene.
+  ///   `null`  — PENDIENTE DE VERIFICAR. No es lo mismo que `false`.
+  ///
+  /// Sin valor por omisión a propósito: omitir el campo no puede significar
+  /// «no la tiene», porque eso sería afirmar algo que nadie comprobó.
+  ///
+  /// CUIDADO: `Boolean?` hace que `if (club.hasLegalStatus)` siga compilando y
+  /// trate `null` como `false` en silencio. En el servicio las tres ramas se
+  /// comparan de forma explícita (`=== true` / `=== false` / `=== null`).
+  hasLegalStatus Boolean? @map("has_legal_status")
+  rut            String?  @map("rut") // obligatorio si hasLegalStatus=true; opcional y validado si null (RB-02)
   legalName      String? @map("legal_name")
 
   email String
@@ -398,7 +409,17 @@ model ClubSwimmer {
   reviewedAt        DateTime? @map("reviewed_at")
   rejectionReason   String?   @map("rejection_reason")
 
-  startDate DateTime? @map("start_date") // se completa al aprobar
+  /// Fecha EFECTIVA de inicio: desde cuándo pertenece al club. Es un dato del
+  /// negocio, no una marca de auditoría — esa es `reviewedAt`.
+  ///
+  /// `@db.Date` a propósito: una fecha de calendario no tiene hora ni zona. Como
+  /// `TIMESTAMP` dependía de la zona del servidor (Render corre en UTC), y la
+  /// base y la pantalla llegaban a mostrar días distintos para el mismo dato.
+  /// Prisma la escribe y la lee como medianoche UTC: se maneja con
+  /// `shared/fecha.util.ts`, nunca con `new Date()` ni `toLocaleDateString()`.
+  startDate DateTime? @db.Date @map("start_date")
+  // Sigue siendo un instante: no se muestra en ninguna pantalla. Mismo defecto
+  // que tenía `startDate`, pendiente de decidir aparte.
   endDate   DateTime? @map("end_date") // se completa al finalizar
 
   createdAt DateTime @default(now()) @map("created_at")

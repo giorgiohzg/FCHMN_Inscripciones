@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useState, useCallback, useRef } from "react
 import { useSwimmerAssignmentApi, type ClubSwimmerAssignment } from "./assignmentApi";
 import { usePersonsApi } from "../persons/personsApi";
 import { useSort, sortItems, SortableTh } from "../../shared/sortableTable";
+import { formatearFechaCalendario, claveOrdenFechaCalendario, esFechaCalendario } from "../../shared/fechaCalendario";
 import { useBusquedaDePersonas } from "../../shared/useBusquedaDePersonas";
 
 /** Filas por página de la tabla. El pie de página usa este mismo número. */
@@ -104,9 +105,11 @@ function validarPaginaDeLaTabla(respuesta: unknown, pagePedida: number, pageSize
       throw new Error(`La membresía ${String(f.id)} trae un nadador sin RUN.`);
     }
     // `startDate` puede faltar —se pinta como "—"—, pero si viene tiene que ser
-    // una fecha legible: `new Date("cualquier cosa")` produce "Invalid Date".
+    // una fecha de CALENDARIO: `AAAA-MM-DD`, con o sin la hora que añade la
+    // serialización. Antes bastaba con que `new Date()` la supiera interpretar,
+    // que acepta formas que esta pantalla no sabe mostrar sin desplazar el día.
     if (f.startDate !== null && f.startDate !== undefined) {
-      if (typeof f.startDate !== "string" || Number.isNaN(new Date(f.startDate).getTime())) {
+      if (!esFechaCalendario(f.startDate)) {
         throw new Error(`La membresía ${String(f.id)} trae una fecha de inicio ilegible.`);
       }
     }
@@ -546,7 +549,7 @@ export function ClubSwimmersSection({ clubId }: ClubSwimmersSectionProps) {
             switch (key) {
               case "person": return a.person.fullName;
               case "status": return STATUS_LABELS[a.status];
-              case "startDate": return a.startDate ? new Date(a.startDate) : null;
+              case "startDate": return a.startDate ? claveOrdenFechaCalendario(a.startDate) : null;
             }
           }).map((a) => (
             <tr key={a.id}>
@@ -554,7 +557,7 @@ export function ClubSwimmersSection({ clubId }: ClubSwimmersSectionProps) {
               <td>
                 <span className={`badge ${STATUS_BADGE[a.status]}`}>{STATUS_LABELS[a.status]}</span>
               </td>
-              <td>{a.startDate ? new Date(a.startDate).toLocaleDateString("es-CL") : "—"}</td>
+              <td>{a.startDate ? formatearFechaCalendario(a.startDate) : "—"}</td>
               <td>
                 <button
                   className="btn-danger"

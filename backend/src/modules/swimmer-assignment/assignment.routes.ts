@@ -7,6 +7,8 @@ import {
   swimmersByClubFilterQuerySchema,
   bulkAssignSwimmersSchema,
   reassignSwimmerSchema,
+  directAssignmentSchema,
+  approveAssignmentSchema,
 } from "./assignment.schemas";
 import { requireAuth, requirePermission } from "../auth/rbac.middleware";
 import { ValidationError, ForbiddenError } from "../../shared/errors";
@@ -64,7 +66,7 @@ export async function swimmerAssignmentRoutes(app: FastifyInstance) {
    * mismo permiso que aprobar (`swimmer-assignment:approve`, exclusivo de `admin`).
    */
   app.post("/swimmer-assignments/direct", { preHandler: [requirePermission("swimmer-assignment:approve")] }, async (req, reply) => {
-    const parsed = proposeAssignmentSchema.safeParse(req.body);
+    const parsed = directAssignmentSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Datos de solicitud inválidos", parsed.error.flatten());
 
     const assignment = await assignmentService.assignSwimmerDirectly(parsed.data, { userId: req.authUser!.sub, ipAddress: req.ip });
@@ -112,7 +114,14 @@ export async function swimmerAssignmentRoutes(app: FastifyInstance) {
     const { personId } = req.params as { personId: string };
     const parsed = reassignSwimmerSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Datos inválidos", parsed.error.flatten());
-    reply.send(await assignmentService.reassignSwimmerToClub(personId, parsed.data.newClubId, { userId: req.authUser!.sub, ipAddress: req.ip }));
+    reply.send(
+      await assignmentService.reassignSwimmerToClub(
+        personId,
+        parsed.data.newClubId,
+        { userId: req.authUser!.sub, ipAddress: req.ip },
+        parsed.data.fechaEfectiva
+      )
+    );
   });
 
   /**
@@ -140,7 +149,10 @@ export async function swimmerAssignmentRoutes(app: FastifyInstance) {
    */
   app.post("/swimmer-assignments/:id/approve", { preHandler: [requirePermission("swimmer-assignment:approve")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    reply.send(await assignmentService.approveAssignment(id, { userId: req.authUser!.sub, ipAddress: req.ip }));
+    // El cuerpo es opcional: aprobar sin fecha usa el día de hoy en Chile.
+    const parsed = approveAssignmentSchema.safeParse(req.body ?? {});
+    if (!parsed.success) throw new ValidationError("Datos inválidos", parsed.error.flatten());
+    reply.send(await assignmentService.approveAssignment(id, { userId: req.authUser!.sub, ipAddress: req.ip }, parsed.data.fechaEfectiva));
   });
 
   app.post("/swimmer-assignments/:id/reject", { preHandler: [requirePermission("swimmer-assignment:approve")] }, async (req, reply) => {

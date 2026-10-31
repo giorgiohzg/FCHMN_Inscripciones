@@ -465,9 +465,9 @@ cuenta `system`.
 
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
-| GET | `/clubs` | Lista clubes (búsqueda por nombre/razón social/RUT, filtro por estado, paginado) | `clubs:read` |
+| GET | `/clubs` | Lista clubes (búsqueda por nombre/razón social/RUT, filtro por estado y por **personalidad jurídica** —`si` / `no` / `pendiente`—, paginado) | `clubs:read` |
 | GET | `/clubs/:id` | Detalle de un club (incluye su personal —delegados, entrenadores y representante legal— y las credenciales) | `clubs:read` |
-| POST | `/clubs` | Crea un club (RB-02: RUT obligatorio solo si tiene personalidad jurídica) | `clubs:write` |
+| POST | `/clubs` | Crea un club (RB-02: RUT obligatorio solo si tiene personalidad jurídica confirmada) | `clubs:write` |
 | PUT | `/clubs/:id` | Actualiza datos del club | `clubs:write` |
 | DELETE | `/clubs/:id` | Eliminación lógica | `clubs:write` |
 | POST | `/clubs/:id/block` | Bloquea el club y su cuenta de acceso si tiene | `clubs:write` |
@@ -478,9 +478,28 @@ cuenta `system`.
 
 ### Reglas aplicadas en el Módulo 3
 
-- **RB-02**: el RUT es obligatorio y se valida (formato + dígito verificador) únicamente
-  si `hasLegalStatus = true`. Se reutiliza el mismo algoritmo del RUN de personas
-  (`shared/run.util.ts`), cubierto con 14 pruebas unitarias sobre el esquema Zod (`clubs.schemas.test.ts`).
+- **RB-02 — la personalidad jurídica tiene TRES estados**, y `null` no es `false`:
+
+  | `hasLegalStatus` | Significado | RUT |
+  |---|---|---|
+  | `true` | tiene personalidad jurídica | **obligatorio**, validado |
+  | `false` | se **verificó** que no la tiene | se descarta |
+  | `null` | **pendiente de verificar** | **opcional**, y validado si viene |
+
+  El tercer estado existe porque `false` afirmaba «no tiene» incluso cuando nadie
+  lo había comprobado. La columna es anulable y **sin valor por omisión**: omitir
+  el campo deja «pendiente», no «no tiene». Tener un RUT **no** cambia el estado
+  a verificado — eso es siempre una decisión explícita.
+
+  El RUT se valida (formato + dígito verificador) con el mismo algoritmo del RUN
+  de personas (`shared/run.util.ts`). Cubierto en `clubs.schemas.test.ts`,
+  `clubs-personalidad-juridica.test.ts` (22 pruebas sobre los tres estados) y
+  `personalidad-juridica-transiciones.integration.test.ts` (23 sobre las
+  transiciones).
+
+  > **Cuidado al leer este campo en código.** Es `boolean | null`, así que
+  > `if (club.hasLegalStatus)` compila y trata «pendiente» igual que «no», sin
+  > ningún error de tipos. Compare siempre `=== true`, `=== false` o `=== null`.
 - **A-01 / A-02**: el personal del club vive en la tabla `club_staff`
   (`club_id`, `person_id`, `role_type`), no en columnas `delegate_person_id` /
   `coach_person_id` como decía la propuesta original: un club puede tener **varios**
@@ -495,12 +514,24 @@ cuenta `system`.
   - Puede tener credenciales y operar sobre el club donde fue nombrado; no las
     requiere obligatoriamente (igual que delegados y entrenadores).
   - Le aplica la misma restricción de un solo club que a delegado y entrenador.
-  - Solo existe si el club declara personalidad jurídica (RB-02). Si el club la
-    pierde, el nombramiento se retira automáticamente.
+  - Solo se puede designar con personalidad jurídica **confirmada** (`true`). Con
+    el estado `false` o **pendiente de verificar** la designación se **rechaza**
+    con un mensaje que lo explica — no se descarta en silencio.
+  - **Un representante designado BLOQUEA el cambio de estado.** Pasar de `true` a
+    `false` o a `pendiente` se rechaza mientras exista uno, y hay que retirarlo
+    expresamente primero (`legalRepresentativePersonId: null`, con el estado
+    todavía en `true`). Son dos pasos a propósito.
+
+    > **Esto cambió el 2026-10-31.** Antes, poner el indicador en `false`
+    > retiraba el nombramiento y desactivaba el rol de acceso de esa persona
+    > **sin avisar**. Con dos estados pasaba poco; al añadir «pendiente», la
+    > transición «pendiente → no» se volvió rutinaria y cada vez le habría
+    > quitado el acceso a alguien como efecto colateral de cambiar una casilla.
+    > Ahora quitar el acceso de una persona es siempre una decisión visible.
   - Como máximo **uno por club** (a diferencia de delegados y entrenadores).
   - El rol funcional (`person_roles`) y el rol de acceso (`user_roles`) se **derivan**
-    del nombramiento: se activan al nombrarlo y se desactivan al retirarlo,
-    reemplazarlo o quitarle al club la personalidad jurídica.
+    del nombramiento: se activan al nombrarlo y se desactivan al retirarlo o
+    reemplazarlo — nunca por un cambio de estado del club.
 
   La equivalencia de permisos se verifica en `tests/rbac.definitions.test.ts` y el
   ciclo de vida completo en `tests/legal-representative.integration.test.ts`.
@@ -514,7 +545,7 @@ cuenta `system`.
 | GET | `/swimmer-assignments` | Lista solicitudes (filtro por club/nadador/estado, paginado) | `swimmer-assignment:read` |
 | GET | `/swimmer-assignments/:id` | Detalle de una solicitud | `swimmer-assignment:read` |
 | POST | `/swimmer-assignments` | El club o su personal —delegado, entrenador o representante legal— propone incorporar un nadador (queda `pending`) | `swimmer-assignment:write` |
-| POST | `/swimmer-assignments/:id/approve` | Aprueba y activa la asignación | `swimmer-assignment:approve` (solo `admin`) |
+| POST | `/swimmer-assignments/:id/approve` | Aprueba y activa la asignación. Cuerpo opcional: `fechaEfectiva` (`AAAA-MM-DD`) | `swimmer-assignment:approve` (solo `admin`) |
 | POST | `/swimmer-assignments/:id/reject` | Rechaza la solicitud | `swimmer-assignment:approve` (solo `admin`) |
 | POST | `/swimmer-assignments/:id/end` | Finaliza una membresía activa | `swimmer-assignment:write` + alcance: el `admin`, o el personal **del mismo club** |
 
@@ -533,6 +564,32 @@ cuenta `system`.
   El permiso habilita la acción; el alcance lo decide `endAssignment` comparando
   el club del actor con el de la membresía, y está cubierto en
   `tests/authorization.integration.test.ts`.
+- **La fecha efectiva de la membresía es un dato del negocio, no una marca de auditoría.**
+  `club_swimmers.start_date` es una columna **`DATE`** —una fecha de calendario,
+  sin hora y sin zona— y responde «desde cuándo pertenece al club». La marca de
+  auditoría es `reviewed_at`, que sigue siendo un instante y responde «cuándo se
+  registró».
+
+  Los cuatro endpoints que activan una membresía aceptan `fechaEfectiva` en
+  formato `AAAA-MM-DD`: `/direct`, `/bulk-assign`, `/:id/approve` y
+  `/reassign/:personId`. Si no viene, se usa **el día de hoy en Chile**, no el del
+  reloj del servidor. En `bulk-assign` la fecha se resuelve **una vez** y se
+  aplica a toda la tanda.
+
+  > **Antes los dos campos recibían `new Date()` en la misma operación**, así que
+  > `start_date` era una segunda copia de `reviewed_at`. Medido: una asignación
+  > hecha en Chile a las 23:58 del 30 de octubre quedaba guardada como el 31,
+  > mientras la interfaz mostraba el 30. El dato valía una cosa en la base y otra
+  > en la pantalla.
+  >
+  > **Al mostrar una fecha de calendario, no la pase por `new Date()`.** Prisma
+  > sirve una columna `DATE` como medianoche UTC, y
+  > `toLocaleDateString("es-CL")` sobre eso resta un día. Use
+  > `shared/fechaCalendario.ts` en el frontend y `shared/fecha.util.ts` en el
+  > backend.
+  >
+  > **Pendiente:** la pantalla de asignación masiva todavía no tiene el campo de
+  > fecha, así que desde la interfaz se usa el día de hoy. La API sí la acepta.
 - **RB-06 — un nadador activo, un solo club. Es una invariante, no un parámetro.**
   Si el nadador ya tiene una membresía activa en **otro** club, tanto la
   aprobación como la asignación directa se **bloquean** con un mensaje explícito:

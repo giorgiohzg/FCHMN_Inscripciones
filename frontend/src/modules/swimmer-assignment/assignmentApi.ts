@@ -11,6 +11,14 @@ export interface ClubSwimmerAssignment {
   reviewedByUserId: string | null;
   reviewedAt: string | null;
   rejectionReason: string | null;
+  /**
+   * Fecha EFECTIVA de inicio, como fecha de CALENDARIO.
+   *
+   * El servidor la guarda en una columna `DATE` y Prisma la serializa como
+   * medianoche UTC (`"2026-10-30T00:00:00.000Z"`). **Nunca pasarla por
+   * `new Date(...).toLocaleDateString()`**: al oeste de Greenwich eso muestra el
+   * día ANTERIOR. Se formatea con `formatearFechaCalendario`.
+   */
   startDate: string | null;
   endDate: string | null;
   club: { id: string; name: string };
@@ -61,11 +69,12 @@ export function useSwimmerAssignmentApi() {
       api.post<ClubSwimmerAssignment>(`/swimmer-assignments`, { clubId, personId }),
 
     /** Asignación directa (solo admin): queda activa de inmediato, sin pasar por "pendiente". */
-    assignDirectly: (clubId: string, personId: string) =>
-      api.post<ClubSwimmerAssignment>(`/swimmer-assignments/direct`, { clubId, personId }),
+    assignDirectly: (clubId: string, personId: string, fechaEfectiva?: string) =>
+      api.post<ClubSwimmerAssignment>(`/swimmer-assignments/direct`, { clubId, personId, fechaEfectiva }),
 
-    approve: (id: string) =>
-      api.post<ClubSwimmerAssignment>(`/swimmer-assignments/${id}/approve`),
+    /** `fechaEfectiva` en AAAA-MM-DD; sin ella, el servidor usa hoy en Chile. */
+    approve: (id: string, fechaEfectiva?: string) =>
+      api.post<ClubSwimmerAssignment>(`/swimmer-assignments/${id}/approve`, { fechaEfectiva }),
 
     reject: (id: string, reason?: string) =>
       api.post<ClubSwimmerAssignment>(`/swimmer-assignments/${id}/reject`, { reason }),
@@ -82,15 +91,19 @@ export function useSwimmerAssignmentApi() {
       return api.get<SwimmerForBulkAssign[]>(`/swimmer-assignments/swimmers-by-club?${qs}`);
     },
 
-    bulkAssign: (targetClubId: string, personIds: string[]) =>
-      api.post<BulkAssignSummary>(`/swimmer-assignments/bulk-assign`, { targetClubId, personIds }),
+    /**
+     * `fechaEfectiva` (AAAA-MM-DD) se aplica a TODA la tanda: una sola fecha
+     * para todas las membresías, no el instante de cada escritura.
+     */
+    bulkAssign: (targetClubId: string, personIds: string[], fechaEfectiva?: string) =>
+      api.post<BulkAssignSummary>(`/swimmer-assignments/bulk-assign`, { targetClubId, personIds, fechaEfectiva }),
 
     /** Club actual del nadador (null si no tiene ninguno activo). */
     getCurrentClub: (personId: string) =>
       api.get<(ClubSwimmerAssignment & { club: { id: string; name: string } }) | null>(`/swimmer-assignments/current-club/${personId}`),
 
     /** Cambia de club en un solo paso (finaliza el anterior si existía). */
-    reassign: (personId: string, newClubId: string) =>
-      api.post<ClubSwimmerAssignment>(`/swimmer-assignments/reassign/${personId}`, { newClubId }),
+    reassign: (personId: string, newClubId: string, fechaEfectiva?: string) =>
+      api.post<ClubSwimmerAssignment>(`/swimmer-assignments/reassign/${personId}`, { newClubId, fechaEfectiva }),
   };
 }
