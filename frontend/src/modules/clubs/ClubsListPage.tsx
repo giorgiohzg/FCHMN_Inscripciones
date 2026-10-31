@@ -1,35 +1,53 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../../shared/AppShell";
-import { useClubsApi, type Club, type AccountStatus } from "./clubsApi";
+import { useClubsApi, type Club, type AccountStatus, type EstadoPjFiltro } from "./clubsApi";
 import { InlineEditableCell } from "../../shared/InlineEditableCell";
 import { useSort, sortItems, SortableTh } from "../../shared/sortableTable";
 
 const STATUS_LABELS: Record<AccountStatus, string> = { active: "Activo", locked: "Bloqueado", disabled: "Inhabilitado" };
 const STATUS_BADGE: Record<AccountStatus, string> = { active: "badge-active", locked: "badge-locked", disabled: "badge-disabled" };
 
+/**
+ * La personalidad jurídica tiene TRES estados y `null` es uno de ellos.
+ *
+ * Sin esto, un club pendiente se veía idéntico a uno sin personalidad jurídica:
+ * la columna RUT mostraba «Sin personalidad jurídica» para los dos, porque
+ * ninguno tiene RUT.
+ */
+const PJ_ETIQUETA = (v: boolean | null): string => (v === true ? "Sí" : v === false ? "No" : "Pendiente");
+const PJ_COLOR = (v: boolean | null): string => (v === true ? "var(--brand-navy)" : v === false ? "var(--brand-gray-600)" : "#9a6700");
+
 export function ClubsListPage() {
   const api = useClubsApi();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<AccountStatus | "">("");
+  const [pjFiltro, setPjFiltro] = useState<EstadoPjFiltro | "">("");
   const [data, setData] = useState<{ items: Club[]; total: number; page: number; pageSize: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const { sortKey, sortDir, onSort } = useSort<"name" | "code" | "rut" | "delegate" | "coach" | "status">();
+  const { sortKey, sortDir, onSort } = useSort<"name" | "code" | "rut" | "pj" | "delegate" | "coach" | "status">();
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setData(await api.list({ search: search || undefined, status: (status || undefined) as AccountStatus | undefined, page }));
+      setData(
+        await api.list({
+          search: search || undefined,
+          status: (status || undefined) as AccountStatus | undefined,
+          personalidadJuridica: (pjFiltro || undefined) as EstadoPjFiltro | undefined,
+          page,
+        })
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar clubes");
     } finally {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status, page]);
+  }, [search, status, pjFiltro, page]);
 
   useEffect(() => {
     load();
@@ -76,6 +94,17 @@ export function ClubsListPage() {
           <option value="locked">Bloqueado</option>
           <option value="disabled">Inhabilitado</option>
         </select>
+        <select
+          value={pjFiltro}
+          onChange={(e) => { setPage(1); setPjFiltro(e.target.value as EstadoPjFiltro | ""); }}
+          style={{ maxWidth: 240 }}
+          aria-label="Filtrar por personalidad jurídica"
+        >
+          <option value="">Toda personalidad jurídica</option>
+          <option value="si">Con personalidad jurídica</option>
+          <option value="no">Sin personalidad jurídica</option>
+          <option value="pendiente">Pendiente de verificar</option>
+        </select>
       </div>
 
       {error && <p className="error-message">{error}</p>}
@@ -89,6 +118,7 @@ export function ClubsListPage() {
                 <SortableTh label="Club" sortKey="name" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
                 <SortableTh label="Sigla" sortKey="code" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
                 <SortableTh label="RUT" sortKey="rut" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
+                <SortableTh label="Pers. jurídica" sortKey="pj" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
                 <SortableTh label="Delegado(a)" sortKey="delegate" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
                 <SortableTh label="Entrenador(a)" sortKey="coach" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
                 <SortableTh label="Estado" sortKey="status" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
@@ -101,6 +131,7 @@ export function ClubsListPage() {
                   case "name": return c.name;
                   case "code": return c.code;
                   case "rut": return c.rut;
+                  case "pj": return PJ_ETIQUETA(c.hasLegalStatus);
                   case "delegate": return c.staff.filter((s) => s.roleType === "delegate").map((s) => s.person.fullName).join(", ") || null;
                   case "coach": return c.staff.filter((s) => s.roleType === "coach").map((s) => s.person.fullName).join(", ") || null;
                   case "status": return STATUS_LABELS[c.status];
@@ -120,7 +151,20 @@ export function ClubsListPage() {
                       }}
                     />
                   </td>
-                  <td>{c.rut ? c.rut : <span style={{ color: "var(--brand-gray-600)" }}>Sin personalidad jurídica</span>}</td>
+                  <td>
+                    {c.rut ? (
+                      c.rut
+                    ) : (
+                      <span style={{ color: "var(--brand-gray-600)" }}>
+                        {c.hasLegalStatus === null ? "Sin RUT todavía" : "Sin personalidad jurídica"}
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    <span style={{ color: PJ_COLOR(c.hasLegalStatus), fontWeight: c.hasLegalStatus === null ? 600 : 400 }}>
+                      {PJ_ETIQUETA(c.hasLegalStatus)}
+                    </span>
+                  </td>
                   <td>{c.staff.filter((s) => s.roleType === "delegate").map((s) => s.person.fullName).join(", ") || "—"}</td>
                   <td>{c.staff.filter((s) => s.roleType === "coach").map((s) => s.person.fullName).join(", ") || "—"}</td>
                   <td>

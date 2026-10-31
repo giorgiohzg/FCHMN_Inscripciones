@@ -2,6 +2,9 @@ import { api } from "../../shared/apiClient";
 
 export type AccountStatus = "active" | "locked" | "disabled";
 
+/** Filtro por personalidad jurídica. Lo resuelve el servidor, no la página. */
+export type EstadoPjFiltro = "si" | "no" | "pendiente";
+
 export interface ClubStaffMember {
   id: string;
   roleType: "delegate" | "coach" | "legal_representative";
@@ -13,7 +16,8 @@ export interface Club {
   name: string;
   username: string;
   code: string;
-  hasLegalStatus: boolean;
+  /** `true` sí · `false` verificado que no · `null` **pendiente de verificar**. */
+  hasLegalStatus: boolean | null;
   rut: string | null;
   legalName: string | null;
   email: string;
@@ -37,7 +41,8 @@ export interface ClubFormInput {
   name: string;
   username?: string; // solo en creación
   code: string;
-  hasLegalStatus: boolean;
+  /** `null` deja el club como «pendiente de verificar». Nunca se omite. */
+  hasLegalStatus: boolean | null;
   rut?: string;
   legalName?: string;
   email: string;
@@ -52,10 +57,11 @@ export interface ClubFormInput {
 
 export function useClubsApi() {
   return {
-    list: (params: { search?: string; status?: AccountStatus; page?: number; pageSize?: number } = {}) => {
+    list: (params: { search?: string; status?: AccountStatus; personalidadJuridica?: EstadoPjFiltro; page?: number; pageSize?: number } = {}) => {
       const qs = new URLSearchParams();
       if (params.search) qs.set("search", params.search);
       if (params.status) qs.set("status", params.status);
+      if (params.personalidadJuridica) qs.set("personalidadJuridica", params.personalidadJuridica);
       if (params.page) qs.set("page", String(params.page));
       if (params.pageSize) qs.set("pageSize", String(params.pageSize));
       return api.get<ClubListResult>(`/clubs?${qs}`);

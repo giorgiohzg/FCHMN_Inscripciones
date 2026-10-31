@@ -7,6 +7,19 @@ import { PersonPicker } from "./PersonPicker";
 import { PersonMultiPicker } from "./PersonMultiPicker";
 import { ClubSwimmersSection } from "../swimmer-assignment/ClubSwimmersSection";
 
+/**
+ * Los TRES estados de la personalidad jurídica, como los ve el formulario.
+ *
+ * Una casilla de verificación no puede expresar tres cosas, y el estado
+ * «pendiente de verificar» no es «no»: el booleano del servidor es
+ * `true | false | null` y aquí vive como un valor con nombre, para que ninguna
+ * comparación por veracidad pueda confundir «pendiente» con «no».
+ */
+type EstadoPj = "si" | "no" | "pendiente";
+
+const aEstadoPj = (v: boolean | null | undefined): EstadoPj => (v === true ? "si" : v === false ? "no" : "pendiente");
+const aValorPj = (e: EstadoPj): boolean | null => (e === "si" ? true : e === "no" ? false : null);
+
 export function ClubFormPage() {
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id) && id !== "nuevo";
@@ -16,7 +29,9 @@ export function ClubFormPage() {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [code, setCode] = useState("");
-  const [hasLegalStatus, setHasLegalStatus] = useState(false);
+  // Un club nuevo nace PENDIENTE: nadie ha verificado nada todavía. Antes nacía
+  // en `false`, que afirmaba «no tiene personalidad jurídica» sin comprobarlo.
+  const [pjEstado, setPjEstado] = useState<EstadoPj>("pendiente");
   const [rut, setRut] = useState("");
   const [legalName, setLegalName] = useState("");
   const [email, setEmail] = useState("");
@@ -38,7 +53,7 @@ export function ClubFormPage() {
       setName(c.name);
       setUsername(c.username);
       setCode(c.code);
-      setHasLegalStatus(c.hasLegalStatus);
+      setPjEstado(aEstadoPj(c.hasLegalStatus));
       setRut(c.rut ?? "");
       setLegalName(c.legalName ?? "");
       setEmail(c.email);
@@ -51,14 +66,29 @@ export function ClubFormPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const rutValid = !hasLegalStatus || rut.length === 0 || isValidRun(rut);
+  // El RUT se valida siempre que haya uno, salvo cuando el club está verificado
+  // como SIN personalidad jurídica (ahí no se guarda).
+  const rutValid = pjEstado === "no" || rut.length === 0 || isValidRun(rut);
+  const representanteActual = club?.staff.find((s) => s.roleType === "legal_representative") ?? null;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
 
-    if (hasLegalStatus && !isValidRun(rut)) {
+    if (pjEstado === "si" && !isValidRun(rut)) {
       setError("El RUT es obligatorio y debe ser válido para clubes con personalidad jurídica");
+      return;
+    }
+    // Pendiente: el RUT es opcional, pero si se escribe uno tiene que ser válido.
+    if (pjEstado === "pendiente" && rut.trim().length > 0 && !isValidRun(rut)) {
+      setError("El RUT ingresado no es válido. Déjelo en blanco si todavía no lo tiene.");
+      return;
+    }
+    if (pjEstado !== "si" && representanteActual) {
+      setError(
+        `Este club tiene a ${representanteActual.person.fullName} designado(a) como representante legal. ` +
+          "Retírelo expresamente —con la personalidad jurídica todavía en «Sí»— antes de cambiar el estado."
+      );
       return;
     }
     if (!isEdit && username.trim().length < 4) {
@@ -76,13 +106,13 @@ export function ClubFormPage() {
         await api.update(id!, {
           name,
           code,
-          hasLegalStatus,
-          rut: hasLegalStatus ? rut : undefined,
+          hasLegalStatus: aValorPj(pjEstado),
+          rut: pjEstado === "no" ? undefined : rut.trim() || undefined,
           legalName: legalName || undefined,
           email,
           delegatePersonIds,
           coachPersonIds,
-          legalRepresentativePersonId: hasLegalStatus ? legalRepresentativePersonId : null,
+          legalRepresentativePersonId: pjEstado === "si" ? legalRepresentativePersonId : null,
           isAchmnMember: achmnStatus === "member",
           isAchmnCollaborator: achmnStatus === "collaborator",
           isFchmnMember: fchmnStatus === "member",
@@ -93,13 +123,13 @@ export function ClubFormPage() {
           name,
           username,
           code,
-          hasLegalStatus,
-          rut: hasLegalStatus ? rut : undefined,
+          hasLegalStatus: aValorPj(pjEstado),
+          rut: pjEstado === "no" ? undefined : rut.trim() || undefined,
           legalName: legalName || undefined,
           email,
           delegatePersonIds,
           coachPersonIds,
-          legalRepresentativePersonId: hasLegalStatus ? legalRepresentativePersonId : null,
+          legalRepresentativePersonId: pjEstado === "si" ? legalRepresentativePersonId : null,
           isAchmnMember: achmnStatus === "member",
           isAchmnCollaborator: achmnStatus === "collaborator",
           isFchmnMember: fchmnStatus === "member",
@@ -173,21 +203,42 @@ export function ClubFormPage() {
           </p>
         )}
 
-        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontWeight: 400, marginTop: "0.9rem" }}>
-          <input type="checkbox" checked={hasLegalStatus} onChange={(e) => setHasLegalStatus(e.target.checked)} style={{ width: "auto" }} />
-          Tiene personalidad jurídica
-        </label>
+        <label style={{ marginTop: "1rem" }}>Personalidad jurídica</label>
+        <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap" }}>
+          {([
+            ["si", "Sí, tiene"],
+            ["no", "No tiene"],
+            ["pendiente", "Pendiente de verificar"],
+          ] as [EstadoPj, string][]).map(([valor, etiqueta]) => (
+            <label key={valor} style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 400 }}>
+              <input
+                type="radio"
+                name="personalidadJuridica"
+                checked={pjEstado === valor}
+                onChange={() => setPjEstado(valor)}
+                style={{ width: "auto" }}
+              />
+              {etiqueta}
+            </label>
+          ))}
+        </div>
+        {pjEstado === "pendiente" && (
+          <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "0.25rem" }}>
+            «Pendiente de verificar» no es lo mismo que «No tiene»: queda registrado que el dato todavía no se ha comprobado.
+            El RUT es opcional y no se puede designar representante legal.
+          </p>
+        )}
 
-        {hasLegalStatus && (
+        {pjEstado !== "no" && (
           <>
-            <label htmlFor="rut">RUT</label>
+            <label htmlFor="rut">RUT{pjEstado === "pendiente" && " (opcional mientras esté pendiente)"}</label>
             <input
               id="rut"
               value={rut}
               onChange={(e) => setRut(e.target.value)}
               onBlur={() => setRut((r) => (isValidRun(r) ? formatRun(r) : r))}
               placeholder="76.123.456-7"
-              required={hasLegalStatus}
+              required={pjEstado === "si"}
             />
             {!rutValid && <p className="error-message">El RUT ingresado no es válido</p>}
 
@@ -205,10 +256,18 @@ export function ClubFormPage() {
         <div style={{ marginTop: "0.9rem" }}>
           <PersonMultiPicker label="Entrenador(a) — puede agregar más de uno" values={coachPersonIds} onChange={setCoachPersonIds} />
         </div>
-        {hasLegalStatus && (
+        {pjEstado === "si" ? (
           <div style={{ marginTop: "0.9rem" }}>
             <PersonPicker label="Representante legal" value={legalRepresentativePersonId} onChange={setLegalRepresentativePersonId} />
           </div>
+        ) : (
+          <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "0.9rem" }}>
+            {pjEstado === "pendiente"
+              ? "No se puede designar representante legal mientras la personalidad jurídica esté pendiente de verificar: es un rol con acceso al sistema."
+              : "Solo los clubes con personalidad jurídica pueden tener representante legal."}
+            {representanteActual &&
+              ` Actualmente está designado(a) ${representanteActual.person.fullName}; hay que retirarlo con el estado en «Sí» antes de cambiarlo.`}
+          </p>
         )}
 
         <label style={{ marginTop: "1rem" }}>Membresía ACHMN</label>

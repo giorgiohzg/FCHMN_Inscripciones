@@ -4,7 +4,17 @@ import { ValidationError, NotFoundError } from "../../shared/errors";
 import { type ActorContext, assertClubAccess } from "../../shared/actorContext";
 import { type Db } from "../../shared/transaction";
 import { evaluateTransition } from "./assignment.rules";
-import type { ProposeAssignmentInput, AssignmentListQuery } from "./assignment.schemas";
+import type { DirectAssignmentInput, ProposeAssignmentInput, AssignmentListQuery } from "./assignment.schemas";
+import { fechaCalendarioAUtc, hoyEnZonaDelNegocio } from "../../shared/fecha.util";
+
+/**
+ * La fecha EFECTIVA que se va a guardar, a partir de lo que pidió quien llama.
+ *
+ * Sin argumento, el día de hoy EN CHILE — no el del reloj del servidor, que en
+ * Render es UTC y tres o cuatro horas más adelante. Era el origen del defecto:
+ * una asignación hecha a las 23:58 del 30 quedaba guardada como el 31.
+ */
+const fechaEfectivaAGuardar = (fecha?: string) => fechaCalendarioAUtc(fecha ?? hoyEnZonaDelNegocio());
 
 /**
  * Quién ejecuta una operación que solo el administrador puede pedir.
@@ -165,7 +175,7 @@ export async function getAssignmentById(id: string) {
  * OTRO club, se bloquea con el mismo mensaje claro, en vez de hacer un
  * reemplazo silencioso.
  */
-export async function assignSwimmerDirectly(input: ProposeAssignmentInput, actor: ContextoDeAuditoria) {
+export async function assignSwimmerDirectly(input: DirectAssignmentInput, actor: ContextoDeAuditoria) {
   await assertClubActive(input.clubId);
 
   const existingActiveSameClub = await prisma.clubSwimmer.findFirst({
@@ -192,8 +202,10 @@ export async function assignSwimmerDirectly(input: ProposeAssignmentInput, actor
         status: "active",
         requestedByUserId: actor.userId,
         reviewedByUserId: actor.userId,
+        // `reviewedAt` es la marca de auditoría: CUÁNDO se hizo. Instante.
         reviewedAt: new Date(),
-        startDate: new Date(),
+        // `startDate` es el dato del negocio: DESDE CUÁNDO pertenece. Fecha.
+        startDate: fechaEfectivaAGuardar(input.fechaEfectiva),
       },
     });
     await syncSwimmerRole(input.personId, tx);
@@ -284,8 +296,22 @@ export interface BulkAssignSummary {
  * procesamiento de los demás; se acumula un reporte por nadador, igual
  * que la carga masiva de Personas.
  */
-export async function bulkAssignSwimmers(input: { targetClubId: string; personIds: string[] }, actor: ContextoDeAuditoria): Promise<BulkAssignSummary> {
+export async function bulkAssignSwimmers(
+  input: { targetClubId: string; personIds: string[]; fechaEfectiva?: string },
+  actor: ContextoDeAuditoria
+): Promise<BulkAssignSummary> {
   await assertClubActive(input.targetClubId);
+
+  /**
+   * La fecha se resuelve UNA VEZ, antes del bucle, y se reparte a todas.
+   *
+   * Resolverla dentro del bucle era el otro defecto medido: en una tanda de
+   * 5.071 asignaciones que tardó tres minutos, cada membresía recibía el
+   * instante de su propia escritura, así que no había «una fecha de la carga»
+   * sino 5.071 marcas distintas — y una tanda que cruzara la medianoche
+   * quedaba partida en dos días.
+   */
+  const fechaEfectiva = input.fechaEfectiva ?? hoyEnZonaDelNegocio();
 
   const results: BulkAssignRowResult[] = [];
   let assignedCount = 0;
@@ -294,7 +320,7 @@ export async function bulkAssignSwimmers(input: { targetClubId: string; personId
     const person = await prisma.person.findFirst({ where: { id: personId, deletedAt: null } });
     const fullName = person?.fullName ?? personId;
     try {
-      await assignSwimmerDirectly({ clubId: input.targetClubId, personId }, actor);
+      await assignSwimmerDirectly({ clubId: input.targetClubId, personId, fechaEfectiva }, actor);
       results.push({ personId, fullName, status: "assigned" });
       assignedCount++;
     } catch (err) {
@@ -312,7 +338,7 @@ export async function bulkAssignSwimmers(input: { targetClubId: string; personId
  * dos pasos ("finalizar" y luego "asignar") al cambiar de club desde la
  * ficha de la persona.
  */
-export async function reassignSwimmerToClub(personId: string, newClubId: string, actor: ContextoDeAuditoria) {
+export async function reassignSwimmerToClub(personId: string, newClubId: string, actor: ContextoDeAuditoria, fechaEfectiva?: string) {
   await assertClubActive(newClubId);
 
   const current = await getCurrentClubForPerson(personId);
@@ -331,8 +357,8 @@ export async function reassignSwimmerToClub(personId: string, newClubId: string,
         status: "active",
         requestedByUserId: actor.userId,
         reviewedByUserId: actor.userId,
-        reviewedAt: new Date(),
-        startDate: new Date(),
+        reviewedAt: new Date(), // marca de auditoría
+        startDate: fechaEfectivaAGuardar(fechaEfectiva), // fecha efectiva
       },
     });
     // Dentro de la transacción: antes quedaba fuera, así que un fallo aquí
@@ -414,7 +440,7 @@ export async function proposeAssignment(input: ProposeAssignmentInput, actor: Ac
  * administrador debe finalizar explícitamente la asignación anterior
  * primero (flujo auditable, sin swaps automáticos silenciosos).
  */
-export async function approveAssignment(id: string, actor: ContextoDeAuditoria) {
+export async function approveAssignment(id: string, actor: ContextoDeAuditoria, fechaEfectiva?: string) {
   const before = await getAssignmentById(id);
 
   const transition = evaluateTransition(before.status, "approve");
@@ -433,9 +459,9 @@ export async function approveAssignment(id: string, actor: ContextoDeAuditoria) 
       where: { id },
       data: {
         status: "active",
-        startDate: new Date(),
+        startDate: fechaEfectivaAGuardar(fechaEfectiva), // fecha efectiva
         reviewedByUserId: actor.userId,
-        reviewedAt: new Date(),
+        reviewedAt: new Date(), // marca de auditoría
       },
     });
     await syncSwimmerRole(before.personId, tx);

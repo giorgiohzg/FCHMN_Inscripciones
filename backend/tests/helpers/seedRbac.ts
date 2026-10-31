@@ -8,6 +8,7 @@
 import { prisma } from "../../src/shared/prisma.client";
 import { PERMISSIONS, ROLES } from "../../src/modules/auth/rbac.definitions";
 import { hashPassword } from "../../src/modules/auth/password.util";
+import { fechaCalendarioAUtc, hoyEnZonaDelNegocio } from "../../src/shared/fecha.util";
 
 export const TEST_PASSWORD = "ClaveValida123";
 
@@ -99,9 +100,15 @@ export async function addClubStaff(clubId: string, personId: string, roleType: "
   return prisma.clubStaff.create({ data: { clubId, personId, roleType } });
 }
 
-/** Membresía ACTIVA de un nadador en un club. */
+/**
+ * Membresía ACTIVA de un nadador en un club.
+ *
+ * `startDate` es una FECHA de calendario, no un instante: se construye igual que
+ * en producción, para que los fixtures no guarden algo que el servicio nunca
+ * guardaría. Con `new Date()` el día depende de la zona del proceso.
+ */
 export async function addActiveMembership(clubId: string, personId: string, requestedByUserId: string) {
   return prisma.clubSwimmer.create({
-    data: { clubId, personId, status: "active", requestedByUserId, startDate: new Date() },
+    data: { clubId, personId, status: "active", requestedByUserId, startDate: fechaCalendarioAUtc(hoyEnZonaDelNegocio()) },
   });
 }

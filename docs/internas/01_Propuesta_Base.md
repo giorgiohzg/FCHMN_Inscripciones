@@ -241,8 +241,11 @@ usa.
 **person_roles** — `id`, `person_id`, `role_type ENUM(swimmer,delegate,coach,legal_representative)`, `active`
 - Único por `(person_id, role_type)`.
 
-**clubs** — `id`, `name`, `username`, `code`, `has_legal_status`, `rut`
-(obligatorio solo si `has_legal_status`, RB-02), `legal_name`, `email`,
+**clubs** — `id`, `name`, `username`, `code`, `has_legal_status` **NULLABLE**
+(tres estados: `true` tiene · `false` verificado que no · `NULL` **pendiente de
+verificar**; sin valor por omisión), `rut` (obligatorio solo si
+`has_legal_status = true`; opcional y validado si está pendiente, RB-02),
+`legal_name`, `email`,
 `is_achmn_member`, `is_achmn_collaborator`, `is_fchmn_member`,
 `is_fchmn_collaborator`, `status`
 
@@ -434,7 +437,7 @@ la primera versión** y con autorización explícita.
 | # | Regla |
 |---|---|
 | RB-01 | Un `user` pertenece exclusivamente a una `person` **o** a un `club`, nunca a ambos — o a **ninguno** de los dos si es el administrador del sistema (`owner_type = system`). La coherencia se exige con una restricción en la base, no solo en el servicio. |
-| RB-02 | `rut` de club es obligatorio **solo si** `has_legal_status = true`; se valida formato y dígito verificador chileno. |
+| RB-02 | `has_legal_status` tiene **tres** estados: `true` (tiene), `false` (verificado que no) y `NULL` (**pendiente de verificar**). El `rut` es obligatorio **solo si** `has_legal_status = true`; con el estado pendiente es **opcional** y se valida igual si viene; con `false` se descarta. Se valida formato y dígito verificador chileno. **Tener RUT no cambia el estado a verificado.** `NULL` no es `false`: comparar siempre de forma explícita, porque `if (x)` trataría «pendiente» como «no». |
 | RB-03 | `run` de persona es obligatorio, se valida con el dígito verificador chileno y es único **entre las filas vigentes**: una persona eliminada lógicamente no bloquea su RUN para siempre. |
 | RB-04 | Una persona puede tener múltiples roles simultáneos vía `person_roles`, que hoy son cuatro: nadador, delegado, entrenador y representante legal. Los tres últimos se **derivan** del nombramiento en `club_staff`, no se marcan a mano. |
 | RB-05 | La edad de un nadador para efectos de categoría se calcula con `birth_date` vs. la **fecha de corte de la COMPETENCIA** (`competitions.age_cutoff_date`), no la de inscripción ni la de la prueba. ~~`category.cutoff_date`~~: esa columna no existe; la fecha de corte se movió a la competencia porque una misma categoría se reutiliza entre competencias con cortes distintos. |
@@ -454,7 +457,7 @@ la primera versión** y con autorización explícita.
 ## 4. Supuestos Funcionales
 
 1. **RUN vs. RUT**: se asume que "RUN" (personas) y "RUT" (clubes con personalidad jurídica) siguen el mismo algoritmo de validación chileno estándar (módulo 11).
-2. Un club **sin** personalidad jurídica puede seguir operando en el sistema (inscribiendo nadadores) — el RUT solo es obligatorio si `has_legal_status = true`.
+2. Un club **sin** personalidad jurídica puede seguir operando en el sistema (inscribiendo nadadores) — el RUT solo es obligatorio si `has_legal_status = true`. **Añadido después:** también puede operar con la personalidad jurídica **pendiente de verificar** (`NULL`), que es un estado distinto de «no la tiene». Lo único que el estado pendiente impide es designar representante legal.
 3. ~~El campo "Delegado(a)" y "Entrenador(a)" a nivel de **club** representa al delegado/entrenador **principal** (1 cada uno).~~ **Supuesto descartado**: no hay «principal». Un club tiene tantos delegados y entrenadores como haga falta, todos en `club_staff`, y el rol individual de `person_roles` se deriva de ese nombramiento. Lo único limitado a uno por club es el representante legal.
 4. Las categorías (`edad mínima/máxima`) se definen una vez y se reutilizan entre competencias — no se duplican por competencia. **La fecha de corte NO es de la categoría**, precisamente por esa reutilización: es de cada competencia (`age_cutoff_date`), y es la que usa RB-05.
 5. El "orden de competencia" de una prueba dentro de una competencia es informativo (para armar el programa), no afecta reglas de inscripción.
@@ -562,14 +565,30 @@ Dos precisiones que la matriz no puede expresar:
 **Representante legal** (regla confirmada después de esta propuesta) — es un
 **rol de acceso** con exactamente las mismas atribuciones que un delegado. Sus
 reglas propias:
-- Solo existe si el club declara personalidad jurídica (RB-02); si el club la
-  pierde, el nombramiento se retira automáticamente.
+- Solo se puede designar con personalidad jurídica **confirmada** (`true`). Con
+  `false` o con el estado **pendiente de verificar** la designación se
+  **rechaza**, no se descarta en silencio: es un rol de acceso, y concederlo
+  apoyándose en una personalidad jurídica que nadie comprobó sería fundarlo en un
+  supuesto.
+- **Un representante ya designado bloquea el cambio de estado.** Salir de `true`
+  —hacia `false` o hacia pendiente— se rechaza mientras exista uno; hay que
+  retirarlo expresamente primero, con el estado todavía en `true`.
+
+  > **CAMBIO DE COMPORTAMIENTO — 2026-10-31.** Antes decía aquí que «si el club
+  > pierde la personalidad jurídica, el nombramiento se retira automáticamente»,
+  > y así estaba implementado: poner el indicador en `false` borraba la fila de
+  > `club_staff` y desactivaba el rol de acceso de esa persona **sin avisar**.
+  > Con dos estados eso pasaba poco. Al añadir «pendiente de verificar», la
+  > transición «pendiente → no» pasó a ser una operación de rutina, y cada vez
+  > habría retirado a alguien y su acceso como efecto colateral de cambiar una
+  > casilla. Ahora son dos pasos, para que quitar el acceso de una persona sea
+  > una decisión visible.
 - Como máximo **uno por club** —a diferencia de delegados y entrenadores—, y le
   aplica la misma restricción de un solo club.
 - Puede tener credenciales, pero no las requiere.
 - El rol funcional (`person_roles`) y el de acceso (`user_roles`) se **derivan**
-  del nombramiento: se activan al nombrarlo y se desactivan al retirarlo,
-  reemplazarlo o quitarle al club la personalidad jurídica.
+  del nombramiento: se activan al nombrarlo y se desactivan al retirarlo o
+  reemplazarlo — **nunca** por un cambio de estado del club.
 
 La equivalencia de permisos se verifica en `tests/rbac.definitions.test.ts` y el
 ciclo de vida completo en `tests/legal-representative.integration.test.ts`.
@@ -582,10 +601,24 @@ club_swimmers
   requested_by_user_id,        -- quién propuso la asignación (club)
   reviewed_by_user_id NULLABLE,-- admin que aprobó/rechazó
   reviewed_at NULLABLE,
-  start_date NULLABLE,         -- se completa al aprobar (= reviewed_at o fecha indicada)
+  start_date DATE NULLABLE,    -- FECHA EFECTIVA: desde cuando pertenece al club
   end_date NULLABLE
 ```
-Flujo: `Club crea solicitud (pending)` → `Admin aprueba (active, start_date=hoy)` **o** `Admin rechaza (rejected)`. Un nadador solo puede tener una fila en `active` a la vez (constraint de RB-06/A-04 aplica solo sobre filas `active`, no sobre `pending`). Toda transición queda en `audit_logs` (RB-14).
+
+**`start_date` es una fecha de CALENDARIO (`DATE`), no un instante** — desde el
+2026-10-31. Era un `TIMESTAMP` al que el servicio escribía `new Date()`, el mismo
+valor que `reviewed_at`: dos campos para un solo hecho, y el que tenía nombre de
+dato del negocio guardaba un instante en UTC. Medido: una asignación hecha en
+Chile a las 23:58 del 30 quedaba almacenada como el 31, mientras la interfaz
+mostraba el 30.
+
+Esta propuesta ya contemplaba «= reviewed_at **o fecha indicada**»; lo que
+faltaba era conectar la fecha indicada. Ahora los endpoints que activan una
+membresía aceptan `fechaEfectiva` en `AAAA-MM-DD`, y sin ella se usa el día de
+hoy **en Chile**, no el del reloj del servidor. `reviewed_at` queda como la
+única marca de auditoría.
+
+Flujo: `Club crea solicitud (pending)` → `Admin aprueba (active, start_date = la fecha indicada o hoy en Chile)` **o** `Admin rechaza (rejected)`. Un nadador solo puede tener una fila en `active` a la vez (constraint de RB-06/A-04 aplica solo sobre filas `active`, no sobre `pending`). Toda transición queda en `audit_logs` (RB-14).
 
 ---
 

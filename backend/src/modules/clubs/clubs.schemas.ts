@@ -12,7 +12,17 @@ const codeField = z
 const baseClubFields = {
   name: z.string().trim().min(2, "El nombre del club es obligatorio"),
   code: codeField,
-  hasLegalStatus: z.boolean(),
+  /**
+   * TRES estados, y `null` NO es `false`:
+   *   `true`  — tiene personalidad jurídica
+   *   `false` — se verificó que no la tiene
+   *   `null`  — **pendiente de verificar**
+   *
+   * `.nullable()` y no `.optional()`: omitir el campo no puede significar
+   * «pendiente», porque entonces un cliente que no lo envíe estaría declarando
+   * algo sin querer. Para dejarlo pendiente hay que enviar `null` a propósito.
+   */
+  hasLegalStatus: z.boolean().nullable(),
   rut: z.string().trim().optional(),
   legalName: z.string().trim().optional(),
   email: z.string().email("Correo electrónico inválido"),
@@ -21,7 +31,8 @@ const baseClubFields = {
   // la creación se aplica aparte, solo en clubCreateSchema.
   delegatePersonIds: z.array(z.string().uuid()).optional(),
   coachPersonIds: z.array(z.string().uuid()).optional(),
-  // Solo aplica si hasLegalStatus=true — se ignora/limpia en el servicio si no.
+  // Solo aplica si hasLegalStatus === true. En los otros dos estados la
+  // designación se RECHAZA (ver refineRepresentanteLegal), no se descarta.
   legalRepresentativePersonId: z.string().uuid().optional().nullable(),
   isAchmnMember: z.boolean().default(false),
   isAchmnCollaborator: z.boolean().default(false),
@@ -30,25 +41,70 @@ const baseClubFields = {
 };
 
 /**
- * RB-02: el RUT es obligatorio (y se valida formato + dígito verificador)
- * únicamente si el club declara tener personalidad jurídica.
+ * RB-02 con tres estados. El RUT se comporta distinto en cada uno:
+ *
+ * | personalidad jurídica | RUT |
+ * |---|---|
+ * | `true`  | **obligatorio**, con formato y dígito verificador válidos |
+ * | `null`  | **opcional**, y validado igual si viene |
+ * | `false` | no aplica: el servicio lo descarta, así que no se valida |
+ *
+ * Que un club pendiente pueda guardar su RUT es deliberado: el RUT es
+ * precisamente la evidencia que permite CERRAR la verificación, y descartarlo
+ * obligaría a volver a pedirlo. **Tener RUT no cambia el estado por su cuenta:**
+ * pasar a `true` sigue siendo una decisión que alguien toma explícitamente.
+ *
+ * Las comparaciones son `=== true` / `=== false` a propósito. Con
+ * `boolean | null`, un `if (data.hasLegalStatus)` seguiría compilando y trataría
+ * «pendiente» como «no» en silencio, que es justo lo que este cambio evita.
  */
-function refineRut<T extends { hasLegalStatus: boolean; rut?: string }>(schema: z.ZodType<T>) {
+function refineRut<T extends { hasLegalStatus: boolean | null; rut?: string }>(schema: z.ZodType<T>) {
   return schema.superRefine((data, ctx) => {
-    if (data.hasLegalStatus) {
-      if (!data.rut || data.rut.trim().length === 0) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["rut"], message: "El RUT es obligatorio para clubes con personalidad jurídica" });
-        return;
-      }
-      const result = validateRun(data.rut);
-      if (!result.valid) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["rut"],
-          message: result.reason === "FORMAT" ? "Formato de RUT inválido (use 12345678-9)" : "El dígito verificador del RUT no es válido",
-        });
-      }
+    if (data.hasLegalStatus === false) return; // el RUT no se guarda: nada que validar
+    const rut = data.rut?.trim() ?? "";
+
+    if (data.hasLegalStatus === true && rut.length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["rut"], message: "El RUT es obligatorio para clubes con personalidad jurídica" });
+      return;
     }
+    if (rut.length === 0) return; // pendiente y sin RUT: válido
+
+    const result = validateRun(rut);
+    if (!result.valid) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["rut"],
+        message: result.reason === "FORMAT" ? "Formato de RUT inválido (use 12345678-9)" : "El dígito verificador del RUT no es válido",
+      });
+    }
+  });
+}
+
+/**
+ * No se designa representante legal sin personalidad jurídica CONFIRMADA.
+ *
+ * Mientras está pendiente de verificar, tampoco: el representante legal no es
+ * un dato decorativo —comparte `CLUB_STAFF_PERMISSIONS` con el delegado, o sea
+ * que es una vía de acceso al sistema— y nombrarlo apoyándose en una
+ * personalidad jurídica que nadie comprobó sería conceder ese acceso sobre un
+ * supuesto.
+ *
+ * Esto cubre la designación NUEVA. Que un representante ya designado impida
+ * cambiar el estado se comprueba en el servicio, que es quien ve la plantilla
+ * actual del club.
+ */
+function refineRepresentanteLegal<T extends { hasLegalStatus: boolean | null; legalRepresentativePersonId?: string | null }>(schema: z.ZodType<T>) {
+  return schema.superRefine((data, ctx) => {
+    if (!data.legalRepresentativePersonId) return;
+    if (data.hasLegalStatus === true) return;
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["legalRepresentativePersonId"],
+      message:
+        data.hasLegalStatus === null
+          ? "No se puede designar un representante legal mientras la personalidad jurídica esté pendiente de verificar. Confirme primero la personalidad jurídica."
+          : "Solo los clubes con personalidad jurídica pueden tener representante legal",
+    });
   });
 }
 
@@ -70,10 +126,13 @@ function refineMembershipExclusivity<T extends { isAchmnMember?: boolean; isAchm
   });
 }
 
-export const clubCreateSchema = refineMembershipExclusivity(refineRut(z.object({ ...baseClubFields, username: usernameField })));
+export const clubCreateSchema = refineMembershipExclusivity(
+  refineRepresentanteLegal(refineRut(z.object({ ...baseClubFields, username: usernameField })))
+);
 export type ClubCreateInput = z.infer<typeof clubCreateSchema>;
 
 export const clubUpdateSchema = refineMembershipExclusivity(
+  refineRepresentanteLegal(
   refineRut(
     z.object({
       ...baseClubFields,
@@ -84,12 +143,21 @@ export const clubUpdateSchema = refineMembershipExclusivity(
       // username deliberadamente no editable — ver misma razón que en Personas.
     }).partial({ name: true, email: true, code: true, isAchmnMember: true, isAchmnCollaborator: true, isFchmnMember: true, isFchmnCollaborator: true })
   )
+  )
 );
 export type ClubUpdateInput = z.infer<typeof clubUpdateSchema>;
 
 export const clubListQuerySchema = z.object({
   search: z.string().trim().optional(), // nombre, razón social, sigla o RUT
   status: z.enum(["active", "locked", "disabled"]).optional(),
+  /**
+   * Filtro por personalidad jurídica, con sus tres estados.
+   *
+   * Se resuelve en la CONSULTA, no en la página ya cargada: un filtro que solo
+   * tamizara los 20 registros visibles diría «no hay clubes pendientes» cuando
+   * lo único cierto es que no hay ninguno en esa página.
+   */
+  personalidadJuridica: z.enum(["si", "no", "pendiente"]).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });

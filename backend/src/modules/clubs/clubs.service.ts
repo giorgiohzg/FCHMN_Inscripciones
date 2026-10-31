@@ -29,6 +29,23 @@ async function assertRutNotDuplicated(rut: string, excludeClubId?: string) {
 // Hallazgo 20: misma razón que en Personas — la comprobación miraba solo
 // `clubs`. Ahora la fuente de verdad es `shared/username.ts`.
 
+/**
+ * No se designa representante legal sin personalidad jurídica CONFIRMADA.
+ *
+ * Vive en el servicio y no solo en el esquema Zod porque es una regla del
+ * negocio, y porque las pruebas y los guiones de carga llaman a los servicios
+ * directamente: una validación que solo estuviera en la capa HTTP dejaría la
+ * puerta abierta por dentro.
+ */
+function assertRepresentanteLegalPermitido(estado: boolean | null, representante?: string | null) {
+  if (!representante || estado === true) return;
+  throw new ValidationError(
+    estado === null
+      ? "No se puede designar un representante legal mientras la personalidad jurídica esté pendiente de verificar. Confirme primero la personalidad jurídica."
+      : "Solo los clubes con personalidad jurídica pueden tener representante legal"
+  );
+}
+
 async function assertPersonsExist(personIds: string[], roleLabel: string) {
   if (personIds.length === 0) return;
   const found = await prisma.person.findMany({ where: { id: { in: personIds }, deletedAt: null }, select: { id: true } });
@@ -176,6 +193,11 @@ export async function listClubs(query: ClubListQuery, actor: ScopedActor) {
     ];
   }
   if (query.status) where.status = query.status;
+  // Los tres estados, explícitos. «pendiente» es `null` en la base, así que se
+  // consulta con `null` y no con una comparación que lo confundiría con `false`.
+  if (query.personalidadJuridica === "si") where.hasLegalStatus = true;
+  else if (query.personalidadJuridica === "no") where.hasLegalStatus = false;
+  else if (query.personalidadJuridica === "pendiente") where.hasLegalStatus = null;
 
   const [items, total] = await Promise.all([
     prisma.club.findMany({
@@ -205,14 +227,30 @@ export async function getClubById(id: string, db: Db = prisma) {
 }
 
 export async function createClub(input: ClubCreateInput, actor: ActorContext) {
-  const rut = input.hasLegalStatus && input.rut ? normalizeRun(input.rut) : null;
+  /**
+   * El RUT se guarda salvo que se haya VERIFICADO que el club no tiene
+   * personalidad jurídica. Con el estado pendiente (`null`) se conserva: es la
+   * evidencia que después permite cerrar la verificación. Guardarlo no cambia
+   * el estado — eso se decide aparte y a propósito.
+   */
+  const rut = input.hasLegalStatus === false ? null : input.rut?.trim() ? normalizeRun(input.rut) : null;
   if (rut) await assertRutNotDuplicated(rut);
   await assertUsernameAvailable(input.username);
 
   const delegatePersonIds = input.delegatePersonIds ?? [];
   const coachPersonIds = input.coachPersonIds ?? [];
-  // El representante legal solo aplica si el club tiene personalidad jurídica.
-  const legalRepresentativePersonId = input.hasLegalStatus ? input.legalRepresentativePersonId ?? null : null;
+  /**
+   * Representante legal: SOLO con personalidad jurídica confirmada.
+   *
+   * Se RECHAZA, no se ignora. Descartar la designación en silencio dejaría a
+   * quien la pidió creyendo que quedó hecha, y el representante legal es una vía
+   * de acceso al sistema: un malentendido ahí no es cosmético.
+   *
+   * `=== true` y no una comparación por veracidad: con `boolean | null`, un
+   * `if (input.hasLegalStatus)` trataría «pendiente» igual que «no».
+   */
+  assertRepresentanteLegalPermitido(input.hasLegalStatus, input.legalRepresentativePersonId);
+  const legalRepresentativePersonId = input.hasLegalStatus === true ? input.legalRepresentativePersonId ?? null : null;
 
   await assertPersonsExist(delegatePersonIds, "delegado(a)");
   await assertPersonsExist(coachPersonIds, "entrenador(a)");
@@ -267,9 +305,52 @@ export async function createClub(input: ClubCreateInput, actor: ActorContext) {
 export async function updateClub(id: string, input: ClubUpdateInput, actor: ActorContext) {
   const before = await getClubById(id);
 
-  const hasLegalStatus = input.hasLegalStatus ?? before.hasLegalStatus;
-  const rut = hasLegalStatus && input.rut ? normalizeRun(input.rut) : hasLegalStatus ? before.rut : null;
+  /**
+   * `input.hasLegalStatus` SIEMPRE viene en una actualización —el esquema lo
+   * exige, para poder re-evaluar RB-02—, así que se usa tal cual.
+   *
+   * Aquí había un `??` y con tres estados se volvió una trampa: `null` es un
+   * valor DELIBERADO —«pendiente de verificar»— y `??` lo habría descartado
+   * para quedarse con el valor anterior, de modo que marcar un club como
+   * pendiente no habría hecho nada.
+   */
+  const hasLegalStatus = input.hasLegalStatus;
+
+  /**
+   * El RUT: se descarta solo si se verificó que el club NO tiene personalidad
+   * jurídica. Si no se envió el campo, no se toca.
+   */
+  const rut =
+    hasLegalStatus === false
+      ? null
+      : input.rut !== undefined
+        ? input.rut.trim()
+          ? normalizeRun(input.rut)
+          : null
+        : before.rut;
   if (rut && rut !== before.rut) await assertRutNotDuplicated(rut, id);
+
+  /**
+   * Un representante legal YA DESIGNADO bloquea el cambio de estado.
+   *
+   * Antes, poner el indicador en `false` ejecutaba
+   * `replaceClubStaff(legal_representative, [])`: borraba el nombramiento y
+   * recalculaba el rol de acceso de esa persona, sin avisar. Con dos estados
+   * eso pasaba poco; con tres, la transición «pendiente → no» es una operación
+   * de rutina, y cada vez retiraría a alguien y su acceso en silencio.
+   *
+   * Ahora se rechaza y se pide retirarlo expresamente primero. Son dos pasos a
+   * propósito: así quitar el acceso de una persona es una decisión visible y no
+   * el efecto colateral de cambiar una casilla.
+   */
+  const representanteActual = before.staff?.find((s) => s.roleType === "legal_representative")?.personId ?? null;
+  if (hasLegalStatus !== true && representanteActual) {
+    throw new ValidationError(
+      hasLegalStatus === null
+        ? "Este club tiene un representante legal designado. Retírelo expresamente antes de dejar la personalidad jurídica como «pendiente de verificar»: el sistema no retira nombramientos ni permisos por su cuenta."
+        : "Este club tiene un representante legal designado. Retírelo expresamente antes de declarar que el club no tiene personalidad jurídica: el sistema no retira nombramientos ni permisos por su cuenta."
+    );
+  }
 
   if (input.delegatePersonIds !== undefined) {
     await assertPersonsExist(input.delegatePersonIds, "delegado(a)");
@@ -279,12 +360,14 @@ export async function updateClub(id: string, input: ClubUpdateInput, actor: Acto
     await assertPersonsExist(input.coachPersonIds, "entrenador(a)");
     await assertNotStaffOfAnotherClub(input.coachPersonIds, "coach", id, "entrenador(a)");
   }
-  // Si el club deja de tener personalidad jurídica, el representante legal se quita.
-  const legalRepresentativePersonId = !hasLegalStatus
-    ? null
-    : input.legalRepresentativePersonId !== undefined
-      ? input.legalRepresentativePersonId
-      : undefined; // undefined = no tocar
+  /**
+   * Designar sin personalidad jurídica confirmada se RECHAZA, igual que al
+   * crear. Y como el bloque de arriba ya garantizó que no queda ninguno
+   * designado cuando el estado no es `true`, aquí no hay nada que borrar:
+   * `undefined` significa «no tocar».
+   */
+  assertRepresentanteLegalPermitido(hasLegalStatus, input.legalRepresentativePersonId);
+  const legalRepresentativePersonId = hasLegalStatus === true ? input.legalRepresentativePersonId : undefined;
   if (legalRepresentativePersonId) {
     await assertPersonsExist([legalRepresentativePersonId], "representante legal");
     await assertNotStaffOfAnotherClub([legalRepresentativePersonId], "legal_representative", id, "representante legal");
@@ -312,9 +395,14 @@ export async function updateClub(id: string, input: ClubUpdateInput, actor: Acto
 
     if (input.delegatePersonIds !== undefined) await replaceClubStaff(id, "delegate", input.delegatePersonIds, tx);
     if (input.coachPersonIds !== undefined) await replaceClubStaff(id, "coach", input.coachPersonIds, tx);
-    if (!hasLegalStatus) {
-      await replaceClubStaff(id, "legal_representative", [], tx);
-    } else if (legalRepresentativePersonId !== undefined) {
+    /**
+     * Ya NO hay una rama que vacíe la designación por el solo hecho de cambiar
+     * el estado. Si el estado no es `true`, la comprobación de más arriba
+     * garantiza que no había representante, así que no hay nada que retirar;
+     * y retirarlo es siempre una petición explícita
+     * (`legalRepresentativePersonId: null`) con el estado todavía en `true`.
+     */
+    if (hasLegalStatus === true && legalRepresentativePersonId !== undefined) {
       await replaceClubStaff(id, "legal_representative", legalRepresentativePersonId ? [legalRepresentativePersonId] : [], tx);
     }
 
