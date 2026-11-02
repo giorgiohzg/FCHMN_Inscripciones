@@ -1,0 +1,42 @@
+{
+  "_lea_esto_primero": [
+    "PLANTILLA. Copie este archivo JUNTO A SUS PLANILLAS, fuera del repositorio, y rellénelo.",
+    "No lo rellene aquí: el repositorio es público y las planillas llevan datos personales.",
+    "Las huellas de abajo NO son hexadecimales a propósito, para que esta plantilla no se",
+    "pueda ejecutar por descuido: el cargador se detiene al validarlas.",
+    "Calcule cada sha256 con: node -e \"console.log(require('node:crypto').createHash('sha256').update(require('node:fs').readFileSync(process.argv[1])).digest('hex'))\" <archivo>",
+    "o con: Get-FileHash <archivo> -Algorithm SHA256",
+    "Los totales se contrastan con las planillas: ejecute calcular-esperados.mjs antes de cargar."
+  ],
+
+  "fechaEfectiva": "AAAA-MM-DD",
+
+  "directorioDePlanillas": ".",
+
+  "planillas": {
+    "clubes": {
+      "archivo": "Clubes.xlsx",
+      "hoja": "Clubes",
+      "sha256": "RELLENE-CON-EL-SHA256-DE-SU-PLANILLA-DE-CLUBES"
+    },
+    "personas": {
+      "archivo": "Personas.xlsx",
+      "hoja": "Personas",
+      "sha256": "RELLENE-CON-EL-SHA256-DE-SU-PLANILLA-DE-PERSONAS"
+    },
+    "asignaciones": {
+      "archivo": "Asignaciones.xlsx",
+      "hoja": "Asignaciones",
+      "sha256": "RELLENE-CON-EL-SHA256-DE-SU-PLANILLA-DE-ASIGNACIONES"
+    }
+  },
+
+  "totales": {
+    "clubes": 0,
+    "personas": 0,
+    "asignaciones": 0,
+    "clubesConNadadores": 0
+  },
+
+  "limiteDeSolicitudesPorMinuto": 300
+}
