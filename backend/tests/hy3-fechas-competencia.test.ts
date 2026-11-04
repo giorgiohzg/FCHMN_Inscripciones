@@ -118,7 +118,7 @@ describe("registro B1", () => {
     const { inicio, termino } = fechasDeLaCompetencia([dia("2026-11-08")], "Copa Regresión");
     const corte = new Date("2026-12-31T00:00:00.000Z");
 
-    const b1 = buildB1({ name: "Copa Regresión", startDate: inicio, endDate: termino, ageUpDate: corte });
+    const b1 = buildB1({ facility: "cduc", name: "Copa Regresión", startDate: inicio, endDate: termino, ageUpDate: corte });
     const { inicio: i, termino: t, corte: c } = camposDeFecha(b1);
 
     expect(i).toBe("11082026");
@@ -136,7 +136,7 @@ describe("registro B1", () => {
 
   it("varios días: B1 lleva primera y última, con checksum válido", () => {
     const { inicio, termino } = fechasDeLaCompetencia([dia("2026-11-15"), dia("2026-11-08"), dia("2026-11-09")], "Copa");
-    const b1 = buildB1({ name: "Copa", startDate: inicio, endDate: termino, ageUpDate: new Date("2026-12-31T00:00:00.000Z") });
+    const b1 = buildB1({ facility: "cduc", name: "Copa", startDate: inicio, endDate: termino, ageUpDate: new Date("2026-12-31T00:00:00.000Z") });
     const { inicio: i, termino: t } = camposDeFecha(b1);
     expect([i, t]).toEqual(["11082026", "11152026"]);
     expect(b1.slice(HY3_CONTENT_LENGTH)).toBe(computeHy3Checksum(b1.slice(0, HY3_CONTENT_LENGTH)));

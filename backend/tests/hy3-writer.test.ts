@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
 import {
+  buildA1,
   buildD1,
   buildE1,
   buildF1,
@@ -10,6 +11,7 @@ import {
   formatHy3Time_SecondsComma,
   strokeNameToHy3Code,
 } from "../src/modules/team-manager-export/hy3-writer";
+import { computeHy3Checksum } from "../src/modules/team-manager-export/hy3-checksum";
 
 const FIXTURE_PATH = path.join(__dirname, "fixtures", "sample.hy3");
 const RELAY_FIXTURE_PATH = path.join(__dirname, "fixtures", "sample-with-relays.hy3");
@@ -23,6 +25,52 @@ function loadRelayFixtureLines(): string[] {
   const raw = fs.readFileSync(RELAY_FIXTURE_PATH, "latin1");
   return raw.split("\r\n").filter(Boolean);
 }
+
+describe("hy3-writer — A1 respeta las posiciones del encabezado de Hy-Tek", () => {
+  const a1 = (h: number, m: number) => buildA1(new Date(Date.UTC(2030, 0, 3, h, m)));
+
+  it("el fabricante es Hy-Tek, Ltd y la hora queda pegada a TEAM MANAGER Lite", () => {
+    const linea = a1(15, 54);
+    expect(linea.slice(0, 92)).toBe(
+      "A102Meet Entries             Hy-Tek, Ltd    Win-TM 8.0De  01032030  3:54 PMTEAM MANAGER Lite".padEnd(92, " ")
+    );
+    expect(linea).not.toContain("Sist. FCHMN");
+    expect(linea).toHaveLength(130);
+    expect(linea.slice(128)).toBe(computeHy3Checksum(linea.slice(0, 128)));
+  });
+
+  it.each([
+    ["hora de un dígito, AM", 9, 5, "  9:05 AM"],
+    ["hora de un dígito, PM", 15, 54, "  3:54 PM"],
+    ["hora de dos dígitos, AM", 11, 9, " 11:09 AM"],
+    ["hora de dos dígitos, PM", 22, 30, " 10:30 PM"],
+    ["medianoche", 0, 0, " 12:00 AM"],
+    ["mediodía", 12, 0, " 12:00 PM"],
+    ["un minuto después de medianoche", 0, 1, " 12:01 AM"],
+    ["una de la tarde", 13, 0, "  1:00 PM"],
+  ])("%s: ocupa las columnas 66-74 y no desplaza nada", (_caso, h, m, esperada) => {
+    const linea = a1(h, m);
+    expect(linea.slice(58, 66)).toBe("01032030");
+    expect(linea.slice(66, 75)).toBe(esperada);
+    expect(linea.slice(75, 92)).toBe("TEAM MANAGER Lite");
+  });
+});
+
+describe("hy3-writer — D1 alinea el RUN a la izquierda desde la columna 69", () => {
+  const base = { swimmerId: 1, gender: "F" as const, lastName: "Sintetica", firstName: "Ana", birthDate: new Date(Date.UTC(1980, 2, 15)), age: 46 };
+
+  it.each([
+    ["ocho dígitos", "12345678-5"],
+    ["siete dígitos", "1234567-4"],
+    ["K mayúscula", "12345678-K"],
+  ])("%s", (_caso, run) => {
+    const linea = buildD1({ ...base, run });
+    expect(linea.slice(60, 69).trim()).toBe("");
+    expect(linea.slice(69, 88).trimEnd()).toBe(run);
+    expect(linea.slice(88, 96)).toBe("03151980"); // el nacimiento no se mueve
+    expect(linea.slice(97, 99)).toBe("46");
+  });
+});
 
 describe("hy3-writer — buildD1 reconstruye líneas del fixture sintético", () => {
   const lines = loadFixtureLines();
@@ -48,7 +96,9 @@ describe("hy3-writer — buildD1 reconstruye líneas del fixture sintético", ()
       gender: "F",
       lastName: "Bravo",
       firstName: "Persona02",
-      run: "1000001-4",
+      // Con espacio inicial, como vino en el archivo real: Team Manager lo guardaba
+      // así, igual en sus otros registros. El campo se alinea a la izquierda.
+      run: " 1000001-4",
       birthDate: new Date(Date.UTC(1971, 1, 2)), // 02021971
       age: 55,
     });
@@ -223,6 +273,12 @@ describe("hy3-writer — buildF1/buildF3 reconstruyen relevos del fixture sinté
     });
     expect(withSeed).toContain("125,50");
     expect(withSeed).not.toContain("0.00");
+  });
+
+  it("la X de la columna 83 acompaña a la marca: sin marca no se escribe", () => {
+    const relevo = { clubCode: "SINT", relayLetter: "A", relayId: 999, genderCode: "MMM" as const, distanceMeters: 200, strokeCode: "A" as const, meetEventNumber: 5 };
+    expect(buildF1({ ...relevo, seedTimeSeconds: 125.5 })[83]).toBe("X");
+    expect(buildF1({ ...relevo, seedTimeSeconds: 0 })[83]).toBe(" ");
   });
 });
 

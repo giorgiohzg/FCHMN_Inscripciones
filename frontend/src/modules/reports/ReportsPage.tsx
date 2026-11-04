@@ -170,14 +170,14 @@ export function ReportsPage() {
         {/* Solo muestra u oculta: el servidor aplica el permiso y, para el personal de club, que sea SU club. */}
         {hasPermission("export:team-manager") && (
           <button className="btn-secondary" onClick={handleTeamManagerExport} disabled={!competitionId || exporting !== null}>
-            {exporting === "hy3" ? "Generando..." : "Exportar a Team Manager (.HY3)"}
+            {exporting === "hy3" ? "Generando..." : "Exportar a Team Manager (.zip)"}
           </button>
         )}
       </div>
 
       {hasRole("admin") && !clubId && (
         <p style={{ fontSize: "0.8rem", color: "var(--brand-gray-600)", marginTop: "0.4rem" }}>
-          Para exportar a Team Manager, seleccione también un club arriba — el archivo .HY3 es por club.
+          Para exportar a Team Manager, seleccione también un club arriba — el archivo .zip es por club.
         </p>
       )}
 

@@ -1,39 +1,26 @@
+import AdmZip from "adm-zip";
 import { prisma } from "../../shared/prisma.client";
 import { NotFoundError, ValidationError } from "../../shared/errors";
 import { audit } from "../audit/audit.service";
 import { relayTotalMetersForExport } from "../../shared/relayDistance.util";
-import {
-  buildA1,
-  buildB1,
-  buildB2,
-  buildC1,
-  buildC2,
-  buildC3,
-  buildD1,
-  buildE1,
-  buildF1,
-  buildF3,
-  joinHy3Lines,
-  strokeNameToHy3Code,
-  type SwimmerInfo,
-  type IndividualEntryInfo,
-  type RelayEntryInfo,
-  type RelayLegInfo,
-} from "./hy3-writer";
+import { buildHy3File, strokeNameToHy3Code, type RelayLegInfo } from "./hy3-writer";
+import { buildCl2File } from "./cl2-writer";
+import { textoExportable, type ExportRelay, type ExportSwimmer, type TeamManagerExportModel } from "./export-model";
 import { computeAge } from "../../shared/age.util";
 import { fechasDeLaCompetencia } from "./competition-dates";
 import { assertClubAccess, type ActorContext } from "../../shared/actorContext";
+import { formatRunConGuion } from "../../shared/run.util";
 
 /**
  * Adaptador desacoplado (según lo planteado en la propuesta de arquitectura,
- * §1.3 y §7/A-06): esta función es la única que conoce el formato Hy-Tek
- * HY3. El resto del sistema no depende de este módulo para nada — si en el
- * futuro se necesita otro formato de exportación, se agrega un adaptador
- * nuevo sin tocar el dominio de inscripciones.
+ * §1.3 y §7/A-06): este módulo es el único que conoce los formatos de Hy-Tek.
+ * El resto del sistema no depende de él para nada — si en el futuro se necesita
+ * otro formato de exportación, se agrega un adaptador nuevo sin tocar el dominio
+ * de inscripciones.
  *
- * Incluye tanto pruebas individuales (D1/E1) como relevos (F1/F3),
- * decodificados byte a byte contra una exportación real con ambos tipos de
- * prueba (ver tests/fixtures/sample-with-relays.hy3).
+ * Produce un ZIP con un .CL2 y un .HY3 de las mismas inscripciones, igual que el
+ * paquete de Team Manager que Meet Manager importa. Incluye pruebas individuales
+ * y relevos, decodificados byte a byte contra exportaciones reales.
  */
 /**
  * Tope de inscripciones por archivo .HY3. Ver la nota en el cuerpo de
@@ -42,12 +29,55 @@ import { assertClubAccess, type ActorContext } from "../../shared/actorContext";
  */
 export const DEFAULT_MAX_EXPORT_ROWS = 20_000;
 
-export async function buildTeamManagerHy3Export(
+/**
+ * Sede que va en el B1 de ambos formatos. Sigue siendo la constante observada en
+ * la exportación real: el sistema no modela este dato.
+ */
+const SEDE_EN_ARCHIVO = "cduc";
+
+/**
+ * Sin esto `adm-zip` marca cada nombre como UTF-8, cosa que el paquete original no
+ * hace. Los nombres de estos archivos son ASCII: la marca no aporta nada, y así el
+ * ZIP se parece más al que Meet Manager ya acepta.
+ */
+const NOMBRES_ZIP_SIN_MARCA_UTF8 = {
+  efs: false,
+  encode: (texto: string) => Buffer.from(texto, "latin1"),
+  decode: (bytes: Buffer) => bytes.toString("latin1"),
+};
+
+const MESES = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/** Lo que entrega la exportación: el ZIP, y cada archivo por separado. */
+export interface TeamManagerExport {
+  filename: string;
+  zip: Buffer;
+  /** Contenido como texto; se codifica en Latin-1 al escribirlo. */
+  hy3: { filename: string; content: string };
+  cl2: { filename: string; content: string };
+}
+
+/**
+ * Nombre y apellido PATERNO para exportar, o `null` si la persona no los tiene
+ * por separado.
+ *
+ * Una persona histórica solo guarda `fullName`, y de ahí no se puede saber cuál
+ * es el apellido paterno: "Pérez Soto" pueden ser dos apellidos o uno compuesto.
+ * No se adivina: la exportación se detiene con un mensaje claro, igual que con
+ * una piscina sin asignar o un relevo incompleto.
+ */
+function nombreParaExportar(person: { firstName: string | null; paternalLastName: string | null }) {
+  const firstName = person.firstName?.trim();
+  const lastName = person.paternalLastName?.trim();
+  return firstName && lastName ? { firstName: textoExportable(firstName), lastName: textoExportable(lastName) } : null;
+}
+
+export async function buildTeamManagerExport(
   competitionId: string,
   clubId: string,
   actor: ActorContext,
   options: { maxRows?: number } = {}
-): Promise<{ filename: string; content: string }> {
+): Promise<TeamManagerExport> {
   /**
    * ALCANCE, antes de leer NADA.
    *
@@ -185,35 +215,6 @@ export async function buildTeamManagerHy3Export(
   // usa la fecha de cierre de inscripciones como respaldo.
   const ageUpDate = competition.ageCutoffDate ?? competition.registrationEndAt;
 
-  const lines: string[] = [];
-  lines.push(buildA1(new Date()));
-  lines.push(
-    buildB1({
-      name: competition.name,
-      startDate: inicioCompetencia,
-      endDate: terminoCompetencia,
-      ageUpDate,
-    })
-  );
-  lines.push(buildB2(courseCode));
-  lines.push(buildC1({ code: club.code, name: club.name }));
-  lines.push(buildC2());
-  lines.push(buildC3());
-
-  function nameParts(person: { firstName: string | null; paternalLastName: string | null; maternalLastName: string | null; fullName: string }) {
-    // Usa los campos separados (Nombre/Apellido paterno/Apellido materno)
-    // cuando existen; si es una persona creada ANTES de ese cambio (campos
-    // en null), recurre al método anterior (fullName = "Apellido, Nombre")
-    // como respaldo, para no romper la exportación de datos históricos.
-    if (person.firstName && person.paternalLastName) {
-      const firstName = person.firstName;
-      const lastName = person.maternalLastName ? `${person.paternalLastName} ${person.maternalLastName}` : person.paternalLastName;
-      return { firstName, lastName };
-    }
-    const [legacyLastName, ...firstParts] = person.fullName.split(",").map((s: string) => s.trim());
-    return { lastName: legacyLastName || person.fullName, firstName: firstParts.join(" ") || "" };
-  }
-
   // -------- Junta TODAS las personas involucradas (individuales + integrantes de relevo) --------
   type PersonRow = (typeof registrations)[number]["person"] | (typeof relayRegistrations)[number]["members"][number]["person"];
   const individualRegsByPerson = new Map<string, typeof registrations>();
@@ -227,6 +228,16 @@ export async function buildTeamManagerHy3Export(
   for (const reg of registrations) allPeople.set(reg.personId, reg.person);
   for (const relay of relayRegistrations) for (const m of relay.members) allPeople.set(m.personId, m.person);
 
+  const sinApellidoSeparado = Array.from(allPeople.values()).filter((p) => !nombreParaExportar(p));
+  if (sinApellidoSeparado.length > 0) {
+    throw new ValidationError(
+      `No se puede generar el archivo: ${sinApellidoSeparado.length} persona(s) inscrita(s) no tienen nombre y apellido paterno por separado, ` +
+        `y el archivo exporta solo el apellido paterno. Pida al administrador completarlos en la ficha de: ` +
+        `${sinApellidoSeparado.map((p) => p.fullName).join("; ")}.`,
+      { personsWithoutSeparateNames: sinApellidoSeparado.map((p) => p.id) }
+    );
+  }
+
   // Igual que en la exportación real de Hy-Tek: primero se listan los
   // nadadores que SOLO están en relevos (D1 sin ningún E1 después), y
   // después los que tienen pruebas individuales (D1 + sus E1). El id
@@ -237,64 +248,33 @@ export async function buildTeamManagerHy3Export(
     .filter((p) => individualRegsByPerson.has(p.id))
     .sort((a, b) => a.fullName.localeCompare(b.fullName, "es"));
 
-  const swimmerIdByPersonId = new Map<string, number>();
-  const lastNameById = new Map<string, string>();
-  let nextSwimmerId = 1;
+  const swimmers: ExportSwimmer[] = [];
+  const swimmerByPersonId = new Map<string, ExportSwimmer>();
 
-  for (const person of relayOnlyPeople) {
-    const { firstName, lastName } = nameParts(person);
-    const swimmerId = nextSwimmerId++;
-    swimmerIdByPersonId.set(person.id, swimmerId);
-    lastNameById.set(person.id, lastName);
-
-    const swimmer: SwimmerInfo = {
-      swimmerId,
+  for (const person of [...relayOnlyPeople, ...individualPeople]) {
+    const swimmer: ExportSwimmer = {
+      ...nombreParaExportar(person)!,
+      swimmerId: swimmers.length + 1,
       gender: person.gender === "male" ? "M" : "F",
-      lastName,
-      firstName,
-      run: person.run,
+      run: formatRunConGuion(person.run),
       birthDate: person.birthDate,
       age: computeAge(person.birthDate, ageUpDate),
-    };
-    lines.push(buildD1(swimmer));
-  }
-
-  for (const person of individualPeople) {
-    const { firstName, lastName } = nameParts(person);
-    const swimmerId = nextSwimmerId++;
-    swimmerIdByPersonId.set(person.id, swimmerId);
-    lastNameById.set(person.id, lastName);
-
-    const gender: "M" | "F" = person.gender === "male" ? "M" : "F";
-    const swimmer: SwimmerInfo = {
-      swimmerId,
-      gender,
-      lastName,
-      firstName,
-      run: person.run,
-      birthDate: person.birthDate,
-      age: computeAge(person.birthDate, ageUpDate),
-    };
-    lines.push(buildD1(swimmer));
-
-    for (const reg of individualRegsByPerson.get(person.id)!) {
-      const entry: IndividualEntryInfo = {
-        gender,
-        swimmerId,
-        lastNameAbbrev: lastName.slice(0, 5),
+      ageAtMeet: computeAge(person.birthDate, inicioCompetencia),
+      entries: (individualRegsByPerson.get(person.id) ?? []).map((reg) => ({
         distanceMeters: reg.competitionEvent.event.distance.meters,
         strokeCode: strokeNameToHy3Code(reg.competitionEvent.event.stroke.name),
         meetEventNumber: reg.competitionEvent.displayOrder ?? 1,
         seedTimeSeconds: (reg.seedTimeCentiseconds ?? 0) / 100, // 0 = "sin marca de referencia" si no se ingresó
-        courseCode,
-      };
-      lines.push(buildE1(entry));
-    }
+      })),
+    };
+    swimmers.push(swimmer);
+    swimmerByPersonId.set(person.id, swimmer);
   }
 
   // -------- Relevos (F1 + F3) --------
   const GENDER_CODE: Record<"male" | "female" | "mixed", "MMM" | "FFF" | "MIX"> = { male: "MMM", female: "FFF", mixed: "MIX" };
   let relayId = 100; // igual convención de ancho (3 dígitos) que la exportación real; el valor exacto no importa, solo que sea único
+  const relays: ExportRelay[] = [];
 
   /**
    * Hallazgo 17 — los relevos inconsistentes ya no se omiten en silencio.
@@ -322,9 +302,7 @@ export async function buildTeamManagerHy3Export(
   }
 
   for (const relay of relayRegistrations) {
-
-    const entry: RelayEntryInfo = {
-      clubCode: club.code,
+    relays.push({
       relayLetter: "A", // un club solo puede tener un equipo por prueba+categoría (regla de negocio ya validada al inscribir)
       relayId: relayId++,
       genderCode: GENDER_CODE[relay.competitionEvent.event.gender],
@@ -337,23 +315,50 @@ export async function buildTeamManagerHy3Export(
       strokeCode: strokeNameToHy3Code(relay.competitionEvent.event.stroke.name),
       meetEventNumber: relay.competitionEvent.displayOrder ?? 1,
       seedTimeSeconds: (relay.seedTimeCentiseconds ?? 0) / 100,
-      courseCode,
-    };
-    lines.push(buildF1(entry));
-
-    const legs = relay.members.map((m): RelayLegInfo => ({
-      gender: m.person.gender === "male" ? "M" : "F",
-      swimmerId: swimmerIdByPersonId.get(m.personId)!,
-      lastNameAbbrev: (lastNameById.get(m.personId) ?? nameParts(m.person).lastName).slice(0, 5),
-      legNumber: (m.orderPosition as 1 | 2 | 3 | 4),
-    }));
-    lines.push(buildF3(legs as [RelayLegInfo, RelayLegInfo, RelayLegInfo, RelayLegInfo]));
+      legs: relay.members.map((m): RelayLegInfo => {
+        const swimmer = swimmerByPersonId.get(m.personId)!;
+        return {
+          gender: swimmer.gender,
+          swimmerId: swimmer.swimmerId,
+          lastNameAbbrev: swimmer.lastName.slice(0, 5),
+          legNumber: m.orderPosition as 1 | 2 | 3 | 4,
+        };
+      }),
+    });
   }
 
-  const content = joinHy3Lines(lines);
-  const safeName = competition.name.replace(/[^\w\- ]/g, "").replace(/\s+/g, "_");
-  const safeClub = club.name.replace(/[^\w\- ]/g, "").replace(/\s+/g, "_");
-  const filename = `${safeClub}-Entries-${safeName}.HY3`;
+  const generatedAt = new Date();
+  const model: TeamManagerExportModel = {
+    generatedAt,
+    meet: {
+      name: textoExportable(competition.name),
+      facility: SEDE_EN_ARCHIVO,
+      startDate: inicioCompetencia,
+      endDate: terminoCompetencia,
+      ageUpDate,
+      courseCode,
+    },
+    club: { code: textoExportable(club.code), name: textoExportable(club.name) },
+    swimmers,
+    relays,
+  };
+
+  // Misma forma de nombre que el paquete de Team Manager, en ASCII para que viaje
+  // sin problemas en la cabecera HTTP. El "-001" es fijo: el sistema no numera envíos.
+  const seguro = (texto: string) => texto.replace(/[^\w\- ]/g, "").replace(/\s+/g, "_");
+  const dia = String(inicioCompetencia.getUTCDate()).padStart(2, "0");
+  const fecha = `${dia}${MESES[inicioCompetencia.getUTCMonth()]}${inicioCompetencia.getUTCFullYear()}`;
+  const base = `${seguro(club.code)}-Entries-${seguro(competition.name)}-${fecha}-001`;
+
+  const hy3 = { filename: `${base}.HY3`, content: buildHy3File(model) };
+  const cl2 = { filename: `${base}.CL2`, content: buildCl2File(model) };
+  const filename = `${base}.zip`;
+
+  const paquete = new AdmZip(undefined, { decoder: NOMBRES_ZIP_SIN_MARCA_UTF8 } as Partial<AdmZip.InitOptions>);
+  // Latin-1, no UTF-8: Team Manager es un programa de la era DOS/Windows clásico.
+  paquete.addFile(cl2.filename, Buffer.from(cl2.content, "latin1"));
+  paquete.addFile(hy3.filename, Buffer.from(hy3.content, "latin1"));
+  const zip = paquete.toBuffer();
 
   await audit({
     userId: actor.userId,
@@ -361,8 +366,14 @@ export async function buildTeamManagerHy3Export(
     entityType: "Competition",
     entityId: competitionId,
     ipAddress: actor.ipAddress,
-    after: { clubId, filename, individualCount: registrations.length, relayCount: relayRegistrations.length },
+    after: {
+      clubId,
+      filename,
+      files: [cl2.filename, hy3.filename],
+      individualCount: registrations.length,
+      relayCount: relayRegistrations.length,
+    },
   });
 
-  return { filename, content };
+  return { filename, zip, hy3, cl2 };
 }

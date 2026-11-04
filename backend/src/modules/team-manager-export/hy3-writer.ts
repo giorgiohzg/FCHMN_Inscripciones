@@ -1,4 +1,7 @@
 import { buildHy3Line } from "./hy3-checksum";
+import { formatHy3Date, type TeamManagerExportModel } from "./export-model";
+
+export { formatHy3Date };
 
 /**
  * Constructor de registros del formato Hy-Tek HY3, con las posiciones de
@@ -26,15 +29,7 @@ function padLeft(value: string, width: number): string {
   return value.slice(0, width).padStart(width, " ");
 }
 
-/** MMDDYYYY, tal como usa Hy-Tek (formato de fecha estadounidense). */
-export function formatHy3Date(date: Date): string {
-  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(date.getUTCDate()).padStart(2, "0");
-  const yyyy = String(date.getUTCFullYear());
-  return `${mm}${dd}${yyyy}`;
-}
-
-/** hh:mm AM/PM de 7 caracteres para hora de un solo dígito (tal como en la muestra); usa 8 si la hora tiene dos dígitos. */
+/** "h:mm AM" o "hh:mm PM": 7 u 8 caracteres según los dígitos de la hora. */
 export function formatHy3Time(date: Date): string {
   let hours = date.getUTCHours();
   const minutes = String(date.getUTCMinutes()).padStart(2, "0");
@@ -55,7 +50,18 @@ export function formatHy3Time_SecondsComma(totalSeconds: number): string {
 // --------------------------------------------------------------------------
 // A1 — encabezado del archivo
 // --------------------------------------------------------------------------
-export function buildA1(generatedAt: Date, appName = "Sist. FCHMN"): string {
+/**
+ * El fabricante va en la columna 29: Meet Manager rechaza con «NO es un archivo
+ * .HY3 creado por Active» lo que ofrecía este encabezado con otro nombre (ver el
+ * README: es la diferencia que motivó el cambio, pero no se pudo ejecutar el
+ * programa para aislarla).
+ *
+ * La hora va AJUSTADA A LA DERECHA en las columnas 66-74, de modo que su última
+ * letra queda pegada al "TEAM MANAGER Lite" de la columna 75, con uno o dos
+ * dígitos de hora. Antes iba a la izquierda desde la 68: con dos dígitos corría
+ * todo el resto una columna, y con uno dejaba un espacio después de AM/PM.
+ */
+export function buildA1(generatedAt: Date, appName = "Hy-Tek, Ltd"): string {
   let content = "";
   content += "A1";
   content += "02";
@@ -65,8 +71,7 @@ export function buildA1(generatedAt: Date, appName = "Sist. FCHMN"): string {
   content += padRight("Win-TM 8.0De", 12);
   content += padRight("", 2);
   content += formatHy3Date(generatedAt);
-  content += padRight("", 2);
-  content += padRight(formatHy3Time(generatedAt), 8);
+  content += padLeft(formatHy3Time(generatedAt), 9);
   content += padRight("TEAM MANAGER Lite", 18);
   return buildHy3Line(padRight(content, 128));
 }
@@ -76,6 +81,7 @@ export function buildA1(generatedAt: Date, appName = "Sist. FCHMN"): string {
 // --------------------------------------------------------------------------
 export interface MeetInfo {
   name: string;
+  facility: string; // sede: columna 47
   startDate: Date;
   endDate: Date;
   ageUpDate: Date; // fecha de corte para el cálculo de edad (RB-05)
@@ -85,7 +91,7 @@ export function buildB1(meet: MeetInfo): string {
   let content = "";
   content += "B1";
   content += padRight(meet.name, 45);
-  content += padRight("cduc", 45); // constante observada (abreviación de sede/organizador)
+  content += padRight(meet.facility, 45);
   content += formatHy3Date(meet.startDate);
   content += formatHy3Date(meet.endDate);
   content += formatHy3Date(meet.ageUpDate);
@@ -145,7 +151,7 @@ export interface SwimmerInfo {
   gender: "M" | "F";
   lastName: string;
   firstName: string;
-  run: string; // usado en el campo reservado a "USS#"/ID nacional
+  run: string; // ya con el formato de exportación; ocupa el campo de "USS#"/ID nacional
   birthDate: Date;
   age: number;
 }
@@ -158,9 +164,10 @@ export function buildD1(swimmer: SwimmerInfo): string {
   content += padLeft(String(swimmer.swimmerId), 3);
   content += padRight(swimmer.lastName, 20);
   content += padRight(swimmer.firstName, 20);
-  content += padRight("", 17);
-  content += padLeft(swimmer.run, 14);
-  content += padRight("", 9);
+  content += padRight("", 21);
+  // Ajustado a la IZQUIERDA desde la columna 69, como en la exportación real: un
+  // RUN de 7 dígitos no empieza más adentro que uno de 8.
+  content += padRight(swimmer.run, 19);
   content += formatHy3Date(swimmer.birthDate);
   content += " ";
   content += padLeft(String(swimmer.age), 2);
@@ -270,7 +277,11 @@ export function buildF1(entry: RelayEntryInfo): string {
   content += entry.courseCode ?? "L"; // curso de la marca de referencia (misma convención que E1)
   content += entry.seedTimeSeconds > 0 ? padLeft(formatHy3Time_SecondsComma(entry.seedTimeSeconds), 8) : padLeft("0.00", 8);
   content += entry.courseCode ?? "L"; // curso de la competencia
-  content += padRight("", 31);
+  content += padRight("", 23);
+  // Solo con marca: así en las exportaciones reales con y sin ella. Es el mismo dato
+  // que la "X" de la columna 154 del E0 del CL2.
+  content += entry.seedTimeSeconds > 0 ? "X" : " ";
+  content += padRight("", 7);
   content += " "; // los relevos NO llevan el marcador de estado "C" que sí lleva E1
   return buildHy3Line(padRight(content, 128));
 }
@@ -294,4 +305,39 @@ export function buildF3(legs: [RelayLegInfo, RelayLegInfo, RelayLegInfo, RelayLe
     content += String(leg.legNumber);
   }
   return buildHy3Line(padRight(content, 128));
+}
+
+/** El archivo HY3 completo. El orden de los registros es el de la exportación real. */
+export function buildHy3File(model: TeamManagerExportModel): string {
+  const { meet, club } = model;
+  const lines = [
+    buildA1(model.generatedAt),
+    buildB1(meet),
+    buildB2(meet.courseCode),
+    buildC1(club),
+    buildC2(),
+    buildC3(),
+  ];
+
+  for (const swimmer of model.swimmers) {
+    lines.push(buildD1(swimmer));
+    for (const entry of swimmer.entries) {
+      lines.push(
+        buildE1({
+          ...entry,
+          gender: swimmer.gender,
+          swimmerId: swimmer.swimmerId,
+          lastNameAbbrev: swimmer.lastName.slice(0, 5),
+          courseCode: meet.courseCode,
+        })
+      );
+    }
+  }
+
+  for (const { legs, ...relay } of model.relays) {
+    lines.push(buildF1({ ...relay, clubCode: club.code, courseCode: meet.courseCode }));
+    lines.push(buildF3(legs as [RelayLegInfo, RelayLegInfo, RelayLegInfo, RelayLegInfo]));
+  }
+
+  return joinHy3Lines(lines);
 }

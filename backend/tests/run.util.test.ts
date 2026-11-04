@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateRun, normalizeRun, formatRun } from "../src/shared/run.util";
+import { validateRun, normalizeRun, formatRun, formatRunConGuion } from "../src/shared/run.util";
 
 describe("run.util — validateRun", () => {
   // RUNs reales de prueba (formato genérico, dígito verificador correcto)
@@ -54,5 +54,21 @@ describe("run.util — formatRun", () => {
 
   it("formatea un RUN de 8 dígitos en el cuerpo correctamente", () => {
     expect(formatRun("111111111")).toBe("11.111.111-1");
+  });
+});
+
+describe("formatRunConGuion — la forma de los archivos de Team Manager", () => {
+  it.each([
+    ["11.111.111-1", "11111111-1"],
+    ["111111111", "11111111-1"],
+    ["11111111-1", "11111111-1"],
+    ["1234567-k", "1234567-K"],
+    [" 12345678k ", "12345678-K"],
+  ])("%s → %s", (entrada, esperado) => {
+    expect(formatRunConGuion(entrada)).toBe(esperado);
+  });
+
+  it("lo que no tiene forma de RUN no recibe un guion inventado", () => {
+    expect(formatRunConGuion("PASAPORTE1")).toBe("PASAPORTE1");
   });
 });

@@ -169,6 +169,12 @@ dentro de una transacción), `frontend/src/modules/persons/PersonsBulkImportPage
 
 ### Cambio 2 — Exportación Team Manager para delegado / entrenador / representante legal
 
+> **Actualización local posterior (sin commit ni despliegue).** La descarga pasa a ser
+> un ZIP con un `.CL2` y un `.HY3`, por `GET /export/team-manager/zip`; `/hy3` queda
+> como alias del mismo ZIP. Las referencias a un `.HY3` suelto de este cambio son
+> históricas. Ver el Módulo 11 del README. Permisos y alcance no cambian. La
+> importación real en HY-Tek está pendiente.
+
 > **Definición actualizada (4 de noviembre de 2026).** La exportación «Exportar a
 > Team Manager (.HY3)» de Reportes está disponible para **delegado, entrenador,
 > representante legal y rol `club`**; el administrador conserva su acceso. Esta

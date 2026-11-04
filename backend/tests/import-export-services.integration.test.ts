@@ -4,7 +4,7 @@
  *
  *   - `importCompetitionFromMeetEventsZip` (el ZIP de Meet Events)
  *   - `getRegistrationsReport` + `buildCsv` / `buildXlsx` (los reportes)
- *   - `buildTeamManagerHy3Export` (el archivo .HY3)
+ *   - `buildTeamManagerExport` (el ZIP con el .CL2 y el .HY3)
  *
  * Hasta ahora la Fase 3 se apoyaba en pruebas de funciones puras
  * (parser, escritor HY3, escapado CSV, límites de ZIP). Eso verifica las
@@ -30,7 +30,8 @@ import * as relayService from "../src/modules/relay-registrations/relay-registra
 import * as catalogsCategories from "../src/modules/catalogs/categories.service";
 import * as catalogsEvents from "../src/modules/catalogs/events.service";
 import * as reportsService from "../src/modules/reports/reports.service";
-import { buildTeamManagerHy3Export } from "../src/modules/team-manager-export/team-manager-export.service";
+import { buildTeamManagerExport } from "../src/modules/team-manager-export/team-manager-export.service";
+import { isValidCl2Line } from "../src/modules/team-manager-export/cl2-writer";
 import { formatHy3Date } from "../src/modules/team-manager-export/hy3-writer";
 import { computeHy3Checksum } from "../src/modules/team-manager-export/hy3-checksum";
 import {
@@ -1540,14 +1541,30 @@ describe("getRegistrationsReport (invocación real)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// buildTeamManagerHy3Export
+// buildTeamManagerExport
 // ---------------------------------------------------------------------------
 
-describe("buildTeamManagerHy3Export (invocación real)", () => {
+/** El HY3 del paquete: la mayoría de estas pruebas miran su contenido. */
+async function exportarHy3(...args: Parameters<typeof buildTeamManagerExport>) {
+  const { hy3 } = await buildTeamManagerExport(...args);
+  return hy3;
+}
+
+/** Abre el ZIP de una respuesta y devuelve sus archivos, con los bytes tal cual. */
+function abrirZip(zip: Buffer) {
+  const entradas = new AdmZip(zip).getEntries();
+  const de = (ext: string) => entradas.find((e) => e.entryName.endsWith(ext))?.getData();
+  return { nombres: entradas.map((e) => e.entryName).sort(), hy3: de(".HY3")!, cl2: de(".CL2")! };
+}
+
+/** Sin el encabezado, que lleva la hora de generación. */
+const sinEncabezado = (bytes: Buffer) => bytes.toString("latin1").split("\r\n").slice(1).join("\r\n");
+
+describe("buildTeamManagerExport (invocación real)", () => {
   it("genera el archivo con la piscina configurada y la distancia TOTAL del relevo", async () => {
     const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: true });
 
-    const { filename, content } = await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR);
+    const { filename, content } = await exportarHy3(competencia.id, club.id, ADMIN_ACTOR);
 
     expect(filename).toMatch(/\.hy3$/i);
     const lineas = content.split(/\r?\n/);
@@ -1568,7 +1585,7 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
   it("RECHAZA exportar si la competencia no tiene piscina asignada", async () => {
     const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: false });
 
-    await expect(buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR)).rejects.toThrow(/no tiene piscina asignada/i);
+    await expect(exportarHy3(competencia.id, club.id, ADMIN_ACTOR)).rejects.toThrow(/no tiene piscina asignada/i);
   });
 
   it("RECHAZA generar el archivo si hay un relevo con datos inconsistentes, en vez de omitirlo", async () => {
@@ -1578,7 +1595,7 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
     const miembros = await prisma.relayRegistrationMember.findMany({ where: { relayRegistrationId: relevo.id } });
     await prisma.relayRegistrationMember.delete({ where: { id: miembros[0]!.id } });
 
-    const error: ValidationError = await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR).then(
+    const error: ValidationError = await exportarHy3(competencia.id, club.id, ADMIN_ACTOR).then(
       () => {
         throw new Error("se esperaba que la exportación fallara");
       },
@@ -1598,7 +1615,7 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
     const conteos = conConteosObsoletos(0);
 
     try {
-      const error = await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR, { maxRows: 2 })
+      const error = await exportarHy3(competencia.id, club.id, ADMIN_ACTOR, { maxRows: 2 })
         .then(() => null)
         .catch((e) => e as ValidationError);
 
@@ -1622,7 +1639,7 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
     try {
       // Tope 5: las cuatro individuales caben y queda 1 de presupuesto para
       // dos relevos, así que el exceso lo aportan solo ellos.
-      const error = await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR, { maxRows: 5 })
+      const error = await exportarHy3(competencia.id, club.id, ADMIN_ACTOR, { maxRows: 5 })
         .then(() => null)
         .catch((e) => e as ValidationError);
 
@@ -1647,7 +1664,7 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
     const conteos = conConteosObsoletos(0);
 
     try {
-      await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR, { maxRows: 5 });
+      await exportarHy3(competencia.id, club.id, ADMIN_ACTOR, { maxRows: 5 });
       const lecturasRelevo = conteos.lecturasDe("RelayRegistration");
       expect(lecturasRelevo[0]!.args.take).toBe(2); // remanente (5 - 4) + 1
       expect(lecturasRelevo[0]!.args.take).not.toBe(6);
@@ -1659,7 +1676,7 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
   it("el tope del archivo .HY3 también cuenta individuales y relevos", async () => {
     const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: true });
 
-    const error = await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR, { maxRows: 1 })
+    const error = await exportarHy3(competencia.id, club.id, ADMIN_ACTOR, { maxRows: 1 })
       .then(() => null)
       .catch((e) => e as ValidationError);
 
@@ -1675,12 +1692,12 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
     const { competencia } = await montarCompetenciaConInscripciones({ conPiscina: true });
     const otroClub = await createClub("Club Sin Inscritos", "CLBS");
 
-    await expect(buildTeamManagerHy3Export(competencia.id, otroClub.id, ADMIN_ACTOR)).rejects.toThrow(/no tiene inscripciones confirmadas/i);
+    await expect(exportarHy3(competencia.id, otroClub.id, ADMIN_ACTOR)).rejects.toThrow(/no tiene inscripciones confirmadas/i);
   });
 
   it("deja registro de auditoría de la exportación", async () => {
     const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: true });
-    await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR);
+    await exportarHy3(competencia.id, club.id, ADMIN_ACTOR);
 
     const registros = await prisma.auditLog.findMany({ where: { action: "TEAM_MANAGER_EXPORT_HY3" } });
     expect(registros.length).toBeGreaterThan(0);
@@ -1688,7 +1705,7 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// buildTeamManagerHy3Export — ALCANCE del actor (etapa 2)
+// buildTeamManagerExport — ALCANCE del actor (etapa 2)
 // ---------------------------------------------------------------------------
 
 /** Actor de un solo club, tal como lo construiría `buildActorContext`. */
@@ -1696,12 +1713,12 @@ function actorDeClub(userId: string, clubId: string): ActorContext {
   return { userId, isAdmin: false, scope: { kind: "club", clubId }, canRegisterPostClose: false };
 }
 
-describe("buildTeamManagerHy3Export — el servicio se protege solo", () => {
+describe("buildTeamManagerExport — el servicio se protege solo", () => {
   it("el personal de un club exporta SU club y el archivo es idéntico al del administrador", async () => {
     const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: true });
 
-    const delAdmin = await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR);
-    const delPersonal = await buildTeamManagerHy3Export(competencia.id, club.id, actorDeClub(ADMIN_ACTOR.userId, club.id));
+    const delAdmin = await exportarHy3(competencia.id, club.id, ADMIN_ACTOR);
+    const delPersonal = await exportarHy3(competencia.id, club.id, actorDeClub(ADMIN_ACTOR.userId, club.id));
 
     expect(delPersonal.filename).toBe(delAdmin.filename);
     expect(delPersonal.content).toBe(delAdmin.content);
@@ -1712,7 +1729,7 @@ describe("buildTeamManagerHy3Export — el servicio se protege solo", () => {
     const otroClub = await createClub("Club Ajeno", "CLBX");
     const lecturas = conConteosObsoletos(0);
     try {
-      const error = await buildTeamManagerHy3Export(competencia.id, club.id, actorDeClub(ADMIN_ACTOR.userId, otroClub.id)).then(
+      const error = await exportarHy3(competencia.id, club.id, actorDeClub(ADMIN_ACTOR.userId, otroClub.id)).then(
         () => null,
         (e: unknown) => e
       );
@@ -1731,21 +1748,21 @@ describe("buildTeamManagerHy3Export — el servicio se protege solo", () => {
     const ajeno = actorDeClub(ADMIN_ACTOR.userId, otroClub.id);
 
     // Competencia inexistente + club ajeno: 403, no 404 (no se revela qué existe).
-    await expect(buildTeamManagerHy3Export("no-existe", club.id, ajeno)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(exportarHy3("no-existe", club.id, ajeno)).rejects.toBeInstanceOf(ForbiddenError);
     // Control: con alcance válido, esa misma competencia sí da 404.
-    await expect(buildTeamManagerHy3Export("no-existe", club.id, actorDeClub(ADMIN_ACTOR.userId, club.id))).rejects.toBeInstanceOf(NotFoundError);
+    await expect(exportarHy3("no-existe", club.id, actorDeClub(ADMIN_ACTOR.userId, club.id))).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("un nadador puro no puede exportar ningún club, ni siquiera el suyo", async () => {
     const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: true });
     const nadador: ActorContext = { userId: ADMIN_ACTOR.userId, isAdmin: false, scope: { kind: "swimmer", personId: "p" }, canRegisterPostClose: false };
-    await expect(buildTeamManagerHy3Export(competencia.id, club.id, nadador)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(exportarHy3(competencia.id, club.id, nadador)).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it("un rechazo por alcance NO deja registro de auditoría de exportación", async () => {
     const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: true });
     const otroClub = await createClub("Club Ajeno", "CLBX");
-    await expect(buildTeamManagerHy3Export(competencia.id, club.id, actorDeClub(ADMIN_ACTOR.userId, otroClub.id))).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(exportarHy3(competencia.id, club.id, actorDeClub(ADMIN_ACTOR.userId, otroClub.id))).rejects.toBeInstanceOf(ForbiddenError);
     expect(await prisma.auditLog.count({ where: { action: "TEAM_MANAGER_EXPORT_HY3" } })).toBe(0);
   });
 });
@@ -1767,7 +1784,7 @@ describe("GET /export/team-manager/hy3 — permisos y alcance por HTTP", () => {
   const exportar = (token: string, competitionId: string, clubId: string) =>
     app.inject({
       method: "GET",
-      url: `/export/team-manager/hy3?competitionId=${competitionId}&clubId=${clubId}`,
+      url: `/export/team-manager/zip?competitionId=${competitionId}&clubId=${clubId}`,
       headers: { authorization: `Bearer ${token}` },
     });
 
@@ -1836,15 +1853,19 @@ describe("GET /export/team-manager/hy3 — permisos y alcance por HTTP", () => {
 
     const propio = await exportar(m.tokens[clave]!, m.competencia.id, m.clubPropio.id);
     expect(propio.statusCode).toBe(200);
-    expect(propio.headers["content-type"]).toContain("application/octet-stream");
-    expect(propio.headers["content-disposition"]).toMatch(/\.HY3"/i);
+    expect(propio.headers["content-type"]).toContain("application/zip");
+    expect(propio.headers["content-disposition"]).toMatch(/^attachment; filename="[\w-]+\.zip"$/);
+    const nombres = abrirZip(propio.rawPayload).nombres;
+    expect(nombres.map((n) => n.slice(-4))).toEqual([".CL2", ".HY3"]);
+    expect(nombres[0]!.slice(0, -4), "los dos archivos llevan el mismo nombre base").toBe(nombres[1]!.slice(0, -4));
+    expect(new AdmZip(propio.rawPayload).getEntries().map((e) => e.header.flags)).toEqual([0, 0]);
 
     // Ajeno: el personal del club propio pide el club ajeno.
     const ajeno = await exportar(m.tokens[clave]!, m.competencia.id, m.clubAjeno.id);
     expect(ajeno.statusCode).toBe(403);
-    expect(ajeno.headers["content-type"]).not.toContain("octet-stream");
+    expect(ajeno.headers["content-type"]).not.toContain("zip");
     expect(ajeno.headers["content-disposition"]).toBeUndefined();
-    expect(ajeno.rawPayload.toString("latin1")).not.toMatch(/^A1|\nB1|\nD1|\nE1/m);
+    expect(ajeno.rawPayload.subarray(0, 2).toString("latin1"), "sin firma de ZIP").not.toBe("PK");
   });
 
   it("el personal de OTRO club tampoco puede pedir el club propio de aquellos", async () => {
@@ -1859,7 +1880,7 @@ describe("GET /export/team-manager/hy3 — permisos y alcance por HTTP", () => {
     const res = await exportar(m.tokens.cuentaClubAjena!, m.competencia.id, m.clubPropio.id);
     expect(res.statusCode).toBe(403);
     expect(res.headers["content-disposition"]).toBeUndefined();
-    expect(res.rawPayload.toString("latin1")).not.toMatch(/^A1|\nB1|\nD1|\nE1/m);
+    expect(res.rawPayload.subarray(0, 2).toString("latin1"), "sin firma de ZIP").not.toBe("PK");
 
     // Y, simétricamente, su propio club sí (el club ajeno no tiene inscripciones: el error es de negocio, no 403).
     const suyo = await exportar(m.tokens.cuentaClubAjena!, m.competencia.id, m.clubAjeno.id);
@@ -1879,12 +1900,14 @@ describe("GET /export/team-manager/hy3 — permisos y alcance por HTTP", () => {
     const delAdmin = await exportar(m.tokens.admin!, m.competencia.id, m.clubPropio.id);
     const delClub = await exportar(m.tokens.cuentaClub!, m.competencia.id, m.clubPropio.id);
     expect(delClub.statusCode).toBe(200);
-    expect(Buffer.compare(delClub.rawPayload, delAdmin.rawPayload)).toBe(0);
+    for (const archivo of ["hy3", "cl2"] as const) {
+      expect(sinEncabezado(abrirZip(delClub.rawPayload)[archivo])).toBe(sinEncabezado(abrirZip(delAdmin.rawPayload)[archivo]));
+    }
   });
 
   it("sin sesión → 401", async () => {
     const m = await montarMatriz();
-    const res = await app.inject({ method: "GET", url: `/export/team-manager/hy3?competitionId=${m.competencia.id}&clubId=${m.clubPropio.id}` });
+    const res = await app.inject({ method: "GET", url: `/export/team-manager/zip?competitionId=${m.competencia.id}&clubId=${m.clubPropio.id}` });
     expect(res.statusCode).toBe(401);
   });
 
@@ -1895,7 +1918,9 @@ describe("GET /export/team-manager/hy3 — permisos y alcance por HTTP", () => {
     expect(delAdmin.statusCode).toBe(200);
     const delPersonal = await exportar(m.tokens.delegado!, m.competencia.id, m.clubPropio.id);
     expect(delPersonal.statusCode).toBe(200);
-    expect(Buffer.compare(delPersonal.rawPayload, delAdmin.rawPayload)).toBe(0);
+    for (const archivo of ["hy3", "cl2"] as const) {
+      expect(sinEncabezado(abrirZip(delPersonal.rawPayload)[archivo])).toBe(sinEncabezado(abrirZip(delAdmin.rawPayload)[archivo]));
+    }
 
     // Cualquier club: el ajeno no tiene inscripciones, y el error de negocio (no 403) lo demuestra.
     const ajeno = await exportar(m.tokens.admin!, m.competencia.id, m.clubAjeno.id);
@@ -1906,7 +1931,8 @@ describe("GET /export/team-manager/hy3 — permisos y alcance por HTTP", () => {
   it("el formato se conserva: Latin-1, registros HY3 de individuales y relevos", async () => {
     const m = await montarMatriz();
     const res = await exportar(m.tokens.delegado!, m.competencia.id, m.clubPropio.id);
-    const texto = res.rawPayload.toString("latin1");
+    const { hy3: bytesHy3, cl2 } = abrirZip(res.rawPayload);
+    const texto = bytesHy3.toString("latin1");
     const lineas = texto.split(/\r?\n/);
 
     expect(lineas[0]!.startsWith("A1")).toBe(true);
@@ -1914,8 +1940,79 @@ describe("GET /export/team-manager/hy3 — permisos y alcance por HTTP", () => {
     expect(lineas.some((l) => l.startsWith("F1"))).toBe(true); // relevo
     expect(lineas.some((l) => l.startsWith("F3"))).toBe(true);
     // Byte a byte equivale a codificar el contenido del servicio en Latin-1.
-    const directo = await buildTeamManagerHy3Export(m.competencia.id, m.clubPropio.id, ADMIN_ACTOR);
-    expect(Buffer.compare(res.rawPayload, Buffer.from(directo.content, "latin1"))).toBe(0);
+    const directo = await exportarHy3(m.competencia.id, m.clubPropio.id, ADMIN_ACTOR);
+    expect(sinEncabezado(bytesHy3)).toBe(sinEncabezado(Buffer.from(directo.content, "latin1")));
+
+    // El CL2 del mismo paquete: 160 columnas, checksums válidos y sus registros.
+    const lineasCl2 = cl2.toString("latin1").split("\r\n").filter(Boolean);
+    expect(lineasCl2.filter((l) => !isValidCl2Line(l))).toEqual([]);
+    expect(lineasCl2.some((l) => l.startsWith("D0"))).toBe(true);
+    expect(lineasCl2.some((l) => l.startsWith("E0"))).toBe(true);
+    expect(lineasCl2.some((l) => l.startsWith("F0"))).toBe(true);
+    expect(lineasCl2[lineasCl2.length - 1]!.startsWith("Z0")).toBe(true);
+  });
+
+  it("la ruta anterior /hy3 sigue viva como alias: mismos permisos y el mismo ZIP", async () => {
+    const m = await montarMatriz();
+    const pedir = (token: string, clubId: string) =>
+      app.inject({
+        method: "GET",
+        url: `/export/team-manager/hy3?competitionId=${m.competencia.id}&clubId=${clubId}`,
+        headers: { authorization: `Bearer ${token}` },
+      });
+
+    const propio = await pedir(m.tokens.cuentaClub!, m.clubPropio.id);
+    expect(propio.statusCode).toBe(200);
+    expect(propio.headers["content-type"]).toContain("application/zip");
+    expect(abrirZip(propio.rawPayload).nombres).toHaveLength(2);
+
+    expect((await pedir(m.tokens.cuentaClub!, m.clubAjeno.id)).statusCode).toBe(403);
+    expect((await pedir(m.tokens.nadadorPuro!, m.clubPropio.id)).statusCode).toBe(403);
+  });
+
+  it("exporta solo el apellido PATERNO y el RUN con guion, sin tocar lo almacenado", async () => {
+    const m = await montarMatriz();
+    const persona = await prisma.person.findFirstOrThrow({ where: { run: "80000001" } });
+    await prisma.person.update({
+      where: { id: persona.id },
+      data: { paternalLastName: "De la Fuente", maternalLastName: "Maternoúnico", firstName: "Ana María", run: "12345678K" },
+    });
+    const antes = await prisma.person.findUniqueOrThrow({ where: { id: persona.id } });
+
+    const res = await exportar(m.tokens.admin!, m.competencia.id, m.clubPropio.id);
+    const { hy3, cl2 } = abrirZip(res.rawPayload);
+    const textoHy3 = hy3.toString("latin1");
+    const textoCl2 = cl2.toString("latin1");
+
+    // Apellido compuesto entero, tal como está en su campo, y nada del materno.
+    expect(textoHy3).toContain("De la Fuente");
+    expect(textoCl2).toContain("De la Fuente, Ana María");
+    expect(textoHy3 + textoCl2).not.toContain("Maternoúnico");
+    expect(textoHy3 + textoCl2).toContain("12345678-K");
+
+    // Las referencias de relevo usan ese mismo apellido.
+    const f3 = textoHy3.split("\r\n").filter((l) => l.startsWith("F3")).join("");
+    expect(f3).toContain("De la");
+
+    expect(await prisma.person.findUniqueOrThrow({ where: { id: persona.id } }), "los datos no se tocan").toEqual(antes);
+  });
+
+  it("una persona histórica sin apellido separado detiene la exportación, sin adivinar y sin auditar", async () => {
+    const m = await montarMatriz();
+    const persona = await prisma.person.findFirstOrThrow({ where: { run: "80000002" } });
+    await prisma.person.update({
+      where: { id: persona.id },
+      data: { paternalLastName: null, maternalLastName: null, firstName: null, fullName: "Pérez Soto, Luisa" },
+    });
+    const antes = await prisma.auditLog.count({ where: { action: "TEAM_MANAGER_EXPORT_HY3" } });
+
+    const res = await exportar(m.tokens.admin!, m.competencia.id, m.clubPropio.id);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain("apellido paterno");
+    expect(res.body).toContain("Pérez Soto, Luisa");
+    expect(await prisma.auditLog.count({ where: { action: "TEAM_MANAGER_EXPORT_HY3" } })).toBe(antes);
+    expect((await prisma.person.findUniqueOrThrow({ where: { id: persona.id } })).fullName).toBe("Pérez Soto, Luisa");
   });
 
   it("AUDITORÍA: cada descarga permitida registra TEAM_MANAGER_EXPORT_HY3 con su autor; un rechazo no registra nada", async () => {
@@ -1934,7 +2031,10 @@ describe("GET /export/team-manager/hy3 — permisos y alcance por HTTP", () => {
     expect(registros).toHaveLength(antes + 1);
     const entrenador = await prisma.user.findFirstOrThrow({ where: { username: "staff_entrenador" } });
     expect(registros[registros.length - 1]!.userId).toBe(entrenador.id);
-    expect((registros[registros.length - 1]!.after as { clubId: string }).clubId).toBe(m.clubPropio.id);
+    const detalle = registros[registros.length - 1]!.after as { clubId: string; filename: string; files: string[] };
+    expect(detalle.clubId).toBe(m.clubPropio.id);
+    expect(detalle.filename).toMatch(/\.zip$/);
+    expect(detalle.files.map((f) => f.slice(-3)).sort()).toEqual(["CL2", "HY3"]);
   });
 });
 
@@ -1950,14 +2050,14 @@ const fechasDeB1 = (contenido: string) => {
 
 const checksumValido = (linea: string) => linea.slice(128, 130) === computeHy3Checksum(linea.slice(0, 128));
 
-describe("buildTeamManagerHy3Export — B1 lleva las fechas de la COMPETENCIA", () => {
+describe("buildTeamManagerExport — B1 lleva las fechas de la COMPETENCIA", () => {
   it("REGRESIÓN: inscripción 26/10–05/11/2026 y competencia el 08/11/2026 → 11082026 en ambos campos, con checksum válido", async () => {
     const { competencia, club } = await montarCompetenciaConInscripciones({
       conPiscina: true,
       fechas: ["2026-11-08"],
       inscripcion: { inicio: "2026-10-26", fin: "2026-11-05" },
     });
-    const { content } = await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR);
+    const { content } = await exportarHy3(competencia.id, club.id, ADMIN_ACTOR);
     const { b1, inicio, termino } = fechasDeB1(content);
 
     expect(inicio).toBe("11082026");
@@ -1975,7 +2075,7 @@ describe("buildTeamManagerHy3Export — B1 lleva las fechas de la COMPETENCIA", 
       fechas: ["2026-11-10", "2026-11-15", "2026-11-08", "2026-11-09"],
       inscripcion: { inicio: "2026-10-26", fin: "2026-11-05" },
     });
-    const { b1, inicio, termino } = fechasDeB1((await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR)).content);
+    const { b1, inicio, termino } = fechasDeB1((await exportarHy3(competencia.id, club.id, ADMIN_ACTOR)).content);
     expect([inicio, termino]).toEqual(["11082026", "11152026"]);
     expect(checksumValido(b1)).toBe(true);
   });
@@ -1997,7 +2097,7 @@ describe("buildTeamManagerHy3Export — B1 lleva las fechas de la COMPETENCIA", 
     );
     const club = await createClub("Club Sin Fechas", "CSF", "club_sin_fechas");
 
-    const error = await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR).then(
+    const error = await exportarHy3(competencia.id, club.id, ADMIN_ACTOR).then(
       () => null,
       (e: unknown) => e
     );
@@ -2015,12 +2115,12 @@ describe("buildTeamManagerHy3Export — B1 lleva las fechas de la COMPETENCIA", 
     });
 
     // Con ageCutoffDate: el 31 de diciembre que fijó la competencia.
-    const conCorte = fechasDeB1((await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR)).content);
+    const conCorte = fechasDeB1((await exportarHy3(competencia.id, club.id, ADMIN_ACTOR)).content);
     expect(conCorte.corte).toBe(formatHy3Date((await prisma.competition.findUniqueOrThrow({ where: { id: competencia.id } })).ageCutoffDate!));
 
     // Sin ageCutoffDate: la alternativa de siempre, el cierre de inscripciones (05/11), NO la fecha de la competencia.
     await prisma.competition.update({ where: { id: competencia.id }, data: { ageCutoffDate: null } });
-    const sinCorte = fechasDeB1((await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR)).content);
+    const sinCorte = fechasDeB1((await exportarHy3(competencia.id, club.id, ADMIN_ACTOR)).content);
     expect(sinCorte.corte).toBe("11052026");
     expect(sinCorte.inicio).toBe("11082026");
     expect(sinCorte.termino).toBe("11082026");
@@ -2034,7 +2134,7 @@ describe("buildTeamManagerHy3Export — B1 lleva las fechas de la COMPETENCIA", 
     });
     const sinA1B1 = (c: string) => c.split(/\r?\n/).filter((l) => l && !l.startsWith("A1") && !l.startsWith("B1"));
 
-    const antes = (await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR)).content;
+    const antes = (await exportarHy3(competencia.id, club.id, ADMIN_ACTOR)).content;
     // Se programan dos días más: cambia B1, y nada más.
     await prisma.competitionDate.createMany({
       data: [
@@ -2042,7 +2142,7 @@ describe("buildTeamManagerHy3Export — B1 lleva las fechas de la COMPETENCIA", 
         { competitionId: competencia.id, date: new Date("2026-11-15T00:00:00.000Z") },
       ],
     });
-    const despues = (await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR)).content;
+    const despues = (await exportarHy3(competencia.id, club.id, ADMIN_ACTOR)).content;
 
     expect(fechasDeB1(antes).termino).toBe("11082026");
     expect(fechasDeB1(despues).termino).toBe("11152026");

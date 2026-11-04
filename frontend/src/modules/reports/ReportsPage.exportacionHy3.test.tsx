@@ -1,5 +1,5 @@
 /**
- * Etapa 2 — el botón «Exportar a Team Manager (.HY3)» sigue al PERMISO, no al rol.
+ * Etapa 2 — el botón «Exportar a Team Manager (.zip)» sigue al PERMISO, no al rol.
  *
  * Antes lo gobernaba `hasRole("admin")`. Ahora lo gobierna
  * `hasPermission("export:team-manager")`, que tienen el administrador, la cuenta
@@ -96,7 +96,7 @@ vi.mock("./reportsApi", () => ({
   useReportsApi: () => ({ getRegistrationsReport: vi.fn(), downloadExport: vi.fn(), downloadTeamManagerExport }),
 }));
 
-const BOTON = /Exportar a Team Manager/i;
+const BOTON = "Exportar a Team Manager (.zip)";
 
 async function montar(clave: keyof typeof ACTORES) {
   actual = ACTORES[clave]!;

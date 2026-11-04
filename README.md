@@ -854,10 +854,22 @@ Filtros soportados (sección 16): `competitionId` (obligatorio), `clubId`, `comp
 
 ## Módulo 11 — Exportación a Team Manager (resuelve A-06)
 
-Se partió de una exportación real de Hy-Tek Team Manager (formatos `.HY3`/`.CL2`).
-Se decodificó su estructura byte a byte y se implementó un generador **verificado
-contra datos reales**, no contra documentación de terceros sin contrastar. El
-fixture que se conserva en el repositorio es sintético.
+Se partió de exportaciones reales de Hy-Tek Team Manager (`.HY3` y `.CL2`). Se
+decodificó su estructura byte a byte y se implementaron generadores **verificados
+contra datos reales**, no contra documentación de terceros sin contrastar. Los
+fixtures que se conservan en el repositorio son sintéticos.
+
+**Lo que se descarga es un ZIP con exactamente dos archivos, un `.CL2` y un `.HY3`**,
+de las mismas inscripciones, personas y relevos: los dos salen de un único modelo
+(`export-model.ts`). Es la forma del paquete que Team Manager produce y que HY-TEK
+Meet Manager importa.
+
+> **Motivo.** Meet Manager rechazó el `.HY3` anterior con «NO es un archivo .HY3
+> creado por Active». Frente a una exportación real que sí importa, el encabezado
+> difería: el `A1` decía `Sist. FCHMN` donde va `Hy-Tek, Ltd`, y la hora corría una
+> columna el resto de la línea. **Es la causa probable, no demostrada**: no se ha
+> podido ejecutar Meet Manager para aislar cuál de las diferencias lo provoca.
+> **La importación real en HY-Tek sigue pendiente de comprobarse.**
 
 ### Verificación
 
@@ -878,6 +890,12 @@ fixture que se conserva en el repositorio es sintético.
   conservan el checksum original de Hy-Tek — son las que demuestran que el algoritmo
   es el correcto —, mientras que las demás verifican que el cálculo se aplica de forma
   consistente a los ocho tipos de registro.
+- **Exportación real reconstruida**: con los generadores actuales, un paquete real
+  de 24 nadadores, 72 pruebas y 3 relevos se reconstruyó **idéntico byte a byte**, en
+  sus dos archivos (108 líneas de HY3 y 115 de CL2), a partir de los datos leídos del
+  propio archivo. Es una comprobación hecha **fuera del repositorio**, porque ese
+  archivo tiene datos personales. Reconstruir no es importar: demuestra el formato de
+  lo que aquel archivo contenía, no lo que hace el programa con otros casos.
 - **Estructura de campos**: se decodificaron las posiciones exactas de columna para
   los registros `A1` (encabezado), `B1`/`B2` (competencia), `C1`/`C2`/`C3` (club),
   `D1` (nadador) y `E1` (prueba individual inscrita). El generador (`hy3-writer.ts`)
@@ -902,12 +920,13 @@ fixture que se conserva en el repositorio es sintético.
 
 ### Limitaciones documentadas honestamente
 
-- **Solo formato `.HY3`**, no `.CL2`. El archivo `.CL2` de la muestra usa un
-  algoritmo de checksum **distinto** al de `.HY3` que no se logró determinar con
-  certeza en el tiempo disponible (se intentó por fuerza bruta sobre variantes del
-  mismo algoritmo, sin éxito). Dado que `.HY3` es el formato moderno recomendado por
-  Hy-Tek y ya está 100% verificado, se priorizó entregarlo funcional en vez de
-  arriesgar ambos formatos a medio verificar.
+- **Lo que el `.CL2` real no contenía y por tanto es inferencia.** Sale del estándar
+  SDIF, sin contraste contra Hy-Tek: una prueba o relevo **sin marca** (`NT`), el
+  relevo **combinado** (estilo `7`), el relevo **mixto** (sexo `X`), un código de club
+  de 5 caracteres, y un nadador **que solo nada relevos**, que no lleva `D0` y aparece
+  únicamente en sus `F0`. Son los primeros sitios donde mirar si un caso real falla.
+- **Sede**: el `B1` de ambos formatos lleva la constante `cduc` de la muestra. El
+  sistema no modela este dato.
 - **Nombres con caracteres especiales (ñ, á, é, etc.)**: se encontró un caso en el
   propia exportación real (un apellido con "ñ") donde la línea `D1`
   generada por el Team Manager original presenta un corrimiento de una columna
@@ -926,6 +945,41 @@ fixture que se conserva en el repositorio es sintético.
   cómo interpretar los tiempos de referencia, y una competencia de piscina corta
   exportada como larga produce marcas mal clasificadas sin que nada avise.
 
+### `.CL2`: SDIF de 160 columnas
+
+`cl2-writer.ts`. Registros `A0`, `B1`, `C1`, `D0` (una prueba individual), `D3` (una
+por nadador, tras su primer `D0`), `E0` (equipo de relevo), `F0` (un integrante, en
+orden de posta) y `Z0` (conteos). Cada línea tiene 160 columnas: 156 de contenido, un
+espacio, una `N` y el checksum, y termina en CRLF, también la última.
+
+**El checksum se determinó** (antes figuraba como no resuelto): suma simple de los
+bytes de las columnas 0-155, sin ponderar; `floor(suma / 19) + 11`; dígito de unidades
+y luego el de decenas. Búsqueda exhaustiva sobre ventana, pesos, divisor, constante y
+orden de dígitos: es la **única** combinación que acierta en las 115 líneas de una
+exportación real, incluidas las que llevan `ñ`. Solo se ven dos dígitos, así que la
+constante queda determinada módulo 100.
+
+Un hallazgo que se cruza con el HY3: la edad de `D0` y `D1` es a la **fecha de corte**,
+pero la de `F0` es a la **fecha de la competencia** (en el archivo real solo así
+coinciden los 12 integrantes; a la fecha de corte, 10).
+
+### Nombres y RUN en estos archivos
+
+- **Solo el apellido paterno**, en los dos formatos y en las referencias de relevo
+  (`F3`), tal como está en su campo: `De la Fuente` sale entero, y el materno no sale.
+- **Una persona histórica sin nombre y apellido paterno por separado detiene la
+  exportación** con un 400 que la nombra. De su `fullName` no se puede saber qué es
+  apellido paterno, así que no se adivina, igual que con una piscina sin asignar o un
+  relevo incompleto. Se corrige completando la ficha.
+- **RUN sin puntos y con guion** (`11111111-1`, `K` mayúscula), alineado a la izquierda
+  en su campo, en la columna 69 del `D1`. Lo que no tiene forma de RUN no recibe un
+  guion inventado.
+- Es solo la forma de exportarlos: lo almacenado y lo que muestra el resto del sistema
+  no cambian.
+
+El `A1` del HY3 lleva `Hy-Tek, Ltd` en la columna 29 y la hora ajustada a la derecha en
+las columnas 66-74, pegada a `TEAM MANAGER Lite`: `3:54 PMTEAM MANAGER Lite`.
+
 ### Relevos (`F1`/`F2`, resuelto)
 
 La limitación original (solo inscripciones individuales) quedó resuelta con una
@@ -941,14 +995,15 @@ Se decodificó igual que el resto — byte a byte
   Un hallazgo relevante: cuando NO hay marca de referencia, el campo se escribe
   como `0.00` con **punto** decimal (formato inglés) — a diferencia de una marca
   real, que usa **coma** decimal (formato chileno) igual que en `E1`. Tampoco lleva
-  el marcador de estado `C` que sí lleva `E1` (esa posición queda en blanco).
+  el marcador de estado `C` que sí lleva `E1` (esa posición queda en blanco). Con
+  marca lleva una `X` en la columna 83; sin marca, no.
 - **`F3`** (los 4 integrantes del equipo, en orden): mismo `swimmerId` que su
   registro `D1` — un nadador que compite en un relevo pero en ninguna prueba
   individual igual recibe su línea `D1` (sin `E1` después), tal como en la muestra
   real: primero se listan todos los nadadores que SOLO están en relevos, y recién
   después los que tienen pruebas individuales (con su `D1` seguido de sus `E1`).
 
-El endpoint ahora incluye ambos tipos de inscripción en un mismo archivo por club.
+El endpoint incluye ambos tipos de inscripción en un mismo paquete por club.
 
 - El campo de "tiempo de marca de referencia" (seed time) se exporta con el valor
   real si el nadador (o el equipo de relevo) tiene uno cargado; si no, se exporta
@@ -981,7 +1036,14 @@ devolvía el mismo archivo. El contrato queda fijado en
 
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
-| GET | `/export/team-manager/hy3?competitionId=&clubId=` | Descarga el archivo `.HY3` con las inscripciones individuales Y de relevo confirmadas de un club en una competencia. El administrador exporta cualquier club; el rol `club` y el personal de club, solo el suyo | `export:team-manager` |
+| GET | `/export/team-manager/zip?competitionId=&clubId=` | Descarga el ZIP (`application/zip`) con un `.CL2` y un `.HY3` de las inscripciones individuales Y de relevo confirmadas de un club en una competencia. El administrador exporta cualquier club; el rol `club` y el personal de club, solo el suyo | `export:team-manager` |
+| GET | `/export/team-manager/hy3?competitionId=&clubId=` | Alias de la ruta anterior: entrega el mismo ZIP, para las pestañas que sigan abiertas con la versión previa de la web durante un despliegue. Ya no devuelve un `.HY3` suelto | `export:team-manager` |
+
+**Cambio de contrato.** La ruta canónica pasa a ser `/export/team-manager/zip`, y la
+respuesta deja de ser `application/octet-stream` con un `.HY3`: es `application/zip`.
+El permiso, los parámetros, los 403 y los límites no cambian. La auditoría sigue
+registrando `TEAM_MANAGER_EXPORT_HY3` para no partir el historial, y añade `files` con
+los dos nombres.
 
 **Quién puede exportar.** El permiso `export:team-manager` lo tienen el
 administrador, el rol `club` (la cuenta del club) y el personal de club
@@ -1015,9 +1077,10 @@ personal y a la cuenta del club, que es el fallo seguro; el servidor relee los p
 solicitud, y el botón aparece en la siguiente sesión que se emita. Es una
 operación de despliegue sujeta a autorización específica en producción.
 
-El archivo se codifica en **ISO-8859-1** (Latin-1), igual que el archivo original —
+Los dos archivos se codifican en **ISO-8859-1** (Latin-1), igual que los originales —
 no UTF-8, ya que Team Manager es un software de la era DOS/Windows clásico que
-espera esa codificación.
+espera esa codificación. Un carácter fuera de Latin-1 se exporta como `?`, sin tocar
+el dato almacenado.
 
 ## Módulo 12 — Auditoría
 
@@ -1033,7 +1096,7 @@ Al revisar qué se estaba auditando realmente, encontré que **las exportaciones
 quedaban registradas** pese a que la sección 19 las lista explícitamente
 ("Auditar especialmente: ... Exportaciones"). Corregido en dos lugares:
 - `reports.routes.ts` — cada exportación (CSV/Excel/PDF) ahora registra `REPORT_EXPORTED` con el formato, los filtros usados y la cantidad de filas exportadas.
-- `team-manager-export.service.ts` — cada descarga `.HY3` ahora registra `TEAM_MANAGER_EXPORT_HY3` con el club y la cantidad de inscripciones incluidas.
+- `team-manager-export.service.ts` — cada descarga ahora registra `TEAM_MANAGER_EXPORT_HY3` con el club y la cantidad de inscripciones incluidas.
 
 ### Endpoints
 
@@ -1140,7 +1203,7 @@ Estas rutas son del administrador, que no necesita proponerse nada a sí mismo:
 
 ## Inventario completo de endpoints
 
-**116 endpoints**, agrupados por el módulo que los declara. Esta lista no está
+**117 endpoints**, agrupados por el módulo que los declara. Esta lista no está
 escrita a mano: `backend/tests/documentacion.test.ts` la compara con las rutas que
 el código declara y **falla si alguna sobra o falta**. Además comprueba que
 ninguna ruta fuera de las públicas se quede sin guardia, y que el permiso exacto
@@ -1347,6 +1410,7 @@ fuera de producción o con `ENABLE_SWAGGER=true`.
 
 | Método | Ruta |
 |---|---|
+| GET | `/export/team-manager/zip` |
 | GET | `/export/team-manager/hy3` |
 
 ## Módulo 13 — Pruebas y documentación final
@@ -1386,8 +1450,9 @@ Lo que sigue abierto, sin adornos:
 
 - **No hay pruebas E2E** de interfaz. Es el hueco más grande: Playwright está
   aprobado como herramienta y el plan escrito, pero la dependencia no se instaló.
-- **La exportación a Team Manager no cubre `.CL2`**, solo `.HY3` (el checksum del
-  `.CL2` no se logró determinar). Los relevos **sí** están cubiertos.
+- **La importación del ZIP en HY-Tek no se ha comprobado**: los archivos reproducen
+  byte a byte un paquete real, pero el programa no se ha ejecutado contra lo generado
+  por este sistema.
 - **El `docker build` real sigue sin ejecutarse**, y tampoco un smoke test en
   navegadores reales.
 - La cobertura del frontend (54,77 %) va por detrás de la del backend (85,28 %).

@@ -92,8 +92,8 @@ export function useReportsApi() {
     downloadExport: (filters: ReportFilters, format: "csv" | "xlsx" | "pdf") =>
       descargarArchivo(`/reports/registrations/export?${buildQs(filters, { format })}`, `reporte.${format}`),
 
-    /** Descarga el archivo .HY3 para Team Manager (Módulo 11). */
+    /** Descarga el ZIP para Team Manager, con un .CL2 y un .HY3 (Módulo 11). */
     downloadTeamManagerExport: (competitionId: string, clubId: string) =>
-      descargarArchivo(`/export/team-manager/hy3?${new URLSearchParams({ competitionId, clubId })}`, "export.HY3"),
+      descargarArchivo(`/export/team-manager/zip?${new URLSearchParams({ competitionId, clubId })}`, "export.zip"),
   };
 }

@@ -15,7 +15,7 @@ const { inicio, termino } = fechasDeLaCompetencia(
   dias.map((d) => ({ date: new Date(`${d}T00:00:00.000Z`) })),
   "Copa"
 );
-const b1 = buildB1({ name: "Copa", startDate: inicio, endDate: termino, ageUpDate: new Date("2026-12-31T00:00:00.000Z") });
+const b1 = buildB1({ facility: "cduc", name: "Copa", startDate: inicio, endDate: termino, ageUpDate: new Date("2026-12-31T00:00:00.000Z") });
 
 console.log(
   JSON.stringify({

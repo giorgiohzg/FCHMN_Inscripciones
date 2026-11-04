@@ -19,6 +19,16 @@ export function formatRun(raw: string): string {
   return `${withDots}-${dv}`;
 }
 
+/**
+ * "11111111-1": sin puntos, con guion antes del dígito verificador y K mayúscula.
+ * Es la forma que llevan los archivos de Team Manager. Lo que no tiene forma de
+ * RUN se devuelve normalizado, sin inventarle un guion.
+ */
+export function formatRunConGuion(raw: string): string {
+  const clean = normalizeRun(raw);
+  return /^\d+[0-9K]$/.test(clean) ? `${clean.slice(0, -1)}-${clean.slice(-1)}` : clean;
+}
+
 function computeCheckDigit(body: string): string {
   let sum = 0;
   let multiplier = 2;
