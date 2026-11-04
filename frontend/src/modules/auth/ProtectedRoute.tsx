@@ -64,6 +64,30 @@ export function ProtectedRoute({ requiredRole }: ProtectedRouteProps) {
 }
 
 /**
+ * Guard de `/login`: el formulario es solo para quien NO tiene sesión.
+ *
+ * Con una sesión válida —restaurada tras una recarga, o ya iniciada— mostrar el
+ * formulario aparenta un cierre de sesión que no ocurrió, y quien lo ve vuelve a
+ * ingresar sin necesidad. Aquí se lleva al destino que le corresponde.
+ *
+ * Mismo orden de decisión que `ProtectedRoute`, y por la misma razón: mientras
+ * se restaura no se decide nada, y un fallo de red o de servidor no es una
+ * sesión vencida (se explica y se ofrece reintentar, no se muestra el
+ * formulario como si la sesión hubiera terminado).
+ *
+ * No hay bucle posible: `/dashboard` y `/cambiar-password` no redirigen a
+ * `/login` mientras haya token, que es justo la condición que trae hasta aquí.
+ */
+export function RutaDeAcceso() {
+  const { accessToken, mustChangePassword, restaurando, restauracionFallida } = useAuth();
+
+  if (restaurando) return <Esperando />;
+  if (!accessToken && restauracionFallida) return <SinConexion />;
+  if (accessToken) return <Navigate to={mustChangePassword ? "/cambiar-password" : "/dashboard"} replace />;
+  return <Outlet />;
+}
+
+/**
  * Exige sesión iniciada pero NO que la contraseña ya esté cambiada.
  *
  * Es el guard de `/cambiar-password`: esa ruta estaba fuera de todo guard, de

@@ -206,7 +206,8 @@ describe("sin sesión no se llega a ninguna parte", () => {
     expect(await screen.findByText("PANTALLA login")).toBeInTheDocument();
   });
 
-  it("una ruta que no existe también manda al login", async () => {
+  it("una ruta que no existe, sin sesión, también acaba en el login", async () => {
+    sesion.accessToken = null;
     abrir("/esta-ruta-no-existe");
 
     expect(await screen.findByText("PANTALLA login")).toBeInTheDocument();
@@ -298,6 +299,126 @@ describe("la restauración de sesión no expulsa a nadie", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Reintentar" }));
 
+    expect(reintentarRestauracion).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * LA RAÍZ, LAS RUTAS DESCONOCIDAS Y /login CON UNA SESIÓN VÁLIDA.
+ *
+ * Incidente del 4 de noviembre de 2026: abrir `/` (que no tenía ruta) o una
+ * dirección mal escrita mandaba a `/login` aunque la sesión estuviera restaurada
+ * y viva, y la pantalla de acceso no redirigía a quien ya tenía sesión. Parecía
+ * un cierre de sesión que no había ocurrido. La prueba que existía —«una ruta que
+ * no existe también manda al login»— usaba una sesión VÁLIDA y fijaba justo ese
+ * comportamiento.
+ *
+ * Aquí la sesión es una simulación (`useAuth` sustituido): se comprueba el
+ * enrutado. Las transiciones asíncronas con el `AuthProvider` y el `LoginPage`
+ * reales están en `modules/auth/rutasYSesion.test.tsx`.
+ */
+describe("la raíz y las rutas desconocidas llevan al panel, sin aparentar un cierre de sesión", () => {
+  it.each([["/"], ["/esta-ruta-no-existe"], ["/clubs"]])("%s con sesión válida: panel, no login", async (ruta) => {
+    abrir(ruta);
+
+    expect(await screen.findByText("PANTALLA panel admin")).toBeInTheDocument();
+    expect(screen.queryByText("PANTALLA login")).not.toBeInTheDocument();
+  });
+
+  it.each([["/"], ["/esta-ruta-no-existe"]])("%s con sesión de delegado: su bienvenida, sin pantallas de admin", async (ruta) => {
+    sesion.roles = ["delegate"];
+    abrir(ruta);
+
+    expect(await screen.findByText("Bienvenido")).toBeInTheDocument();
+    expect(screen.queryByText("No autorizado")).not.toBeInTheDocument();
+  });
+
+  it.each([["/"], ["/esta-ruta-no-existe"]])("%s sin sesión: login", async (ruta) => {
+    sesion.accessToken = null;
+    abrir(ruta);
+
+    expect(await screen.findByText("PANTALLA login")).toBeInTheDocument();
+  });
+
+  it.each([["/"], ["/esta-ruta-no-existe"]])("%s mientras se restaura: espera, ni login ni panel", async (ruta) => {
+    sesion = { ...sesion, accessToken: null, restaurando: true };
+    abrir(ruta);
+
+    expect(await screen.findByText(/Restaurando sesión/)).toBeInTheDocument();
+    expect(screen.queryByText("PANTALLA login")).not.toBeInTheDocument();
+    expect(screen.queryByText("PANTALLA panel admin")).not.toBeInTheDocument();
+  });
+
+  it.each([["/"], ["/esta-ruta-no-existe"]])("%s con el cambio de contraseña pendiente: va al cambio", async (ruta) => {
+    sesion.mustChangePassword = true;
+    abrir(ruta);
+
+    expect(await screen.findByText("PANTALLA cambiar contraseña")).toBeInTheDocument();
+    expect(screen.queryByText("PANTALLA login")).not.toBeInTheDocument();
+  });
+
+  it.each([["/"], ["/esta-ruta-no-existe"]])("%s con la restauración fallida por red: reintentar, no login", async (ruta) => {
+    sesion = { ...sesion, accessToken: null, restauracionFallida: true };
+    abrir(ruta);
+
+    expect(await screen.findByRole("button", { name: "Reintentar" })).toBeInTheDocument();
+    expect(screen.queryByText("PANTALLA login"), "un 5xx no es una sesión vencida").not.toBeInTheDocument();
+  });
+
+  it("una ruta desconocida no abre las de administración a quien no es admin", async () => {
+    sesion.roles = ["delegate"];
+    abrir("/auditoria-que-no-existe");
+
+    expect(await screen.findByText("Bienvenido")).toBeInTheDocument();
+    expect(screen.queryByText("PANTALLA auditoría")).not.toBeInTheDocument();
+  });
+});
+
+describe("/login con una sesión válida ya no muestra el formulario", () => {
+  it("sesión válida: va al panel", async () => {
+    abrir("/login");
+
+    expect(await screen.findByText("PANTALLA panel admin")).toBeInTheDocument();
+    expect(screen.queryByText("PANTALLA login")).not.toBeInTheDocument();
+  });
+
+  it("sesión válida de delegado: a su bienvenida", async () => {
+    sesion.roles = ["delegate"];
+    abrir("/login");
+
+    expect(await screen.findByText("Bienvenido")).toBeInTheDocument();
+  });
+
+  it("cambio de contraseña pendiente: a la pantalla de cambio, no al panel", async () => {
+    sesion.mustChangePassword = true;
+    abrir("/login");
+
+    expect(await screen.findByText("PANTALLA cambiar contraseña")).toBeInTheDocument();
+    expect(screen.queryByText("PANTALLA panel admin")).not.toBeInTheDocument();
+  });
+
+  it("sin sesión: conserva el formulario de acceso", async () => {
+    sesion.accessToken = null;
+    abrir("/login");
+
+    expect(await screen.findByText("PANTALLA login")).toBeInTheDocument();
+  });
+
+  it("mientras se restaura: espera, sin mostrar el formulario", async () => {
+    sesion = { ...sesion, accessToken: null, restaurando: true };
+    abrir("/login");
+
+    expect(await screen.findByText(/Restaurando sesión/)).toBeInTheDocument();
+    expect(screen.queryByText("PANTALLA login")).not.toBeInTheDocument();
+  });
+
+  it("restauración fallida por red: reintentar, y el botón reintenta", async () => {
+    sesion = { ...sesion, accessToken: null, restauracionFallida: true };
+    abrir("/login");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reintentar" }));
+
+    expect(screen.queryByText("PANTALLA login")).not.toBeInTheDocument();
     expect(reintentarRestauracion).toHaveBeenCalledTimes(1);
   });
 });

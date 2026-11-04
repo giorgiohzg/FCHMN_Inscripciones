@@ -3,7 +3,7 @@ import { AuthProvider } from "./modules/auth/AuthContext";
 import { ToastProvider } from "./shared/ToastProvider";
 import { LoginPage } from "./modules/auth/LoginPage";
 import { ForceChangePasswordPage } from "./modules/auth/ForceChangePasswordPage";
-import { ProtectedRoute, RequireSession } from "./modules/auth/ProtectedRoute";
+import { ProtectedRoute, RequireSession, RutaDeAcceso } from "./modules/auth/ProtectedRoute";
 import { AppShell } from "./shared/AppShell";
 import { PersonsListPage } from "./modules/persons/PersonsListPage";
 import { PersonFormPage } from "./modules/persons/PersonFormPage";
@@ -60,7 +60,10 @@ export function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
+          {/* El formulario es solo para quien no tiene sesión; con sesión lleva al panel. */}
+          <Route element={<RutaDeAcceso />}>
+            <Route path="/login" element={<LoginPage />} />
+          </Route>
           <Route path="/no-autorizado" element={<p>No autorizado</p>} />
 
           {/* Exige sesión, pero no que la contraseña ya esté cambiada. */}
@@ -94,7 +97,15 @@ export function App() {
             <Route path="/competencias/:id" element={<CompetitionDetailPage />} />
           </Route>
 
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          {/*
+            La raíz y cualquier ruta desconocida van al panel, y es `ProtectedRoute` quien
+            decide: espera la restauración, ofrece reintentar si falló por red, manda al
+            login solo si de verdad no hay sesión, y al cambio de contraseña si está
+            pendiente. Antes iban directo a `/login`, y con una sesión válida aparentaba
+            un cierre de sesión.
+          */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
