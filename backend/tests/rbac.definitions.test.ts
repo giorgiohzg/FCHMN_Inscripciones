@@ -30,6 +30,33 @@ describe("matriz de permisos por rol", () => {
     }
   });
 
+  it("exportar a Team Manager: administrador, rol `club` y personal de club sí; nadador no", () => {
+    // El alcance (solo SU club) lo aplica el servicio exportador, no la matriz.
+    for (const rol of ["admin", "club", "delegate", "coach", "legal_representative"]) {
+      expect(ROLES[rol], `${rol} debe poder exportar`).toContain("export:team-manager");
+    }
+    expect(ROLES.swimmer, "swimmer NO debe poder exportar").not.toContain("export:team-manager");
+  });
+
+  it("agregar la exportación al rol `club` no le amplía ningún otro permiso", () => {
+    // Fija el conjunto completo: lo único que el rol `club` tiene de más respecto de antes es la exportación.
+    expect([...ROLES.club!].sort()).toEqual(
+      [
+        "catalogs:read",
+        "clubs:read",
+        "competitions:read",
+        "export:team-manager",
+        "registrations:read",
+        "registrations:write",
+        "reports:read",
+        "swimmer-assignment:read",
+        "swimmer-assignment:write",
+      ].sort()
+    );
+    // Y sigue siendo el mismo conjunto que el personal de club: la exportación no abre una diferencia nueva.
+    expect([...ROLES.club!].sort()).toEqual([...CLUB_STAFF_PERMISSIONS].sort());
+  });
+
   it("todo permiso asignado a un rol existe en el catálogo", () => {
     const catalogo = new Set<string>(PERMISSIONS);
     for (const [rol, permisos] of Object.entries(ROLES)) {

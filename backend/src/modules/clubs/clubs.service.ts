@@ -1,6 +1,14 @@
 import { prisma } from "../../shared/prisma.client";
 import { audit, withAudit } from "../audit/audit.service";
-import { assertUsernameAvailable } from "../../shared/username";
+import {
+  assertUsernameAvailable,
+  conErroresDeIdentidad,
+  MENSAJE_FALTA_USERNAME,
+  MENSAJE_NOMBRE_BLOQUEADO,
+  tieneCuentaVigente,
+} from "../../shared/username";
+import { withTranslatedPrismaErrors } from "../../shared/prismaErrors";
+import { assertSiglaDisponible, normalizarSigla } from "../../shared/clubCode";
 import { hashPassword, generateOpaqueToken } from "../auth/password.util";
 import { normalizeRun } from "../../shared/run.util";
 import { ValidationError, NotFoundError } from "../../shared/errors";
@@ -37,13 +45,9 @@ async function assertRutNotDuplicated(rut: string, excludeClubId?: string) {
  * directamente: una validación que solo estuviera en la capa HTTP dejaría la
  * puerta abierta por dentro.
  */
-function assertRepresentanteLegalPermitido(estado: boolean | null, representante?: string | null) {
+function assertRepresentanteLegalPermitido(estado: boolean, representante?: string | null) {
   if (!representante || estado === true) return;
-  throw new ValidationError(
-    estado === null
-      ? "No se puede designar un representante legal mientras la personalidad jurídica esté pendiente de verificar. Confirme primero la personalidad jurídica."
-      : "Solo los clubes con personalidad jurídica pueden tener representante legal"
-  );
+  throw new ValidationError("Solo los clubes con personalidad jurídica pueden tener representante legal");
 }
 
 async function assertPersonsExist(personIds: string[], roleLabel: string) {
@@ -193,11 +197,9 @@ export async function listClubs(query: ClubListQuery, actor: ScopedActor) {
     ];
   }
   if (query.status) where.status = query.status;
-  // Los tres estados, explícitos. «pendiente» es `null` en la base, así que se
-  // consulta con `null` y no con una comparación que lo confundiría con `false`.
+  // Dos estados, explícitos.
   if (query.personalidadJuridica === "si") where.hasLegalStatus = true;
   else if (query.personalidadJuridica === "no") where.hasLegalStatus = false;
-  else if (query.personalidadJuridica === "pendiente") where.hasLegalStatus = null;
 
   const [items, total] = await Promise.all([
     prisma.club.findMany({
@@ -227,27 +229,24 @@ export async function getClubById(id: string, db: Db = prisma) {
 }
 
 export async function createClub(input: ClubCreateInput, actor: ActorContext) {
-  /**
-   * El RUT se guarda salvo que se haya VERIFICADO que el club no tiene
-   * personalidad jurídica. Con el estado pendiente (`null`) se conserva: es la
-   * evidencia que después permite cerrar la verificación. Guardarlo no cambia
-   * el estado — eso se decide aparte y a propósito.
-   */
+  /** El RUT solo se guarda si el club tiene personalidad jurídica; con «No tiene» se descarta. */
   const rut = input.hasLegalStatus === false ? null : input.rut?.trim() ? normalizeRun(input.rut) : null;
   if (rut) await assertRutNotDuplicated(rut);
-  await assertUsernameAvailable(input.username);
+  // Sin nombre de usuario el club queda con `NULL`: no se genera ninguno ni se
+  // crea cuenta. Registrar y dar acceso son pasos separados.
+  const username = input.username ?? null;
+  if (username) await assertUsernameAvailable(username);
+  // Mensaje claro antes de escribir; frente a dos altas simultáneas decide el índice único.
+  await assertSiglaDisponible(input.code);
 
   const delegatePersonIds = input.delegatePersonIds ?? [];
   const coachPersonIds = input.coachPersonIds ?? [];
   /**
-   * Representante legal: SOLO con personalidad jurídica confirmada.
+   * Representante legal: SOLO con personalidad jurídica.
    *
    * Se RECHAZA, no se ignora. Descartar la designación en silencio dejaría a
    * quien la pidió creyendo que quedó hecha, y el representante legal es una vía
    * de acceso al sistema: un malentendido ahí no es cosmético.
-   *
-   * `=== true` y no una comparación por veracidad: con `boolean | null`, un
-   * `if (input.hasLegalStatus)` trataría «pendiente» igual que «no».
    */
   assertRepresentanteLegalPermitido(input.hasLegalStatus, input.legalRepresentativePersonId);
   const legalRepresentativePersonId = input.hasLegalStatus === true ? input.legalRepresentativePersonId ?? null : null;
@@ -267,16 +266,17 @@ export async function createClub(input: ClubCreateInput, actor: ActorContext) {
    * plantilla incompleta y personas con `ClubStaff` pero sin el `PersonRole`
    * que les da acceso, un estado que solo se detectaba usándolo.
    */
-  const withStaff = await prisma.$transaction(async (tx) => {
+  const withStaff = await conErroresDeIdentidad(() => prisma.$transaction(async (tx) => {
     const club = await tx.club.create({
       data: {
         name: input.name,
-        username: input.username,
-        code: input.code.toUpperCase(),
+        username,
+        code: normalizarSigla(input.code),
         hasLegalStatus: input.hasLegalStatus,
         rut,
         legalName: input.legalName || null,
-        email: input.email,
+        // Ausente = NULL: nunca una cadena vacía ni un correo provisional.
+        email: input.email ?? null,
         isAchmnMember: input.isAchmnMember,
         isAchmnCollaborator: input.isAchmnCollaborator,
         isFchmnMember: input.isFchmnMember,
@@ -297,7 +297,7 @@ export async function createClub(input: ClubCreateInput, actor: ActorContext) {
       { tx }
     );
     return creado;
-  }, LONG_TRANSACTION_OPTIONS);
+  }, LONG_TRANSACTION_OPTIONS));
 
   return withStaff;
 }
@@ -305,21 +305,13 @@ export async function createClub(input: ClubCreateInput, actor: ActorContext) {
 export async function updateClub(id: string, input: ClubUpdateInput, actor: ActorContext) {
   const before = await getClubById(id);
 
-  /**
-   * `input.hasLegalStatus` SIEMPRE viene en una actualización —el esquema lo
-   * exige, para poder re-evaluar RB-02—, así que se usa tal cual.
-   *
-   * Aquí había un `??` y con tres estados se volvió una trampa: `null` es un
-   * valor DELIBERADO —«pendiente de verificar»— y `??` lo habría descartado
-   * para quedarse con el valor anterior, de modo que marcar un club como
-   * pendiente no habría hecho nada.
-   */
+  // Editar sin cambiar la sigla no la re-evalúa contra sí misma; cambiarla sí se comprueba.
+  if (input.code && normalizarSigla(input.code) !== normalizarSigla(before.code)) await assertSiglaDisponible(input.code, { excludeClubId: id });
+
+  /** `input.hasLegalStatus` SIEMPRE viene en una actualización: el esquema lo exige para poder re-evaluar RB-02. */
   const hasLegalStatus = input.hasLegalStatus;
 
-  /**
-   * El RUT: se descarta solo si se verificó que el club NO tiene personalidad
-   * jurídica. Si no se envió el campo, no se toca.
-   */
+  /** El RUT: se descarta si el club NO tiene personalidad jurídica. Si no se envió el campo, no se toca. */
   const rut =
     hasLegalStatus === false
       ? null
@@ -335,9 +327,7 @@ export async function updateClub(id: string, input: ClubUpdateInput, actor: Acto
    *
    * Antes, poner el indicador en `false` ejecutaba
    * `replaceClubStaff(legal_representative, [])`: borraba el nombramiento y
-   * recalculaba el rol de acceso de esa persona, sin avisar. Con dos estados
-   * eso pasaba poco; con tres, la transición «pendiente → no» es una operación
-   * de rutina, y cada vez retiraría a alguien y su acceso en silencio.
+   * recalculaba el rol de acceso de esa persona, sin avisar.
    *
    * Ahora se rechaza y se pide retirarlo expresamente primero. Son dos pasos a
    * propósito: así quitar el acceso de una persona es una decisión visible y no
@@ -346,9 +336,7 @@ export async function updateClub(id: string, input: ClubUpdateInput, actor: Acto
   const representanteActual = before.staff?.find((s) => s.roleType === "legal_representative")?.personId ?? null;
   if (hasLegalStatus !== true && representanteActual) {
     throw new ValidationError(
-      hasLegalStatus === null
-        ? "Este club tiene un representante legal designado. Retírelo expresamente antes de dejar la personalidad jurídica como «pendiente de verificar»: el sistema no retira nombramientos ni permisos por su cuenta."
-        : "Este club tiene un representante legal designado. Retírelo expresamente antes de declarar que el club no tiene personalidad jurídica: el sistema no retira nombramientos ni permisos por su cuenta."
+      "Este club tiene un representante legal designado. Retírelo expresamente antes de declarar que el club no tiene personalidad jurídica: el sistema no retira nombramientos ni permisos por su cuenta."
     );
   }
 
@@ -373,18 +361,34 @@ export async function updateClub(id: string, input: ClubUpdateInput, actor: Acto
     await assertNotStaffOfAnotherClub([legalRepresentativePersonId], "legal_representative", id, "representante legal");
   }
 
+  /**
+   * Nombre de usuario: `undefined` no lo toca; un valor lo asigna o lo cambia;
+   * `null` lo quita. Solo cuenta si de verdad cambia.
+   */
+  const cambiaUsername = input.username !== undefined && input.username !== before.username;
+
   // Mismo criterio que en `createClub`: la ficha, la plantilla y los roles
   // derivados cambian juntos o no cambian.
-  const withStaff = await prisma.$transaction(async (tx) => {
+  const withStaff = await conErroresDeIdentidad(() => prisma.$transaction(async (tx) => {
+    if (cambiaUsername) {
+      // Bloqueado con una cuenta VIGENTE (activa, bloqueada o inhabilitada).
+      // Ver la nota equivalente en `persons.service.updatePerson`.
+      if (await tieneCuentaVigente({ clubId: id }, { tx })) throw new ValidationError(MENSAJE_NOMBRE_BLOQUEADO);
+      if (input.username) await assertUsernameAvailable(input.username, { excludeClubId: id, tx });
+    }
+
     await tx.club.update({
       where: { id },
       data: {
+        username: cambiaUsername ? input.username : undefined,
         name: input.name ?? undefined,
-        code: input.code ? input.code.toUpperCase() : undefined,
+        code: input.code ? normalizarSigla(input.code) : undefined,
         hasLegalStatus,
         rut,
         legalName: input.legalName !== undefined ? input.legalName || null : undefined,
-        email: input.email ?? undefined,
+        // `undefined` conserva el valor; `null` lo elimina (el esquema ya
+        // convirtió vacío y espacios en `null`).
+        email: input.email,
         isAchmnMember: input.isAchmnMember ?? undefined,
         isAchmnCollaborator: input.isAchmnCollaborator ?? undefined,
         isFchmnMember: input.isFchmnMember ?? undefined,
@@ -412,7 +416,7 @@ export async function updateClub(id: string, input: ClubUpdateInput, actor: Acto
       { tx }
     );
     return actualizado;
-  }, LONG_TRANSACTION_OPTIONS);
+  }, LONG_TRANSACTION_OPTIONS));
 
   return withStaff;
 }
@@ -464,37 +468,77 @@ export async function softDeleteClub(id: string, actor: ActorContext) {
 // Credenciales de acceso del club (RB-01, A-03: una credencial por club)
 // --------------------------------------------------------------------------
 
-/** Crea la cuenta de acceso del club usando su `username` ya definido. */
-export async function createClubCredentials(clubId: string, actor: ActorContext) {
-  const club = await getClubById(clubId);
-  if (club.user) throw new ValidationError("El club ya tiene credenciales de acceso");
-
-  // Solo puede tomar el nombre de usuario su propio dueño: el club.
-  await assertUsernameAvailable(club.username, { excludeClubId: club.id });
-
-  const clubRole = await prisma.role.findUnique({ where: { name: "club" } });
-  if (!clubRole) throw new ValidationError("El rol 'club' no está configurado en el sistema (revise el seed)");
-
+/**
+ * Crea la cuenta de acceso del club.
+ *
+ * Mismo contrato que `persons.service.createCredentials`: el nombre es el de
+ * `opciones.username` si viene, o el guardado; sin ninguno, 400 sin escribir.
+ * Asignar el nombre al club y crear la cuenta van en UNA transacción
+ * serializable: o quedan los dos, o ninguno, y un fallo deja el nombre
+ * todavía editable.
+ *
+ * Antes el club se leía FUERA de la transacción que creaba la cuenta; con el
+ * nombre ahora editable, eso dejaba una ventana en la que se podía crear la
+ * cuenta con un nombre que ya no era el del club.
+ */
+export async function createClubCredentials(clubId: string, actor: ActorContext, opciones: { username?: string | null } = {}) {
+  // El hash, fuera de la transacción: ver la nota en `persons.service.createCredentials`.
   const tempPassword = generateOpaqueToken().token.slice(0, 12);
   const passwordHash = await hashPassword(tempPassword);
 
-  const user = await withAudit(
-    (tx) =>
-      tx.user.create({
-        data: {
-          username: club.username,
-          passwordHash,
-          ownerType: "club",
-          clubId,
-          mustChangePassword: true,
-          status: "active",
-          userRoles: { create: { roleId: clubRole.id } },
-        },
-      }),
-    (user) => ({ userId: actor.userId, action: "CLUB_CREDENTIALS_CREATED", entityType: "User", entityId: user.id, ipAddress: actor.ipAddress })
-  );
+  return withTranslatedPrismaErrors(() =>
+    conErroresDeIdentidad(() =>
+      prisma.$transaction(
+        async (tx) => {
+          const club = await tx.club.findFirst({ where: { id: clubId, deletedAt: null }, include: { user: { select: { id: true } } } });
+          if (!club) throw new NotFoundError("Club");
+          if (club.user) throw new ValidationError("El club ya tiene credenciales de acceso");
 
-  return { userId: user.id, username: user.username, temporaryPassword: tempPassword };
+          const username = opciones.username ?? club.username;
+          if (!username) throw new ValidationError(MENSAJE_FALTA_USERNAME, { field: "username" });
+
+          // Solo puede tomar el nombre de usuario su propio dueño: el club.
+          await assertUsernameAvailable(username, { excludeClubId: club.id, tx });
+
+          const clubRole = await tx.role.findUnique({ where: { name: "club" } });
+          if (!clubRole) throw new ValidationError("El rol 'club' no está configurado en el sistema (revise el seed)");
+
+          // El nombre se asigna justo antes de crear la cuenta, en esta misma
+          // transacción: `users_username_igual_al_titular` exige que coincidan.
+          if (username !== club.username) {
+            await tx.club.update({ where: { id: clubId }, data: { username, updatedBy: actor.userId } });
+          }
+
+          const user = await withAudit(
+            (tx) =>
+              tx.user.create({
+                data: {
+                  username,
+                  passwordHash,
+                  ownerType: "club",
+                  clubId,
+                  mustChangePassword: true,
+                  status: "active",
+                  userRoles: { create: { roleId: clubRole.id } },
+                },
+              }),
+            (user) => ({
+              userId: actor.userId,
+              action: "CLUB_CREDENTIALS_CREATED",
+              entityType: "User",
+              entityId: user.id,
+              ipAddress: actor.ipAddress,
+              after: { username, usernameAnterior: club.username },
+            }),
+            { tx }
+          );
+
+          return { userId: user.id, username: user.username, temporaryPassword: tempPassword };
+        },
+        { isolationLevel: "Serializable" }
+      )
+    )
+  );
 }
 
 export async function resetClubCredentials(clubId: string, actor: ActorContext) {

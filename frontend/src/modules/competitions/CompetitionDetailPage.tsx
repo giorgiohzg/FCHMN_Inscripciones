@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AppShell } from "../../shared/AppShell";
 import {
@@ -10,6 +10,7 @@ import {
   type SessionType,
 } from "./competitionsApi";
 import { CuposPanel } from "./CuposPanel";
+import { parseMaxSwimmersPerClub } from "./maxSwimmersPerClub";
 import { useCatalogsApi, type EventItem, type Category, type CategoryGroup } from "../catalogs/catalogsApi";
 import { formatEventLabel } from "../../shared/eventLabel";
 import { formatCalendarDate } from "../../shared/calendarDate";
@@ -64,7 +65,20 @@ export function CompetitionDetailPage() {
     maxSwimmers: "",
     maxSwimmersPerClub: "",
     poolId: "",
+    // Casilla «Ocultar…»: desmarcada = visible (lo guardado es el sentido positivo).
+    ocultar: false,
+    // Condición de relevos: marcada por defecto.
+    exigirIndividual: true,
   });
+  // Aviso tras GUARDAR la activación: cuántos equipos confirmados no cumplen (el servidor lo recalcula al guardar).
+  const [avisoActivacion, setAvisoActivacion] = useState<number | null>(null);
+  /**
+   * Las dos fechas tal como las dejó `load` en el formulario (recortadas a
+   * `AAAA-MM-DDTHH:mm`, sin zona horaria). Sirven para saber si el usuario las TOCÓ:
+   * ese texto no es el instante guardado, así que reenviarlo sin cambios lo
+   * reinterpreta en la zona del servidor y desplaza la fecha.
+   */
+  const fechasIniciales = useRef({ registrationStartAt: "", registrationEndAt: "" });
   const [capacity, setCapacity] = useState<CompetitionCapacity | null>(null);
 
   const load = useCallback(async () => {
@@ -79,6 +93,7 @@ export function CompetitionDetailPage() {
       poolsApi.list(),
     ]);
     setCompetition(c);
+    fechasIniciales.current = { registrationStartAt: c.registrationStartAt.slice(0, 16), registrationEndAt: c.registrationEndAt.slice(0, 16) };
     setEditForm({
       name: c.name,
       description: c.description ?? "",
@@ -90,6 +105,8 @@ export function CompetitionDetailPage() {
       maxSwimmers: c.maxSwimmers !== null ? String(c.maxSwimmers) : "",
       maxSwimmersPerClub: c.maxSwimmersPerClub !== null ? String(c.maxSwimmersPerClub) : "",
       poolId: c.poolId ?? "",
+      ocultar: c.visibleInRegistrationPanels === false,
+      exigirIndividual: c.requireIndividualForRelay !== false,
     });
     // El uso de cupos se pide aparte: su fallo no debe impedir ver la
     // competencia (por ejemplo, si el usuario no tiene permiso de lectura de
@@ -159,11 +176,16 @@ export function CompetitionDetailPage() {
   async function handleSaveDetails() {
     setError(null);
     try {
-      await api.update(id!, {
+      const guardada = await api.update(id!, {
         name: editForm.name,
         description: editForm.description,
-        registrationStartAt: editForm.registrationStartAt,
-        registrationEndAt: editForm.registrationEndAt,
+        // Solo se envían las fechas que el usuario modificó: sin esto, guardar CUALQUIER otro
+        // campo (p. ej. la casilla de visibilidad) reenviaba el texto recortado y movía los
+        // instantes guardados. Editar una fecha a propósito sigue funcionando igual.
+        registrationStartAt:
+          editForm.registrationStartAt !== fechasIniciales.current.registrationStartAt ? editForm.registrationStartAt : undefined,
+        registrationEndAt:
+          editForm.registrationEndAt !== fechasIniciales.current.registrationEndAt ? editForm.registrationEndAt : undefined,
         ageCutoffDate: editForm.ageCutoffDate || undefined,
         maxIndividualEventsPerSwimmer: editForm.maxIndividualEventsPerSwimmer ? Number(editForm.maxIndividualEventsPerSwimmer) : undefined,
         maxRelayEventsPerSwimmerPerSession:
@@ -173,7 +195,13 @@ export function CompetitionDetailPage() {
         maxSwimmers: editForm.maxSwimmers !== "" ? Number(editForm.maxSwimmers) : null,
         maxSwimmersPerClub: editForm.maxSwimmersPerClub !== "" ? Number(editForm.maxSwimmersPerClub) : null,
         poolId: editForm.poolId || null,
+        visibleInRegistrationPanels: !editForm.ocultar,
+        requireIndividualForRelay: editForm.exigirIndividual,
       });
+      // El recuento viene del servidor, calculado DESPUÉS de guardar: es el que importa si cambió entre medias.
+      setAvisoActivacion(
+        editForm.exigirIndividual && competition?.requireIndividualForRelay === false ? (guardada?.relayTeamsNotMeetingCondition ?? 0) : null
+      );
       setEditing(false);
       load();
     } catch (err) {
@@ -281,6 +309,32 @@ export function CompetitionDetailPage() {
               "Sin especificar"
             )}
           </p>
+          <p style={{ color: "var(--brand-gray-600)", fontSize: "0.9rem" }}>
+            Visible en el panel de inscripción y en el panel de relevos:{" "}
+            {competition.visibleInRegistrationPanels === false ? (
+              <strong>No</strong>
+            ) : (
+              "Sí"
+            )}
+            {competition.visibleInRegistrationPanels === false && (
+              <> (oculta de esos dos selectores; sigue accesible desde Competencias, Reportes y los asistentes)</>
+            )}
+          </p>
+
+          <p style={{ color: "var(--brand-gray-600)", fontSize: "0.9rem" }}>
+            Exigir una inscripción individual confirmada antes de participar en relevos:{" "}
+            {competition.requireIndividualForRelay === false ? <strong>No</strong> : "Sí"}
+            {competition.requireIndividualForRelay === false && (
+              <> (los relevos se forman y se modifican sin ese requisito, y se puede cancelar la última individual de quien integre un relevo)</>
+            )}
+          </p>
+          {competition.requireIndividualForRelay !== false && (competition.relayTeamsNotMeetingCondition ?? 0) > 0 && (
+            <p role="status" style={{ color: "var(--state-warning)", fontSize: "0.9rem" }}>
+              {avisoActivacion !== null ? "Condición activada. " : ""}
+              <strong>{competition.relayTeamsNotMeetingCondition}</strong> equipo(s) de relevo confirmado(s) tienen integrantes sin inscripción individual
+              confirmada. <strong>No se modificaron ni se cancelaron</strong>: para editar uno habrá que regularizar a quien falte; cancelarlo sigue siendo posible.
+            </p>
+          )}
 
           {competition.status === "closed" && (
             <p style={{ color: "var(--state-warning)", fontSize: "0.9rem" }}>
@@ -372,6 +426,39 @@ export function CompetitionDetailPage() {
             <option value="">Sin especificar</option>
             {pools.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+          <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 400 }}>
+            <input
+              type="checkbox"
+              style={{ width: "auto" }}
+              checked={editForm.exigirIndividual}
+              onChange={(e) => setEditForm({ ...editForm, exigirIndividual: e.target.checked })}
+            />
+            Exigir al menos una inscripción individual confirmada antes de participar en relevos
+          </label>
+          <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "0.2rem" }}>
+            Marcada (valor por defecto): formar o modificar un equipo exige que todos sus integrantes tengan una inscripción individual confirmada en esta
+            competencia, y <strong>no se podrá cancelar la última inscripción individual</strong> de quien integre un relevo confirmado. Desmarcada: ninguna
+            de las dos cosas se exige. Cambiarla <strong>no modifica ni cancela</strong> equipos ya formados.
+          </p>
+          {editForm.exigirIndividual && competition?.requireIndividualForRelay === false && (competition.relayTeamsNotMeetingCondition ?? 0) > 0 && (
+            <p role="alert" style={{ fontSize: "0.82rem", color: "var(--state-warning)", marginTop: "0.2rem" }}>
+              Al activar esta condición, <strong>{competition.relayTeamsNotMeetingCondition}</strong> equipo(s) de relevo confirmado(s) quedarían con integrantes
+              sin inscripción individual confirmada. Puede guardar igual: <strong>no se modifica, cancela ni retira a nadie</strong>.
+            </p>
+          )}
+          <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 400 }}>
+            <input
+              type="checkbox"
+              style={{ width: "auto" }}
+              checked={editForm.ocultar}
+              onChange={(e) => setEditForm({ ...editForm, ocultar: e.target.checked })}
+            />
+            Ocultar esta competencia del panel de inscripción y del panel de relevos
+          </label>
+          <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "0.2rem" }}>
+            Solo quita la competencia de los selectores de esos dos paneles. <strong>No es una medida de protección</strong>: no cambia permisos, reglas de
+            inscripción ni el acceso directo, y la competencia sigue apareciendo en Competencias, en Reportes y en los asistentes de inscripción.
+          </p>
           <button className="btn-primary" style={{ marginTop: "0.75rem" }} onClick={handleSaveDetails}>Guardar cambios</button>
         </div>
       )}
@@ -573,6 +660,7 @@ function CompetitionEventsBoard({
   const [pendingAdd, setPendingAdd] = useState<{ eventId: string; dateId: string } | null>(null);
   const [pendingSessionId, setPendingSessionId] = useState("");
   const [pendingGroupIds, setPendingGroupIds] = useState<string[]>([]);
+  const [pendingMaxPerClub, setPendingMaxPerClub] = useState("");
   const [adding, setAdding] = useState(false);
 
   // Edición de una prueba ya asignada (jornada/estado/grupos), inline en su tarjeta.
@@ -580,6 +668,7 @@ function CompetitionEventsBoard({
   const [editSessionId, setEditSessionId] = useState("");
   const [editStatus, setEditStatus] = useState<"enabled" | "disabled">("enabled");
   const [editGroupIds, setEditGroupIds] = useState<string[]>([]);
+  const [editMaxPerClub, setEditMaxPerClub] = useState("");
 
   const DRAG_CATALOG = "application/x-catalog-event";
   const DRAG_ASSIGNED = "application/x-assigned-event";
@@ -709,6 +798,7 @@ function CompetitionEventsBoard({
     setPendingAdd({ eventId, dateId: date.id });
     setPendingSessionId(sortBySessionTypeName(date.sessions, (s) => s.sessionType.name)[0]!.id);
     setPendingGroupIds([]);
+    setPendingMaxPerClub("");
   }
 
   async function confirmPendingAdd() {
@@ -720,6 +810,13 @@ function CompetitionEventsBoard({
       onError("Debe seleccionar al menos un grupo de categorías.");
       return;
     }
+    // Solo las pruebas individuales admiten el máximo por club; en un relevo ni se envía.
+    const esIndividual = event.testType.swimmersCount === 1;
+    const maxPorClub = esIndividual ? parseMaxSwimmersPerClub(pendingMaxPerClub) : null;
+    if (maxPorClub === "invalido") {
+      onError("El máximo de nadadores por club debe ser un número entero positivo, o déjelo vacío para «Sin límite».");
+      return;
+    }
     setAdding(true);
     try {
       // Se agrega al final de la numeración consecutiva de TODA la
@@ -727,7 +824,7 @@ function CompetitionEventsBoard({
       // ya sea consecutiva, esto la mantiene así sin tener que
       // renumerar todo de nuevo en cada alta.
       const maxOrder = competitionEvents.reduce((max, ce) => Math.max(max, ce.displayOrder ?? 0), 0);
-      await api.addCompetitionEvent(competitionId, { eventId: pendingAdd.eventId, competitionSessionId: pendingSessionId, categoryIds, displayOrder: maxOrder + 1 });
+      await api.addCompetitionEvent(competitionId, { eventId: pendingAdd.eventId, competitionSessionId: pendingSessionId, categoryIds, displayOrder: maxOrder + 1, ...(maxPorClub === null ? {} : { maxSwimmersPerClub: maxPorClub }) });
       setPendingAdd(null);
       setPendingGroupIds([]);
       onChanged();
@@ -743,6 +840,7 @@ function CompetitionEventsBoard({
     setEditSessionId(ce.competitionSessionId);
     setEditStatus(ce.status);
     setEditGroupIds(computeSelectedGroupsFromCategoryIds(ce.enabledCategories.map((ec) => ec.category.id), categories, categoryGroups, ce.event.testTypeId));
+    setEditMaxPerClub(ce.maxSwimmersPerClub !== null && ce.maxSwimmersPerClub !== undefined ? String(ce.maxSwimmersPerClub) : "");
   }
 
   async function saveEdit(ce: CompetitionEventItem) {
@@ -751,8 +849,20 @@ function CompetitionEventsBoard({
       onError("Debe seleccionar al menos un grupo de categorías.");
       return;
     }
+    // Vacío envía `null` (quita el límite); en un relevo el campo no existe y no se envía.
+    const esIndividual = ce.event.testType.swimmersCount === 1;
+    const maxPorClub = esIndividual ? parseMaxSwimmersPerClub(editMaxPerClub) : undefined;
+    if (maxPorClub === "invalido") {
+      onError("El máximo de nadadores por club debe ser un número entero positivo, o déjelo vacío para «Sin límite».");
+      return;
+    }
     try {
-      await api.updateCompetitionEvent(ce.id, { competitionSessionId: editSessionId, status: editStatus, categoryIds });
+      await api.updateCompetitionEvent(ce.id, {
+        competitionSessionId: editSessionId,
+        status: editStatus,
+        categoryIds,
+        ...(maxPorClub === undefined ? {} : { maxSwimmersPerClub: maxPorClub }),
+      });
       setEditingId(null);
       onChanged();
     } catch (err) {
@@ -916,6 +1026,11 @@ function CompetitionEventsBoard({
                       <span className={`badge ${ce.status === "enabled" ? "badge-active" : "badge-disabled"}`} style={{ fontSize: "0.68rem" }}>
                         {ce.status === "enabled" ? "Habilitada" : "Deshabilitada"}
                       </span>
+                      {ce.event.testType.swimmersCount === 1 && (
+                        <p style={{ fontSize: "0.68rem", color: "var(--brand-gray-600)", margin: "0.25rem 0 0" }}>
+                          Máx. por club: {ce.maxSwimmersPerClub !== null && ce.maxSwimmersPerClub !== undefined ? ce.maxSwimmersPerClub : "Sin límite"}
+                        </p>
+                      )}
                       <div style={{ display: "flex", gap: "0.3rem", marginTop: "0.35rem" }}>
                         <button className="btn-secondary" style={{ padding: "0.1rem 0.4rem", fontSize: "0.72rem" }} onClick={() => startEdit(ce)}>Editar</button>
                         <button className="btn-danger" style={{ padding: "0.1rem 0.4rem", fontSize: "0.72rem" }} onClick={() => handleDeleteAssigned(ce)}>Eliminar</button>
@@ -937,8 +1052,9 @@ function CompetitionEventsBoard({
                       </select>
                       <label style={{ fontSize: "0.72rem" }}>Grupos de categorías</label>
                       <GroupCheckboxes testTypeId={ce.event.testTypeId} categories={categories} categoryGroups={categoryGroups} selectedGroupIds={editGroupIds} onChange={setEditGroupIds} />
+                      {ce.event.testType.swimmersCount === 1 && <MaxPorClubField id={`max-club-edit-${ce.id}`} value={editMaxPerClub} onChange={setEditMaxPerClub} />}
                       <div style={{ display: "flex", gap: "0.3rem", marginTop: "0.4rem" }}>
-                        <button className="btn-primary" style={{ padding: "0.15rem 0.5rem", fontSize: "0.75rem" }} onClick={() => saveEdit(ce)}>Guardar</button>
+                        <button className="btn-primary" style={{ padding: "0.15rem 0.5rem", fontSize: "0.75rem" }} onClick={() => saveEdit(ce)} disabled={ce.event.testType.swimmersCount === 1 && parseMaxSwimmersPerClub(editMaxPerClub) === "invalido"}>Guardar</button>
                         <button className="btn-secondary" style={{ padding: "0.15rem 0.5rem", fontSize: "0.75rem" }} onClick={() => setEditingId(null)}>Cancelar</button>
                       </div>
                     </div>
@@ -967,8 +1083,9 @@ function CompetitionEventsBoard({
                     )}
                     <label style={{ fontSize: "0.72rem" }}>Grupos de categorías</label>
                     <GroupCheckboxes testTypeId={event.testTypeId} categories={categories} categoryGroups={categoryGroups} selectedGroupIds={pendingGroupIds} onChange={setPendingGroupIds} />
+                    {event.testType.swimmersCount === 1 && <MaxPorClubField id="max-club-nueva" value={pendingMaxPerClub} onChange={setPendingMaxPerClub} />}
                     <div style={{ display: "flex", gap: "0.3rem", marginTop: "0.4rem" }}>
-                      <button className="btn-primary" style={{ padding: "0.15rem 0.5rem", fontSize: "0.75rem" }} onClick={confirmPendingAdd} disabled={pendingGroupIds.length === 0 || adding}>
+                      <button className="btn-primary" style={{ padding: "0.15rem 0.5rem", fontSize: "0.75rem" }} onClick={confirmPendingAdd} disabled={pendingGroupIds.length === 0 || adding || (event.testType.swimmersCount === 1 && parseMaxSwimmersPerClub(pendingMaxPerClub) === "invalido")}>
                         {adding ? "Agregando..." : "Confirmar"}
                       </button>
                       <button className="btn-secondary" style={{ padding: "0.15rem 0.5rem", fontSize: "0.75rem" }} onClick={() => setPendingAdd(null)}>Cancelar</button>
@@ -982,5 +1099,40 @@ function CompetitionEventsBoard({
       })}
       {reordering && <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)" }}>Guardando nuevo orden...</p>}
     </div>
+  );
+}
+
+/** El campo de «máximo de nadadores por club», solo para pruebas INDIVIDUALES (se usa en el alta por arrastre y en la edición). */
+function MaxPorClubField({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) {
+  // Campo de TEXTO con teclado numérico, no `type="number"`: un campo numérico entrega "" tanto para
+  // «vacío a propósito» como para una entrada inválida o incompleta ("abc", "1e", "-"), y esa
+  // confusión guardaba «Sin límite» sin querer. Con texto se conserva lo escrito y se valida aquí.
+  const invalido = parseMaxSwimmersPerClub(value) === "invalido";
+  return (
+    <>
+      <label htmlFor={id} style={{ fontSize: "0.72rem" }}>Máximo de nadadores por club</label>
+      <input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder="Sin límite"
+        value={value}
+        aria-invalid={invalido}
+        aria-describedby={invalido ? `${id}-error` : undefined}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ fontSize: "0.78rem", ...(invalido ? { borderColor: "var(--state-error, #b00020)" } : {}) }}
+      />
+      {invalido && (
+        <p id={`${id}-error`} role="alert" style={{ fontSize: "0.7rem", color: "var(--state-error, #b00020)", margin: "0.15rem 0 0" }}>
+          Escriba un número entero positivo, o deje el campo vacío para «Sin límite».
+        </p>
+      )}
+      <p style={{ fontSize: "0.68rem", color: "var(--brand-gray-600)", margin: "0.15rem 0 0" }}>
+        Cuenta las inscripciones confirmadas de cada club <strong>en esta prueba</strong>, sin importar sus otras pruebas, y es independiente de los
+        cupos de la competencia. Vacío = sin límite. Reducirlo <strong>no elimina ni cancela</strong> inscripciones: solo impide altas nuevas. Solo un
+        administrador puede excederlo. No aplica a relevos.
+      </p>
+    </>
   );
 }

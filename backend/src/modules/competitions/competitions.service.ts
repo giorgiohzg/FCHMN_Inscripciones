@@ -4,6 +4,7 @@ import { ValidationError, NotFoundError } from "../../shared/errors";
 import { computeEffectiveStatus, recomputeStatusAfterEdit, evaluateCompetitionAction, evaluateReopenRegistrations, type CompetitionAction } from "./competitions.rules";
 import { shouldCloseRegistrations } from "./competition-capacity.rules";
 import { readCapacityUsage } from "./competition-capacity.service";
+import { contarEquiposDeRelevoIncumplidores } from "./relay-condition.service";
 import { scopedClubId, type ActorContext as SharedActorContext } from "../../shared/actorContext";
 import { type TxOption } from "../../shared/transaction";
 import { withTranslatedPrismaErrors } from "../../shared/prismaErrors";
@@ -94,6 +95,12 @@ export async function listCompetitions(query: CompetitionListQuery, hideDraftAnd
   // datos, sin afectar el resto de la lógica de paginación.
   if (hideDraftAndScheduled) where.NOT = { status: "draft" };
 
+  // Filtro explícito de los paneles de inscripción y relevos. Clave PROPIA del
+  // `where` (no toca `NOT` ni `status`), así que se suma a las restricciones por
+  // rol y estado en vez de reemplazarlas, y `findMany` y `count` —resultados,
+  // total y paginación— parten de la misma condición. Omitido: no hay filtro.
+  if (query.visibleInRegistrationPanels !== undefined) where.visibleInRegistrationPanels = query.visibleInRegistrationPanels;
+
   const filteringByMutableStatus = query.status && AUTO_MUTABLE_STATUSES.includes(query.status);
   if (query.status) {
     where.status = filteringByMutableStatus ? { in: AUTO_MUTABLE_STATUSES } : query.status;
@@ -126,7 +133,21 @@ export async function listCompetitions(query: CompetitionListQuery, hideDraftAnd
     prisma.competition.count({ where }),
   ]);
 
-  const withEffectiveStatus = await Promise.all(rawItems.map((c) => applyAutoStatus(c)));
+  /**
+   * SECUENCIAL, A PROPÓSITO. Cada competencia cuyo estado hay que actualizar abre su propia
+   * transacción (cambio + auditoría), y con `Promise.all` todas se iniciaban A LA VEZ: N
+   * competencias por sanar pedían N conexiones simultáneas. Las que no estaban ya abiertas había
+   * que abrirlas en ese momento, y si eso tarda más que el plazo de arranque de una transacción
+   * (2 s), el listado entero fallaba con P2028 / 503 (visto con solo tres competencias en la base
+   * de ensayo). En orden, todas reutilizan la misma conexión.
+   *
+   * Cuesta poco: una competencia que no cambia de estado no toca la base (`applyAutoStatus`
+   * devuelve al instante), y solo las que sí cambian pagan una transacción, que se persiste una
+   * única vez —las siguientes lecturas ya las encuentran sanadas—. El orden de `rawItems`
+   * se conserva, así que el listado, los totales y la paginación no cambian.
+   */
+  const withEffectiveStatus: typeof rawItems = [];
+  for (const c of rawItems) withEffectiveStatus.push(await applyAutoStatus(c));
 
   if (!needsFullFetch) {
     return { items: withEffectiveStatus, total: totalWithoutStatusFilter, page: query.page, pageSize: query.pageSize };
@@ -162,6 +183,19 @@ export async function getCompetitionById(id: string, hideIfDraftOrScheduled: boo
     throw new NotFoundError("Competencia");
   }
   return withEffectiveStatus;
+}
+
+/**
+ * El detalle de la competencia + el AVISO de la condición de relevos.
+ *
+ * `relayTeamsNotMeetingCondition` = equipos de relevo CONFIRMADOS con algún integrante sin
+ * inscripción individual confirmada en la competencia (equipos distintos, no integrantes).
+ * Lectura pura, sin escribir nada. Lo usa el formulario para avisar al activar la condición
+ * («exigir una individual para relevos»); el aviso no impide guardar ni modifica a nadie.
+ */
+export async function getCompetitionDetail(id: string, hideIfDraftOrScheduled: boolean = false) {
+  const competition = await getCompetitionById(id, hideIfDraftOrScheduled);
+  return { ...competition, relayTeamsNotMeetingCondition: await contarEquiposDeRelevoIncumplidores(prisma, id) };
 }
 
 export async function createCompetition(input: CompetitionCreateInput, actor: ActorContext, options?: TxOption) {
@@ -204,6 +238,11 @@ export async function createCompetition(input: CompetitionCreateInput, actor: Ac
           // formulario no los envía, que es el comportamiento de siempre.
           maxSwimmers: input.maxSwimmers ?? null,
           maxSwimmersPerClub: input.maxSwimmersPerClub ?? null,
+          // Visible salvo configuración expresa: también para las competencias
+          // importadas, que llegan sin este dato.
+          visibleInRegistrationPanels: input.visibleInRegistrationPanels ?? true,
+          // Activada salvo configuración expresa: también las importadas, que no traen el dato.
+          requireIndividualForRelay: input.requireIndividualForRelay ?? true,
           poolId: input.poolId || null,
           createdBy: actor.userId,
           updatedBy: actor.userId,
@@ -348,6 +387,8 @@ export async function updateCompetition(id: string, input: CompetitionUpdateInpu
           // de "quítalo".
           maxSwimmers: input.maxSwimmers === undefined ? undefined : input.maxSwimmers,
           maxSwimmersPerClub: input.maxSwimmersPerClub === undefined ? undefined : input.maxSwimmersPerClub,
+          visibleInRegistrationPanels: input.visibleInRegistrationPanels ?? undefined,
+          requireIndividualForRelay: input.requireIndividualForRelay ?? undefined,
           // OJO: no usar `?? undefined` aquí — así sí se puede "limpiar" la
           // piscina de una competencia (enviando poolId: null explícito).
           poolId: input.poolId === undefined ? undefined : input.poolId,
@@ -371,7 +412,9 @@ export async function updateCompetition(id: string, input: CompetitionUpdateInpu
     });
   }
 
-  return actualizada;
+  // El recuento se calcula DESPUÉS de guardar: puede haber cambiado desde que el formulario lo
+  // mostró (alguien inscribió o canceló entre medias), y es lo que debe ver quien acaba de activar.
+  return { ...actualizada, relayTeamsNotMeetingCondition: await contarEquiposDeRelevoIncumplidores(prisma, id) };
 }
 
 export interface CompetitionCapacityView {
@@ -624,6 +667,11 @@ export async function duplicateCompetition(sourceId: string, input: DuplicateCom
         // que arranca con el cupo íntegro disponible.
         maxSwimmers: source.maxSwimmers,
         maxSwimmersPerClub: source.maxSwimmersPerClub,
+        // La visibilidad también se hereda: la copia es «otra edición de lo
+        // mismo», y si el origen estaba oculto de los paneles, la copia también.
+        visibleInRegistrationPanels: source.visibleInRegistrationPanels,
+        // La condición de relevos también se hereda del origen.
+        requireIndividualForRelay: source.requireIndividualForRelay,
         poolId: input.poolId !== undefined ? input.poolId : source.poolId,
         createdBy: actor.userId,
         updatedBy: actor.userId,
@@ -668,6 +716,8 @@ export async function duplicateCompetition(sourceId: string, input: DuplicateCom
           competitionSessionId: newSessionId,
           status: oldCe.status,
           displayOrder: oldCe.displayOrder,
+          // El máximo de nadadores por club también se hereda: la copia es «otra edición de lo mismo».
+          maxSwimmersPerClub: oldCe.maxSwimmersPerClub,
         },
       });
 

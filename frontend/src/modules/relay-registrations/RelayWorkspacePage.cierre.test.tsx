@@ -49,10 +49,12 @@ vi.mock("../../shared/ToastProvider", async () => {
 
 /** El estado de la competencia se cambia por prueba. */
 let estadoCompetencia = "open";
+// Etapa 5: `Competition.requireIndividualForRelay` (activada por defecto).
+let exigirIndividual = true;
 const CLUBES = [{ id: "club-1", name: "Club Uno", code: "C1", status: "active" }];
 
 const competitionsList = vi.fn(async () => ({
-  items: [{ id: "comp-A", name: "Competencia A", status: estadoCompetencia, dates: [], ageCutoffDate: "2026-12-31" }],
+  items: [{ id: "comp-A", name: "Competencia A", status: estadoCompetencia, dates: [], ageCutoffDate: "2026-12-31", requireIndividualForRelay: exigirIndividual }],
   total: 1,
   page: 1,
   pageSize: 100,
@@ -105,12 +107,13 @@ vi.mock("./relayRegistrationsApi", () => ({
 beforeEach(() => {
   sesion = { ownerType: "club", clubId: "club-1", personId: null, roles: ["club"] };
   estadoCompetencia = "open";
+  exigirIndividual = true;
   vi.clearAllMocks();
   // Las implementaciones se reestablecen aquí, como en la prueba hermana de
   // esta pantalla: la configuración de vitest las descarta entre casos, y sin
   // esto los servicios devuelven `undefined` y el panel no llega a pintar nada.
   competitionsList.mockImplementation(async () => ({
-    items: [{ id: "comp-A", name: "Competencia A", status: estadoCompetencia, dates: [], ageCutoffDate: "2026-12-31" }],
+    items: [{ id: "comp-A", name: "Competencia A", status: estadoCompetencia, dates: [], ageCutoffDate: "2026-12-31", requireIndividualForRelay: exigirIndividual }],
     total: 1,
     page: 1,
     pageSize: 100,
@@ -179,6 +182,13 @@ describe("«Inscripciones individuales cerradas»: los relevos SIGUEN abiertos",
     await montarYElegir();
     expect(await screen.findByText(/Los relevos siguen abiertos/i)).toBeInTheDocument();
     expect(screen.getByText(/inscripción individual confirmada/i)).toBeInTheDocument();
+  });
+
+  it("el aviso refleja la configuración: con la condición DESACTIVADA ya no afirma la individual previa", async () => {
+    exigirIndividual = false;
+    await montarYElegir();
+    expect(await screen.findByText(/Los relevos siguen abiertos/i)).toBeInTheDocument();
+    expect(screen.queryByText(/inscripción individual confirmada/i)).not.toBeInTheDocument();
   });
 
   it("conserva Editar y × : es operación normal, no excepción", async () => {

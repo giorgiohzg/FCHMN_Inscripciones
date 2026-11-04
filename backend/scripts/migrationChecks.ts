@@ -100,7 +100,7 @@ export const CHECKS: Check[] = [
     constraint: "persons_username_unique_active",
     query: `
       SELECT username, count(*) AS repeticiones, string_agg(full_name, ' | ') AS personas
-        FROM persons WHERE deleted_at IS NULL
+        FROM persons WHERE deleted_at IS NULL AND username IS NOT NULL
        GROUP BY username HAVING count(*) > 1`,
     remediation:
       "Renombre los usuarios repetidos, o elimine lógicamente la ficha sobrante (deleted_at = now()). " +
@@ -112,7 +112,7 @@ export const CHECKS: Check[] = [
     constraint: "clubs_username_unique_active",
     query: `
       SELECT username, count(*) AS repeticiones, string_agg(name, ' | ') AS clubes
-        FROM clubs WHERE deleted_at IS NULL
+        FROM clubs WHERE deleted_at IS NULL AND username IS NOT NULL
        GROUP BY username HAVING count(*) > 1`,
     remediation:
       "Renombre los usuarios repetidos, o elimine lógicamente el club sobrante (deleted_at = now()). " +
@@ -258,10 +258,10 @@ export const CHECKS: Check[] = [
     query: `
       WITH titulares AS (
         SELECT p.username, 'person'::text AS owner_kind, p.id::text AS owner_id, 'persona: ' || p.full_name AS detalle
-          FROM persons p WHERE p.deleted_at IS NULL
+          FROM persons p WHERE p.deleted_at IS NULL AND p.username IS NOT NULL
         UNION ALL
         SELECT c.username, 'club', c.id::text, 'club: ' || c.name
-          FROM clubs c WHERE c.deleted_at IS NULL
+          FROM clubs c WHERE c.deleted_at IS NULL AND c.username IS NOT NULL
         UNION ALL
         SELECT u.username,
                CASE WHEN u.person_id IS NOT NULL THEN 'person'
@@ -286,7 +286,7 @@ export const CHECKS: Check[] = [
        GROUP BY username
       HAVING count(*) > 1`,
     remediation:
-      "Renombre a uno de los titulares antes de migrar. El nombre de usuario es inmutable desde la aplicación, así que " +
+      "Renombre a uno de los titulares antes de migrar. Con una cuenta vigente el nombre de usuario es inmutable desde la aplicación, así que " +
       "hay que hacerlo por base de datos (UPDATE persons SET username='...' WHERE id='...', y el mismo cambio en su fila " +
       "de users si tiene credenciales). Elija cuál conserva el nombre y avise al otro titular: es el nombre con el que entra al sistema.",
   },
@@ -302,10 +302,10 @@ export const CHECKS: Check[] = [
     query: `
       WITH filas AS (
         SELECT p.username, 'person'::text AS owner_kind, p.id::text AS owner_id, 'persona: ' || p.full_name AS detalle
-          FROM persons p WHERE p.deleted_at IS NULL
+          FROM persons p WHERE p.deleted_at IS NULL AND p.username IS NOT NULL
         UNION ALL
         SELECT c.username, 'club', c.id::text, 'club: ' || c.name
-          FROM clubs c WHERE c.deleted_at IS NULL
+          FROM clubs c WHERE c.deleted_at IS NULL AND c.username IS NOT NULL
         UNION ALL
         SELECT u.username,
                CASE WHEN u.person_id IS NOT NULL THEN 'person'
@@ -383,6 +383,69 @@ export const CHECKS: Check[] = [
       "Una persona es delegado, entrenador o representante legal de UN solo club. Elimine sus vínculos con los demás " +
       "(DELETE FROM club_staff WHERE person_id='...' AND club_id <> '<el que conserva>'). Es una decisión de negocio: " +
       "de ese vínculo depende a qué club queda acotada su sesión.",
+  },
+  {
+    id: "username-vacio",
+    title: "Personas o clubes con el nombre de usuario vacío o de solo espacios",
+    constraint: "persons_username_no_vacio / clubs_username_no_vacio",
+    query: `
+      SELECT 'persona' AS titular, p.id, p.full_name AS nombre, p.username
+        FROM persons p WHERE p.username ~ '^\\s*$'
+      UNION ALL
+      SELECT 'club', c.id, c.name, c.username
+        FROM clubs c WHERE c.username ~ '^\\s*$'`,
+    remediation:
+      "La ausencia de nombre de usuario pasa a ser NULL y no una cadena vacía, pero la columna solo admite NULL DESPUÉS de esta " +
+      "migración. Asigne a cada titular su nombre real (UPDATE persons SET username = '...' WHERE id = '...', o en clubs). " +
+      "El sistema no los corrige solo ni inventa nombres. Una vez migrada, quitar el nombre de quien no tiene cuenta se hace desde su ficha.",
+  },
+  {
+    id: "club-pendiente-con-representante-legal",
+    title: "Clubes con personalidad jurídica pendiente que tienen representante legal",
+    constraint: "20261102020000_personalidad_juridica_sin_pendiente (conversión de «pendiente» a «No tiene»)",
+    // Solo cuenta y nombra al CLUB: ni el RUT del club ni los datos de las personas.
+    query: `
+      SELECT c.id, c.name AS club, count(*) AS nombramientos
+        FROM club_staff cs
+        JOIN clubs c ON c.id = cs.club_id
+       WHERE cs.role_type = 'legal_representative' AND c.has_legal_status IS NULL
+       GROUP BY c.id, c.name`,
+    remediation:
+      "La conversión de «pendiente» a «No tiene» NO retira nombramientos, y un club «No tiene» no puede tener representante legal. " +
+      "Decida por cada club, antes de migrar: o se confirma que SÍ tiene personalidad jurídica (has_legal_status = true, con su RUT), " +
+      "o se retira el nombramiento desde la ficha del club (lo que también retira el acceso derivado de esa persona: es una decisión de negocio). " +
+      "El sistema no lo resuelve por su cuenta.",
+  },
+  {
+    id: "club-sigla-duplicada",
+    title: "Clubes vigentes (activos o no) que comparten sigla",
+    constraint: "clubs_code_unique_active",
+    // La misma normalización que `club_code_normalizado`, escrita aquí porque el preflight
+    // corre ANTES de la migración que crea esa función.
+    query: `
+      SELECT upper(regexp_replace(c.code, '^[\\s\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]+|[\\s\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]+$', '', 'g')) AS sigla,
+             count(*) AS repeticiones,
+             string_agg(c.name || ' (' || c.id || ', ' || c.status || ')', ', ' ORDER BY c.name, c.id) AS clubes
+        FROM clubs c
+       WHERE c.deleted_at IS NULL
+       GROUP BY 1
+      HAVING count(*) > 1`,
+    remediation:
+      "La sigla es el identificador único del club, y un club inactivo también la conserva. Decida qué club mantiene cada sigla y " +
+      "corrija las demás desde la ficha del club. El sistema no renombra, fusiona ni elimina clubes por su cuenta.",
+  },
+  {
+    id: "club-email-vacio",
+    title: "Clubes con el correo electrónico vacío o de solo espacios",
+    constraint: "clubs_email_no_vacio",
+    query: `
+      SELECT c.id, c.name AS club, c.email
+        FROM clubs c
+       WHERE c.email ~ '^\\s*$'`,
+    remediation:
+      "La ausencia de correo pasa a ser NULL y no una cadena vacía, pero la columna solo admite NULL DESPUÉS de esta migración. " +
+      "Asigne a cada club su correo real (UPDATE clubs SET email = '...' WHERE id = '...'). El sistema no los corrige solo ni " +
+      "inventa un correo provisional. Una vez migrada, quitar el correo de un club se hace desde la ficha del club.",
   },
   {
     id: "cuenta-username-distinto-al-titular",

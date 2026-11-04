@@ -5,6 +5,8 @@ import { usePersonsApi, type Person } from "./personsApi";
 import { formatRun, isValidRun } from "./runValidator";
 import { SwimmerClubSection } from "./SwimmerClubSection";
 import { useAuth } from "../auth/AuthContext";
+import { CredencialesDeAcceso } from "../../shared/CredencialesDeAcceso";
+import { evaluarUsernameEditado, problemaDeUsername } from "../../shared/usernameFormato";
 
 export function PersonFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +28,15 @@ export function PersonFormPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [credentialsMsg, setCredentialsMsg] = useState<string | null>(null);
+  const [creandoCredenciales, setCreandoCredenciales] = useState(false);
+  /**
+   * Cuenta cuya creación CONFIRMÓ el servidor, antes de volver a leer la ficha.
+   * Solo lleva lo que la respuesta del POST afirma (el nombre); el estado de la
+   * cuenta no se inventa. Bloquea el nombre y el botón aunque la lectura
+   * posterior falle o tarde.
+   */
+  const [cuentaCreada, setCuentaCreada] = useState<{ username: string } | null>(null);
+  const cuentaVigente = person?.user ?? cuentaCreada;
 
   const { hasRole, user: usuarioActual, logout, reintentarRestauracion } = useAuth();
   const esAdministrador = hasRole("admin");
@@ -93,7 +104,7 @@ export function PersonFormPage() {
     api.get(id!).then((p) => {
       setPerson(p);
       setRun(p.run);
-      setUsername(p.username);
+      setUsername(p.username ?? "");
       setFirstName(p.firstName ?? "");
       setPaternalLastName(p.paternalLastName ?? "");
       setMaternalLastName(p.maternalLastName ?? "");
@@ -124,8 +135,13 @@ export function PersonFormPage() {
       setError("El RUN ingresado no es válido");
       return;
     }
-    if (!isEdit && username.trim().length < 4) {
-      setError("El nombre de usuario debe tener al menos 4 caracteres");
+    // El nombre de usuario es OPCIONAL. En el alta, si se escribe debe tener
+    // formato válido. Al editar solo se valida si CAMBIÓ: un nombre antiguo sin
+    // tocar (p. ej. de 3 letras) se conserva y no impide guardar otros datos.
+    const usernameEditado = evaluarUsernameEditado(person?.username, username);
+    const problemaUsername = cuentaVigente ? null : isEdit ? usernameEditado.problema : problemaDeUsername(username);
+    if (problemaUsername) {
+      setError(problemaUsername);
       return;
     }
 
@@ -148,11 +164,16 @@ export function PersonFormPage() {
           gender,
           email,
           phone: phone || undefined,
+          // Solo si CAMBIÓ y mientras no haya cuenta: sin cambios no se envía
+          // (así un nombre antiguo se conserva intacto); con cuenta está
+          // bloqueado. Vacío = quitarlo.
+          ...(cuentaVigente || !usernameEditado.cambio ? {} : { username: usernameEditado.valor }),
         });
       } else {
         await api.create({
           run,
-          username,
+          // Vacío = sin nombre de usuario: no se genera ninguno.
+          username: username.trim() || null,
           firstName,
           paternalLastName,
           maternalLastName: maternalLastName || undefined,
@@ -170,17 +191,43 @@ export function PersonFormPage() {
     }
   }
 
+  /**
+   * Asigna el nombre escrito y crea la cuenta en UNA operación del servidor.
+   * Si falla, nada cambia: el campo conserva lo escrito y sigue editable.
+   */
   async function handleCreateCredentials() {
-    if (!id) return;
+    if (!id || cuentaVigente) return;
+    setError(null);
+    setCredentialsMsg(null);
+    setCreandoCredenciales(true);
+
+    // 1. Crear la cuenta. Si esto falla, nada cambió: el campo sigue editable.
+    //    Sin cambios en el campo se usa el nombre guardado (no se reenvía).
+    const editado = evaluarUsernameEditado(person?.username, username);
+    let creada: { username: string; temporaryPassword: string };
     try {
-      const result = await api.createCredentials(id);
-      setCredentialsMsg(
-        `Credenciales creadas. Usuario: ${result.username} — Contraseña temporal: ${result.temporaryPassword} (comunicar de forma segura; se solicitará cambio en el primer ingreso).`
-      );
-      const refreshed = await api.get(id);
-      setPerson(refreshed);
+      creada = await api.createCredentials(id, editado.cambio ? editado.valor : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudieron crear las credenciales");
+      setCreandoCredenciales(false);
+      return;
+    }
+
+    // 2. El servidor CONFIRMÓ la creación: se registra antes de depender de
+    //    nada más. Desde aquí el nombre está bloqueado y no se ofrece repetirla.
+    setCuentaCreada({ username: creada.username });
+    setUsername(creada.username);
+    setCredentialsMsg(`Credenciales creadas. Usuario: ${creada.username} — Contraseña temporal: ${creada.temporaryPassword} (comunicar de forma segura; se solicitará cambio en el primer ingreso).`);
+    setCreandoCredenciales(false);
+
+    // 3. Releer la ficha. Un fallo aquí NO es un fallo de la creación.
+    try {
+      setPerson(await api.get(id));
+    } catch (err) {
+      setError(
+        `Las credenciales se crearon correctamente, pero no se pudo actualizar la ficha${err instanceof Error ? `: ${err.message}` : ""}. ` +
+          "Recargue la página para ver el estado actual."
+      );
     }
   }
 
@@ -213,21 +260,6 @@ export function PersonFormPage() {
         />
         {!runValid && <p className="error-message">El RUN ingresado no es válido</p>}
 
-        <label htmlFor="username">Nombre de usuario (para iniciar sesión)</label>
-        <input
-          id="username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="ej: jperez"
-          disabled={isEdit}
-          required
-        />
-        {isEdit && (
-          <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "-0.4rem" }}>
-            El nombre de usuario no se puede modificar una vez creado.
-          </p>
-        )}
-
         <label htmlFor="firstName">Nombre</label>
         <input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
 
@@ -258,6 +290,18 @@ export function PersonFormPage() {
 
         <label htmlFor="phone">Teléfono de contacto</label>
         <input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+
+        <CredencialesDeAcceso
+          modo={isEdit ? "edicion" : "alta"}
+          username={username}
+          onUsernameChange={setUsername}
+          usernameOriginal={person?.username}
+          cuenta={cuentaVigente}
+          onCrearCredenciales={handleCreateCredentials}
+          onRestablecerContrasena={handleResetCredentials}
+          creando={creandoCredenciales}
+          mensaje={credentialsMsg}
+        />
 
         {error && <p role="alert" className="error-message">{error}</p>}
 
@@ -305,7 +349,7 @@ export function PersonFormPage() {
             {adminAccess && !person?.user ? (
               <>
                 <strong>Marcado, pero todavía sin acceso.</strong> Esta persona no tiene credenciales, así que aún no puede entrar.
-                Guardar la casilla <em>no</em> crea la cuenta ni genera ninguna contraseña. Use «Crear credenciales» más abajo: la cuenta
+                Guardar la casilla <em>no</em> crea la cuenta ni genera ninguna contraseña. Use «Crear credenciales», en la sección «Credenciales de acceso»: la cuenta
                 nacerá con permisos de administrador, con contraseña temporal y cambio obligatorio en el primer ingreso.
               </>
             ) : adminAccess ? (
@@ -324,39 +368,6 @@ export function PersonFormPage() {
           {adminMsg && (
             <p style={{ fontSize: "0.85rem", background: "var(--brand-bg)", padding: "0.6rem 0.75rem", borderRadius: 6, marginTop: "0.5rem" }}>
               {adminMsg}
-            </p>
-          )}
-        </div>
-      )}
-
-      {isEdit && (
-        <div style={{ marginTop: "2rem", paddingTop: "1.5rem", borderTop: "1px solid var(--brand-gray-100)", maxWidth: 520 }}>
-          <h2 style={{ fontSize: "1.05rem", color: "var(--brand-navy)" }}>Credenciales de acceso</h2>
-          {person?.user ? (
-            <>
-              <p style={{ fontSize: "0.9rem" }}>
-                Cuenta activa: <strong>{person.user.username}</strong>{" "}
-                <span className={`badge ${person.user.status === "active" ? "badge-active" : "badge-locked"}`}>
-                  {person.user.status}
-                </span>
-              </p>
-              <button className="btn-secondary" onClick={handleResetCredentials}>
-                Restablecer contraseña
-              </button>
-            </>
-          ) : (
-            <>
-              <p style={{ fontSize: "0.9rem", color: "var(--brand-gray-600)" }}>
-                Esta persona no tiene credenciales de acceso al sistema. Se creará con el nombre de usuario: <strong>{username || "(defina el nombre de usuario arriba)"}</strong>.
-              </p>
-              <button className="btn-secondary" onClick={handleCreateCredentials}>
-                Crear credenciales
-              </button>
-            </>
-          )}
-          {credentialsMsg && (
-            <p style={{ fontSize: "0.85rem", background: "var(--brand-bg)", padding: "0.75rem", borderRadius: 6, marginTop: "0.75rem" }}>
-              {credentialsMsg}
             </p>
           )}
         </div>

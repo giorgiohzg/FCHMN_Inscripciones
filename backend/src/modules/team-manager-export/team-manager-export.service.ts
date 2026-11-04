@@ -21,6 +21,8 @@ import {
   type RelayLegInfo,
 } from "./hy3-writer";
 import { computeAge } from "../../shared/age.util";
+import { fechasDeLaCompetencia } from "./competition-dates";
+import { assertClubAccess, type ActorContext } from "../../shared/actorContext";
 
 /**
  * Adaptador desacoplado (según lo planteado en la propuesta de arquitectura,
@@ -43,12 +45,27 @@ export const DEFAULT_MAX_EXPORT_ROWS = 20_000;
 export async function buildTeamManagerHy3Export(
   competitionId: string,
   clubId: string,
-  actor: { userId: string; ipAddress?: string },
+  actor: ActorContext,
   options: { maxRows?: number } = {}
 ): Promise<{ filename: string; content: string }> {
+  /**
+   * ALCANCE, antes de leer NADA.
+   *
+   * El archivo lleva RUN y fecha de nacimiento de los nadadores del club. Desde
+   * que el permiso `export:team-manager` también lo tienen el rol `club` y el personal de club,
+   * el `clubId` ya no puede darse por bueno: llega de la query y quien llama
+   * puede cambiarlo. El alcance sale de la identidad (`ActorContext`), no del
+   * parámetro: el administrador exporta cualquier club, el personal solo el
+   * suyo, y un nadador puro ninguno. Se comprueba aquí y no solo en la ruta
+   * para que cualquier llamador futuro quede cubierto, y antes de la primera
+   * consulta para que ni la existencia de la competencia ni la del club se
+   * revelen a quien no corresponde.
+   */
+  assertClubAccess(actor, clubId);
+
   const MAX_EXPORT_ROWS = options.maxRows ?? DEFAULT_MAX_EXPORT_ROWS;
 
-  const competition = await prisma.competition.findUnique({ where: { id: competitionId }, include: { pool: true } });
+  const competition = await prisma.competition.findUnique({ where: { id: competitionId }, include: { pool: true, dates: { select: { date: true } } } });
   if (!competition) throw new NotFoundError("Competencia");
 
   /**
@@ -70,6 +87,12 @@ export async function buildTeamManagerHy3Export(
     );
   }
   const courseCode: "L" | "S" = competition.pool.courseLength === "short_25m" ? "S" : "L";
+
+  /**
+   * Fechas REALES de la competencia (sus `CompetitionDate`), no las de
+   * inscripción. Sin ninguna, error claro: ver `competition-dates.ts`.
+   */
+  const { inicio: inicioCompetencia, termino: terminoCompetencia } = fechasDeLaCompetencia(competition.dates, competition.name);
 
   const club = await prisma.club.findUnique({ where: { id: clubId } });
   if (!club) throw new NotFoundError("Club");
@@ -167,8 +190,8 @@ export async function buildTeamManagerHy3Export(
   lines.push(
     buildB1({
       name: competition.name,
-      startDate: competition.registrationStartAt,
-      endDate: competition.registrationEndAt,
+      startDate: inicioCompetencia,
+      endDate: terminoCompetencia,
       ageUpDate,
     })
   );

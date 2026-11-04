@@ -8,15 +8,9 @@ import { useSort, sortItems, SortableTh } from "../../shared/sortableTable";
 const STATUS_LABELS: Record<AccountStatus, string> = { active: "Activo", locked: "Bloqueado", disabled: "Inhabilitado" };
 const STATUS_BADGE: Record<AccountStatus, string> = { active: "badge-active", locked: "badge-locked", disabled: "badge-disabled" };
 
-/**
- * La personalidad jurídica tiene TRES estados y `null` es uno de ellos.
- *
- * Sin esto, un club pendiente se veía idéntico a uno sin personalidad jurídica:
- * la columna RUT mostraba «Sin personalidad jurídica» para los dos, porque
- * ninguno tiene RUT.
- */
-const PJ_ETIQUETA = (v: boolean | null): string => (v === true ? "Sí" : v === false ? "No" : "Pendiente");
-const PJ_COLOR = (v: boolean | null): string => (v === true ? "var(--brand-navy)" : v === false ? "var(--brand-gray-600)" : "#9a6700");
+/** La personalidad jurídica tiene DOS estados: «Sí» y «No». */
+const PJ_ETIQUETA = (v: boolean): string => (v ? "Sí" : "No");
+const PJ_COLOR = (v: boolean): string => (v ? "var(--brand-navy)" : "var(--brand-gray-600)");
 
 export function ClubsListPage() {
   const api = useClubsApi();
@@ -103,7 +97,6 @@ export function ClubsListPage() {
           <option value="">Toda personalidad jurídica</option>
           <option value="si">Con personalidad jurídica</option>
           <option value="no">Sin personalidad jurídica</option>
-          <option value="pendiente">Pendiente de verificar</option>
         </select>
       </div>
 
@@ -155,13 +148,11 @@ export function ClubsListPage() {
                     {c.rut ? (
                       c.rut
                     ) : (
-                      <span style={{ color: "var(--brand-gray-600)" }}>
-                        {c.hasLegalStatus === null ? "Sin RUT todavía" : "Sin personalidad jurídica"}
-                      </span>
+                      <span style={{ color: "var(--brand-gray-600)" }}>Sin personalidad jurídica</span>
                     )}
                   </td>
                   <td>
-                    <span style={{ color: PJ_COLOR(c.hasLegalStatus), fontWeight: c.hasLegalStatus === null ? 600 : 400 }}>
+                    <span style={{ color: PJ_COLOR(c.hasLegalStatus) }}>
                       {PJ_ETIQUETA(c.hasLegalStatus)}
                     </span>
                   </td>

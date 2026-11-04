@@ -6,6 +6,7 @@ import {
   personUpdateSchema,
   personListQuerySchema,
   adminAccessSchema,
+  createCredentialsSchema,
 } from "./persons.schemas";
 import { requireAuth, requirePermission, requireRole } from "../auth/rbac.middleware";
 import { ValidationError } from "../../shared/errors";
@@ -91,7 +92,14 @@ export async function personsRoutes(app: FastifyInstance) {
 
   app.post("/persons/:id/credentials", { preHandler: [requirePermission("persons:write")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const result = await personsService.createCredentials(id, { userId: req.authUser!.sub, ipAddress: req.ip });
+    // Cuerpo opcional: `{ username? }`. Sin cuerpo, se usa el nombre guardado.
+    const cuerpo = createCredentialsSchema.safeParse(req.body ?? undefined);
+    if (!cuerpo.success) throw new ValidationError("Datos inválidos", cuerpo.error.flatten());
+    const result = await personsService.createCredentials(
+      id,
+      { userId: req.authUser!.sub, ipAddress: req.ip },
+      { username: cuerpo.data?.username ?? null }
+    );
     reply.code(201).send(result);
   });
 
@@ -116,7 +124,13 @@ export async function personsRoutes(app: FastifyInstance) {
     if (!file) throw new ValidationError("Debe adjuntar un archivo Excel (.xlsx).");
 
     const buffer = await file.toBuffer();
-    const summary = await bulkImportService.importPersonsFromExcel(buffer, { userId: req.authUser!.sub, ipAddress: req.ip });
+    // Incorporar personas a un club exige además el permiso de asignación: se decide aquí,
+    // con el token, y el servicio rechaza el archivo entero si trae clubes sin él.
+    const summary = await bulkImportService.importPersonsFromExcel(
+      buffer,
+      { userId: req.authUser!.sub, ipAddress: req.ip },
+      { puedeAsignarClub: req.authUser!.permissions.includes(bulkImportService.PERMISO_ASIGNAR_CLUB) }
+    );
     reply.send(summary);
   });
 }

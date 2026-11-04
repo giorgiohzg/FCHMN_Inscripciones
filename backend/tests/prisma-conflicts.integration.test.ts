@@ -89,7 +89,7 @@ describe("P2002 real — claves naturales del catálogo", () => {
     const club = await createClub("Club A", "CA");
 
     const error = await conflictoReal(() =>
-      prisma.club.create({ data: { name: "Club B", username: club.username, code: "CB", email: "cb@test.local", status: "active" } })
+      prisma.club.create({ data: { name: "Club B", username: club.username, code: "CB", email: "cb@test.local", hasLegalStatus: false, status: "active" } })
     );
 
     expect(error.message).toMatch(/club con ese nombre de usuario/i);

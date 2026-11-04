@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clubCreateSchema } from "../src/modules/clubs/clubs.schemas";
+import { clubCreateSchema, clubUpdateSchema } from "../src/modules/clubs/clubs.schemas";
 
 const base = {
   name: "Club Delfines",
@@ -86,5 +86,55 @@ describe("clubs.schemas — sigla (code) y nombre de usuario", () => {
   it("acepta un nombre de usuario con letras, números, puntos y guiones", () => {
     const result = clubCreateSchema.safeParse({ ...base, hasLegalStatus: false, username: "club.delfines-2026" });
     expect(result.success).toBe(true);
+  });
+});
+
+describe("clubs.schemas — correo OPCIONAL (etapa 8)", () => {
+  const sinCorreo = (() => {
+    const { email: _omitido, ...resto } = base;
+    return resto;
+  })();
+
+  it("alta SIN el campo: válida, y la ausencia no se convierte en cadena vacía", () => {
+    const r = clubCreateSchema.safeParse({ ...sinCorreo, hasLegalStatus: false });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.email ?? null).toBeNull();
+  });
+
+  it.each([[null], [""], ["   "], [" 	 "]])("alta con email %j: válida y queda en null", (email) => {
+    const r = clubCreateSchema.safeParse({ ...base, email, hasLegalStatus: false });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.email).toBeNull();
+  });
+
+  it("alta con un correo informado: se recorta y se conserva", () => {
+    const r = clubCreateSchema.safeParse({ ...base, email: "  a@b.cl  ", hasLegalStatus: false });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.email).toBe("a@b.cl");
+  });
+
+  it.each([["no-es-correo"], ["a@"], ["@b.cl"], ["a b@c.cl"]])("rechaza el correo mal formado %j en el alta y en la edición", (email) => {
+    expect(clubCreateSchema.safeParse({ ...base, email, hasLegalStatus: false }).success).toBe(false);
+    expect(clubUpdateSchema.safeParse({ email, hasLegalStatus: false }).success).toBe(false);
+  });
+
+  describe("edición", () => {
+    it("OMITIR el campo lo deja indefinido (el servicio conserva el valor)", () => {
+      const r = clubUpdateSchema.safeParse({ hasLegalStatus: false });
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data.email).toBeUndefined();
+    });
+
+    it.each([[null], [""], ["   "]])("email %j significa ELIMINAR: llega como null", (email) => {
+      const r = clubUpdateSchema.safeParse({ email, hasLegalStatus: false });
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data.email).toBeNull();
+    });
+
+    it("un correo informado, válido, se recorta", () => {
+      const r = clubUpdateSchema.safeParse({ email: " nuevo@club.cl ", hasLegalStatus: false });
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data.email).toBe("nuevo@club.cl");
+    });
   });
 });

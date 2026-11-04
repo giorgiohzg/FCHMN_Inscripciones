@@ -415,14 +415,14 @@ sesión no viaja.
 |---|---|---|---|
 | GET | `/persons` | Lista personas (búsqueda por RUN/nombre, filtro por rol/estado, paginado) | `persons:read` |
 | GET | `/persons/:id` | Detalle de una persona (incluye roles y credenciales) | `persons:read` |
-| POST | `/persons` | Crea una persona (valida RUN chileno). **No acepta `roles`**: son derivados, y enviarlos se rechaza con 400 | `persons:write` |
-| PUT | `/persons/:id` | Actualiza datos (RUN y nombre de usuario no editables). **Tampoco acepta `roles`** | `persons:write` |
+| POST | `/persons` | Crea una persona (valida RUN chileno). El nombre de usuario es **opcional** y no se genera ni se crea cuenta. **No acepta `roles`**: son derivados, y enviarlos se rechaza con 400 | `persons:write` |
+| PUT | `/persons/:id` | Actualiza datos (RUN no editable; nombre de usuario editable solo sin cuenta vigente). **Tampoco acepta `roles`** | `persons:write` |
 | DELETE | `/persons/:id` | Eliminación lógica | `persons:write` |
 | POST | `/persons/:id/block` | Bloquea persona y su cuenta de acceso si tiene | `persons:write` |
 | POST | `/persons/:id/disable` | Inhabilita persona y su cuenta de acceso si tiene | `persons:write` |
 | POST | `/persons/:id/reactivate` | Reactiva persona y su cuenta de acceso si tiene | `persons:write` |
 | PUT | `/persons/:id/admin-access` | Concede o retira permisos de administrador. Exige además el **rol** `admin` | `persons:write` + rol `admin` |
-| POST | `/persons/:id/credentials` | Crea credenciales de acceso (contraseña temporal, un solo uso en la respuesta) | `persons:write` |
+| POST | `/persons/:id/credentials` | Crea credenciales de acceso (contraseña temporal, un solo uso en la respuesta). Cuerpo opcional `{ username }` | `persons:write` |
 | POST | `/persons/:id/credentials/reset` | Restablece la contraseña (revoca sesiones activas) | `persons:write` |
 
 **Permisos de administrador por persona.** `persons.admin_access` guarda la
@@ -452,6 +452,24 @@ cuenta `system`.
   El historial se preserva igual que antes: al desaparecer la relación el rol se
   **desactiva**, no se borra. Y una persona recién creada no tiene ningún rol,
   que es lo correcto: todavía no es nada de ningún club.
+- **Nombre de usuario opcional (etapa 9).** Registrar a una persona o un club
+  **no** exige nombre de usuario ni crea cuenta: la ausencia es `NULL` (nunca una
+  cadena vacía; lo impiden `persons_username_no_vacio` y `clubs_username_no_vacio`)
+  y no se genera ningún nombre automáticamente. Mientras el titular **no tenga una
+  cuenta vigente** —activa, bloqueada o inhabilitada—, el nombre se puede asignar,
+  cambiar o quitar desde su ficha (`PUT` con `username`; `null`, vacío o espacios lo
+  quitan; omitirlo lo conserva). Con cuenta, el nombre queda **bloqueado**: el
+  servicio lo rechaza y, por debajo, `titular_forbid_rename_con_cuenta`.
+  `POST …/credentials` acepta un cuerpo opcional `{ "username": "…" }`: si viene,
+  se asigna al titular **en la misma transacción serializable** que crea la cuenta;
+  si no, se usa el guardado; sin ninguno, **400 sin escribir nada**. Cualquier
+  fallo revierte todo y el nombre sigue editable. Restablecer la contraseña no
+  cambia ni desbloquea el nombre. La reserva global (`username_reservations`)
+  ignora `NULL` y libera el nombre anterior al cambiarlo o quitarlo (migración
+  `20261102010000_username_opcional`, comprobación `username-vacio` del
+  preflight). El formato (4 a 30 caracteres: letras, números, puntos y guiones)
+  lo exige la API; la base solo impide la cadena vacía. La carga masiva por Excel
+  admite la columna B vacía.
 - **RB-01**: al crear credenciales se valida que la persona no tenga ya una
   cuenta y que su **nombre de usuario** esté libre. ~~Que el correo no esté en
   uso~~: la identidad es el `username`, no el correo —que es un dato de contacto
@@ -465,41 +483,77 @@ cuenta `system`.
 
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
-| GET | `/clubs` | Lista clubes (búsqueda por nombre/razón social/RUT, filtro por estado y por **personalidad jurídica** —`si` / `no` / `pendiente`—, paginado) | `clubs:read` |
+| GET | `/clubs` | Lista clubes (búsqueda por nombre/razón social/RUT, filtro por estado y por **personalidad jurídica** —`si` / `no`—, paginado) | `clubs:read` |
 | GET | `/clubs/:id` | Detalle de un club (incluye su personal —delegados, entrenadores y representante legal— y las credenciales) | `clubs:read` |
-| POST | `/clubs` | Crea un club (RB-02: RUT obligatorio solo si tiene personalidad jurídica confirmada) | `clubs:write` |
-| PUT | `/clubs/:id` | Actualiza datos del club | `clubs:write` |
+| POST | `/clubs` | Crea un club (RB-02: RUT obligatorio solo si tiene personalidad jurídica; `hasLegalStatus` es obligatorio y solo admite `true` o `false`). El correo y el nombre de usuario son opcionales | `clubs:write` |
+| PUT | `/clubs/:id` | Actualiza datos del club. Omitir `email` lo conserva; `null`, vacío o solo espacios lo elimina. `username`, igual, solo sin cuenta vigente | `clubs:write` |
 | DELETE | `/clubs/:id` | Eliminación lógica | `clubs:write` |
 | POST | `/clubs/:id/block` | Bloquea el club y su cuenta de acceso si tiene | `clubs:write` |
 | POST | `/clubs/:id/disable` | Inhabilita el club y su cuenta de acceso si tiene | `clubs:write` |
 | POST | `/clubs/:id/reactivate` | Reactiva el club y su cuenta de acceso si tiene | `clubs:write` |
-| POST | `/clubs/:id/credentials` | Crea credenciales de acceso del club | `clubs:write` |
+| POST | `/clubs/:id/credentials` | Crea credenciales de acceso del club. Cuerpo opcional `{ username }`, igual que en personas | `clubs:write` |
 | POST | `/clubs/:id/credentials/reset` | Restablece la contraseña del club | `clubs:write` |
 
 ### Reglas aplicadas en el Módulo 3
 
-- **RB-02 — la personalidad jurídica tiene TRES estados**, y `null` no es `false`:
+- **RB-02 — la personalidad jurídica tiene DOS estados** (`true` / `false`):
 
   | `hasLegalStatus` | Significado | RUT |
   |---|---|---|
   | `true` | tiene personalidad jurídica | **obligatorio**, validado |
-  | `false` | se **verificó** que no la tiene | se descarta |
-  | `null` | **pendiente de verificar** | **opcional**, y validado si viene |
+  | `false` | no tiene | se descarta |
 
-  El tercer estado existe porque `false` afirmaba «no tiene» incluso cuando nadie
-  lo había comprobado. La columna es anulable y **sin valor por omisión**: omitir
-  el campo deja «pendiente», no «no tiene». Tener un RUT **no** cambia el estado
-  a verificado — eso es siempre una decisión explícita.
+  El campo es **obligatorio y sin valor por omisión** en el contrato público:
+  `null`, omitirlo o enviar otra cosa responde **400** con un mensaje que lo
+  explica, sin escribir nada. El filtro del listado solo admite `si` o `no`;
+  `pendiente` responde 400. En la interfaz, un club nuevo comienza con «No tiene»
+  seleccionado (es solo la selección inicial; el servidor no asume nada).
 
   El RUT se valida (formato + dígito verificador) con el mismo algoritmo del RUN
   de personas (`shared/run.util.ts`). Cubierto en `clubs.schemas.test.ts`,
-  `clubs-personalidad-juridica.test.ts` (22 pruebas sobre los tres estados) y
-  `personalidad-juridica-transiciones.integration.test.ts` (23 sobre las
-  transiciones).
+  `clubs-personalidad-juridica.test.ts`,
+  `personalidad-juridica-transiciones.integration.test.ts` y
+  `personalidad-juridica-api.integration.test.ts`.
 
-  > **Cuidado al leer este campo en código.** Es `boolean | null`, así que
-  > `if (club.hasLegalStatus)` compila y trata «pendiente» igual que «no», sin
-  > ningún error de tipos. Compare siempre `=== true`, `=== false` o `=== null`.
+  > **Historia: el estado «pendiente de verificar» (2026-10-31 → 2026-11-02).**
+  > Entre ambas fechas existió un tercer estado, `null`. Se retiró por decisión del
+  > usuario, y la migración `20261102020000_personalidad_juridica_sin_pendiente`
+  > (**etapa 10a**) convirtió los clubes pendientes en «No tiene» y **eliminó el RUT
+  > de esos mismos clubes**. Esto es convertir un dato *desconocido* en una
+  > afirmación *negativa*: no es una verificación, y así debe leerse. La migración:
+  > corre en una transacción explícita; **se detiene entera, sin escribir nada, si
+  > un club pendiente tiene representante legal** (no retira nombramientos; ver la
+  > comprobación `club-pendiente-con-representante-legal` del preflight); deja
+  > **una fila de auditoría por club** (`CLUB_LEGAL_STATUS_CONVERTED`: estado
+  > anterior, nuevo y si se eliminó un RUT, **nunca su valor**); y no toca los RUT
+  > de otros estados, las razones sociales, los nombramientos, los roles ni los
+  > permisos. **No existe ninguna tabla con los RUT retirados**: recuperarlos, si
+  > hiciera falta, depende del respaldo previo protegido del procedimiento de
+  > despliegue.
+  >
+  > **Cierre (etapa 10b).** La migración `20261103030000_personalidad_juridica_obligatoria`
+  > declara `clubs.has_legal_status` **`NOT NULL`, sin valor por omisión** en la base, y
+  > Prisma pasa a `Boolean`. **No convierte ni borra nada**: si al migrar queda algún
+  > `NULL`, se **detiene** con el detalle (cuántos y cuáles clubes, también los
+  > eliminados lógicamente) y sin modificar ninguna fila; convertir pendientes es
+  > trabajo de la 10a. La API sigue exigiendo un booleano explícito en cada alta y
+  > edición (`null` u omitirlo responde 400), y el formulario conserva «No tiene» como
+  > valor inicial. **Se despliega junto con la 10a**, en el mismo `migrate deploy` y
+  > antes de la API y la web nuevas: un cliente anterior que enviara `null` fallaría en
+  > la base.
+- **Correo del club opcional.** `clubs.email` es anulable: la ausencia es **`NULL`**,
+  nunca una cadena vacía ni un correo provisional (lo impide la restricción
+  `clubs_email_no_vacio`, que también rechaza solo-espacios y tabuladores). Al
+  crear, omitirlo o enviar `null`, `""` o espacios deja `NULL`. Al editar:
+  **omitirlo conserva el valor**; `null`, `""` o solo espacios **lo elimina**; un
+  correo informado se recorta y debe tener formato válido. Las respuestas pueden
+  traer `"email": null`. La migración `20261102000000_club_email_opcional` no
+  modifica ningún correo existente —tampoco los provisionales— y se **detiene**
+  con el detalle si hay un club con el correo vacío (comprobación
+  `club-email-vacio` del preflight): esos casos se corrigen a mano, antes de migrar.
+  Pasar la columna a anulable exige desplegar la migración **antes** que el código
+  nuevo, y una API o un cliente anteriores pueden fallar al leer un club sin
+  correo (ver el plan de despliegue de las etapas 8 a 10).
 - **A-01 / A-02**: el personal del club vive en la tabla `club_staff`
   (`club_id`, `person_id`, `role_type`), no en columnas `delegate_person_id` /
   `coach_person_id` como decía la propuesta original: un club puede tener **varios**
@@ -514,20 +568,19 @@ cuenta `system`.
   - Puede tener credenciales y operar sobre el club donde fue nombrado; no las
     requiere obligatoriamente (igual que delegados y entrenadores).
   - Le aplica la misma restricción de un solo club que a delegado y entrenador.
-  - Solo se puede designar con personalidad jurídica **confirmada** (`true`). Con
-    el estado `false` o **pendiente de verificar** la designación se **rechaza**
-    con un mensaje que lo explica — no se descarta en silencio.
+  - Solo se puede designar con personalidad jurídica (`true`). Con `false` la
+    designación se **rechaza** con un mensaje que lo explica — no se descarta en
+    silencio.
   - **Un representante designado BLOQUEA el cambio de estado.** Pasar de `true` a
-    `false` o a `pendiente` se rechaza mientras exista uno, y hay que retirarlo
-    expresamente primero (`legalRepresentativePersonId: null`, con el estado
-    todavía en `true`). Son dos pasos a propósito.
+    `false` se rechaza mientras exista uno, y hay que retirarlo expresamente
+    primero (`legalRepresentativePersonId: null`, con el estado todavía en
+    `true`). Son dos pasos a propósito.
 
     > **Esto cambió el 2026-10-31.** Antes, poner el indicador en `false`
     > retiraba el nombramiento y desactivaba el rol de acceso de esa persona
-    > **sin avisar**. Con dos estados pasaba poco; al añadir «pendiente», la
-    > transición «pendiente → no» se volvió rutinaria y cada vez le habría
-    > quitado el acceso a alguien como efecto colateral de cambiar una casilla.
-    > Ahora quitar el acceso de una persona es siempre una decisión visible.
+    > **sin avisar**. Ahora quitar el acceso de una persona es siempre una
+    > decisión visible. La conversión de la etapa 10a respeta la misma regla: no
+    > retira ningún nombramiento, y se detiene si encuentra uno en un club pendiente.
   - Como máximo **uno por club** (a diferencia de delegados y entrenadores).
   - El rol funcional (`person_roles`) y el rol de acceso (`user_roles`) se **derivan**
     del nombramiento: se activan al nombrarlo y se desactivan al retirarlo o
@@ -640,14 +693,14 @@ cuenta `system`.
 
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
-| GET/POST | `/competitions[/:id]` | Listar/crear competencias | `competitions:read` / `competitions:write` |
-| PUT | `/competitions/:id` | Editar (fechas de inscripción solo en `draft`/`scheduled`) | `competitions:write` |
-| POST | `/competitions/:id/duplicate` | Duplica estructura completa como base de una nueva | `competitions:write` |
+| GET/POST | `/competitions[/:id]` | Listar/crear competencias. El listado admite el filtro explícito `visibleInRegistrationPanels=true\|false` (ver «Visibilidad en los paneles de inscripción y relevos») | `competitions:read` / `competitions:write` |
+| PUT | `/competitions/:id` | Editar (fechas de inscripción solo en `draft`/`scheduled`); también `visibleInRegistrationPanels` y `requireIndividualForRelay`. La respuesta y `GET /competitions/:id` traen `relayTeamsNotMeetingCondition` (ver «Condición de inscripción individual para relevos») | `competitions:write` |
+| POST | `/competitions/:id/duplicate` | Duplica estructura completa como base de una nueva (hereda la visibilidad en los paneles) | `competitions:write` |
 | POST | `/competitions/:id/{schedule\|cancel\|closeRegistrations\|start\|finish}` | Transiciones de ciclo de vida | `competitions:write` |
 | POST/DELETE | `/competitions/:id/dates`, `/competition-dates/:dateId` | Fechas de la competencia | `competitions:write` |
 | POST/DELETE | `/competition-dates/:dateId/sessions`, `/competition-sessions/:sessionId` | Jornadas dentro de una fecha | `competitions:write` |
 | PUT | `/competition-sessions/:sessionId/limit` | Límites de pruebas individuales/relevos (NULL = sin límite) | `competitions:write` |
-| GET/POST/PUT/DELETE | `/competitions/:id/events`, `/competition-events/:ceId` | Pruebas asignadas a la competencia | `competitions:read` / `competitions:write` |
+| GET/POST/PUT/DELETE | `/competitions/:id/events`, `/competition-events/:ceId` | Pruebas asignadas a la competencia. Alta y edición admiten `maxSwimmersPerClub` (máximo de nadadores por club en esa prueba individual; ver «Máximo de nadadores por club y prueba») | `competitions:read` / `competitions:write` |
 | GET/POST | `/catalogs/session-types` | Catálogo extensible de jornadas (Mañana/Tarde sembrado) | `catalogs:read` / `catalogs:write` |
 
 ### Reglas aplicadas en el Módulo 6
@@ -658,6 +711,53 @@ cuenta `system`.
 - **Sección 13 / RB-13**: al asignar una prueba a la competencia, las categorías habilitadas deben ser un **subconjunto** de las ya asociadas a esa prueba en el catálogo general (Módulo 5) — no se puede habilitar una categoría que la prueba no admite. Quitar una prueba de la competencia borra únicamente `competition_events`, nunca la prueba maestra.
 - **Duplicar competencia**: copia completa de fechas, jornadas, límites y pruebas asignadas (con sus categorías habilitadas) hacia una nueva competencia en `draft`, remapeando todos los IDs internos dentro de una transacción.
 - **Sección 12 (A-09)**: límites de pruebas individuales/relevos definidos por fecha+jornada, uniformes para todos los nadadores de esa sesión; `null` en cualquiera de los dos campos significa "sin límite".
+
+#### Máximo de nadadores por club y prueba
+
+Cada prueba **individual** de una competencia puede llevar un máximo de nadadores por club (`CompetitionEvent.maxSwimmersPerClub`, columna `max_swimmers_per_club`).
+
+- **Valor y validación.** Por omisión **«Sin límite»**, que se guarda como `NULL` (así quedan todas las pruebas anteriores, y las nuevas y las importadas). Con valor, un **entero positivo** (la API lo valida y la base lo exige con un `CHECK`). Enviar `null` al editar **quita** el límite; omitirlo no lo toca. **No se ofrece para relevos**: una prueba de relevo con un valor responde 400 con un mensaje, y la interfaz no muestra el campo.
+- **Qué cuenta.** Las inscripciones individuales **confirmadas** del club en **esa** prueba de competencia —equivale a nadadores distintos de ese club en esa prueba—, sin importar en qué otras pruebas esté cada nadador. Otro club y otra prueba no consumen el cupo. **Cancelar libera** el cupo (las canceladas no cuentan).
+- **Es independiente** de los cupos de nadadores de la competencia (`maxSwimmers` y `maxSwimmersPerClub` de la competencia, que cuentan nadadores **distintos en toda la competencia**): ni los consulta ni los modifica, y ambos se aplican a la vez.
+- **Reducirlo** por debajo de lo ya inscrito **no elimina ni cancela** nada: solo impide altas posteriores (el mensaje lo dice).
+- **Concurrencia.** El conteo, la comprobación y el alta ocurren dentro de la misma transacción serializable que ya protege las inscripciones simultáneas: dos altas sobre el último cupo no pueden quedar ambas (una recibe el rechazo del límite o el conflicto reintentable).
+- **Excepción de administrador.** **Solo un administrador** (`actor.isAdmin`) puede exceder el máximo. **No basta** tener `registrations:write`, ni `registrations:write:post-close` sin ser administrador; el resto de las reglas de inscripción no se relaja. Cada exceso deja una fila de auditoría `REGISTRATION_CREATED_OVER_EVENT_CLUB_LIMIT_BY_ADMIN` **en la misma transacción** que el alta (si la auditoría falla, el alta se revierte), con autor, club, competencia, prueba de competencia, máximo vigente y cantidad resultante.
+- **Mensaje para el club:** «El club … alcanzó el máximo de N nadador(es) por club en la prueba «…». No quedan cupos para este club en esta prueba…».
+- **Duplicar** la competencia **hereda** el máximo de cada prueba.
+
+#### Visibilidad en los paneles de inscripción y relevos
+
+Cada competencia guarda `visibleInRegistrationPanels` (columna `visible_in_registration_panels`, `BOOLEAN NOT NULL DEFAULT true`).
+
+- **Qué significa ocultar.** Quita la competencia **únicamente del desplegable del Panel de Inscripción y del Panel de Relevos**, para **todos los roles, administrador incluido** (es configuración, no permiso).
+- **Qué NO hace.** No es una medida de protección: **no** modifica permisos, accesos directos (`GET /competitions/:id` sigue respondiendo), reglas de inscripción ni las altas —una competencia oculta pero abierta admite inscripciones por los mismos medios que antes—, y **no** alcanza a **Reportes** ni a los **asistentes** de inscripción y de relevos, que conservan su listado. Tampoco la quita de la tabla de Competencias de administración.
+- **Formularios.** Alta y edición llevan la casilla «Ocultar esta competencia del panel de inscripción y del panel de relevos», **desmarcada por defecto**. Se guarda en sentido positivo (casilla marcada = `false`), para no tener que negar el campo en cada lectura. La tabla de administración añade al final la columna **«Mostrar en competencia»** con `Sí`/`No`.
+- **El filtro.** `GET /competitions?visibleInRegistrationPanels=true|false`. **Omitido, el listado se comporta como siempre** (todas las competencias que el rol puede ver). Solo los dos paneles envían `true`. `false` devuelve únicamente las ocultas. Se aceptan exactamente los textos `true` y `false`; cualquier otro valor responde 400 (en particular, `"false"` **no** se interpreta como verdadero, como haría una coerción a booleano). El filtro es una condición propia de la consulta: **se suma** a las restricciones por rol y estado (el personal que no es administrador sigue sin ver Borrador ni Programada) y los resultados, el total y la paginación salen de la misma condición.
+- **Competencias existentes, duplicadas e importadas.** La migración `20261102030000_competencia_visible_en_paneles` es aditiva: las competencias anteriores quedan **visibles**. Duplicar **hereda** la visibilidad del origen. Las nuevas y las importadas (Team Manager / Meet Events) nacen visibles salvo configuración expresa.
+
+### Sigla del club
+
+La **sigla** (`clubs.code`) es el **identificador único del club**. La garantía es de la base: el índice único parcial `clubs_code_unique_active`, sobre `club_code_normalizado(code)` y `WHERE deleted_at IS NULL` (migración `20261103020000_sigla_club_unica`).
+
+- **Alcance:** clubes no eliminados lógicamente, **incluidos los inactivos**: un club inactivo conserva su sigla. Un club eliminado la libera.
+- **Normalización:** sin blancos a los lados y en mayúsculas, la misma en la aplicación (`shared/clubCode.ts`) y en la función SQL.
+- **Al crear y editar:** se responde con un mensaje que nombra al club que la usa. Frente a dos operaciones simultáneas la garantía final es el índice, y la perdedora recibe un 409 con el mensaje de la sigla.
+- **Datos anteriores:** si hay duplicados, la migración se **detiene** con el detalle (comprobación `club-sigla-duplicada` del preflight) y no modifica ningún club: decidir qué club conserva la sigla es del negocio.
+
+### Carga masiva por Excel con club y fecha efectiva
+
+`GET /persons/bulk-import/template` descarga la plantilla y `POST /persons/bulk-import` la procesa (`persons-bulk-import.rules.ts` y `.service.ts`).
+
+- **Columnas de la hoja `Personas`, en este orden:** A RUN · B nombre de usuario (opcional) · C nombre · D apellido paterno · E apellido materno (opcional) · F fecha de nacimiento `DD-MM-AAAA` · G género · H correo (opcional) · I teléfono (opcional) · **J sigla del club (opcional)** · **K fecha efectiva de membresía** (`AAAA-MM-DD` o `DD-MM-AAAA`; **obligatoria si hay club**). La hoja `Instrucciones` trae el ejemplo, las notas y la **lista de clubes vigentes y activos** (sigla y nombre), con cada valor pasado por `neutralizeSpreadsheetFormula`; el importador no la lee.
+- **Plantillas anteriores:** la de A-I (sin J ni K) sigue sirviendo para registrar solo personas. Una plantilla con la J titulada «Roles» se **rechaza entera** (400, nada escrito): esa columna nunca se reinterpreta como club. Cualquier otro título en J o K, también.
+- **Club:** se identifica por la **sigla** (`clubs.code`, comparada con `trim` y mayúsculas), no por el nombre ni por el nombre de usuario. Solo se resuelven clubes **vigentes y activos**. Una sigla inexistente, de un club inactivo o eliminado rechaza la fila con un mensaje que lo dice. **La correspondencia sigla → club se resuelve dentro de la transacción de cada fila, con `FOR SHARE`:** no hay lectura previa ni caché. Si otra operación está cambiando ese club, la fila espera y evalúa lo confirmado; una vez leído, el club no puede cambiar de sigla, estado ni vigencia hasta que la fila termine. Si la sigla ya no corresponde, se rechaza esa fila y las demás continúan. La sigla es única por garantía de la base (ver «Sigla del club»); aun así el importador conserva su defensa: si una lectura devolviera dos clubes vigentes, rechaza la fila como **ambigua** sin elegir. La lista de la plantilla usa el mismo criterio (sigla normalizada, evaluada con `resolverSigla`) y es orientativa: vale lo vigente al procesar cada fila.
+- **Fecha efectiva:** con club es obligatoria y debe ser un día que exista; **nunca** se usa la fecha de hoy en silencio. Una fecha sin club es un error informado. Se guarda exactamente el día escrito (columna `DATE`, medianoche UTC, `shared/fecha.util.ts`), sin desplazamiento por zona horaria; una celda de fecha nativa de Excel se lee por sus componentes UTC.
+- **Sin club** la fila registra solo a la persona, como antes. El nombre de usuario sigue siendo opcional: vacío = `NULL`; **nunca** se genera uno ni se crean credenciales.
+- **Una transacción por fila:** resolución de la sigla, persona, membresía activa (`assignSwimmerDirectly` con `{ tx }`), rol de nadador derivado y las auditorías `PERSON_CREATED` y `SWIMMER_ASSIGNMENT_DIRECT` se escriben juntos; si algo falla, la fila se revierte entera. Entre filas el procesamiento sigue siendo **parcial**: una fila con error no impide las demás.
+- **Sin reasignar ni sobrescribir:** una persona cuyo RUN ya existe se rechaza (no se modifica ni se cambia de club); se mantiene una sola membresía activa por persona (RB-06). No se crean cuentas.
+- **Duplicados dentro del archivo:** RUN (normalizado) y nombre de usuario **informado** repetidos se rechazan desde la **segunda** aparición, indicando la fila de la primera; dos filas sin nombre de usuario no son duplicadas.
+- **Permisos:** la ruta exige `persons:write`; si **alguna** fila trae club, además `swimmer-assignment:approve` (se comprueba antes de escribir: sin él, el archivo entero responde 403). Un archivo sin clubes se importa solo con `persons:write`.
+- **Informe:** por fila (número de fila del Excel), con el club y la fecha guardados en las creadas con club; totales `totalRows = createdCount + errorCount` y `withClubCount` (de las creadas, las incorporadas a un club).
 
 ## Corrección al Módulo 2: campo Género en Personas
 
@@ -706,6 +806,18 @@ puede implementar.
 - Reutiliza exactamente el mismo patrón de excepción post-cierre (RB-08) y alcance por club que el Módulo 7, sin duplicar esa lógica de permisos.
 - **Frontend**: el asistente bloquea la selección de un 5º nadador en cuanto hay 4 marcados (UX preventiva), pero la validación real y autoritativa siempre ocurre en el backend.
 
+#### Condición de inscripción individual para relevos (configurable por competencia)
+
+Cada competencia guarda `requireIndividualForRelay` (columna `require_individual_for_relay`, `BOOLEAN NOT NULL DEFAULT true`), con la casilla «Exigir al menos una inscripción individual confirmada antes de participar en relevos» en el alta y en la edición. **Comienza marcada**: las competencias anteriores, las nuevas y las importadas la tienen activada, y **duplicar hereda** el valor del origen.
+
+- **Activada** (la regla de siempre, ahora explícita; antes no estaba documentada). Tiene **dos lados** (`relay-membership.rules.ts`):
+  1. **Formar o modificar un equipo** (`POST /relay-registrations` y `PUT /relay-registrations/:id` con integrantes) exige que **todos** los integrantes tengan al menos una inscripción individual **confirmada en la misma competencia** —no en la misma prueba—. Rige también para el administrador: su excepción levanta cupos y cierres, no esto. Editar un equipo que hoy incumple exige que el equipo **resultante** cumpla; corregir solo su tiempo no es modificar integrantes.
+  2. **Cancelar la última inscripción individual** de un nadador que integra un relevo confirmado se **rechaza**; con otra individual confirmada, o tras cancelar el relevo, se permite. El sistema nunca retira al nadador ni cancela en cascada.
+- **Desactivada**: no se exige la individual para formar o modificar un relevo, y **no se bloquea** cancelar la última individual por esa condición. Nada se recalcula al apagarla.
+- **Se lee de la misma competencia, dentro de la transacción** de cada operación (la de relevos y la de la cancelación individual), no de una lectura previa.
+- **Se conserva todo lo demás:** cupos, cierres, edades, categorías, el límite de relevos por nadador y jornada, la pertenencia al club, permisos y alcance. Solo el texto del cierre parcial («Los relevos siguen disponibles…») deja de afirmar la individual previa cuando la competencia no la exige.
+- **Aviso al activarla sobre equipos que no cumplen.** No se modifica, cancela ni retira a nadie y **el administrador puede guardar**. `GET /competitions/:id` y la respuesta de `PUT /competitions/:id` incluyen `relayTeamsNotMeetingCondition`: los **equipos confirmados distintos** (no los integrantes) con algún integrante sin individual confirmada en la competencia. Es una lectura pura, sin ruta nueva. El formulario lo muestra al marcar la casilla y, tras guardar, en el resumen.
+
 ## Módulo 9 — Validaciones
 
 No se agregó código nuevo: las 12 validaciones exigidas por la sección 15 ya estaban
@@ -733,6 +845,12 @@ Filtros soportados (sección 16): `competitionId` (obligatorio), `clubId`, `comp
 - **Columnas mínimas exigidas** (sección 16) todas presentes: para individuales — competencia, club, RUN, nombre, fecha de nacimiento, categoría, prueba, distancia, estilo, género, fecha, jornada, tipo de prueba; para relevos — equipo/club, prueba, categoría, y los 4 integrantes con nombre y RUN.
 - **Exportación real a 3 formatos**: se agregaron `exceljs` (Excel nativo, no CSV disfrazado) y `pdfkit` (PDF real) como dependencias del backend — verificado generando y reabriendo archivos de muestra antes de entregar el módulo.
 - El reporte siempre parte de `Registration`/`RelayRegistration` con `status: confirmed` — las inscripciones canceladas nunca aparecen en el listado ni en las exportaciones.
+- **Orden del reporte** (criterios puros en `reports.rules.ts`, compartidos por la vista agrupada y por las filas planas de CSV / XLSX / PDF, probados en `reports-orden.test.ts`):
+  - **Clubes**: alfabético, como siempre. **Nadadores dentro de cada club: por apellido paterno** (no por edad; la edad se sigue mostrando). Desempates, en orden: apellido materno, nombre de pila, nombre completo almacenado, RUN e identificador. Sin distinguir mayúsculas ni tildes; la «ñ» es una letra propia.
+  - **Personas históricas sin apellido paterno** (`paternalLastName` nulo o vacío): **no se les inventa ni se les deduce un apellido** del nombre completo, ni se modifica el nombre almacenado. Van **después** de todas las que sí lo tienen, por su nombre completo almacenado y luego RUN e identificador.
+  - **Pruebas y relevos de cada nadador**, en listas separadas, por **número de programa numérico** (2, 3, 10 y no 10, 2, 3). El número de programa es `CompetitionEvent.displayOrder` —la única columna que lo guarda; `eventNumber` es el nombre que le da el importador de Meet Events al mismo dato—. Los números **ausentes van al final**; los **repetidos o ausentes** se desempatan por su texto visible (descripción y tiempo, el mismo que muestra la vista agrupada) y, **solo como último recurso**, por el identificador de la inscripción: el identificador nunca decide antes que el texto. La vista agrupada y las filas planas de los archivos comparten el mismo criterio (`compararLineasDePrueba`), de modo que dos filas equivalentes de un mismo nadador salen en el mismo orden relativo en ambos.
+  - **Categoría y club mostrados: no cambian.** Siguen siendo los de la primera inscripción del nadador en el orden en que el servicio la entrega (sus individuales antes que sus relevos), como antes. **No dependen del orden de presentación**: ordenar pruebas y relevos no altera la categoría, y no se redefine como «la de la primera prueba del programa».
+  - **Formatos**: CSV, XLSX y PDF usan las mismas filas planas, así que comparten el orden: individuales por club, nadador (apellido paterno…) y, dentro del nadador, el criterio de pruebas anterior; **relevos, una fila por equipo** (no por nadador), por club y ese mismo criterio (luego categoría e identificador). No se añaden columnas ni se duplican filas. La diferencia con la vista agrupada es la justificada por su estructura: allí hay una línea por nadador con sus listas; aquí, una fila por inscripción o por equipo.
 
 ## Módulo 11 — Exportación a Team Manager (resuelve A-06)
 
@@ -770,6 +888,17 @@ fixture que se conserva en el repositorio es sintético.
   `B1` corresponde exactamente al concepto de fecha de corte que ya
   usábamos para el cálculo de edad (RB-05, Módulo 5) — confirma que esa decisión de
   diseño está alineada con el estándar de la industria.
+- **Fechas de la competencia en `B1`.** Los dos campos de fecha de la competencia
+  (inicio y término) salen de sus **`CompetitionDate`**, no de las fechas de
+  inscripción, que es lo que se escribía hasta el 2026-11-02. Con un día, inicio y
+  término son ese día; con varios, la primera y la última programadas, sea cual sea
+  el orden en que se dieron de alta. Una competencia **sin fechas** no se exporta:
+  responde 400 con un mensaje claro, sin sustituirlas por las de inscripción. El día
+  se lee con los componentes UTC (el sistema guarda cada fecha como medianoche UTC),
+  así que no se desplaza por la zona horaria del servidor. **El corte de edad no
+  cambió**: sigue siendo `ageCutoffDate` y, si falta, el cierre de inscripciones.
+  Cubierto en `hy3-fechas-competencia.test.ts` (incluye procesos con otras zonas
+  horarias) y en `import-export-services.integration.test.ts`.
 
 ### Limitaciones documentadas honestamente
 
@@ -852,7 +981,39 @@ devolvía el mismo archivo. El contrato queda fijado en
 
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
-| GET | `/export/team-manager/hy3?competitionId=&clubId=` | Descarga el archivo `.HY3` con las inscripciones individuales Y de relevo confirmadas de un club en una competencia | `export:team-manager` (solo `admin`) |
+| GET | `/export/team-manager/hy3?competitionId=&clubId=` | Descarga el archivo `.HY3` con las inscripciones individuales Y de relevo confirmadas de un club en una competencia. El administrador exporta cualquier club; el rol `club` y el personal de club, solo el suyo | `export:team-manager` |
+
+**Quién puede exportar.** El permiso `export:team-manager` lo tienen el
+administrador, el rol `club` (la cuenta del club) y el personal de club
+—delegado, entrenador y representante legal, que comparten
+`CLUB_STAFF_PERMISSIONS`—. **No** lo tiene el nadador. El archivo lleva RUN y fecha
+de nacimiento, así que el permiso por sí solo no basta: **el alcance lo aplica el
+servicio** (`buildTeamManagerHy3Export` recibe el `ActorContext` y llama a
+`assertClubAccess` antes de leer nada). La cuenta del club y el personal que pidan
+otro `clubId` reciben **403 sin contenido**; el administrador conserva cualquier
+club; un nadador puro queda rechazado aunque algún día se le concediera el
+permiso. El botón de **Reportes** aparece según `hasPermission("export:team-manager")`
+y, para quien no es administrador, el club es el suyo y no se puede elegir.
+
+**Al desplegar este cambio.** (Incluye al rol `club`.) La matriz de permisos vive en
+`rbac.definitions.ts`, pero la base de datos guarda la suya en `role_permissions`
+y **ninguna migración la actualiza**. Hay que ejecutar el seed (idempotente: agrega lo que falta, no quita nada) en cada entorno donde se
+despliegue. **En el despliegue** se ejecuta con la **imagen de mantenimiento**
+(`backend/Dockerfile.mantenimiento`, etapa `migrate`) **construida desde el mismo
+commit de la entrega**, con el comando admitido en esa imagen:
+
+```bash
+node dist-seed/prisma/seed.js
+```
+
+y **después de aplicar las migraciones y antes de actualizar la API y la web**.
+Secuencia operativa de esta entrega: (1) `prisma migrate deploy --schema=/app/prisma/schema.prisma`
+con todas las migraciones pendientes, (2) `node dist-seed/prisma/seed.js`, (3) API,
+(4) web. **No se ejecuta `seed-admin`**: la cuenta administradora existente se
+conserva. `npm run prisma:seed` es solo para el desarrollo local. Mientras no se ejecute, el servidor sigue respondiendo 403 al
+personal y a la cuenta del club, que es el fallo seguro; el servidor relee los permisos en cada
+solicitud, y el botón aparece en la siguiente sesión que se emita. Es una
+operación de despliegue sujeta a autorización específica en producción.
 
 El archivo se codifica en **ISO-8859-1** (Latin-1), igual que el archivo original —
 no UTF-8, ya que Team Manager es un software de la era DOS/Windows clásico que
@@ -939,7 +1100,7 @@ omitido.
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
 | GET | `/persons/bulk-import/template` | Descarga la plantilla del archivo de carga | `persons:write` |
-| POST | `/persons/bulk-import` | Carga masiva de personas, con informe de errores por fila | `persons:write` |
+| POST | `/persons/bulk-import` | Carga masiva de personas —y, si la fila trae sigla de club y fecha efectiva, su membresía activa—, con informe por fila (ver «Carga masiva por Excel con club y fecha efectiva»). Las filas con club exigen además `swimmer-assignment:approve` | `persons:write` |
 
 ### Grupos de categorías
 

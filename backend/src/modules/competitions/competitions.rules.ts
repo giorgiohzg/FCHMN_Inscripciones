@@ -281,7 +281,12 @@ export function evaluateRegistrationWindow(
    * cuando servía a los dos por igual, y así ninguna llamada existente cambia
    * de sentido por olvidar el argumento.
    */
-  kind: RegistrationKind = "individual"
+  kind: RegistrationKind = "individual",
+  /**
+   * `Competition.requireIndividualForRelay`. Solo cambia el TEXTO del cierre parcial: si la
+   * competencia exige la individual previa, el mensaje lo recuerda; si no, no lo afirma.
+   */
+  relayRequiresIndividual: boolean = true
 ): RegistrationWindowResult {
   if (status === "open") {
     return { allowed: true, isPostCloseException: false };
@@ -312,7 +317,9 @@ export function evaluateRegistrationWindow(
         isPostCloseException: false,
         reason:
           `Esta competencia alcanzó su cupo de nadadores, así que las inscripciones individuales están cerradas y no se puede ${OPERATION_LABELS[operation]}. ` +
-          "Los relevos siguen disponibles con nadadores que ya tengan una inscripción individual confirmada.",
+          (relayRequiresIndividual
+            ? "Los relevos siguen disponibles con nadadores que ya tengan una inscripción individual confirmada."
+            : "Los relevos siguen disponibles."),
       };
     }
     return { allowed: true, isPostCloseException: true };

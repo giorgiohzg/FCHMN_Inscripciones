@@ -247,3 +247,49 @@ export async function registrarExcesoDeCupo(
     { tx: db }
   );
 }
+
+/**
+ * El rastro de la excepción del MÁXIMO POR CLUB Y PRUEBA.
+ *
+ * Acción propia, distinta de la del cupo de la competencia y de la excepción por
+ * cierre: son tres excepciones diferentes y pueden darse a la vez. Se escribe en
+ * la MISMA transacción que el alta (`db` es la transacción): si la auditoría falla,
+ * el alta se revierte y la excepción no queda sin rastro.
+ *
+ * Guarda autor (`userId`), club, competencia, prueba de competencia, el máximo
+ * vigente y la cantidad resultante tras la alta.
+ */
+export async function registrarExcesoDeLimitePorClubYPrueba(
+  db: Db,
+  params: {
+    registrationId: string;
+    competitionId: string;
+    competitionEventId: string;
+    clubId: string;
+    clubName: string;
+    limit: number;
+    resultingCount: number;
+  },
+  actor: ActorContext
+): Promise<void> {
+  await audit(
+    {
+      userId: actor.userId,
+      action: "REGISTRATION_CREATED_OVER_EVENT_CLUB_LIMIT_BY_ADMIN",
+      entityType: "Registration",
+      entityId: params.registrationId,
+      ipAddress: actor.ipAddress,
+      after: {
+        autor: actor.userId,
+        clubId: params.clubId,
+        clubName: params.clubName,
+        competitionId: params.competitionId,
+        competitionEventId: params.competitionEventId,
+        maxSwimmersPerClub: params.limit,
+        cantidadResultante: params.resultingCount,
+        excedente: params.resultingCount - params.limit,
+      },
+    },
+    { tx: db }
+  );
+}

@@ -189,7 +189,7 @@ describe("reports.rules — groupReportByClubAndSwimmer", () => {
     expect(groups[0]!.swimmers[0]!.pruebas).toEqual([]);
   });
 
-  it("ordena los clubes alfabéticamente (los nadadores, en caso de empate de edad, se ordenan alfabéticamente)", () => {
+  it("ordena los clubes alfabéticamente (los nadadores sin apellido paterno registrado, por su nombre completo)", () => {
     const groups = groupReportByClubAndSwimmer(
       [
         entry({ personId: "p1", fullName: "Zoe Soto", clubName: "Norte", run: "1" }),
@@ -202,17 +202,18 @@ describe("reports.rules — groupReportByClubAndSwimmer", () => {
     expect(groups.find((g) => g.clubName === "Norte")!.swimmers.map((s) => s.nombreCompleto)).toEqual(["Ana Rojas", "Zoe Soto"]);
   });
 
-  it("ordena a los nadadores del club por edad (de menor a mayor)", () => {
+  it("la edad se MUESTRA pero ya no ordena: los nadadores van por apellido paterno (el criterio completo está en reports-orden.test.ts)", () => {
     const groups = groupReportByClubAndSwimmer(
       [
-        entry({ personId: "p1", fullName: "Nadador Mayor", run: "1", birthDate: new Date("1980-01-01T00:00:00Z") }),
-        entry({ personId: "p2", fullName: "Nadador Joven", run: "2", birthDate: new Date("2010-01-01T00:00:00Z") }),
-        entry({ personId: "p3", fullName: "Nadador Medio", run: "3", birthDate: new Date("2000-01-01T00:00:00Z") }),
+        // Edades deliberadamente CONTRARIAS al orden alfabético por apellido.
+        entry({ personId: "p1", fullName: "Nadador Zamora", paternalLastName: "Zamora", run: "1", birthDate: new Date("2010-01-01T00:00:00Z") }),
+        entry({ personId: "p2", fullName: "Nadador Soto", paternalLastName: "Soto", run: "2", birthDate: new Date("2000-01-01T00:00:00Z") }),
+        entry({ personId: "p3", fullName: "Nadador Araya", paternalLastName: "Araya", run: "3", birthDate: new Date("1980-01-01T00:00:00Z") }),
       ],
       cutoff
     );
-    expect(groups[0]!.swimmers.map((s) => s.nombreCompleto)).toEqual(["Nadador Joven", "Nadador Medio", "Nadador Mayor"]);
-    expect(groups[0]!.swimmers.map((s) => s.edad)).toEqual([16, 26, 46]);
+    expect(groups[0]!.swimmers.map((s) => s.nombreCompleto)).toEqual(["Nadador Araya", "Nadador Soto", "Nadador Zamora"]);
+    expect(groups[0]!.swimmers.map((s) => s.edad)).toEqual([46, 26, 16]);
   });
 
   it("calcula los totales del club: nadadores, pruebas individuales inscritas y equipos de relevo", () => {

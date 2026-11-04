@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { validateRun } from "../../shared/run.util";
-import { usernameField } from "../../shared/username.schema";
+import { usernameOpcionalField } from "../../shared/username.schema";
 
 const runField = z.string().superRefine((val, ctx) => {
   const result = validateRun(val);
@@ -19,7 +19,9 @@ const roleTypeEnum = z.enum(["swimmer", "delegate", "coach", "legal_representati
 
 export const personCreateSchema = z.object({
   run: runField,
-  username: usernameField,
+  // Opcional: registrar a una persona no exige darle nombre de acceso, ni se
+  // le genera uno. Ausente, `null`, vacío o espacios = sin nombre (`null`).
+  username: usernameOpcionalField.optional(),
   firstName: z.string().trim().min(2, "El nombre es obligatorio"),
   paternalLastName: z.string().trim().min(2, "El apellido paterno es obligatorio"),
   maternalLastName: z.string().trim().optional(),
@@ -58,9 +60,15 @@ export const personUpdateSchema = z.object({
   roles: z
     .undefined({ errorMap: () => ({ message: "Los roles no se asignan desde la ficha de la persona: son derivados. El de nadador se obtiene al incorporarla al plantel de un club, y los de delegado, entrenador y representante legal al nombrarla en la ficha del club. Quite el campo `roles` de la petición." }) })
     .optional(),
-  // RUN y nombre de usuario deliberadamente no editables tras la creación
-  // — el nombre de usuario ya pudo haberse usado para crear credenciales
-  // de acceso (User.username), y desincronizarlos rompería el login.
+  /**
+   * Nombre de usuario: editable SOLO mientras la persona no tenga una cuenta
+   * vigente (activa, bloqueada o inhabilitada). Con cuenta ya es el nombre con
+   * el que entra, y cambiarlo rompería el inicio de sesión; lo rechaza el
+   * servicio y, por debajo, `titular_forbid_rename_con_cuenta`.
+   * Omitido = no tocar; `null`, vacío o espacios = quitarlo.
+   */
+  username: usernameOpcionalField.optional(),
+  // El RUN sigue sin ser editable tras la creación.
 });
 export type PersonUpdateInput = z.infer<typeof personUpdateSchema>;
 
@@ -91,5 +99,14 @@ export const adminAccessSchema = z.object({
 });
 export type AdminAccessInput = z.infer<typeof adminAccessSchema>;
 
-export const createCredentialsSchema = z.object({}).optional();
+/**
+ * Cuerpo de «Crear credenciales» (personas y clubes). Todo opcional.
+ *
+ * `username`: si viene, se asigna al titular EN LA MISMA TRANSACCIÓN que crea
+ * la cuenta; si no viene —o viene `null`, vacío o de espacios—, se usa el que
+ * el titular ya tenga guardado. Sin ninguno de los dos, la operación responde
+ * 400 y no escribe nada. Los clientes anteriores, que no envían cuerpo, siguen
+ * funcionando igual.
+ */
+export const createCredentialsSchema = z.object({ username: usernameOpcionalField.optional() }).optional();
 export type CreateCredentialsInput = z.infer<typeof createCredentialsSchema>;

@@ -9,7 +9,7 @@
  * es del backend.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { RelayWorkspacePage } from "./RelayWorkspacePage";
 
@@ -577,5 +577,271 @@ describe("no se opera sobre una fotografía parcial", () => {
 
     fireEvent.click(seleccionarPrueba());
     expect(await screen.findByRole("button", { name: /Confirmar equipo/ })).toBeInTheDocument();
+  });
+});
+
+/**
+ * NADADORES DISPONIBLES (columna izquierda). Quien ocupa un puesto del equipo en
+ * edición sale de la lista y vuelve en cuanto el puesto se libera; la lista se
+ * calcula solo sobre los puestos del armador abierto, nunca sobre los equipos
+ * confirmados. Las consultas de la columna se limitan a su región: un nadador
+ * colocado SÍ sigue en pantalla, pero en su puesto.
+ */
+describe("los nadadores colocados salen de la columna izquierda", () => {
+  const region = () => screen.getByRole("region", { name: "Nadadores disponibles" });
+  const columna = () => within(region());
+  const enColumna = (n: number) => columna().queryByText(new RegExp(`Nadador ${n}$`));
+
+  function soltar(personId: string, destino: HTMLElement) {
+    fireEvent.drop(destino, {
+      dataTransfer: { getData: (tipo: string) => (tipo === "application/x-roster-swimmer" ? personId : "") },
+    });
+  }
+  const cupoLibre = () => screen.getAllByText("Arrastre aquí")[0]!.parentElement!;
+  /** El puesto que contiene a ese nadador, buscado fuera de la columna. */
+  const puestoDe = (n: number) => {
+    const fila = screen.getAllByText(new RegExp(`Nadador ${n}$`)).find((el) => !region().contains(el))!;
+    return fila.closest("[draggable]") as HTMLElement;
+  };
+  const botonConfirmar = () => screen.getByRole("button", { name: /Confirmar equipo/ });
+
+  const EQUIPO_CONFIRMADO = {
+    id: "t-1",
+    club: { id: "club-1", name: "Club Uno" },
+    category: { id: "cat", name: "Libre" },
+    seedTimeCentiseconds: 12000,
+    members: [1, 2, 3, 4].map((n, i) => ({ orderPosition: i + 1, person: { id: `p${n}`, fullName: `Nadador ${n}` } })),
+    competitionEvent: PRUEBA_DE_RELEVO,
+  };
+
+  async function abrir({ plantel = 6, equipos = [] as unknown[] } = {}) {
+    listEnabledEvents.mockResolvedValue([PRUEBA_DE_RELEVO]);
+    listClubSwimmers.mockResolvedValue(Array.from({ length: plantel }, (_, i) => nadador(i + 1)));
+    relayList.mockResolvedValue({ items: equipos, total: equipos.length, page: 1, pageSize: 50 });
+    sesion = { ownerType: "club", clubId: "club-1", personId: null, roles: ["club"] };
+    montar();
+    await screen.findByText("Club Uno");
+    elegir(/Competencia/, "comp-A");
+    await waitFor(() => expect(enColumna(1)).toBeInTheDocument());
+    fireEvent.click(seleccionarPrueba());
+    await screen.findByRole("button", { name: /Confirmar equipo/ });
+  }
+
+  it("soltar lo saca de la columna y lo deja en su puesto", async () => {
+    await abrir();
+    soltar("p1", cupoLibre());
+
+    await waitFor(() => expect(enColumna(1)).not.toBeInTheDocument());
+    expect(puestoDe(1), "sigue visible, en el puesto").toBeInTheDocument();
+    expect(enColumna(2), "los demás siguen disponibles").toBeInTheDocument();
+  });
+
+  it("retirarlo con × lo devuelve a la columna", async () => {
+    await abrir();
+    soltar("p1", cupoLibre());
+    await waitFor(() => expect(enColumna(1)).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "×" }));
+
+    await waitFor(() => expect(enColumna(1)).toBeInTheDocument());
+    expect(screen.getAllByText("Arrastre aquí")).toHaveLength(4);
+  });
+
+  it("reemplazar a un integrante devuelve al anterior y oculta al nuevo", async () => {
+    await abrir();
+    soltar("p1", cupoLibre());
+    await waitFor(() => expect(enColumna(1)).not.toBeInTheDocument());
+
+    soltar("p2", puestoDe(1));
+
+    await waitFor(() => expect(enColumna(1)).toBeInTheDocument());
+    expect(enColumna(2)).not.toBeInTheDocument();
+    expect(puestoDe(2)).toBeInTheDocument();
+  });
+
+  it("colocar a quien ya está en otro puesto lo mueve sin duplicarlo ni devolverlo", async () => {
+    await abrir();
+    soltar("p1", cupoLibre());
+    await waitFor(() => expect(enColumna(1)).not.toBeInTheDocument());
+
+    soltar("p1", cupoLibre());
+
+    await waitFor(() => expect(screen.getAllByText("Arrastre aquí")).toHaveLength(3));
+    expect(enColumna(1)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Nadador 1$/)).toHaveLength(1);
+  });
+
+  it("intercambiar dos puestos ocupados mantiene a ambos fuera de la columna", async () => {
+    await abrir();
+    soltar("p1", cupoLibre());
+    await waitFor(() => expect(enColumna(1)).not.toBeInTheDocument());
+    soltar("p2", cupoLibre());
+    await waitFor(() => expect(enColumna(2)).not.toBeInTheDocument());
+    const antes = screen.getAllByText(/Nadador [12]$/).map((el) => el.textContent);
+
+    fireEvent.drop(puestoDe(2), {
+      dataTransfer: { getData: (tipo: string) => (tipo === "application/x-slot-index" ? "0" : "") },
+    });
+
+    await waitFor(() => expect(screen.getAllByText(/Nadador [12]$/).map((el) => el.textContent)).not.toEqual(antes));
+    expect(enColumna(1)).not.toBeInTheDocument();
+    expect(enColumna(2)).not.toBeInTheDocument();
+    expect(screen.getAllByText("Arrastre aquí")).toHaveLength(2);
+  });
+
+  it("Escape reinicia el armador y todos vuelven a la columna", async () => {
+    await abrir();
+    soltar("p1", cupoLibre());
+    await waitFor(() => expect(enColumna(1)).not.toBeInTheDocument());
+    soltar("p2", cupoLibre());
+    await waitFor(() => expect(enColumna(2)).not.toBeInTheDocument());
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() => expect(enColumna(1)).toBeInTheDocument());
+    expect(enColumna(2)).toBeInTheDocument();
+  });
+
+  it("volver a pulsar la prueba activa reinicia el armador y los devuelve", async () => {
+    await abrir();
+    soltar("p1", cupoLibre());
+    await waitFor(() => expect(enColumna(1)).not.toBeInTheDocument());
+
+    fireEvent.click(seleccionarPrueba());
+
+    await waitFor(() => expect(enColumna(1)).toBeInTheDocument());
+  });
+
+  it("al editar un equipo sus integrantes salen de la columna, y «Nuevo» los devuelve", async () => {
+    await abrir({ plantel: 6, equipos: [EQUIPO_CONFIRMADO] });
+    // Antes de editar: pertenecer a un equipo confirmado NO excluye a nadie.
+    for (const n of [1, 2, 3, 4, 5, 6]) expect(enColumna(n), `Nadador ${n} disponible`).toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole("button", { name: /Editar/ }));
+
+    await waitFor(() => expect(enColumna(1)).not.toBeInTheDocument());
+    for (const n of [1, 2, 3, 4]) expect(enColumna(n), `Nadador ${n} en su puesto`).not.toBeInTheDocument();
+    expect(enColumna(5)).toBeInTheDocument();
+    expect(enColumna(6)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Nuevo" }));
+
+    await waitFor(() => expect(enColumna(1)).toBeInTheDocument());
+    for (const n of [1, 2, 3, 4]) expect(enColumna(n)).toBeInTheDocument();
+  });
+
+  it("integrar un equipo confirmado no excluye por sí solo al nadador", async () => {
+    await abrir({ plantel: 6, equipos: [EQUIPO_CONFIRMADO] });
+    for (const n of [1, 2, 3, 4]) expect(enColumna(n), `Nadador ${n} del equipo confirmado`).toBeInTheDocument();
+
+    soltar("p1", cupoLibre());
+
+    await waitFor(() => expect(enColumna(1)).not.toBeInTheDocument());
+    expect(puestoDe(1), "p1 integra un equipo confirmado y aun así se puede colocar").toBeInTheDocument();
+    expect(enColumna(2), "y sus compañeros de equipo siguen disponibles").toBeInTheDocument();
+  });
+
+  it("un guardado FALLIDO conserva los puestos y a sus integrantes fuera de la columna", async () => {
+    create.mockRejectedValueOnce(new Error("El nadador 3 ya integra un relevo en esta jornada"));
+    await abrir();
+    for (const p of ["p1", "p2", "p3", "p4"]) {
+      soltar(p, cupoLibre());
+      await waitFor(() => expect(enColumna(Number(p.slice(1)))).not.toBeInTheDocument());
+    }
+    await waitFor(() => expect(botonConfirmar()).toBeEnabled());
+
+    fireEvent.click(botonConfirmar());
+
+    await waitFor(() => expect(toasts.some((t) => t.tipo === "error")).toBe(true));
+    for (const n of [1, 2, 3, 4]) {
+      expect(enColumna(n), `Nadador ${n} sigue fuera de la columna`).not.toBeInTheDocument();
+      expect(puestoDe(n), "y en su puesto").toBeInTheDocument();
+    }
+    expect(screen.queryAllByText("Arrastre aquí")).toHaveLength(0);
+    expect(botonConfirmar(), "se puede reintentar").toBeEnabled();
+    expect(enColumna(5), "quien no estaba colocado sigue disponible").toBeInTheDocument();
+  });
+
+  it("un guardado EXITOSO reinicia el armador y los devuelve a la columna", async () => {
+    await abrir();
+    for (const p of ["p1", "p2", "p3", "p4"]) {
+      soltar(p, cupoLibre());
+      await waitFor(() => expect(enColumna(Number(p.slice(1)))).not.toBeInTheDocument());
+    }
+    await waitFor(() => expect(botonConfirmar()).toBeEnabled());
+
+    fireEvent.click(botonConfirmar());
+
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getAllByText("Arrastre aquí")).toHaveLength(4));
+    for (const n of [1, 2, 3, 4]) expect(enColumna(n)).toBeInTheDocument();
+  });
+});
+
+describe("la columna conserva los filtros de género y de búsqueda", () => {
+  const columna = () => within(screen.getByRole("region", { name: "Nadadores disponibles" }));
+  const enColumna = (n: number) => columna().queryByText(new RegExp(`Nadador ${n}$`));
+  const cupoLibre = () => screen.getAllByText("Arrastre aquí")[0]!.parentElement!;
+  const soltar = (personId: string) =>
+    fireEvent.drop(cupoLibre(), {
+      dataTransfer: { getData: (tipo: string) => (tipo === "application/x-roster-swimmer" ? personId : "") },
+    });
+  const buscar = (texto: string) =>
+    fireEvent.change(screen.getByPlaceholderText(/Buscar nadador/), { target: { value: texto } });
+
+  async function abrir(genero: string) {
+    listEnabledEvents.mockResolvedValue([{ ...PRUEBA_DE_RELEVO, event: { ...PRUEBA_DE_RELEVO.event, gender: genero } }]);
+    listClubSwimmers.mockResolvedValue([1, 2, 3, 4].map(nadador));
+    sesion = { ownerType: "club", clubId: "club-1", personId: null, roles: ["club"] };
+    montar();
+    await screen.findByText("Club Uno");
+    elegir(/Competencia/, "comp-A");
+    await waitFor(() => expect(enColumna(1)).toBeInTheDocument());
+    fireEvent.click(screen.getAllByText((_t, el) => el?.tagName === "STRONG" && (el.textContent ?? "").includes("Relevo"))[0]!);
+    await screen.findByRole("button", { name: /Confirmar equipo/ });
+  }
+
+  it("género: en una prueba femenina solo hay mujeres, y las colocadas dejan de estar", async () => {
+    await abrir("female"); // nadador(n): impar = female
+    expect(enColumna(1)).toBeInTheDocument();
+    expect(enColumna(3)).toBeInTheDocument();
+    expect(enColumna(2), "un hombre no cumple el género de la prueba").not.toBeInTheDocument();
+
+    soltar("p1");
+    await waitFor(() => expect(enColumna(1)).not.toBeInTheDocument());
+    expect(enColumna(3)).toBeInTheDocument();
+  });
+
+  it("búsqueda: quien se retira solo vuelve si cumple la búsqueda vigente", async () => {
+    await abrir("mixed");
+    soltar("p1");
+    await waitFor(() => expect(enColumna(1)).not.toBeInTheDocument());
+
+    buscar("Nadador 3");
+    expect(enColumna(3)).toBeInTheDocument();
+    expect(enColumna(2)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "×" }));
+    await waitFor(() => expect(screen.getAllByText("Arrastre aquí")).toHaveLength(4));
+    expect(enColumna(1), "libre, pero no satisface la búsqueda").not.toBeInTheDocument();
+
+    buscar("");
+    expect(enColumna(1)).toBeInTheDocument();
+  });
+
+  it("el mensaje de lista vacía dice la verdadera causa", async () => {
+    await abrir("mixed");
+
+    buscar("zzz");
+    expect(columna().getByText(/Ningún nadador disponible coincide/)).toBeInTheDocument();
+    expect(columna().queryByText(/Todos los nadadores/), "no es que estén todos colocados").not.toBeInTheDocument();
+
+    buscar("");
+    for (const p of ["p1", "p2", "p3", "p4"]) {
+      soltar(p);
+      await waitFor(() => expect(enColumna(Number(p.slice(1)))).not.toBeInTheDocument());
+    }
+    expect(await columna().findByText(/Todos los nadadores del plantel están en el equipo/)).toBeInTheDocument();
+    expect(columna().queryByText(/Ningún nadador disponible coincide/)).not.toBeInTheDocument();
   });
 });

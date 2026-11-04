@@ -218,15 +218,26 @@ describe("importPersonsFromExcel — invocación real", () => {
     expect(personas[0]?.username).toBe("primero");
   });
 
-  it("la columna J en desuso rechaza la fila entera sin escribir nada", async () => {
-    const buffer = await libroDesdePlantilla([[...filaValida(RUN_UNO, "conroles", "Juan"), "swimmer"]]);
+  it("una plantilla ANTIGUA con la columna J «Roles» se rechaza entera: nunca se lee como club", async () => {
+    const libro = new ExcelJS.Workbook();
+    const hoja = libro.addWorksheet(PERSONS_IMPORT_SHEET);
+    hoja.addRow([...PERSONS_IMPORT_HEADERS.slice(0, 9), "Roles"]);
+    hoja.addRow([...filaValida(RUN_UNO, "conroles", "Juan"), "Nadador"]);
+    hoja.addRow(filaValida(RUN_DOS, "sinroles", "Ana"));
+    const buffer = Buffer.from(await libro.xlsx.writeBuffer());
 
-    const resumen = await importPersonsFromExcel(buffer, ACTOR);
+    await expect(importPersonsFromExcel(buffer, ACTOR, { puedeAsignarClub: true })).rejects.toThrow(/plantilla antigua.*NO se interpreta como club/s);
+    expect(await prisma.person.count(), "ninguna fila del archivo se importó").toBe(0);
+  });
 
-    expect(resumen.createdCount).toBe(0);
-    expect(resumen.errorCount).toBe(1);
-    expect(resumen.results[0]?.errors?.join(" ")).toMatch(/Columna J en desuso/);
-    expect(await prisma.person.count()).toBe(0);
+  it("la plantilla ANTERIOR sin J ni K sigue sirviendo para registrar solo personas", async () => {
+    const libro = new ExcelJS.Workbook();
+    const hoja = libro.addWorksheet(PERSONS_IMPORT_SHEET);
+    hoja.addRow(PERSONS_IMPORT_HEADERS.slice(0, 9));
+    hoja.addRow(filaValida(RUN_UNO, "anterior", "Juan"));
+    const resumen = await importPersonsFromExcel(Buffer.from(await libro.xlsx.writeBuffer()), ACTOR);
+    expect(resumen).toMatchObject({ createdCount: 1, withClubCount: 0, errorCount: 0 });
+    expect(await prisma.clubSwimmer.count()).toBe(0);
   });
 
   it("un archivo que no es .xlsx se rechaza con ValidationError y no escribe nada", async () => {

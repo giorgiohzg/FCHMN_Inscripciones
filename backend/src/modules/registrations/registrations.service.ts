@@ -4,13 +4,14 @@ import { ValidationError, NotFoundError, ForbiddenError } from "../../shared/err
 import { assertClubAccess, resolveClubFilter, scopedPersonId, type ActorContext as SharedActorContext } from "../../shared/actorContext";
 import { computeAge, getDefaultAgeCutoffDate } from "../../shared/age.util";
 import { computeEffectiveStatus, isRegistrationOpen, evaluateRegistrationWindow } from "../competitions/competitions.rules";
-import { evaluateCapacity } from "../competitions/competition-capacity.rules";
+import { evaluateCapacity, evaluateEventClubLimit } from "../competitions/competition-capacity.rules";
 import {
   readCapacityUsage,
   contarNuevos,
   resumirUso,
   cerrarSiSeAlcanzoElCupo,
   registrarExcesoDeCupo,
+  registrarExcesoDeLimitePorClubYPrueba,
 } from "../competitions/competition-capacity.service";
 import { evaluarCancelacionDeIndividual } from "../relay-registrations/relay-membership.rules";
 import { assertTestTypeMatches } from "../../shared/testType.util";
@@ -408,7 +409,7 @@ export async function createRegistration(input: CreateRegistrationInput, actor: 
 
   // Hallazgo 10: qué estados admiten la operación, en vez de "abierta o
   // tengo permiso post-cierre".
-  const window = evaluateRegistrationWindow(effectiveCompetitionStatus, "create", actor.canRegisterPostClose);
+  const window = evaluateRegistrationWindow(effectiveCompetitionStatus, "create", actor.canRegisterPostClose, "individual", competitionEvent.competition.requireIndividualForRelay);
   if (!window.allowed) throw new ValidationError(window.reason!);
   const competitionIsOpen = isRegistrationOpen(effectiveCompetitionStatus);
   const isPostCloseException = window.isPostCloseException;
@@ -519,6 +520,33 @@ export async function createRegistration(input: CreateRegistrationInput, actor: 
 
         if (!capacidad.allowed) throw new ValidationError(capacidad.reason!);
 
+        /**
+         * MÁXIMO DE NADADORES POR CLUB EN ESTA PRUEBA.
+         *
+         * Independiente de los cupos de arriba, que cuentan nadadores distintos en toda
+         * la competencia. Aquí se cuentan las inscripciones CONFIRMADAS del club en ESTA
+         * prueba —sin importar en qué otras esté cada nadador—. Va dentro de la misma
+         * transacción SERIALIZABLE, por el mismo motivo que los demás conteos: dos altas
+         * simultáneas sobre el último cupo no pueden pasar las dos. El máximo se lee AQUÍ,
+         * no de la lectura previa, para que lo evaluado sea lo vigente en la transacción.
+         *
+         * Solo un ADMINISTRADOR puede excederlo (`actor.isAdmin`); `registrations:write`
+         * y el permiso posterior al cierre no bastan.
+         */
+        const limiteDeLaPrueba = await tx.competitionEvent.findUniqueOrThrow({
+          where: { id: input.competitionEventId },
+          select: { maxSwimmersPerClub: true },
+        });
+        const inscritosDelClub =
+          limiteDeLaPrueba.maxSwimmersPerClub === null
+            ? 0
+            : await tx.registration.count({ where: { competitionEventId: input.competitionEventId, clubId: input.clubId, status: "confirmed" } });
+        const limitePorClub = evaluateEventClubLimit(limiteDeLaPrueba.maxSwimmersPerClub, inscritosDelClub, actor.isAdmin, {
+          clubName: club.name,
+          eventLabel: `${competitionEvent.event.distance.meters}m ${competitionEvent.event.stroke.name}`,
+        });
+        if (!limitePorClub.allowed) throw new ValidationError(limitePorClub.reason!);
+
         const creada = await tx.registration.create({
           data: {
             competitionEventId: input.competitionEventId,
@@ -546,6 +574,24 @@ export async function createRegistration(input: CreateRegistrationInput, actor: 
           },
           { tx }
         );
+
+        // La excepción del máximo por club y prueba: auditoría en la MISMA transacción. Si
+        // esta escritura falla, el alta entera se revierte.
+        if (limitePorClub.exceededByOverride) {
+          await registrarExcesoDeLimitePorClubYPrueba(
+            tx,
+            {
+              registrationId: creada.id,
+              competitionId: competitionEvent.competitionId,
+              competitionEventId: input.competitionEventId,
+              clubId: input.clubId,
+              clubName: club.name,
+              limit: limitePorClub.limit!,
+              resultingCount: limitePorClub.resultingCount,
+            },
+            actor
+          );
+        }
 
         if (excedeElCupo) {
           await registrarExcesoDeCupo(
@@ -667,7 +713,7 @@ export async function updateRegistration(id: string, input: { seedTimeCentisecon
     before.competitionEvent.competition.registrationEndAt,
     new Date()
   );
-  const window = evaluateRegistrationWindow(effectiveStatus, "update", actor.canRegisterPostClose);
+  const window = evaluateRegistrationWindow(effectiveStatus, "update", actor.canRegisterPostClose, "individual", before.competitionEvent.competition.requireIndividualForRelay);
   if (!window.allowed) throw new ValidationError(window.reason!);
 
   // Hallazgo 10: la edición posterior al cierre no marcaba la inscripción
@@ -725,15 +771,15 @@ export async function cancelRegistration(id: string, actor: ActorContext) {
     registration.competitionEvent.competition.registrationEndAt,
     new Date()
   );
-  const window = evaluateRegistrationWindow(effectiveStatus, "cancel", actor.canRegisterPostClose);
+  const window = evaluateRegistrationWindow(effectiveStatus, "cancel", actor.canRegisterPostClose, "individual", registration.competitionEvent.competition.requireIndividualForRelay);
   if (!window.allowed) throw new ValidationError(window.reason!);
   const isPostCloseException = window.isPostCloseException;
 
   const competitionId = registration.competitionEvent.competitionId;
 
   /**
-   * LA INVARIANTE DE RELEVOS SE COMPRUEBA Y SE ESCRIBE EN LA MISMA OPERACIÓN
-   * PROTEGIDA.
+   * LA INVARIANTE DE RELEVOS (cuando la competencia la exige) SE COMPRUEBA Y SE ESCRIBE
+   * EN LA MISMA OPERACIÓN PROTEGIDA.
    *
    * Es una regla agregada —depende de cuántas inscripciones vivas quedan y de
    * qué relevos existen—, así que comprobar fuera y escribir después deja una
@@ -777,12 +823,20 @@ export async function cancelRegistration(id: string, actor: ActorContext) {
           },
         });
 
+        // La condición se lee de la MISMA competencia, dentro de esta transacción, y no de la
+        // lectura previa: lo que decide es lo vigente aquí, igual que en el alta del relevo.
+        const { requireIndividualForRelay } = await tx.competition.findUniqueOrThrow({
+          where: { id: competitionId },
+          select: { requireIndividualForRelay: true },
+        });
+
         const veredicto = evaluarCancelacionDeIndividual(
           otras,
           relevos.map((r) => ({
             relayRegistrationId: r.id,
             descripcion: `${r.competitionEvent.event.distance.meters}m ${r.competitionEvent.event.stroke.name}`,
-          }))
+          })),
+          requireIndividualForRelay
         );
         if (!veredicto.allowed) throw new ValidationError(veredicto.reason!);
 

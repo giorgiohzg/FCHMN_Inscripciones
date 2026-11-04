@@ -1,6 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import * as clubsService from "./clubs.service";
 import { clubCreateSchema, clubUpdateSchema, clubListQuerySchema } from "./clubs.schemas";
+// El mismo contrato que en personas: `{ username? }`, todo opcional.
+import { createCredentialsSchema } from "../persons/persons.schemas";
 import { requireAuth, requirePermission } from "../auth/rbac.middleware";
 import { ValidationError, ForbiddenError } from "../../shared/errors";
 import { buildActorContext } from "../../shared/actorContext";
@@ -69,7 +71,14 @@ export async function clubsRoutes(app: FastifyInstance) {
 
   app.post("/clubs/:id/credentials", { preHandler: [requirePermission("clubs:write")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const result = await clubsService.createClubCredentials(id, { userId: req.authUser!.sub, ipAddress: req.ip });
+    // Cuerpo opcional: `{ username? }`. Sin cuerpo, se usa el nombre guardado.
+    const cuerpo = createCredentialsSchema.safeParse(req.body ?? undefined);
+    if (!cuerpo.success) throw new ValidationError("Datos inválidos", cuerpo.error.flatten());
+    const result = await clubsService.createClubCredentials(
+      id,
+      { userId: req.authUser!.sub, ipAddress: req.ip },
+      { username: cuerpo.data?.username ?? null }
+    );
     reply.code(201).send(result);
   });
 

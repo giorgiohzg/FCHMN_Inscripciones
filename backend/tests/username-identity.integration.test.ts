@@ -89,7 +89,7 @@ describe("coherencia entre el tipo de dueño y sus columnas", () => {
           // El nombre coincide con el de su titular a propósito: así lo que
           // rechaza la inserción es la restricción de coherencia del dueño y
           // no el disparador que exige esa igualdad (probado aparte).
-          username: persona.username,
+          username: persona.username!,
           passwordHash: "x",
           ownerType: "person",
           personId: persona.id,
@@ -109,7 +109,7 @@ describe("coherencia entre el tipo de dueño y sus columnas", () => {
     const persona = await personsService.createPerson({ ...PERSONA_BASE, run: "11111111-1", username: "ana.perez" }, ADMIN);
 
     await expect(
-      prisma.user.create({ data: { username: persona.username, passwordHash: "x", ownerType: "system", personId: persona.id } })
+      prisma.user.create({ data: { username: persona.username!, passwordHash: "x", ownerType: "system", personId: persona.id } })
     ).rejects.toThrow(/users_owner_coherente/i);
   });
 });
@@ -137,7 +137,7 @@ describe("unicidad global del nombre de usuario", () => {
     await personsService.createPerson({ ...PERSONA_BASE, run: "11111111-1", username: "delfines" }, ADMIN);
 
     const error = await prisma.club
-      .create({ data: { name: "Club Colado", username: "delfines", code: "CCO", email: "cco@test.local", status: "active" } })
+      .create({ data: { name: "Club Colado", username: "delfines", code: "CCO", email: "cco@test.local", hasLegalStatus: false, status: "active" } })
       .then(() => null)
       .catch((e) => e as { code?: string });
 

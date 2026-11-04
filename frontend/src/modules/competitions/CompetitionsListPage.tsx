@@ -47,7 +47,7 @@ export function CompetitionsListPage() {
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: "", description: "", registrationStartAt: "", registrationEndAt: "", ageCutoffDate: "", maxIndividualEventsPerSwimmer: "", maxRelayEventsPerSwimmerPerSession: "1", maxSwimmers: "", maxSwimmersPerClub: "", poolId: "" });
+  const [form, setForm] = useState({ name: "", description: "", registrationStartAt: "", registrationEndAt: "", ageCutoffDate: "", maxIndividualEventsPerSwimmer: "", maxRelayEventsPerSwimmerPerSession: "1", maxSwimmers: "", maxSwimmersPerClub: "", poolId: "", ocultar: false, exigirIndividual: true });
 
   useEffect(() => {
     poolsApi.list().then(setPools);
@@ -96,10 +96,13 @@ export function CompetitionsListPage() {
         // quede explícitamente sin límite.
         maxSwimmers: form.maxSwimmers !== "" ? Number(form.maxSwimmers) : null,
         maxSwimmersPerClub: form.maxSwimmersPerClub !== "" ? Number(form.maxSwimmersPerClub) : null,
+        // La casilla dice «Ocultar…» (desmarcada por omisión); lo guardado es el sentido positivo.
+        visibleInRegistrationPanels: !form.ocultar,
+        requireIndividualForRelay: form.exigirIndividual,
         poolId: form.poolId || undefined,
       });
       setShowCreate(false);
-      setForm({ name: "", description: "", registrationStartAt: "", registrationEndAt: "", ageCutoffDate: "", maxIndividualEventsPerSwimmer: "", maxRelayEventsPerSwimmerPerSession: "1", maxSwimmers: "", maxSwimmersPerClub: "", poolId: "" });
+      setForm({ name: "", description: "", registrationStartAt: "", registrationEndAt: "", ageCutoffDate: "", maxIndividualEventsPerSwimmer: "", maxRelayEventsPerSwimmerPerSession: "1", maxSwimmers: "", maxSwimmersPerClub: "", poolId: "", ocultar: false, exigirIndividual: true });
       navigate(`/competencias/${c.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear la competencia");
@@ -192,6 +195,33 @@ export function CompetitionsListPage() {
             <option value="">Sin especificar</option>
             {pools.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
+          <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 400 }}>
+            <input
+              type="checkbox"
+              style={{ width: "auto" }}
+              checked={form.ocultar}
+              onChange={(e) => setForm({ ...form, ocultar: e.target.checked })}
+            />
+            Ocultar esta competencia del panel de inscripción y del panel de relevos
+          </label>
+          <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "0.2rem" }}>
+            Solo quita la competencia de los selectores de esos dos paneles. <strong>No es una medida de protección</strong>: no cambia permisos, reglas de
+            inscripción ni el acceso directo, y la competencia sigue apareciendo en Competencias, en Reportes y en los asistentes de inscripción.
+          </p>
+          <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 400 }}>
+            <input
+              type="checkbox"
+              style={{ width: "auto" }}
+              checked={form.exigirIndividual}
+              onChange={(e) => setForm({ ...form, exigirIndividual: e.target.checked })}
+            />
+            Exigir al menos una inscripción individual confirmada antes de participar en relevos
+          </label>
+          <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "0.2rem" }}>
+            Marcada (valor por defecto): formar o modificar un equipo exige que todos sus integrantes tengan una inscripción individual confirmada en esta
+            competencia, y <strong>no se podrá cancelar la última inscripción individual</strong> de quien integre un relevo confirmado. Desmarcada: ninguna
+            de las dos cosas se exige. Cambiarla <strong>no modifica ni cancela</strong> equipos ya formados.
+          </p>
           <button className="btn-primary" style={{ marginTop: "0.75rem" }} onClick={handleCreate}>Crear (borrador)</button>
         </div>
       )}
@@ -217,6 +247,8 @@ export function CompetitionsListPage() {
             <SortableTh label="Período de inscripción" sortKey="registrationStartAt" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
             <SortableTh label="Estado" sortKey="status" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
             <th></th>
+            {/* Título exacto pedido; el `title` aclara QUÉ se muestra (ver README, Módulo 6). */}
+            <th title="Aparece en el selector del Panel de Inscripción y del Panel de Relevos">Mostrar en competencia</th>
           </tr></thead>
           <tbody>
             {sortItems(data.items, sortKey, sortDir, (c, key) => {
@@ -235,10 +267,15 @@ export function CompetitionsListPage() {
                 <td>
                   <button className="btn-danger" onClick={() => handleDelete(c)}>Eliminar</button>
                 </td>
+                <td>
+                  <span className={`badge ${c.visibleInRegistrationPanels ? "badge-active" : "badge-disabled"}`}>
+                    {c.visibleInRegistrationPanels ? "Sí" : "No"}
+                  </span>
+                </td>
               </tr>
             ))}
             {data.items.length === 0 && (
-              <tr><td colSpan={4} style={{ textAlign: "center", color: "var(--brand-gray-600)", padding: "1.5rem" }}>No hay competencias con este filtro.</td></tr>
+              <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--brand-gray-600)", padding: "1.5rem" }}>No hay competencias con este filtro.</td></tr>
             )}
           </tbody>
         </table>

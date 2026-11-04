@@ -321,6 +321,33 @@ async function poblarBaseAnterior(client: Client) {
    * 'cuenta_incoherente' de más arriba ya pertenece a Ana ('ana') con otro
    * nombre, y es exactamente ese caso.
    */
+  /**
+   * [club-email-vacio] — un club con el correo de solo espacios. En el esquema
+   * anterior nada lo impedía; la migración `club_email_opcional` agrega la
+   * restricción y se detendría. Lleva su propio nombre
+   * de usuario para no chocar con las demás comprobaciones.
+   */
+  await client.query(`
+    INSERT INTO clubs (id, name, username, code, email, status, has_legal_status, updated_at) VALUES
+      ('55555555-5555-5555-5555-555555555555', 'Club Sin Correo', 'club_sin_correo', 'CSC', '   ', 'active', false, now());
+  `);
+
+  // [club-sigla-duplicada] misma sigla que «Club Norte» una vez normalizada, y además inactivo.
+  await client.query(`
+    INSERT INTO clubs (id, name, username, code, email, status, has_legal_status, updated_at) VALUES
+      ('55555555-5555-5555-5555-555555555556', 'Club Norte Bis', 'club_norte_bis', ' cn ', 'bis@test.cl', 'disabled', false, now());
+  `);
+
+  /**
+   * [username-vacio] — una persona con el nombre de usuario de solo espacios.
+   * Con `NOT NULL`, una cadena vacía era la única forma de «no tener nombre»;
+   * la migración `username_opcional` la prohíbe y se detendría.
+   */
+  await client.query(`
+    INSERT INTO persons (id, run, username, full_name, birth_date, gender, status, updated_at) VALUES
+      ('66666666-6666-6666-6666-66666666666d', '77777777', '   ', 'Persona Sin Nombre', '1980-02-02', 'female', 'active', now());
+  `);
+
   await client.query(`
     INSERT INTO club_staff (id, club_id, person_id, role_type) VALUES
       ('c5a44001-0000-0000-0000-000000000001', '55555555-5555-5555-5555-555555555551',
@@ -347,6 +374,7 @@ async function corregirConflictos(client: Client) {
     -- Ya no hace falta: el índice de compatibilidad es ordinario.
     UPDATE persons SET deleted_at = now() WHERE id IN ('66666666-6666-6666-6666-666666666664', '66666666-6666-6666-6666-666666666665');
     UPDATE clubs SET deleted_at = now() WHERE id = '55555555-5555-5555-5555-555555555553';
+    UPDATE clubs SET code = 'CNB' WHERE id = '55555555-5555-5555-5555-555555555556';
     UPDATE categories SET deleted_at = now() WHERE id = '77777777-7777-7777-7777-777777777773';
     UPDATE category_groups SET deleted_at = now() WHERE id = 'aaaaaaa2-0000-0000-0000-000000000002';
     UPDATE events SET deleted_at = now() WHERE id = '88888888-8888-8888-8888-888888888883';
@@ -363,6 +391,12 @@ async function corregirConflictos(client: Client) {
     -- [cuenta-username-distinto-al-titular] la cuenta pasa a llamarse como su
     -- titular. Corrige de paso el mismo caso que veía 'cuenta-dueno-incoherente'.
     UPDATE users SET username = 'ana' WHERE id = 'c0ffee01-0000-0000-0000-000000000001';
+
+    -- [username-vacio] la persona recibe un nombre real; el sistema no lo inventa.
+    UPDATE persons SET username = 'persona.sin.nombre' WHERE id = '66666666-6666-6666-6666-66666666666d';
+
+    -- [club-email-vacio] el club recibe su correo real; el sistema no lo inventa.
+    UPDATE clubs SET email = 'sin.correo@test.cl' WHERE id = '55555555-5555-5555-5555-555555555555';
 
     -- [representantes-legales-multiples] queda uno solo.
     DELETE FROM club_staff WHERE id = 'c5a44001-0000-0000-0000-000000000002';
@@ -445,7 +479,25 @@ describe("actualización desde la versión anterior con datos", () => {
     const aplicables = CHECKS.filter((c) => !c.requires);
     const noAplicables = CHECKS.filter((c) => c.requires);
 
-    const noDetectadas = aplicables.filter((check) => !output.includes(`BLOQUEA ${check.title}`)).map((c) => c.id);
+    /**
+     * Comprobaciones que SÍ se ejecutan en esta base pero a las que no se les
+     * puede sembrar un conflicto: miran un estado que la versión previa NO
+     * puede tener. `club-pendiente-con-representante-legal` mira clubes con
+     * `has_legal_status` NULL, y en esta base la columna todavía es NOT NULL.
+     * Su conflicto se siembra en `migracion-personalidad-juridica.integration.test.ts`.
+     * Aquí se exige, en cambio, que corran y den OK: una consulta que no se
+     * ejecutara (por error de sintaxis, por ejemplo) saldría como «SIN VERIFICAR».
+     */
+    const SIN_CONFLICTO_POSIBLE = new Set(["club-pendiente-con-representante-legal"]);
+    for (const id of SIN_CONFLICTO_POSIBLE) {
+      const check = CHECKS.find((c) => c.id === id)!;
+      expect(output, `${id} debe ejecutarse y dar OK en la base de la versión previa`).toContain(`OK ${check.title}`);
+    }
+
+    const noDetectadas = aplicables
+      .filter((check) => !SIN_CONFLICTO_POSIBLE.has(check.id))
+      .filter((check) => !output.includes(`BLOQUEA ${check.title}`))
+      .map((c) => c.id);
     expect(noDetectadas, "toda comprobación aplicable debe tener su caso de conflicto en los datos y ser detectada").toEqual([]);
 
     for (const check of noAplicables) {
@@ -453,10 +505,10 @@ describe("actualización desde la versión anterior con datos", () => {
       expect(output, `${check.id} no puede contarse como verificada`).not.toContain(`OK ${check.title}`);
     }
 
-    expect(CHECKS.length, "si se agregan comprobaciones, hay que sembrar su conflicto arriba").toBe(17);
+    expect(CHECKS.length, "si se agregan comprobaciones, hay que sembrar su conflicto arriba").toBe(21);
 
     // Cada bloqueo nombra la restricción y dice qué hacer, no solo que falla.
-    for (const check of aplicables) {
+    for (const check of aplicables.filter((c) => !SIN_CONFLICTO_POSIBLE.has(c.id))) {
       expect(output, `falta la restricción de ${check.id}`).toContain(check.constraint);
     }
     expect(output).toMatch(/Cómo resolverlo/);
@@ -506,9 +558,10 @@ describe("actualización desde la versión anterior con datos", () => {
       c.query("SELECT (SELECT count(*)::int FROM registrations) AS inscripciones, (SELECT count(*)::int FROM persons) AS personas")
     );
     expect(rows[0].inscripciones).toBe(2); // una confirmada + una cancelada
-    // Las 5 personas siguen ahí: 3 vigentes y 2 eliminadas LÓGICAMENTE
-    // durante la corrección. Migrar no exigió borrar historial.
-    expect(rows[0].personas).toBe(5);
+    // Las 6 personas siguen ahí: 4 vigentes (la de `username-vacio`, ya con
+    // nombre, incluida) y 2 eliminadas LÓGICAMENTE durante la corrección.
+    // Migrar no exigió borrar historial.
+    expect(rows[0].personas).toBe(6);
   }, 240_000);
 
   /**

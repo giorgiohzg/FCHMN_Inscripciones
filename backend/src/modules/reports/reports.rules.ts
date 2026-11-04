@@ -163,8 +163,15 @@ export interface SwimmerEventEntry {
   clubName: string;
   birthDate: Date;
   gender: "male" | "female";
+  /**
+   * Componentes del nombre, SOLO para ordenar (no se muestran ni se modifican).
+   * Las personas históricas pueden no tenerlos: ver `compararNadadores`.
+   */
+  paternalLastName?: string | null;
+  maternalLastName?: string | null;
+  firstName?: string | null;
   categoryName: string;
-  eventNumber: number | null; // número de la prueba en el programa de la competencia (displayOrder)
+  eventNumber: number | null; // número de la prueba en el programa de la competencia (`displayOrder`)
   eventLabel: string; // ej. "50m Libre"
   timeLabel: string | null; // ej. "1:25,67" o null si no se ingresó tiempo
   kind: "individual" | "relay";
@@ -193,10 +200,176 @@ export interface ClubGroup {
   swimmers: ClubGroupSwimmerRow[];
 }
 
-/** { number: 3, text: "50m Libre 1:25,67" } — el número se muestra aparte (círculo), nunca entre paréntesis. */
+// --------------------------------------------------------------------------
+// ORDEN del reporte. Todos los criterios viven aquí, como funciones puras, y los
+// usan tanto la vista agrupada como las filas planas de CSV / XLSX / PDF: así los
+// formatos no pueden divergir.
+// --------------------------------------------------------------------------
+
+/**
+ * Colación para comparar texto: español, sin distinguir mayúsculas ni tildes
+ * («Perez» y «Pérez» empatan en este nivel y se desempatan con las claves
+ * siguientes). La eñe sí es una letra distinta, como en el alfabeto español.
+ */
+const COLACION = new Intl.Collator("es", { sensitivity: "base" });
+
+const limpio = (v: string | null | undefined): string => (v ?? "").trim();
+
+/** Compara dos textos que pueden faltar: los que faltan van DESPUÉS de los presentes. */
+function compararOpcionales(a: string | null | undefined, b: string | null | undefined): number {
+  const x = limpio(a);
+  const y = limpio(b);
+  if (x === "" && y === "") return 0;
+  if (x === "") return 1;
+  if (y === "") return -1;
+  return COLACION.compare(x, y);
+}
+
+/** Orden alfabético de clubes (el de siempre, con `localeCompare` en español). */
+export function compararClubes(a: string, b: string): number {
+  return a.localeCompare(b, "es");
+}
+
+/** Lo mínimo de una persona para ordenarla. */
+export interface PersonaOrdenable {
+  paternalLastName?: string | null;
+  maternalLastName?: string | null;
+  firstName?: string | null;
+  /** Nombre completo ALMACENADO, tal cual: nunca se reescribe ni se parte para inventar apellidos. */
+  fullName: string;
+  run: string;
+  personId: string;
+}
+
+/**
+ * Orden de los nadadores dentro de un club: por APELLIDO PATERNO.
+ *
+ * Claves, en este orden (cada una desempata la anterior):
+ *   1. apellido paterno;
+ *   2. apellido materno;
+ *   3. nombre de pila;
+ *   4. nombre completo almacenado;
+ *   5. RUN;
+ *   6. identificador de la persona (único y estable).
+ * Con eso el resultado es el mismo sea cual sea el orden de entrada, y no hay
+ * dos personas distintas que empaten.
+ *
+ * PERSONAS HISTÓRICAS sin apellido paterno (creadas antes de que el nombre se
+ * separara en tres campos: sus `paternalLastName` son `null`): NO se les
+ * inventa un apellido —partir «María del Carmen Pérez Soto» por palabras
+ * acertaría solo a veces—. Van DESPUÉS de todas las que sí lo tienen, ordenadas
+ * por su nombre completo almacenado y luego por las claves 5 y 6. Un apellido
+ * materno o un nombre de pila sueltos, sin paterno, tampoco se usan como clave:
+ * el paterno es la primera y, si falta, la persona entra en ese grupo.
+ */
+export function compararNadadores(a: PersonaOrdenable, b: PersonaOrdenable): number {
+  const aTienePaterno = limpio(a.paternalLastName) !== "";
+  const bTienePaterno = limpio(b.paternalLastName) !== "";
+  if (aTienePaterno !== bTienePaterno) return aTienePaterno ? -1 : 1;
+
+  if (aTienePaterno) {
+    const porClaves =
+      compararOpcionales(a.paternalLastName, b.paternalLastName) ||
+      compararOpcionales(a.maternalLastName, b.maternalLastName) ||
+      compararOpcionales(a.firstName, b.firstName);
+    if (porClaves !== 0) return porClaves;
+  }
+
+  return (
+    compararOpcionales(a.fullName, b.fullName) ||
+    (a.run < b.run ? -1 : a.run > b.run ? 1 : 0) ||
+    (a.personId < b.personId ? -1 : a.personId > b.personId ? 1 : 0)
+  );
+}
+
+/**
+ * Orden de los números de programa: NUMÉRICO (2, 3, 10 y no «10, 2, 3») y con los
+ * números AUSENTES (`null`) al FINAL. Es el orden en que se nada una jornada, así
+ * que una prueba sin número asignado todavía no tiene lugar en el programa y no
+ * debe abrir la lista.
+ *
+ * El «número de programa» es `CompetitionEvent.displayOrder`: la única columna que
+ * lo guarda. `eventNumber` es el nombre que le da el importador de Meet Events a
+ * ese mismo dato al leer el ZIP (se guarda como `displayOrder`), y la pantalla lo
+ * edita como tal (`reorderCompetitionEvents`). No hay un segundo número.
+ */
+export function compararNumerosDePrograma(a: number | null | undefined, b: number | null | undefined): number {
+  const x = a ?? null;
+  const y = b ?? null;
+  if (x === null && y === null) return 0;
+  if (x === null) return 1;
+  if (y === null) return -1;
+  return x - y;
+}
+
+/**
+ * Orden de las líneas de pruebas (o de relevos) de UN nadador: número de programa
+ * numérico, ausentes al final; si dos pruebas REPITEN número, por su texto
+ * (descripción y tiempo) y no por el orden en que llegaron.
+ *
+ * Es el ÚNICO criterio de presentación de pruebas: lo usan la vista agrupada
+ * (`groupReportByClubAndSwimmer`) y las filas planas que consumen CSV, XLSX y PDF
+ * (`reports.service.ts`), de modo que dos filas equivalentes de un mismo nadador
+ * salen en el mismo orden relativo en ambas. El identificador de la inscripción
+ * entra solo como ÚLTIMO desempate en las filas planas (ver el servicio), nunca
+ * antes del texto visible.
+ */
+export function compararLineasDePrueba(a: ReportEventLine, b: ReportEventLine): number {
+  return compararNumerosDePrograma(a.number, b.number) || COLACION.compare(a.text, b.text) || (a.text < b.text ? -1 : a.text > b.text ? 1 : 0);
+}
+
+/**
+ * { number: 3, text: "50m Libre 1:25,67" } — el número se muestra aparte (círculo), nunca entre paréntesis.
+ * Construye la línea a partir de los mismos datos para la vista agrupada y para
+ * ordenar las filas planas: así el texto que desempata es el que se ve.
+ */
+export function lineaDePrueba(eventNumber: number | null, eventLabel: string, timeLabel: string | null): ReportEventLine {
+  const text = timeLabel ? `${eventLabel} ${timeLabel}` : eventLabel;
+  return { number: eventNumber, text };
+}
+
+const porTexto = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0);
+
+/** Lo que se necesita para ordenar una fila PLANA de individuales (CSV / XLSX / PDF / JSON). */
+export interface FilaIndividualOrdenable {
+  clubName: string;
+  persona: PersonaOrdenable;
+  /** La misma línea (número y texto) que muestra la vista agrupada para esa inscripción. */
+  linea: ReportEventLine;
+  /** Identificador de la inscripción: SOLO el último desempate. */
+  id: string;
+}
+
+/**
+ * Orden de las filas planas de individuales: club, nadador (apellido paterno…),
+ * `compararLineasDePrueba` —el mismo criterio visible de la vista agrupada— y,
+ * como último desempate, el identificador de la inscripción. Así dos filas
+ * equivalentes de un mismo nadador quedan en el mismo orden relativo que sus
+ * líneas en la vista agrupada, y el id nunca decide antes que el texto.
+ */
+export function compararFilasIndividuales(a: FilaIndividualOrdenable, b: FilaIndividualOrdenable): number {
+  return compararClubes(a.clubName, b.clubName) || compararNadadores(a.persona, b.persona) || compararLineasDePrueba(a.linea, b.linea) || porTexto(a.id, b.id);
+}
+
+/** Lo que se necesita para ordenar una fila plana de relevos (una por EQUIPO). */
+export interface FilaRelevoOrdenable {
+  clubName: string;
+  linea: ReportEventLine;
+  categoryName: string;
+  id: string;
+}
+
+/**
+ * Orden de las filas planas de relevos (una por equipo, nunca por integrante):
+ * club, `compararLineasDePrueba` (el mismo criterio visible que la lista de
+ * relevos de cada nadador en la vista agrupada), categoría e identificador.
+ */
+export function compararFilasDeRelevo(a: FilaRelevoOrdenable, b: FilaRelevoOrdenable): number {
+  return compararClubes(a.clubName, b.clubName) || compararLineasDePrueba(a.linea, b.linea) || a.categoryName.localeCompare(b.categoryName, "es") || porTexto(a.id, b.id);
+}
+
 function formatEventLine(entry: SwimmerEventEntry): ReportEventLine {
-  const text = entry.timeLabel ? `${entry.eventLabel} ${entry.timeLabel}` : entry.eventLabel;
-  return { number: entry.eventNumber, text };
+  return lineaDePrueba(entry.eventNumber, entry.eventLabel, entry.timeLabel);
 }
 
 /**
@@ -217,26 +390,40 @@ export function groupReportByClubAndSwimmer(
   relayTeamCountByClub: Map<string, number> = new Map()
 ): ClubGroup[] {
   interface Accum {
-    run: string;
-    fullName: string;
+    persona: PersonaOrdenable;
+    birthDate: Date;
+    gender: "male" | "female";
+    /** Club y categoría de la PRIMERA inscripción vista del nadador (ver más abajo): no los decide el orden de presentación. */
     clubName: string;
-    edad: number;
     categoria: string;
-    genero: string;
     pruebas: ReportEventLine[];
     relevos: ReportEventLine[];
   }
   const swimmers = new Map<string, Accum>();
 
+  /**
+   * SELECCIÓN de club y categoría, separada del orden de las listas: es la de
+   * siempre, la de la primera entrada que llega de cada nadador. El servicio
+   * entrega primero las individuales y luego los relevos, así que la individual
+   * manda sobre el relevo. NO es «la de la primera prueba del programa»: eso
+   * sería una regla nueva. Las listas `pruebas` y `relevos` se ordenan después,
+   * solo para mostrarlas.
+   */
   for (const e of entries) {
     if (!swimmers.has(e.personId)) {
       swimmers.set(e.personId, {
-        run: e.run,
-        fullName: e.fullName,
+        persona: {
+          paternalLastName: e.paternalLastName,
+          maternalLastName: e.maternalLastName,
+          firstName: e.firstName,
+          fullName: e.fullName,
+          run: e.run,
+          personId: e.personId,
+        },
+        birthDate: e.birthDate,
+        gender: e.gender,
         clubName: e.clubName,
-        edad: computeAge(e.birthDate, ageCutoffDate),
         categoria: e.categoryName,
-        genero: REPORT_GENDER_LABELS[e.gender],
         pruebas: [],
         relevos: [],
       });
@@ -247,16 +434,28 @@ export function groupReportByClubAndSwimmer(
     else s.relevos.push(line);
   }
 
-  const byClub = new Map<string, ClubGroupSwimmerRow[]>();
+  const byClub = new Map<string, { persona: PersonaOrdenable; fila: ClubGroupSwimmerRow }[]>();
   for (const s of swimmers.values()) {
     if (!byClub.has(s.clubName)) byClub.set(s.clubName, []);
-    byClub.get(s.clubName)!.push({ run: s.run, nombreCompleto: s.fullName, edad: s.edad, categoria: s.categoria, genero: s.genero, pruebas: s.pruebas, relevos: s.relevos });
+    byClub.get(s.clubName)!.push({
+      persona: s.persona,
+      fila: {
+        run: s.persona.run,
+        nombreCompleto: s.persona.fullName,
+        edad: computeAge(s.birthDate, ageCutoffDate),
+        categoria: s.categoria,
+        genero: REPORT_GENDER_LABELS[s.gender],
+        pruebas: s.pruebas.slice().sort(compararLineasDePrueba),
+        relevos: s.relevos.slice().sort(compararLineasDePrueba),
+      },
+    });
   }
 
   return Array.from(byClub.entries())
-    .sort(([a], [b]) => a.localeCompare(b, "es"))
+    .sort(([a], [b]) => compararClubes(a, b))
     .map(([clubName, swimmerRows]) => {
-      const sortedSwimmers = swimmerRows.slice().sort((a, b) => a.edad - b.edad || a.nombreCompleto.localeCompare(b.nombreCompleto, "es"));
+      // Por apellido paterno, NO por edad: la edad se muestra pero no ordena.
+      const sortedSwimmers = swimmerRows.slice().sort((x, y) => compararNadadores(x.persona, y.persona)).map((x) => x.fila);
       return {
         clubName,
         totalNadadores: sortedSwimmers.length,

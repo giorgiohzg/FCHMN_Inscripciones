@@ -209,3 +209,6 @@ backend/prisma/migrations/PROPUESTA_*.md
 
 # Salida regenerable de Graphify
 /graphify-out/
+
+# Salida compilada de los seeds (tsc -p tsconfig.seed.json): regenerable, la construye el Dockerfile.
+/backend/dist-seed/

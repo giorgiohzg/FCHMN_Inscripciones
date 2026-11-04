@@ -1,6 +1,13 @@
 /**
- * INVARIANTE: todo integrante de un relevo confirmado tiene al menos una
- * inscripción individual confirmada en la MISMA competencia.
+ * INVARIANTE CONFIGURABLE: cuando la competencia lo exige, todo integrante de un
+ * relevo confirmado tiene al menos una inscripción individual confirmada en la
+ * MISMA competencia.
+ *
+ * LA CONDICIÓN VIVE EN LA COMPETENCIA (`Competition.requireIndividualForRelay`,
+ * `true` por omisión). Con `true` rige todo lo que sigue, igual que siempre; con
+ * `false` no se exige nada de esto, en ninguno de los dos lados. Estas funciones
+ * reciben el interruptor ya resuelto —quien llama lo lee de la MISMA competencia
+ * dentro de su transacción— y devuelven «permitido» sin más cuando está apagado.
  *
  * Por qué es una invariante y no una validación de alta. Tiene dos lados, y
  * comprobar solo uno la deja rota:
@@ -18,15 +25,21 @@
  * la prueba en vez de la competencia sería una regla distinta y mucho más
  * dura —exigiría estar inscrito en esa misma prueba—, que no es lo pedido.
  *
- * TAMBIÉN PARA EL ADMINISTRADOR. La excepción administrativa levanta los
- * cupos y los estados de cierre; esto no. Un relevo cuyos integrantes no
- * nadan individualmente no es un permiso especial: es un equipo que no puede
- * competir.
+ * TAMBIÉN PARA EL ADMINISTRADOR (cuando está activada). La excepción
+ * administrativa levanta los cupos y los estados de cierre; esto no. Un relevo
+ * cuyos integrantes no nadan individualmente no es un permiso especial: es un
+ * equipo que no puede competir. Si la competencia la desactiva, deja de
+ * exigirse a todos por igual.
  *
  * NUNCA SE ARREGLA SOLO. Ni se elimina el relevo, ni se le quita el
  * integrante, ni se cancela en cascada. El sistema se niega y dice qué pasa;
  * decidir entre retirar al nadador del equipo o conservar su inscripción es
  * del usuario, y hacerlo por él destruiría datos que nadie pidió borrar.
+ *
+ * ACTIVARLA SOBRE EQUIPOS QUE NO CUMPLEN no modifica ni cancela nada: esos
+ * equipos siguen existiendo, `contarEquiposIncumplidores` solo dice cuántos son,
+ * y las validaciones posteriores son las de siempre (editar uno exige que el
+ * equipo resultante cumpla; cancelarlo sigue siendo posible).
  */
 
 /** Integrante propuesto para un equipo, con lo necesario para el mensaje. */
@@ -53,8 +66,11 @@ export interface ResultadoDeElegibilidad {
  */
 export function evaluarElegibilidadDeIntegrantes(
   integrantes: readonly IntegrantePropuesto[],
-  conIndividualConfirmada: ReadonlySet<string>
+  conIndividualConfirmada: ReadonlySet<string>,
+  /** `Competition.requireIndividualForRelay`. Apagada, todo integrante es elegible. */
+  exigida: boolean
 ): ResultadoDeElegibilidad {
+  if (!exigida) return { ok: true, sinInscripcionIndividual: [] };
   const faltan = integrantes.filter((i) => !conIndividualConfirmada.has(i.personId));
   if (faltan.length === 0) {
     return { ok: true, sinInscripcionIndividual: [] };
@@ -95,8 +111,11 @@ export interface ResultadoDeCancelacion {
  */
 export function evaluarCancelacionDeIndividual(
   otrasIndividualesConfirmadas: number,
-  relevosDependientes: readonly RelevoDependiente[]
+  relevosDependientes: readonly RelevoDependiente[],
+  /** `Competition.requireIndividualForRelay`. Apagada, la cancelación no se bloquea por esta condición. */
+  exigida: boolean
 ): ResultadoDeCancelacion {
+  if (!exigida) return { allowed: true };
   if (otrasIndividualesConfirmadas > 0) return { allowed: true };
   if (relevosDependientes.length === 0) return { allowed: true };
 
@@ -109,4 +128,28 @@ export function evaluarCancelacionDeIndividual(
       "Retire al nadador de esos equipos —o cancele los relevos— antes de cancelar su última prueba individual. " +
       "El sistema no los modifica por su cuenta.",
   };
+}
+
+/** Un equipo de relevo confirmado, con sus integrantes, para contar incumplimientos. */
+export interface EquipoConfirmado {
+  relayRegistrationId: string;
+  personIds: readonly string[];
+}
+
+/**
+ * ¿Cuántos EQUIPOS distintos incumplen la condición?
+ *
+ * Un equipo incumple si AL MENOS UNO de sus integrantes no tiene una inscripción
+ * individual confirmada en la competencia. Se cuentan EQUIPOS, no integrantes: un
+ * equipo con tres integrantes sin individual cuenta una sola vez.
+ *
+ * Es el recuento del aviso al activar la condición; es lectura pura y no depende de
+ * que la condición esté activada o no.
+ */
+export function contarEquiposIncumplidores(equipos: readonly EquipoConfirmado[], conIndividualConfirmada: ReadonlySet<string>): number {
+  const incumplidores = new Set<string>();
+  for (const e of equipos) {
+    if (e.personIds.some((p) => !conIndividualConfirmada.has(p))) incumplidores.add(e.relayRegistrationId);
+  }
+  return incumplidores.size;
 }

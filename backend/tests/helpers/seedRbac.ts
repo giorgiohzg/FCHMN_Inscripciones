@@ -34,19 +34,36 @@ export async function seedRolesAndPermissions() {
  * acceso de un club DEBE llamarse igual que el club. Los fixtures que crean
  * una cuenta con un nombre propio tienen que darle ese mismo nombre al club.
  */
+/**
+ * Estos fixtures SIEMPRE dan nombre de usuario, así que el resultado se tipa
+ * con `username: string`. Desde `username_opcional` la columna admite NULL, y
+ * sin esto cada prueba que pasa el titular a una función que espera un nombre
+ * tendría que repetir la comprobación. Las pruebas de titulares SIN nombre
+ * crean sus filas por su cuenta.
+ */
+type ConNombre<T> = T & { username: string };
+
 export async function createClub(name: string, code: string, username?: string) {
-  return prisma.club.create({
+  const club = await prisma.club.create({
     data: {
       name,
       username: username ?? `club_${code.toLowerCase()}`,
       code,
       email: `${code.toLowerCase()}@test.local`,
+      // Obligatoria y sin valor por omisión (migración 10b): los clubes de prueba «No tienen».
+      hasLegalStatus: false,
       status: "active",
     },
   });
+  return club as ConNombre<typeof club>;
 }
 
 export async function createPerson(opts: { run: string; username: string; firstName: string; gender: "male" | "female"; birthYear?: number; roles?: ("swimmer" | "delegate" | "coach" | "legal_representative")[] }) {
+  const persona = await crearPersona(opts);
+  return persona as ConNombre<typeof persona>;
+}
+
+function crearPersona(opts: Parameters<typeof createPerson>[0]) {
   return prisma.person.create({
     data: {
       run: opts.run,

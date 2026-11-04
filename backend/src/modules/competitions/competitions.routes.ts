@@ -44,7 +44,7 @@ export async function competitionsRoutes(app: FastifyInstance) {
   app.get("/competitions/:id", { preHandler: [requirePermission("competitions:read")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const isAdmin = (req.authUser!.roles as string[]).includes("admin");
-    reply.send(await competitionsService.getCompetitionById(id, !isAdmin));
+    reply.send(await competitionsService.getCompetitionDetail(id, !isAdmin));
   });
 
   /**

@@ -24,6 +24,7 @@ import { prisma } from "../src/shared/prisma.client";
 import { truncateAllTables } from "./helpers/testDb";
 import { seedRolesAndPermissions, createPerson, createUser } from "./helpers/seedRbac";
 import * as clubsService from "../src/modules/clubs/clubs.service";
+import { clubCreateSchema } from "../src/modules/clubs/clubs.schemas";
 import { loadAuthorizationState } from "../src/modules/auth/authorization";
 
 let ADMIN: { userId: string };
@@ -97,16 +98,20 @@ describe("representante legal — nombramiento", () => {
     expect(await rolFuncional(persona.id)).toBeNull();
   });
 
-  it("un club PENDIENTE de verificar tampoco admite representante legal", async () => {
+  it("el estado «pendiente» (null) ya no existe: se rechaza ANTES de tocar nada, también con representante", async () => {
     const persona = await createPerson({ run: "40000008", username: "rep_pend", firstName: "Pamela", gender: "female", roles: [] });
 
-    await expect(
-      clubsService.createClub(
-        { ...CLUB_CON_PERSONALIDAD, hasLegalStatus: null, rut: undefined, legalRepresentativePersonId: persona.id },
-        ADMIN
-      )
-    ).rejects.toThrow(/pendiente de verificar/i);
+    // El servicio recibe lo que dejó pasar el esquema; aquí se prueba el esquema
+    // que la API aplica antes de llamar al servicio.
+    const r = clubCreateSchema.safeParse({
+      ...CLUB_CON_PERSONALIDAD,
+      hasLegalStatus: null,
+      rut: undefined,
+      legalRepresentativePersonId: persona.id,
+    });
+    expect(r.success).toBe(false);
 
+    expect(await prisma.club.count({ where: { code: CLUB_CON_PERSONALIDAD.code } })).toBe(0);
     expect(await prisma.clubStaff.count({ where: { roleType: "legal_representative" } })).toBe(0);
   });
 });

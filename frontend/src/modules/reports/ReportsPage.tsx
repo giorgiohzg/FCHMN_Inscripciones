@@ -9,7 +9,7 @@ import { CircledNumber } from "../../shared/CircledNumber";
 import { traerTodasLasPaginas } from "../../shared/paginacion";
 
 export function ReportsPage() {
-  const { user, hasRole } = useAuth();
+  const { user, hasRole, hasPermission } = useAuth();
   const competitionsApi = useCompetitionsApi();
   const clubsApi = useClubsApi();
   const assignmentApi = useSwimmerAssignmentApi();
@@ -167,7 +167,8 @@ export function ReportsPage() {
         <button className="btn-secondary" onClick={() => handleExport("pdf")} disabled={!competitionId || exporting !== null}>
           {exporting === "pdf" ? "Exportando..." : "Exportar PDF"}
         </button>
-        {hasRole("admin") && (
+        {/* Solo muestra u oculta: el servidor aplica el permiso y, para el personal de club, que sea SU club. */}
+        {hasPermission("export:team-manager") && (
           <button className="btn-secondary" onClick={handleTeamManagerExport} disabled={!competitionId || exporting !== null}>
             {exporting === "hy3" ? "Generando..." : "Exportar a Team Manager (.HY3)"}
           </button>

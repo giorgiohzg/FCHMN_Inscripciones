@@ -219,7 +219,11 @@ model Person {
   // eliminar lógicamente a una persona y volver a crearla con el mismo RUN
   // fallaba con P2002 contra una fila invisible para el usuario.
   run      String
-  username String
+  /// OPCIONAL desde `username_opcional`: `NULL` = sin nombre de acceso (nunca
+  /// una cadena vacía, lo impide `persons_username_no_vacio`). Editable mientras
+  /// la persona no tenga una cuenta vigente; con cuenta, inmutable (lo garantiza
+  /// `titular_forbid_rename_con_cuenta`). No se genera nunca de forma automática.
+  username String?
 
   // Nombre, apellido paterno y apellido materno se ingresan por separado
   // (convención chilena); `fullName` se sigue guardando como columna real
@@ -301,25 +305,31 @@ model Club {
   id       String @id @default(uuid())
   name     String @map("name")
   // Unicidad PARCIAL (solo clubes vigentes) — ver la nota en `Person`.
-  username String
-  code     String @map("code") // sigla o abreviación, máx. 5 caracteres (validado en Zod)
+  // OPCIONAL, con las mismas reglas que `Person.username`.
+  username String?
+  // Sigla: el IDENTIFICADOR ÚNICO del club (máx. 5 caracteres, validado en Zod). Única entre
+  // los clubes no eliminados, incluidos los inactivos, por `clubs_code_unique_active`: índice
+  // único parcial sobre `club_code_normalizado(code)`, escrito en SQL porque Prisma no modela
+  // índices sobre expresiones (ver la migración `sigla_club_unica`).
+  code     String @map("code")
 
-  /// TRES estados, no dos:
+  /// DOS estados, ambos explícitos (migraciones 10a y 10b):
   ///   `true`  — tiene personalidad jurídica. Exige RUT (RB-02).
-  ///   `false` — se verificó que NO la tiene.
-  ///   `null`  — PENDIENTE DE VERIFICAR. No es lo mismo que `false`.
+  ///   `false` — no la tiene.
   ///
-  /// Sin valor por omisión a propósito: omitir el campo no puede significar
-  /// «no la tiene», porque eso sería afirmar algo que nadie comprobó.
-  ///
-  /// CUIDADO: `Boolean?` hace que `if (club.hasLegalStatus)` siga compilando y
-  /// trate `null` como `false` en silencio. En el servicio las tres ramas se
-  /// comparan de forma explícita (`=== true` / `=== false` / `=== null`).
-  hasLegalStatus Boolean? @map("has_legal_status")
-  rut            String?  @map("rut") // obligatorio si hasLegalStatus=true; opcional y validado si null (RB-02)
+  /// Obligatoria y SIN valor por omisión, a propósito: omitir el campo no puede
+  /// significar «no la tiene», porque eso sería afirmar algo que nadie decidió. La API
+  /// exige un booleano en cada alta y edición (`null` u omitirlo responde 400), y la
+  /// base rechaza `NULL` (`NOT NULL`, migración `personalidad_juridica_obligatoria`).
+  /// El antiguo tercer estado, «pendiente de verificar», ya no existe: la migración
+  /// 10a convirtió a `false` los clubes que lo tenían.
+  hasLegalStatus Boolean @map("has_legal_status")
+  rut            String?  @map("rut") // obligatorio si hasLegalStatus=true; con false no se guarda (RB-02)
   legalName      String? @map("legal_name")
 
-  email String
+  /// OPCIONAL. `NULL` = sin correo; nunca una cadena vacía (lo impide la restricción
+  /// `clubs_email_no_vacio`) ni un correo provisional.
+  email String?
 
   isAchmnMember       Boolean @default(false) @map("is_achmn_member")
   isAchmnCollaborator Boolean @default(false) @map("is_achmn_collaborator")
@@ -662,6 +672,31 @@ model Competition {
   maxSwimmers        Int? @map("max_swimmers")
   maxSwimmersPerClub Int? @map("max_swimmers_per_club")
 
+  // VISIBILIDAD EN LOS DESPLEGABLES DE INSCRIPCIÓN Y RELEVOS.
+  //
+  // `true` (por omisión) = la competencia aparece en el selector del Panel de
+  // Inscripción y del Panel de Relevos. `false` = se quita de AHÍ, y de ningún
+  // otro sitio: no restringe el acceso directo (`GET /competitions/:id`), ni las
+  // reglas de inscripción, ni los permisos, ni Reportes ni los asistentes.
+  //
+  // Se guarda en sentido POSITIVO a propósito. La casilla del formulario dice
+  // «Ocultar…» (desmarcada = visible) y la columna de la tabla dice «Mostrar en
+  // competencia»; un campo `hidden` obligaría a negarlo en cada lectura.
+  // `DEFAULT true` deja visibles todas las competencias anteriores a este campo.
+  visibleInRegistrationPanels Boolean @default(true) @map("visible_in_registration_panels")
+
+  // CONDICIÓN DE RELEVOS: exigir al menos una inscripción individual CONFIRMADA en
+  // esta misma competencia antes de participar en relevos.
+  //
+  // `true` (por omisión, y valor de toda competencia anterior a este campo) = la
+  // regla de siempre, con sus dos lados: formar o modificar un equipo exige que todos
+  // sus integrantes la cumplan, y no se puede cancelar la última individual de quien
+  // integra un relevo confirmado. `false` = ninguno de los dos lados se exige.
+  //
+  // Cambiarla NO recalcula, cancela ni retira a nadie. Al activarla sobre equipos
+  // confirmados que no cumplen, el sistema solo informa cuántos son.
+  requireIndividualForRelay Boolean @default(true) @map("require_individual_for_relay")
+
   // CAUSA DEL CIERRE DE INSCRIPCIONES.
   //
   // `status` por sí solo no distingue un cierre manual de uno por fecha o por
@@ -768,6 +803,19 @@ model CompetitionEvent {
   competitionSessionId String                 @map("competition_session_id")
   status               CompetitionEventStatus @default(enabled)
   displayOrder         Int?                   @map("display_order")
+
+  // MÁXIMO DE NADADORES POR CLUB EN ESTA PRUEBA (solo pruebas individuales).
+  //
+  // Cuenta las inscripciones individuales CONFIRMADAS del club en esta prueba,
+  // sin importar en qué otras pruebas esté cada nadador. `NULL` = sin límite, y
+  // es el valor de toda prueba anterior a este campo; con valor, un entero
+  // positivo (lo exige `competition_events_max_swimmers_per_club_positivo`).
+  //
+  // Es independiente de `Competition.maxSwimmers`/`maxSwimmersPerClub`, que
+  // cuentan nadadores DISTINTOS en toda la competencia. Reducirlo por debajo de lo
+  // ya inscrito no borra ni cancela nada: solo restringe las altas nuevas. Solo un
+  // administrador puede excederlo, y queda auditado.
+  maxSwimmersPerClub Int? @map("max_swimmers_per_club")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

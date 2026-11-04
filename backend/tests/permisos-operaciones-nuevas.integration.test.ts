@@ -41,7 +41,7 @@ const CLUB_NUEVO = {
   code: "NUEVO",
   username: "club.nuevo",
   email: "nuevo@example.invalid",
-  hasLegalStatus: null,
+  hasLegalStatus: false,
   isAchmnMember: false,
   isAchmnCollaborator: false,
   isFchmnMember: false,
@@ -58,6 +58,9 @@ beforeAll(async () => {
   const otro = await createClub("Club Dos", "CD", "club_dos");
   ctx.clubId = club.id;
   ctx.otroClubId = otro.id;
+  // El contrato solo admite «Sí» y «No»: el helper de fixtures no fija el estado (queda NULL,
+  // la columna sigue siendo anulable hasta la 10b), y el filtro «no» de más abajo lo necesita explícito.
+  await prisma.club.updateMany({ where: { id: { in: [club.id, otro.id] } }, data: { hasLegalStatus: false } });
 
   const admin = await createUser({ username: "admin_permisos", roleNames: ["admin"] });
   ctx.adminUserId = admin.id;
@@ -109,15 +112,15 @@ describe("crear un club con el tercer estado (POST /clubs — clubs:write)", () 
     expect(res.statusCode).toBe(401);
   });
 
-  it("el administrador sí puede, y el club queda PENDIENTE", async () => {
+  it("el administrador sí puede, y el club queda con el estado enviado (No tiene)", async () => {
     const res = await app.inject({ method: "POST", url: "/clubs", headers: auth(tokens.admin_permisos!), payload: CLUB_NUEVO });
     expect(res.statusCode).toBe(201);
-    expect(res.json().hasLegalStatus).toBeNull();
+    expect(res.json().hasLegalStatus).toBe(false);
   });
 });
 
 describe("cambiar la personalidad jurídica (PUT /clubs/:id — clubs:write)", () => {
-  const cambio = { hasLegalStatus: null, isAchmnMember: false, isAchmnCollaborator: false, isFchmnMember: false, isFchmnCollaborator: false };
+  const cambio = { hasLegalStatus: false, isAchmnMember: false, isAchmnCollaborator: false, isFchmnMember: false, isFchmnCollaborator: false };
 
   it.each(SIN_PERMISO)("%s (%s) recibe 403", async (usuario) => {
     const antes = await prisma.club.findUniqueOrThrow({ where: { id: ctx.clubId } });
@@ -136,7 +139,7 @@ describe("cambiar la personalidad jurídica (PUT /clubs/:id — clubs:write)", (
 
 describe("filtrar por personalidad jurídica (GET /clubs — clubs:read)", () => {
   it("un nadador no puede listar clubes", async () => {
-    const res = await app.inject({ method: "GET", url: "/clubs?personalidadJuridica=pendiente", headers: auth(tokens.nada_uno!) });
+    const res = await app.inject({ method: "GET", url: "/clubs?personalidadJuridica=no", headers: auth(tokens.nada_uno!) });
     expect(res.statusCode).toBe(403);
   });
 
@@ -147,7 +150,7 @@ describe("filtrar por personalidad jurídica (GET /clubs — clubs:read)", () =>
    * para ver clubes ajenos.
    */
   it("el club puede filtrar, pero solo se ve a sí mismo", async () => {
-    const res = await app.inject({ method: "GET", url: "/clubs?personalidadJuridica=pendiente", headers: auth(tokens.club_uno!) });
+    const res = await app.inject({ method: "GET", url: "/clubs?personalidadJuridica=no", headers: auth(tokens.club_uno!) });
     expect(res.statusCode).toBe(200);
     const ids = res.json().items.map((c: { id: string }) => c.id);
     expect(ids).toEqual([ctx.clubId]);

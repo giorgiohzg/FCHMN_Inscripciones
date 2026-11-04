@@ -998,7 +998,7 @@ describe("el representante legal obtiene credenciales y entra", () => {
      */
     const claims = JSON.parse(Buffer.from(entrada.json().accessToken.split(".")[1]!, "base64").toString());
     expect([...claims.permissions].sort()).toEqual(
-      ["catalogs:read", "clubs:read", "competitions:read", "registrations:read", "registrations:write", "reports:read", "swimmer-assignment:read", "swimmer-assignment:write"].sort()
+      ["catalogs:read", "clubs:read", "competitions:read", "export:team-manager", "registrations:read", "registrations:write", "reports:read", "swimmer-assignment:read", "swimmer-assignment:write"].sort()
     );
     expect(claims.clubId, "y su alcance es el club donde fue nombrada").toBe(club.json().id);
   });

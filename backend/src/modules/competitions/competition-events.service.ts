@@ -44,6 +44,20 @@ async function assertCategoriesAllowedForEvent(eventId: string, categoryIds: str
   return event;
 }
 
+/**
+ * El máximo de nadadores por club solo existe para pruebas INDIVIDUALES. Se rechaza
+ * con mensaje —no se ignora en silencio— cuando la prueba es de relevo.
+ */
+function assertMaxPerClubOnlyForIndividual(testType: { name: string; swimmersCount: number }, maxSwimmersPerClub: number | null | undefined) {
+  if (maxSwimmersPerClub === null || maxSwimmersPerClub === undefined) return;
+  if (testType.swimmersCount !== 1) {
+    throw new ValidationError(
+      `El máximo de nadadores por club solo se configura en pruebas individuales; la prueba seleccionada es de tipo "${testType.name}" ` +
+        `(${testType.swimmersCount} nadador(es) por inscripción). Déjelo sin límite.`
+    );
+  }
+}
+
 export async function listCompetitionEvents(competitionId: string) {
   return prisma.competitionEvent.findMany({
     where: { competitionId },
@@ -94,7 +108,11 @@ export async function addCompetitionEvent(
 
   await assertSessionBelongsToCompetition(input.competitionSessionId, competitionId, db);
 
-  await assertCategoriesAllowedForEvent(input.eventId, input.categoryIds, db);
+  const masterEvent = await assertCategoriesAllowedForEvent(input.eventId, input.categoryIds, db);
+  if (input.maxSwimmersPerClub !== null && input.maxSwimmersPerClub !== undefined) {
+    const testType = await db.testType.findUniqueOrThrow({ where: { id: masterEvent.testTypeId } });
+    assertMaxPerClubOnlyForIndividual(testType, input.maxSwimmersPerClub);
+  }
 
   // Una prueba no puede repetirse en ninguna parte de la misma competencia
   // (no solo dentro de la misma jornada) — el catálogo de pruebas es
@@ -112,6 +130,8 @@ export async function addCompetitionEvent(
           eventId: input.eventId,
           competitionSessionId: input.competitionSessionId,
           displayOrder: input.displayOrder ?? null,
+          // Omitido = sin límite (NULL). Pruebas nuevas e importadas empiezan sin límite.
+          maxSwimmersPerClub: input.maxSwimmersPerClub ?? null,
           enabledCategories: { create: input.categoryIds.map((categoryId) => ({ categoryId })) },
         },
         include,
@@ -163,6 +183,8 @@ export async function reorderCompetitionEvents(updates: { id: string; displayOrd
 export async function updateCompetitionEvent(id: string, input: UpdateCompetitionEventInput, actor: ActorContext) {
   const before = await getCompetitionEventById(id);
 
+  assertMaxPerClubOnlyForIndividual(before.event.testType, input.maxSwimmersPerClub);
+
   if (input.categoryIds) {
     await assertCategoriesAllowedForEvent(before.eventId, input.categoryIds);
   }
@@ -201,6 +223,9 @@ export async function updateCompetitionEvent(id: string, input: UpdateCompetitio
         competitionSessionId: input.competitionSessionId ?? undefined,
         status: input.status ?? undefined,
         displayOrder: input.displayOrder !== undefined ? input.displayOrder : undefined,
+        // `=== undefined` y no `??`: `null` QUITA el límite, omitido no lo toca. Reducirlo por
+        // debajo de lo ya inscrito no cancela nada: solo restringe las altas siguientes.
+        maxSwimmersPerClub: input.maxSwimmersPerClub === undefined ? undefined : input.maxSwimmersPerClub,
       },
     });
 

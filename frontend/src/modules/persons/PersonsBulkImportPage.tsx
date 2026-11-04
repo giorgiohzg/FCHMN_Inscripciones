@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppShell } from "../../shared/AppShell";
 import { usePersonsApi, type BulkImportSummary } from "./personsApi";
+import { formatCalendarDate } from "../../shared/calendarDate";
 
 export function PersonsBulkImportPage() {
   const api = usePersonsApi();
@@ -55,7 +56,7 @@ export function PersonsBulkImportPage() {
           <thead><tr><th>Columna</th><th>Campo</th><th>Obligatorio</th><th>Formato</th></tr></thead>
           <tbody>
             <tr><td>A</td><td>RUN</td><td>Sí</td><td>Ej: 12.345.678-9</td></tr>
-            <tr><td>B</td><td>Nombre de usuario</td><td>Sí</td><td>Sin espacios, único en el sistema</td></tr>
+            <tr><td>B</td><td>Nombre de usuario</td><td>No</td><td>Sin espacios, único en el sistema. Vacío = la persona queda sin nombre (no se genera uno)</td></tr>
             <tr><td>C</td><td>Nombre</td><td>Sí</td><td>Texto libre</td></tr>
             <tr><td>D</td><td>Apellido paterno</td><td>Sí</td><td>Texto libre</td></tr>
             <tr><td>E</td><td>Apellido materno</td><td>No</td><td>Texto libre</td></tr>
@@ -63,16 +64,25 @@ export function PersonsBulkImportPage() {
             <tr><td>G</td><td>Género</td><td>Sí</td><td>"Femenino" o "Masculino"</td></tr>
             <tr><td>H</td><td>Correo electrónico</td><td>No</td><td>Ej: nombre@correo.cl</td></tr>
             <tr><td>I</td><td>Teléfono</td><td>No</td><td>Texto libre</td></tr>
-            <tr><td>J</td><td>Roles</td><td>Sí</td><td>Nadador, Delegado y/o Entrenador, separados por coma</td></tr>
+            <tr><td>J</td><td>Sigla del club</td><td>No</td><td>La SIGLA del club (no su nombre). Vacía = la persona se registra sin club</td></tr>
+            <tr><td>K</td><td>Fecha efectiva de membresía</td><td>Sí, si hay club</td><td>AAAA-MM-DD o DD-MM-AAAA. Vacía si no hay club</td></tr>
           </tbody>
         </table>
         <p style={{ fontSize: "0.85rem", color: "var(--brand-gray-600)", marginTop: "0.5rem" }}>
-          El RUN y el nombre de usuario deben ser únicos — filas duplicadas o ya existentes en el sistema se rechazan individualmente, sin afectar al resto del archivo.
+          <strong>Club:</strong> si la fila trae la sigla de un club vigente y activo, la persona queda incorporada a su plantel desde la fecha de la
+          columna K —se guarda exactamente ese día— y obtiene el rol de nadador. La fecha es obligatoria cuando hay club: el sistema no usa la de hoy por su
+          cuenta, y una fecha sin club se informa como error. La lista de siglas viene en la hoja «Instrucciones» de la plantilla. Una sigla inexistente,
+          de un club inactivo o eliminado, o compartida por más de un club, rechaza esa fila sin escribir nada.
         </p>
-        <p style={{ fontSize: "0.85rem", color: "var(--state-danger)", marginTop: "0.5rem" }}>
-          Importante sobre Roles: marcar "Delegado" o "Entrenador" aquí no les da acceso al sistema por sí solo — además hay que asignarlos como delegado/entrenador
-          en la ficha del club correspondiente, ya que el acceso se otorga por esa asignación real, no por esta columna. "Representante Legal" no se puede cargar
-          desde este archivo: se asigna únicamente desde la ficha del club.
+        <p style={{ fontSize: "0.85rem", color: "var(--brand-gray-600)", marginTop: "0.5rem" }}>
+          El RUN, y el nombre de usuario cuando se escribe, deben ser únicos: una fila repetida dentro del archivo (se procesa solo la primera) o que ya
+          existe en el sistema se rechaza individualmente, sin afectar al resto. Una persona ya registrada no se modifica ni se cambia de club desde aquí.
+          Cada fila se guarda completa o no se guarda: persona, club y rol van juntos. La carga no crea credenciales de acceso: se crean después, desde la
+          ficha de cada persona.
+        </p>
+        <p style={{ fontSize: "0.85rem", color: "var(--brand-gray-600)", marginTop: "0.5rem" }}>
+          Incorporar personas a un club requiere además el permiso de aprobar asignaciones; sin él, un archivo con clubes se rechaza entero. Las plantillas
+          anteriores sin las columnas J y K siguen sirviendo para registrar solo personas; una plantilla antigua con la columna «Roles» se rechaza.
         </p>
 
         <button className="btn-secondary" style={{ marginTop: "1rem" }} onClick={handleDownloadTemplate}>
@@ -94,6 +104,7 @@ export function PersonsBulkImportPage() {
             <h2 style={{ fontSize: "1.05rem", color: "var(--brand-navy)" }}>Resultado</h2>
             <p style={{ fontSize: "0.9rem" }}>
               {summary.totalRows} fila(s) procesada(s) — <span style={{ color: "var(--state-success)" }}>{summary.createdCount} creada(s)</span>
+              {(summary.withClubCount ?? 0) > 0 && <> ({summary.withClubCount} con club)</>}
               {summary.errorCount > 0 && <> — <span style={{ color: "var(--state-danger)" }}>{summary.errorCount} con error</span></>}
             </p>
             <table className="data-table" style={{ marginTop: "0.5rem" }}>
@@ -107,7 +118,11 @@ export function PersonsBulkImportPage() {
                         {r.status === "created" ? "Creada" : "Error"}
                       </span>
                     </td>
-                    <td>{r.status === "created" ? r.fullName : r.errors?.join(" · ")}</td>
+                    <td>
+                      {r.status === "created"
+                        ? `${r.fullName}${r.clubName ? ` — ${r.clubName}, desde el ${formatCalendarDate(r.fechaEfectiva!)}` : " — sin club"}`
+                        : r.errors?.join(" · ")}
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -19,7 +19,7 @@ const FECHA = "2026-10-30";
 
 const CLUB_BASE = {
   email: "contacto@example.invalid",
-  hasLegalStatus: null,
+  hasLegalStatus: false,
   isAchmnMember: false,
   isAchmnCollaborator: false,
   isFchmnMember: false,

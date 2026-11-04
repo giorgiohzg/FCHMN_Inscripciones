@@ -12,13 +12,16 @@
  * exigiera la piscina, que el tope contara los relevos, o que una
  * importación fallida no dejara una competencia a medio crear.
  */
-import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import AdmZip from "adm-zip";
+import ExcelJS from "exceljs";
 import { readFileSync } from "node:fs";
+import { inflateSync } from "node:zlib";
 import { join } from "node:path";
 import { prisma } from "../src/shared/prisma.client";
 import { truncateAllTables } from "./helpers/testDb";
-import { seedRolesAndPermissions, createClub, createPerson, createUser, addActiveMembership } from "./helpers/seedRbac";
+import { buildServer } from "../src/server";
+import { seedRolesAndPermissions, createClub, createPerson, createUser, addActiveMembership, addClubStaff, TEST_PASSWORD } from "./helpers/seedRbac";
 import * as competitionsService from "../src/modules/competitions/competitions.service";
 import * as structureService from "../src/modules/competitions/competition-structure.service";
 import * as competitionEventsService from "../src/modules/competitions/competition-events.service";
@@ -28,6 +31,8 @@ import * as catalogsCategories from "../src/modules/catalogs/categories.service"
 import * as catalogsEvents from "../src/modules/catalogs/events.service";
 import * as reportsService from "../src/modules/reports/reports.service";
 import { buildTeamManagerHy3Export } from "../src/modules/team-manager-export/team-manager-export.service";
+import { formatHy3Date } from "../src/modules/team-manager-export/hy3-writer";
+import { computeHy3Checksum } from "../src/modules/team-manager-export/hy3-checksum";
 import {
   importCompetitionFromMeetEventsZip,
   analizarArchivoDeImportacion,
@@ -41,7 +46,8 @@ import {
   AVISO_RELEVOS_SIN_CONFIRMAR_EV3,
   AVISO_RELEVOS_SIN_CONFIRMAR_HYV,
 } from "../src/modules/meet-import/relay-decisions";
-import { ValidationError } from "../src/shared/errors";
+import { ValidationError, ForbiddenError, NotFoundError } from "../src/shared/errors";
+import type { ActorContext } from "../src/shared/actorContext";
 
 /**
  * El actor apunta a un usuario REAL de la base. Con un id inventado, cada
@@ -51,7 +57,7 @@ import { ValidationError } from "../src/shared/errors";
  * registradas.
  */
 let SYSTEM_ACTOR: { userId: string; ipAddress?: string };
-let ADMIN_ACTOR: { userId: string; isAdmin: true; scope: { kind: "admin" }; canRegisterPostClose: boolean };
+let ADMIN_ACTOR: ActorContext & { isAdmin: true; scope: { kind: "admin" } };
 
 /** Catálogos base que normalmente crea el seed y de los que depende la importación. */
 async function seedCatalogosBase() {
@@ -126,9 +132,15 @@ interface ConsultaCapturada {
   args: { take?: number } & Record<string, unknown>;
 }
 
-const control: { conteoObsoleto: number | null; capturas: ConsultaCapturada[] } = {
+const control: {
+  conteoObsoleto: number | null;
+  capturas: ConsultaCapturada[];
+  /** Si no es `null`, reordena lo que devuelve la lectura de inscripciones individuales (la consulta se ejecuta de verdad). */
+  reordenarIndividuales: ((filas: Array<{ competitionEvent: { displayOrder: number | null } }>) => unknown[]) | null;
+} = {
   conteoObsoleto: null,
   capturas: [],
+  reordenarIndividuales: null,
 };
 
 const MODELOS_DE_INSCRIPCION = new Set(["Registration", "RelayRegistration"]);
@@ -142,7 +154,11 @@ prisma.$use(async (params, next) => {
       control.capturas.push({ model: params.model, args: (params.args ?? {}) as ConsultaCapturada["args"] });
     }
   }
-  return next(params);
+  const resultado = await next(params);
+  if (control.reordenarIndividuales && params.model === "Registration" && params.action === "findMany") {
+    return control.reordenarIndividuales(resultado);
+  }
+  return resultado;
 });
 
 /** Fuerza los `count` a un valor obsoleto y empieza a capturar las lecturas. */
@@ -193,6 +209,11 @@ describe("importCompetitionFromMeetEventsZip (invocación real)", () => {
       where: { id: resumen.competitionId },
       include: { dates: { include: { sessions: true } }, competitionEvents: true },
     });
+    // Cambio 6: lo importado nace VISIBLE en los paneles de inscripción y relevos, salvo configuración expresa.
+    expect(competencia.visibleInRegistrationPanels).toBe(true);
+    // Etapa 4: las pruebas importadas empiezan SIN límite de nadadores por club (NULL).
+    expect(competencia.competitionEvents.length).toBeGreaterThan(0);
+    expect(competencia.competitionEvents.every((c) => c.maxSwimmersPerClub === null)).toBe(true);
     expect(competencia.status).toBe("draft");
     expect(competencia.dates).toHaveLength(1);
     expect(competencia.dates[0]!.sessions).toHaveLength(1);
@@ -1164,7 +1185,14 @@ describe("importCompetitionFromMeetEventsZip (invocación real)", () => {
 // Escenario con inscripciones, para reportes y exportación
 // ---------------------------------------------------------------------------
 
-async function montarCompetenciaConInscripciones(opciones: { conPiscina: boolean; nombreClub?: string }) {
+async function montarCompetenciaConInscripciones(opciones: {
+  conPiscina: boolean;
+  nombreClub?: string;
+  /** Días (AAAA-MM-DD) de la competencia, en el orden en que se programan. Por omisión, hoy. */
+  fechas?: string[];
+  /** Ventana de inscripción (AAAA-MM-DD). Por omisión, ayer–mañana. */
+  inscripcion?: { inicio: string; fin: string };
+}) {
   const testType = await prisma.testType.upsert({ where: { name: "Individual" }, update: {}, create: { name: "Individual", swimmersCount: 1 } });
   const relayType = await prisma.testType.upsert({ where: { name: "Relevo" }, update: {}, create: { name: "Relevo", swimmersCount: 4 } });
   const distancia = await prisma.distance.upsert({ where: { meters: 50 }, update: {}, create: { meters: 50 } });
@@ -1202,8 +1230,8 @@ async function montarCompetenciaConInscripciones(opciones: { conPiscina: boolean
   const competencia = await competitionsService.createCompetition(
     {
       name: "Copa Exportación",
-      registrationStartAt: new Date(ahora.getTime() - 86_400_000),
-      registrationEndAt: new Date(ahora.getTime() + 86_400_000),
+      registrationStartAt: opciones.inscripcion ? new Date(`${opciones.inscripcion.inicio}T00:00:00.000Z`) : new Date(ahora.getTime() - 86_400_000),
+      registrationEndAt: opciones.inscripcion ? new Date(`${opciones.inscripcion.fin}T00:00:00.000Z`) : new Date(ahora.getTime() + 86_400_000),
       ageCutoffDate: new Date(ahora.getFullYear(), 11, 31),
       maxIndividualEventsPerSwimmer: 10,
       maxRelayEventsPerSwimmerPerSession: 1,
@@ -1213,8 +1241,11 @@ async function montarCompetenciaConInscripciones(opciones: { conPiscina: boolean
   );
   await competitionsService.transitionCompetition(competencia.id, "schedule", SYSTEM_ACTOR);
 
-  const fecha = await structureService.addCompetitionDate(competencia.id, new Date(), SYSTEM_ACTOR);
+  const dias = opciones.fechas?.map((d) => new Date(`${d}T00:00:00.000Z`)) ?? [new Date()];
+  const fecha = await structureService.addCompetitionDate(competencia.id, dias[0]!, SYSTEM_ACTOR);
   const jornada = await structureService.addSession(fecha.id, tipoJornada.id, SYSTEM_ACTOR);
+  // Los demás días se programan sin jornadas; el orden de alta es el que se pida.
+  for (const dia of dias.slice(1)) await structureService.addCompetitionDate(competencia.id, dia, SYSTEM_ACTOR);
 
   const eventoIndividual = await catalogsEvents.createEvent(
     { testTypeId: testType.id, distanceId: distancia.id, strokeId: estilo.id, gender: "mixed" },
@@ -1516,7 +1547,7 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
   it("genera el archivo con la piscina configurada y la distancia TOTAL del relevo", async () => {
     const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: true });
 
-    const { filename, content } = await buildTeamManagerHy3Export(competencia.id, club.id, SYSTEM_ACTOR);
+    const { filename, content } = await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR);
 
     expect(filename).toMatch(/\.hy3$/i);
     const lineas = content.split(/\r?\n/);
@@ -1537,7 +1568,7 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
   it("RECHAZA exportar si la competencia no tiene piscina asignada", async () => {
     const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: false });
 
-    await expect(buildTeamManagerHy3Export(competencia.id, club.id, SYSTEM_ACTOR)).rejects.toThrow(/no tiene piscina asignada/i);
+    await expect(buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR)).rejects.toThrow(/no tiene piscina asignada/i);
   });
 
   it("RECHAZA generar el archivo si hay un relevo con datos inconsistentes, en vez de omitirlo", async () => {
@@ -1547,7 +1578,7 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
     const miembros = await prisma.relayRegistrationMember.findMany({ where: { relayRegistrationId: relevo.id } });
     await prisma.relayRegistrationMember.delete({ where: { id: miembros[0]!.id } });
 
-    const error: ValidationError = await buildTeamManagerHy3Export(competencia.id, club.id, SYSTEM_ACTOR).then(
+    const error: ValidationError = await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR).then(
       () => {
         throw new Error("se esperaba que la exportación fallara");
       },
@@ -1567,7 +1598,7 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
     const conteos = conConteosObsoletos(0);
 
     try {
-      const error = await buildTeamManagerHy3Export(competencia.id, club.id, SYSTEM_ACTOR, { maxRows: 2 })
+      const error = await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR, { maxRows: 2 })
         .then(() => null)
         .catch((e) => e as ValidationError);
 
@@ -1591,7 +1622,7 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
     try {
       // Tope 5: las cuatro individuales caben y queda 1 de presupuesto para
       // dos relevos, así que el exceso lo aportan solo ellos.
-      const error = await buildTeamManagerHy3Export(competencia.id, club.id, SYSTEM_ACTOR, { maxRows: 5 })
+      const error = await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR, { maxRows: 5 })
         .then(() => null)
         .catch((e) => e as ValidationError);
 
@@ -1616,7 +1647,7 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
     const conteos = conConteosObsoletos(0);
 
     try {
-      await buildTeamManagerHy3Export(competencia.id, club.id, SYSTEM_ACTOR, { maxRows: 5 });
+      await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR, { maxRows: 5 });
       const lecturasRelevo = conteos.lecturasDe("RelayRegistration");
       expect(lecturasRelevo[0]!.args.take).toBe(2); // remanente (5 - 4) + 1
       expect(lecturasRelevo[0]!.args.take).not.toBe(6);
@@ -1628,7 +1659,7 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
   it("el tope del archivo .HY3 también cuenta individuales y relevos", async () => {
     const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: true });
 
-    const error = await buildTeamManagerHy3Export(competencia.id, club.id, SYSTEM_ACTOR, { maxRows: 1 })
+    const error = await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR, { maxRows: 1 })
       .then(() => null)
       .catch((e) => e as ValidationError);
 
@@ -1644,14 +1675,690 @@ describe("buildTeamManagerHy3Export (invocación real)", () => {
     const { competencia } = await montarCompetenciaConInscripciones({ conPiscina: true });
     const otroClub = await createClub("Club Sin Inscritos", "CLBS");
 
-    await expect(buildTeamManagerHy3Export(competencia.id, otroClub.id, SYSTEM_ACTOR)).rejects.toThrow(/no tiene inscripciones confirmadas/i);
+    await expect(buildTeamManagerHy3Export(competencia.id, otroClub.id, ADMIN_ACTOR)).rejects.toThrow(/no tiene inscripciones confirmadas/i);
   });
 
   it("deja registro de auditoría de la exportación", async () => {
     const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: true });
-    await buildTeamManagerHy3Export(competencia.id, club.id, SYSTEM_ACTOR);
+    await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR);
 
     const registros = await prisma.auditLog.findMany({ where: { action: "TEAM_MANAGER_EXPORT_HY3" } });
     expect(registros.length).toBeGreaterThan(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// buildTeamManagerHy3Export — ALCANCE del actor (etapa 2)
+// ---------------------------------------------------------------------------
+
+/** Actor de un solo club, tal como lo construiría `buildActorContext`. */
+function actorDeClub(userId: string, clubId: string): ActorContext {
+  return { userId, isAdmin: false, scope: { kind: "club", clubId }, canRegisterPostClose: false };
+}
+
+describe("buildTeamManagerHy3Export — el servicio se protege solo", () => {
+  it("el personal de un club exporta SU club y el archivo es idéntico al del administrador", async () => {
+    const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: true });
+
+    const delAdmin = await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR);
+    const delPersonal = await buildTeamManagerHy3Export(competencia.id, club.id, actorDeClub(ADMIN_ACTOR.userId, club.id));
+
+    expect(delPersonal.filename).toBe(delAdmin.filename);
+    expect(delPersonal.content).toBe(delAdmin.content);
+  });
+
+  it("un actor de otro club recibe ForbiddenError y el servicio no lee NADA", async () => {
+    const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: true });
+    const otroClub = await createClub("Club Ajeno", "CLBX");
+    const lecturas = conConteosObsoletos(0);
+    try {
+      const error = await buildTeamManagerHy3Export(competencia.id, club.id, actorDeClub(ADMIN_ACTOR.userId, otroClub.id)).then(
+        () => null,
+        (e: unknown) => e
+      );
+      expect(error).toBeInstanceOf(ForbiddenError);
+      // Ni siquiera llegó a consultar inscripciones.
+      expect(lecturas.lecturasDe("Registration")).toHaveLength(0);
+      expect(lecturas.lecturasDe("RelayRegistration")).toHaveLength(0);
+    } finally {
+      lecturas.restore();
+    }
+  });
+
+  it("el rechazo por alcance va ANTES de comprobar si existen la competencia o el club", async () => {
+    const { club } = await montarCompetenciaConInscripciones({ conPiscina: true });
+    const otroClub = await createClub("Club Ajeno", "CLBX");
+    const ajeno = actorDeClub(ADMIN_ACTOR.userId, otroClub.id);
+
+    // Competencia inexistente + club ajeno: 403, no 404 (no se revela qué existe).
+    await expect(buildTeamManagerHy3Export("no-existe", club.id, ajeno)).rejects.toBeInstanceOf(ForbiddenError);
+    // Control: con alcance válido, esa misma competencia sí da 404.
+    await expect(buildTeamManagerHy3Export("no-existe", club.id, actorDeClub(ADMIN_ACTOR.userId, club.id))).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("un nadador puro no puede exportar ningún club, ni siquiera el suyo", async () => {
+    const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: true });
+    const nadador: ActorContext = { userId: ADMIN_ACTOR.userId, isAdmin: false, scope: { kind: "swimmer", personId: "p" }, canRegisterPostClose: false };
+    await expect(buildTeamManagerHy3Export(competencia.id, club.id, nadador)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it("un rechazo por alcance NO deja registro de auditoría de exportación", async () => {
+    const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: true });
+    const otroClub = await createClub("Club Ajeno", "CLBX");
+    await expect(buildTeamManagerHy3Export(competencia.id, club.id, actorDeClub(ADMIN_ACTOR.userId, otroClub.id))).rejects.toBeInstanceOf(ForbiddenError);
+    expect(await prisma.auditLog.count({ where: { action: "TEAM_MANAGER_EXPORT_HY3" } })).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /export/team-manager/hy3 — matriz de permisos por HTTP (etapa 2)
+// ---------------------------------------------------------------------------
+
+describe("GET /export/team-manager/hy3 — permisos y alcance por HTTP", () => {
+  type App = Awaited<ReturnType<typeof buildServer>>;
+  let app: App;
+
+  async function entrar(username: string): Promise<string> {
+    const res = await app.inject({ method: "POST", url: "/auth/login", payload: { username, password: TEST_PASSWORD } });
+    if (res.statusCode !== 200) throw new Error(`login de ${username} falló: ${res.statusCode} ${res.body}`);
+    return res.json().accessToken;
+  }
+
+  const exportar = (token: string, competitionId: string, clubId: string) =>
+    app.inject({
+      method: "GET",
+      url: `/export/team-manager/hy3?competitionId=${competitionId}&clubId=${clubId}`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+  /** Monta competencia, dos clubes y una cuenta por cada actor de la matriz. */
+  async function montarMatriz() {
+    const base = await montarCompetenciaConInscripciones({ conPiscina: true });
+    const clubPropio = base.club;
+    const clubAjeno = await createClub("Club Ajeno", "CLBX", "club_ajeno");
+
+    const tokens: Record<string, string> = {};
+
+    // Personal del club propio: delegado, entrenador y representante legal.
+    for (const [clave, rol, run] of [
+      ["delegado", "delegate", "70000001"],
+      ["entrenador", "coach", "70000002"],
+      ["representante", "legal_representative", "70000003"],
+    ] as const) {
+      const persona = await createPerson({ run, username: `staff_${clave}`, firstName: clave, gender: "female", roles: [] });
+      await addClubStaff(clubPropio.id, persona.id, rol);
+      await createUser({ username: `staff_${clave}`, roleNames: [rol], personId: persona.id });
+      tokens[clave] = await entrar(`staff_${clave}`);
+    }
+
+    // Personal del OTRO club: sirve para comprobar que cada uno ve solo el suyo.
+    const delAjeno = await createPerson({ run: "70000004", username: "staff_ajeno", firstName: "Ajeno", gender: "male", roles: [] });
+    await addClubStaff(clubAjeno.id, delAjeno.id, "delegate");
+    await createUser({ username: "staff_ajeno", roleNames: ["delegate"], personId: delAjeno.id });
+    tokens.delegadoAjeno = await entrar("staff_ajeno");
+
+    // Cuenta del propio club (rol `club`): recibe el permiso, acotada a su club.
+    tokens.cuentaClub = await entrar("club_exportador");
+
+    // Cuenta del OTRO club (rol `club`): sirve para comprobar que cada cuenta ve solo el suyo.
+    await createUser({ username: "club_ajeno", roleNames: ["club"], clubId: clubAjeno.id });
+    tokens.cuentaClubAjena = await entrar("club_ajeno");
+
+    // Nadador puro del club propio (rol `swimmer`, sin staff).
+    const nada = await createPerson({ run: "70000005", username: "nadador_puro", firstName: "Nadia", gender: "female" });
+    await addActiveMembership(clubPropio.id, nada.id, ADMIN_ACTOR.userId);
+    await createUser({ username: "nadador_puro", roleNames: ["swimmer"], personId: nada.id });
+    tokens.nadadorPuro = await entrar("nadador_puro");
+
+    // Administrador.
+    tokens.admin = await entrar("admin_importexport");
+
+    return { ...base, clubPropio, clubAjeno, tokens };
+  }
+
+  beforeEach(async () => {
+    app = await buildServer();
+    await app.ready();
+  });
+  /**
+   * Un servidor por caso, cerrado y ESPERADO después de cada uno —también si el
+   * caso falla—. Antes solo se cerraba el último en un `afterAll`, así que los
+   * demás quedaban abiertos hasta el final de la suite.
+   */
+  afterEach(async () => {
+    const cerrar = app;
+    app = undefined as unknown as App;
+    await cerrar?.close();
+  });
+
+  it.each(["cuentaClub", "delegado", "entrenador", "representante"] as const)("%s: su club → 200 con el archivo; otro club → 403 sin contenido", async (clave) => {
+    const m = await montarMatriz();
+
+    const propio = await exportar(m.tokens[clave]!, m.competencia.id, m.clubPropio.id);
+    expect(propio.statusCode).toBe(200);
+    expect(propio.headers["content-type"]).toContain("application/octet-stream");
+    expect(propio.headers["content-disposition"]).toMatch(/\.HY3"/i);
+
+    // Ajeno: el personal del club propio pide el club ajeno.
+    const ajeno = await exportar(m.tokens[clave]!, m.competencia.id, m.clubAjeno.id);
+    expect(ajeno.statusCode).toBe(403);
+    expect(ajeno.headers["content-type"]).not.toContain("octet-stream");
+    expect(ajeno.headers["content-disposition"]).toBeUndefined();
+    expect(ajeno.rawPayload.toString("latin1")).not.toMatch(/^A1|\nB1|\nD1|\nE1/m);
+  });
+
+  it("el personal de OTRO club tampoco puede pedir el club propio de aquellos", async () => {
+    const m = await montarMatriz();
+    const res = await exportar(m.tokens.delegadoAjeno!, m.competencia.id, m.clubPropio.id);
+    expect(res.statusCode).toBe(403);
+    expect(res.headers["content-disposition"]).toBeUndefined();
+  });
+
+  it("la cuenta de OTRO club (rol `club`) tampoco puede pedir el club propio de aquella", async () => {
+    const m = await montarMatriz();
+    const res = await exportar(m.tokens.cuentaClubAjena!, m.competencia.id, m.clubPropio.id);
+    expect(res.statusCode).toBe(403);
+    expect(res.headers["content-disposition"]).toBeUndefined();
+    expect(res.rawPayload.toString("latin1")).not.toMatch(/^A1|\nB1|\nD1|\nE1/m);
+
+    // Y, simétricamente, su propio club sí (el club ajeno no tiene inscripciones: el error es de negocio, no 403).
+    const suyo = await exportar(m.tokens.cuentaClubAjena!, m.competencia.id, m.clubAjeno.id);
+    expect(suyo.statusCode).not.toBe(403);
+    expect(suyo.body).toMatch(/no tiene inscripciones confirmadas/i);
+  });
+
+  it("el nadador puro es rechazado (403), también con SU propio club", async () => {
+    const m = await montarMatriz();
+    const res = await exportar(m.tokens.nadadorPuro!, m.competencia.id, m.clubPropio.id);
+    expect(res.statusCode).toBe(403);
+    expect(res.headers["content-disposition"]).toBeUndefined();
+  });
+
+  it("el archivo de la cuenta del club es byte a byte el del administrador", async () => {
+    const m = await montarMatriz();
+    const delAdmin = await exportar(m.tokens.admin!, m.competencia.id, m.clubPropio.id);
+    const delClub = await exportar(m.tokens.cuentaClub!, m.competencia.id, m.clubPropio.id);
+    expect(delClub.statusCode).toBe(200);
+    expect(Buffer.compare(delClub.rawPayload, delAdmin.rawPayload)).toBe(0);
+  });
+
+  it("sin sesión → 401", async () => {
+    const m = await montarMatriz();
+    const res = await app.inject({ method: "GET", url: `/export/team-manager/hy3?competitionId=${m.competencia.id}&clubId=${m.clubPropio.id}` });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("el administrador exporta cualquier club, y el archivo del personal es byte a byte el mismo", async () => {
+    const m = await montarMatriz();
+
+    const delAdmin = await exportar(m.tokens.admin!, m.competencia.id, m.clubPropio.id);
+    expect(delAdmin.statusCode).toBe(200);
+    const delPersonal = await exportar(m.tokens.delegado!, m.competencia.id, m.clubPropio.id);
+    expect(delPersonal.statusCode).toBe(200);
+    expect(Buffer.compare(delPersonal.rawPayload, delAdmin.rawPayload)).toBe(0);
+
+    // Cualquier club: el ajeno no tiene inscripciones, y el error de negocio (no 403) lo demuestra.
+    const ajeno = await exportar(m.tokens.admin!, m.competencia.id, m.clubAjeno.id);
+    expect(ajeno.statusCode).not.toBe(403);
+    expect(ajeno.body).toMatch(/no tiene inscripciones confirmadas/i);
+  });
+
+  it("el formato se conserva: Latin-1, registros HY3 de individuales y relevos", async () => {
+    const m = await montarMatriz();
+    const res = await exportar(m.tokens.delegado!, m.competencia.id, m.clubPropio.id);
+    const texto = res.rawPayload.toString("latin1");
+    const lineas = texto.split(/\r?\n/);
+
+    expect(lineas[0]!.startsWith("A1")).toBe(true);
+    expect(lineas.some((l) => l.startsWith("E1"))).toBe(true); // individual
+    expect(lineas.some((l) => l.startsWith("F1"))).toBe(true); // relevo
+    expect(lineas.some((l) => l.startsWith("F3"))).toBe(true);
+    // Byte a byte equivale a codificar el contenido del servicio en Latin-1.
+    const directo = await buildTeamManagerHy3Export(m.competencia.id, m.clubPropio.id, ADMIN_ACTOR);
+    expect(Buffer.compare(res.rawPayload, Buffer.from(directo.content, "latin1"))).toBe(0);
+  });
+
+  it("AUDITORÍA: cada descarga permitida registra TEAM_MANAGER_EXPORT_HY3 con su autor; un rechazo no registra nada", async () => {
+    const m = await montarMatriz();
+    const antes = await prisma.auditLog.count({ where: { action: "TEAM_MANAGER_EXPORT_HY3" } });
+
+    await exportar(m.tokens.delegadoAjeno!, m.competencia.id, m.clubPropio.id); // 403
+    await exportar(m.tokens.cuentaClubAjena!, m.competencia.id, m.clubPropio.id); // 403
+    await exportar(m.tokens.nadadorPuro!, m.competencia.id, m.clubPropio.id); // 403
+    expect(await prisma.auditLog.count({ where: { action: "TEAM_MANAGER_EXPORT_HY3" } })).toBe(antes);
+
+    const res = await exportar(m.tokens.entrenador!, m.competencia.id, m.clubPropio.id);
+    expect(res.statusCode).toBe(200);
+
+    const registros = await prisma.auditLog.findMany({ where: { action: "TEAM_MANAGER_EXPORT_HY3" }, orderBy: { createdAt: "asc" } });
+    expect(registros).toHaveLength(antes + 1);
+    const entrenador = await prisma.user.findFirstOrThrow({ where: { username: "staff_entrenador" } });
+    expect(registros[registros.length - 1]!.userId).toBe(entrenador.id);
+    expect((registros[registros.length - 1]!.after as { clubId: string }).clubId).toBe(m.clubPropio.id);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B1 del HY3 — fechas REALES de la competencia (tarea 1 de la entrega del 2026-11-02)
+// ---------------------------------------------------------------------------
+
+/** Campos de fecha del B1: "B1" + nombre(45) + sede(45) + inicio(8) + término(8) + corte(8). */
+const fechasDeB1 = (contenido: string) => {
+  const b1 = contenido.split(/\r?\n/).find((l) => l.startsWith("B1"))!;
+  return { b1, inicio: b1.slice(92, 100), termino: b1.slice(100, 108), corte: b1.slice(108, 116) };
+};
+
+const checksumValido = (linea: string) => linea.slice(128, 130) === computeHy3Checksum(linea.slice(0, 128));
+
+describe("buildTeamManagerHy3Export — B1 lleva las fechas de la COMPETENCIA", () => {
+  it("REGRESIÓN: inscripción 26/10–05/11/2026 y competencia el 08/11/2026 → 11082026 en ambos campos, con checksum válido", async () => {
+    const { competencia, club } = await montarCompetenciaConInscripciones({
+      conPiscina: true,
+      fechas: ["2026-11-08"],
+      inscripcion: { inicio: "2026-10-26", fin: "2026-11-05" },
+    });
+    const { content } = await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR);
+    const { b1, inicio, termino } = fechasDeB1(content);
+
+    expect(inicio).toBe("11082026");
+    expect(termino).toBe("11082026");
+    expect(b1).not.toContain("10262026"); // ni rastro de la apertura de inscripciones
+    expect(b1).not.toContain("11052026"); // ni de su cierre (el corte de edad es el 31 de diciembre)
+    expect(checksumValido(b1), "checksum del B1").toBe(true);
+    // Todo el archivo conserva sus checksums válidos.
+    for (const linea of content.split(/\r?\n/).filter(Boolean)) expect(checksumValido(linea), linea.slice(0, 2)).toBe(true);
+  });
+
+  it("varios días dados de alta DESORDENADOS: primera y última programadas", async () => {
+    const { competencia, club } = await montarCompetenciaConInscripciones({
+      conPiscina: true,
+      fechas: ["2026-11-10", "2026-11-15", "2026-11-08", "2026-11-09"],
+      inscripcion: { inicio: "2026-10-26", fin: "2026-11-05" },
+    });
+    const { b1, inicio, termino } = fechasDeB1((await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR)).content);
+    expect([inicio, termino]).toEqual(["11082026", "11152026"]);
+    expect(checksumValido(b1)).toBe(true);
+  });
+
+  it("SIN fechas programadas: error claro, y no se sustituyen por las de inscripción", async () => {
+    // Una competencia con piscina y sin ninguna fecha (ni, por tanto, jornadas ni pruebas).
+    const piscina = await prisma.pool.create({ data: { name: "Piscina Sin Fechas", courseLength: "short_25m" } });
+    const competencia = await competitionsService.createCompetition(
+      {
+        name: "Copa Sin Fechas",
+        registrationStartAt: new Date("2026-10-26T00:00:00.000Z"),
+        registrationEndAt: new Date("2026-11-05T00:00:00.000Z"),
+        ageCutoffDate: new Date("2026-12-31T00:00:00.000Z"),
+        maxIndividualEventsPerSwimmer: 10,
+        maxRelayEventsPerSwimmerPerSession: 1,
+        poolId: piscina.id,
+      },
+      SYSTEM_ACTOR
+    );
+    const club = await createClub("Club Sin Fechas", "CSF", "club_sin_fechas");
+
+    const error = await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR).then(
+      () => null,
+      (e: unknown) => e
+    );
+    expect(error).toBeInstanceOf(ValidationError);
+    expect((error as Error).message).toMatch(/Copa Sin Fechas/);
+    expect((error as Error).message).toMatch(/no tiene fechas programadas/);
+    expect(await prisma.auditLog.count({ where: { action: "TEAM_MANAGER_EXPORT_HY3" } }), "no se audita una exportación que no ocurrió").toBe(0);
+  });
+
+  it("el CORTE DE EDAD no cambió: sigue siendo ageCutoffDate, y sin ella el cierre de inscripciones", async () => {
+    const { competencia, club } = await montarCompetenciaConInscripciones({
+      conPiscina: true,
+      fechas: ["2026-11-08"],
+      inscripcion: { inicio: "2026-10-26", fin: "2026-11-05" },
+    });
+
+    // Con ageCutoffDate: el 31 de diciembre que fijó la competencia.
+    const conCorte = fechasDeB1((await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR)).content);
+    expect(conCorte.corte).toBe(formatHy3Date((await prisma.competition.findUniqueOrThrow({ where: { id: competencia.id } })).ageCutoffDate!));
+
+    // Sin ageCutoffDate: la alternativa de siempre, el cierre de inscripciones (05/11), NO la fecha de la competencia.
+    await prisma.competition.update({ where: { id: competencia.id }, data: { ageCutoffDate: null } });
+    const sinCorte = fechasDeB1((await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR)).content);
+    expect(sinCorte.corte).toBe("11052026");
+    expect(sinCorte.inicio).toBe("11082026");
+    expect(sinCorte.termino).toBe("11082026");
+  });
+
+  it("las edades y el resto de las líneas NO dependen de las fechas de la competencia", async () => {
+    const { competencia, club } = await montarCompetenciaConInscripciones({
+      conPiscina: true,
+      fechas: ["2026-11-08"],
+      inscripcion: { inicio: "2026-10-26", fin: "2026-11-05" },
+    });
+    const sinA1B1 = (c: string) => c.split(/\r?\n/).filter((l) => l && !l.startsWith("A1") && !l.startsWith("B1"));
+
+    const antes = (await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR)).content;
+    // Se programan dos días más: cambia B1, y nada más.
+    await prisma.competitionDate.createMany({
+      data: [
+        { competitionId: competencia.id, date: new Date("2026-11-09T00:00:00.000Z") },
+        { competitionId: competencia.id, date: new Date("2026-11-15T00:00:00.000Z") },
+      ],
+    });
+    const despues = (await buildTeamManagerHy3Export(competencia.id, club.id, ADMIN_ACTOR)).content;
+
+    expect(fechasDeB1(antes).termino).toBe("11082026");
+    expect(fechasDeB1(despues).termino).toBe("11152026");
+    expect(fechasDeB1(despues).corte).toBe(fechasDeB1(antes).corte);
+    expect(sinA1B1(despues)).toEqual(sinA1B1(antes));
+    // Y hay edades escritas (D1): el contenido no quedó vacío por casualidad.
+    expect(sinA1B1(despues).some((l) => l.startsWith("D1"))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reportes — ORDEN (tarea 2 de la entrega del 2026-11-02)
+// ---------------------------------------------------------------------------
+
+describe("Reportes: orden por apellido paterno y por número de programa", () => {
+  /**
+   * Cuatro nadadores con edades deliberadamente CONTRARIAS al orden alfabético, y
+   * un nadador histórico sin apellido paterno; una nadadora (la 1) con pruebas
+   * individuales y relevos en números 2, 3, 10 y un número ausente, dadas de alta
+   * en el orden contrario al del programa.
+   */
+  async function montarEscenario() {
+    const base = await montarCompetenciaConInscripciones({ conPiscina: true });
+    const [n1, n2, n3, n4] = base.nadadores as [{ id: string }, { id: string }, { id: string }, { id: string }];
+
+    const nombre = (id: string, paternal: string | null, maternal: string | null, first: string | null, fullName: string, birth: string) =>
+      prisma.person.update({
+        where: { id },
+        data: { paternalLastName: paternal, maternalLastName: maternal, firstName: first, fullName, birthDate: new Date(`${birth}T00:00:00.000Z`) },
+      });
+    await nombre(n1.id, "Zamora", "Pérez", "Zoe", "Zoe Zamora Pérez", "1975-05-05"); // dentro del rango de la categoría (20-60)
+    await nombre(n2.id, "Araya", "Luna", "Bea", "Bea Araya Luna", "2000-05-05");
+    await nombre(n3.id, null, null, null, "Carmen del Río", "1985-05-05"); // histórica: sin apellido paterno
+    await nombre(n4.id, "Araya", "Soto", "Ana", "Ana Araya Soto", "1990-05-05");
+
+    // Números de programa: la individual de la base pasa al 10, el relevo al 10 también (otra lista).
+    await prisma.competitionEvent.update({ where: { id: base.ceIndividual.id }, data: { displayOrder: 10 } });
+    await prisma.competitionEvent.update({ where: { id: base.ceRelevo.id }, data: { displayOrder: 10 } });
+
+    // Más pruebas individuales, creadas en el orden CONTRARIO al del programa: sin número, 3 y 2.
+    const tipo = await prisma.testType.findUniqueOrThrow({ where: { name: "Individual" } });
+    const distancia = await prisma.distance.findFirstOrThrow({ where: { meters: 50 } });
+    const jornada = await prisma.competitionSession.findFirstOrThrow({ where: { competitionId: base.competencia.id } });
+    const extra = async (trazo: string, displayOrder: number | null) => {
+      const estilo = await prisma.stroke.upsert({ where: { name: trazo }, update: {}, create: { name: trazo } });
+      const evento = await catalogsEvents.createEvent({ testTypeId: tipo.id, distanceId: distancia.id, strokeId: estilo.id, gender: "mixed" }, SYSTEM_ACTOR);
+      const ce = await competitionEventsService.addCompetitionEvent(
+        base.competencia.id,
+        { eventId: evento.id, competitionSessionId: jornada.id, categoryIds: [base.categoria.id], displayOrder: displayOrder ?? undefined },
+        SYSTEM_ACTOR
+      );
+      await registrationsService.createRegistration({ competitionEventId: ce.id, clubId: base.club.id, personId: n1.id, seedTimeCentiseconds: 3000 }, ADMIN_ACTOR);
+      return ce;
+    };
+    await extra("Mariposa", null);
+    await extra("Pecho", 3);
+    await extra("Espalda", 2);
+
+    // Un segundo relevo, con número 2 (el primero quedó en 10).
+    const segundo = await base.agregarSegundoRelevo();
+    await prisma.competitionEvent.update({ where: { id: segundo.competitionEventId }, data: { displayOrder: 2 } });
+
+    return { ...base, ids: { n1: n1.id, n2: n2.id, n3: n3.id, n4: n4.id } };
+  }
+
+  const ESPERADO = ["Bea Araya Luna", "Ana Araya Soto", "Zoe Zamora Pérez", "Carmen del Río"];
+
+  it("agrupación: por club, nadadores por apellido paterno (histórico al final), edad y categoría intactas", async () => {
+    const { competencia } = await montarEscenario();
+    const { groupedByClub } = await reportsService.getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR);
+
+    expect(groupedByClub).toHaveLength(1);
+    const club = groupedByClub[0]!;
+    expect(club.swimmers.map((s) => s.nombreCompleto)).toEqual(ESPERADO);
+    // Edades al corte (31-dic del año en curso): por edad saldrían Bea, Ana, Carmen, Zoe —no el orden alfabético—,
+    // y siguen mostrándose.
+    const anio = new Date().getFullYear();
+    expect(club.swimmers.map((s) => s.edad)).toEqual([anio - 2000, anio - 1990, anio - 1975, anio - 1985]);
+    expect(club.totalNadadores).toBe(4);
+    // Cada nadador conserva su categoría (la individual manda).
+    for (const s of club.swimmers) expect(s.categoria).toBeTruthy();
+    expect(club.totalRelevos).toBe(2);
+  });
+
+  it("pruebas y relevos de una nadadora: 2, 3, 10 y el ausente al final; relevos 2, 10", async () => {
+    const { competencia } = await montarEscenario();
+    const { groupedByClub } = await reportsService.getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR);
+    const zoe = groupedByClub[0]!.swimmers.find((s) => s.nombreCompleto === "Zoe Zamora Pérez")!;
+
+    expect(zoe.pruebas.map((l) => l.number)).toEqual([2, 3, 10, null]);
+    expect(zoe.relevos.map((l) => l.number)).toEqual([2, 10]);
+    expect(zoe.pruebas.map((l) => l.text.split(" ")[1])).toEqual(["Espalda", "Pecho", "Libre", "Mariposa"]);
+  });
+
+  it("filas planas: mismo orden que la vista agrupada, una fila por inscripción, relevos por equipo", async () => {
+    const { competencia } = await montarEscenario();
+    const informe = await reportsService.getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR);
+
+    // Individuales: las de cada nadador juntas, nadadores en el orden de la vista agrupada.
+    const secuencia = informe.individualRows.map((r) => r.nombreCompleto);
+    const sinRepetidosConsecutivos = secuencia.filter((n, i) => i === 0 || n !== secuencia[i - 1]);
+    expect(sinRepetidosConsecutivos).toEqual(ESPERADO);
+    // Y no se pierde ni se duplica ninguna fila: 4 nadadores en la base + 3 pruebas extra de Zoe = 7.
+    expect(informe.individualRows).toHaveLength(7);
+    // Las de Zoe, por número de programa.
+    expect(informe.individualRows.filter((r) => r.nombreCompleto === "Zoe Zamora Pérez").map((r) => r.estilo)).toEqual([
+      "Espalda",
+      "Pecho",
+      "Libre",
+      "Mariposa",
+    ]);
+
+    // Relevos: UNA fila por equipo (no por integrante), por número de programa.
+    expect(informe.relayRows).toHaveLength(2);
+    expect(informe.relayRows[0]!.prueba).toMatch(/Espalda/); // número 2
+    expect(informe.relayRows[1]!.prueba).toMatch(/Libre/); // número 10
+  });
+
+  it("CSV, XLSX y PDF: mismo orden y mismas filas que el informe, sin columnas nuevas", async () => {
+    const { competencia } = await montarEscenario();
+    const informe = await reportsService.getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR);
+    const esperadas = informe.individualRows.map((r) => r.nombreCompleto);
+
+    // CSV
+    const csv = reportsService.buildCsv(informe.individualRows, informe.relayRows);
+    const lineasCsv = csv.split("\r\n");
+    const iInd = lineasCsv.indexOf("INDIVIDUALES");
+    const iRel = lineasCsv.indexOf("RELEVOS");
+    const filasInd = lineasCsv.slice(iInd + 2, iRel - 1); // cabecera, filas, línea en blanco
+    expect(filasInd).toHaveLength(informe.individualRows.length);
+    expect(filasInd.map((l) => l.split(",")[3])).toEqual(esperadas); // columna «nombre completo»
+    expect(lineasCsv[iInd + 1]!.split(",")).toHaveLength(13); // sin columnas añadidas
+    expect(lineasCsv[iRel + 1]!.split(",")).toHaveLength(11);
+    expect(lineasCsv.slice(iRel + 2).filter(Boolean)).toHaveLength(informe.relayRows.length);
+
+    // XLSX
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load((await reportsService.buildXlsx(informe.individualRows, informe.relayRows)) as never);
+    const hojaInd = libro.getWorksheet("Individuales")!;
+    const nombresXlsx: string[] = [];
+    hojaInd.eachRow((fila, n) => {
+      if (n > 1) nombresXlsx.push(String(fila.getCell(4).value));
+    });
+    expect(nombresXlsx).toEqual(esperadas);
+    expect(hojaInd.getRow(1).cellCount).toBe(13);
+    expect(libro.getWorksheet("Relevos")!.rowCount).toBe(1 + informe.relayRows.length);
+
+    // PDF: se descomprimen sus flujos y se leen las líneas de texto en el orden en que
+    // quedaron en el archivo (no se renderiza ni se abre en un visor: es una extracción
+    // del contenido generado). Las líneas de «Individuales» siguen el orden del informe.
+    const pdf = await reportsService.buildPdf(informe.competitionName, informe.individualRows, informe.relayRows);
+    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+    const lineasPdf = lineasDeTextoDelPdf(pdf);
+    const iIndPdf = lineasPdf.indexOf("Individuales");
+    const iRelPdf = lineasPdf.indexOf("Relevos");
+    expect(iIndPdf).toBeGreaterThanOrEqual(0);
+    expect(iRelPdf).toBeGreaterThan(iIndPdf);
+    const individualesPdf = lineasPdf.slice(iIndPdf + 1, iRelPdf);
+    expect(individualesPdf).toHaveLength(informe.individualRows.length);
+    informe.individualRows.forEach((r, i) => {
+      expect(individualesPdf[i]).toBe(`${r.club} — ${r.nombreCompleto} (${r.run}) — ${r.prueba} — ${r.categoria} — ${r.fecha} ${r.jornada}`);
+    });
+    // Relevos: una línea por equipo (la lista de integrantes puede partirse en varias líneas del PDF, así que
+    // se buscan las que empiezan con el club del equipo, en el orden del informe).
+    const relevosPdf = lineasPdf.slice(iRelPdf + 1).filter((l) => l.startsWith(`${informe.relayRows[0]!.equipoClub} — `));
+    expect(relevosPdf).toHaveLength(informe.relayRows.length);
+    informe.relayRows.forEach((r, i) => expect(relevosPdf[i]).toContain(`${r.equipoClub} — ${r.prueba} — ${r.categoria}`));
+  });
+
+  it("permisos y alcance no cambian: un club solo ve lo suyo, y el contenido es el mismo", async () => {
+    const { competencia, club } = await montarEscenario();
+    const comoClub: ActorContext = { userId: ADMIN_ACTOR.userId, isAdmin: false, scope: { kind: "club", clubId: club.id }, canRegisterPostClose: false };
+    const delClub = await reportsService.getRegistrationsReport({ competitionId: competencia.id }, comoClub);
+    const delAdmin = await reportsService.getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR);
+    expect(delClub.groupedByClub).toEqual(delAdmin.groupedByClub);
+
+    const otro = await createClub("Club Ajeno Reportes", "CAJR", "club_ajeno_rep");
+    await expect(reportsService.getRegistrationsReport({ competitionId: competencia.id, clubId: otro.id }, comoClub)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it("desempate COHERENTE: números repetidos y ausentes salen en el mismo orden relativo en la vista agrupada y en las filas planas (CSV / XLSX / PDF)", async () => {
+    const base = await montarEscenario();
+    const tipo = await prisma.testType.findUniqueOrThrow({ where: { name: "Individual" } });
+    const jornada = await prisma.competitionSession.findFirstOrThrow({ where: { competitionId: base.competencia.id } });
+    // Ana (n4) con dos pruebas del mismo número (6), dos sin número y distintos tiempos: todo por texto.
+    const agregar = async (metros: number, trazo: string, displayOrder: number | null, centisegundos: number | null) => {
+      const distancia = await prisma.distance.upsert({ where: { meters: metros }, update: {}, create: { meters: metros } });
+      const estilo = await prisma.stroke.upsert({ where: { name: trazo }, update: {}, create: { name: trazo } });
+      const evento = await catalogsEvents.createEvent({ testTypeId: tipo.id, distanceId: distancia.id, strokeId: estilo.id, gender: "mixed" }, SYSTEM_ACTOR);
+      const ce = await competitionEventsService.addCompetitionEvent(
+        base.competencia.id,
+        { eventId: evento.id, competitionSessionId: jornada.id, categoryIds: [base.categoria.id], displayOrder: displayOrder ?? undefined },
+        SYSTEM_ACTOR
+      );
+      await registrationsService.createRegistration(
+        { competitionEventId: ce.id, clubId: base.club.id, personId: base.ids.n4, seedTimeCentiseconds: centisegundos ?? undefined },
+        ADMIN_ACTOR
+      );
+    };
+    // Se dan de alta en un orden que NO coincide con el del texto (Pecho antes que Espalda, etc.).
+    await agregar(100, "Pecho", 6, null);
+    await agregar(100, "Espalda", 6, 7000);
+    await agregar(200, "Mariposa", null, null);
+    await agregar(100, "Mariposa", null, 9000);
+
+    const informe = await reportsService.getRegistrationsReport({ competitionId: base.competencia.id }, ADMIN_ACTOR);
+    const ana = informe.groupedByClub[0]!.swimmers.find((s) => s.nombreCompleto === "Ana Araya Soto")!;
+    const vista = ana.pruebas.map((l) => `${l.number}|${l.text}`);
+
+    // Lo que consumen los archivos: las filas planas de Ana, con su mismo número y texto (descripción + tiempo).
+    // La prueba base de Ana (50m Libre, sin tiempo) está en el programa 10.
+    const planas = informe.individualRows.filter((r) => r.nombreCompleto === "Ana Araya Soto");
+    expect(planas).toHaveLength(ana.pruebas.length);
+    expect(ana.pruebas.map((l) => l.number)).toEqual([6, 6, 10, null, null]);
+    expect(vista[0]).toBe("6|100m Espalda 1:10,00"); // repetido: «Espalda» antes que «Pecho» aunque «Pecho» se inscribió antes
+    expect(vista[1]).toBe("6|100m Pecho");
+    expect(vista[3]).toBe("null|100m Mariposa 1:30,00"); // ausentes al final, por texto: «100m» antes que «200m»
+    expect(vista[4]).toBe("null|200m Mariposa");
+    expect(planas.map((r) => r.prueba)).toEqual(["100m Espalda", "100m Pecho", "50m Libre", "100m Mariposa", "200m Mariposa"]);
+    expect(planas.map((r) => r.prueba)).toEqual(ana.pruebas.map((l) => l.text.replace(/ \d+:\d{2},\d{2}$/, "")));
+
+    // CSV y XLSX respetan ese mismo orden relativo.
+    const csv = reportsService.buildCsv(informe.individualRows, informe.relayRows).split("\r\n");
+    const filasCsv = csv.slice(csv.indexOf("INDIVIDUALES") + 2, csv.indexOf("RELEVOS") - 1).filter((l) => l.includes("Ana Araya Soto"));
+    expect(filasCsv.map((l) => l.split(",")[6])).toEqual(planas.map((r) => r.prueba)); // columna «prueba»
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load((await reportsService.buildXlsx(informe.individualRows, informe.relayRows)) as never);
+    const pruebasXlsx: string[] = [];
+    libro.getWorksheet("Individuales")!.eachRow((fila, n) => {
+      if (n > 1 && String(fila.getCell(4).value) === "Ana Araya Soto") pruebasXlsx.push(String(fila.getCell(7).value));
+    });
+    expect(pruebasXlsx).toEqual(planas.map((r) => r.prueba));
+
+    // PDF: mismas líneas, mismo orden (extracción del contenido generado).
+    const pdf = await reportsService.buildPdf(informe.competitionName, informe.individualRows, informe.relayRows);
+    const lineasPdf = lineasDeTextoDelPdf(pdf);
+    // Solo la sección «Individuales» (Ana también figura como integrante en la de «Relevos»).
+    const delPdf = lineasPdf.slice(lineasPdf.indexOf("Individuales"), lineasPdf.indexOf("Relevos")).filter((l) => l.includes("Ana Araya Soto"));
+    expect(delPdf.map((l) => l.split(" — ")[2])).toEqual(planas.map((r) => r.prueba));
+  });
+
+  it("la categoría y el club mostrados NO cambian por el orden de presentación: la del primer registro entregado, no la de la primera prueba del programa", async () => {
+    const base = await montarCompetenciaConInscripciones({ conPiscina: true });
+    const [n1] = base.nadadores as [{ id: string }];
+    // La prueba de la base de n1 queda en el programa 9 (categoría «Master Export»).
+    await prisma.competitionEvent.update({ where: { id: base.ceIndividual.id }, data: { displayOrder: 9 } });
+    // Una segunda individual, en el programa 1 y de OTRA categoría (otro tipo de prueba, para no solapar edades),
+    // inscrita DESPUÉS: si la selección dependiera del programa, la categoría mostrada pasaría a «Master Dos».
+    const tipoDos = await prisma.testType.upsert({ where: { name: "Individual Dos" }, update: {}, create: { name: "Individual Dos", swimmersCount: 1 } });
+    const categoriaDos = await catalogsCategories.createCategory({ testTypeId: tipoDos.id, name: "Master Dos", minAge: 20, maxAge: 60 }, SYSTEM_ACTOR);
+    const distancia = await prisma.distance.findFirstOrThrow({ where: { meters: 50 } });
+    const estilo = await prisma.stroke.upsert({ where: { name: "Espalda" }, update: {}, create: { name: "Espalda" } });
+    const jornada = await prisma.competitionSession.findFirstOrThrow({ where: { competitionId: base.competencia.id } });
+    const evento = await catalogsEvents.createEvent({ testTypeId: tipoDos.id, distanceId: distancia.id, strokeId: estilo.id, gender: "mixed" }, SYSTEM_ACTOR);
+    const ce = await competitionEventsService.addCompetitionEvent(
+      base.competencia.id,
+      { eventId: evento.id, competitionSessionId: jornada.id, categoryIds: [categoriaDos.id], displayOrder: 1 },
+      SYSTEM_ACTOR
+    );
+    await registrationsService.createRegistration({ competitionEventId: ce.id, clubId: base.club.id, personId: n1.id, seedTimeCentiseconds: 3000 }, ADMIN_ACTOR);
+
+    /**
+     * La base NO garantiza el orden de los empates por (club, nombre): dos inscripciones de un mismo nadador
+     * pueden volver en cualquier orden. Para que la prueba sea determinista el middleware de Prisma reordena la lectura (que se ejecuta de verdad) y se
+     * entrega cada vez el orden que se quiere —con la inscripción del programa 1 al final o al principio—,
+     * y se comprueba que la categoría mostrada sigue a lo entregado, no al número de programa.
+     */
+    const leerEntregando = async (primeroElDelPrograma1: boolean) => {
+      const delUno = (x: { competitionEvent: { displayOrder: number | null } }) => (x.competitionEvent.displayOrder === 1 ? 0 : 1);
+      control.reordenarIndividuales = (filas) => filas.slice().sort((a, b) => (primeroElDelPrograma1 ? delUno(a) - delUno(b) : delUno(b) - delUno(a)));
+      try {
+        return await reportsService.getRegistrationsReport({ competitionId: base.competencia.id }, ADMIN_ACTOR);
+      } finally {
+        control.reordenarIndividuales = null;
+      }
+    };
+    const delNadador = (i: Awaited<ReturnType<typeof leerEntregando>>) => i.groupedByClub[0]!.swimmers.find((s) => s.run === "80000001")!;
+
+    // Se entrega PRIMERO la inscripción del programa 9 (categoría «Master Export»): esa es la categoría mostrada,
+    // aunque la prueba 1 (otra categoría) figure primero en el programa. Las pruebas sí se muestran ordenadas.
+    const conBasePrimero = await leerEntregando(false);
+    expect(delNadador(conBasePrimero).categoria).toBe("Master Export");
+    expect(delNadador(conBasePrimero).pruebas.map((l) => l.number)).toEqual([1, 9]);
+
+    // Entregada primero la del programa 1, la categoría es la de esa inscripción: la selección sigue a lo entregado.
+    const conProgramaUnoPrimero = await leerEntregando(true);
+    expect(delNadador(conProgramaUnoPrimero).categoria).toBe("Master Dos");
+    expect(delNadador(conProgramaUnoPrimero).pruebas.map((l) => l.number)).toEqual([1, 9]);
+
+    // Las filas planas (que sí se ordenan, por programa) no dependen de lo entregado.
+    for (const informe of [conBasePrimero, conProgramaUnoPrimero]) {
+      expect(informe.individualRows.filter((r) => r.run === "80000001").map((r) => r.categoria)).toEqual(["Master Dos", "Master Export"]);
+    }
+  });
+});
+
+/**
+ * Líneas de texto de un PDF generado por PDFKit, en el orden del archivo. Descomprime los flujos
+ * (Flate) y lee los arreglos `TJ` (cadenas hexadecimales en WinAnsi). NO renderiza ni valida el
+ * PDF: es una extracción del contenido para comprobar el orden de las líneas que se escribieron.
+ */
+function lineasDeTextoDelPdf(pdf: Buffer): string[] {
+  const lineas: string[] = [];
+  const texto = pdf.toString("latin1");
+  const flujos = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+  for (let m = flujos.exec(texto); m; m = flujos.exec(texto)) {
+    let contenido: string;
+    try {
+      contenido = inflateSync(Buffer.from(m[1]!, "latin1")).toString("latin1");
+    } catch {
+      continue; // flujo no comprimido (fuentes, etc.)
+    }
+    for (const tj of contenido.matchAll(/\[([^\]]*)\]\s*TJ/g)) {
+      const bytes = [...tj[1]!.matchAll(/<([0-9a-fA-F]*)>/g)].map((h) => h[1]!).join("");
+      lineas.push(new TextDecoder("windows-1252").decode(Buffer.from(bytes, "hex")));
+    }
+  }
+  return lineas;
+}

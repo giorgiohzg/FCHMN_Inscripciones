@@ -9,6 +9,10 @@ import {
   rowsToCsv,
   neutralizeSpreadsheetFormula,
   groupReportByClubAndSwimmer,
+  compararFilasIndividuales,
+  compararFilasDeRelevo,
+  lineaDePrueba,
+  type PersonaOrdenable,
   type IndividualReportRow,
   type RelayReportRow,
   type SwimmerEventEntry,
@@ -232,7 +236,55 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
   const excesoReal = excedeTope(individualRegs.length, relayRegs.length, lecturaTruncada);
   if (excesoReal) throw excesoReal;
 
-  const individualRows: IndividualReportRow[] = individualRegs.map((r) =>
+  /**
+   * ORDEN de las filas planas (las que consumen JSON, CSV, XLSX y PDF).
+   *
+   * Los criterios son los de la vista agrupada (`reports.rules.ts`), aplicados a
+   * lo que cada formato tiene por fila:
+   *   - individuales (una fila por inscripción): club, nadador por apellido
+   *     paterno y, dentro del nadador, `compararLineasDePrueba` —el MISMO criterio
+   *     de la vista agrupada: número de programa numérico, ausentes al final y,
+   *     si se repite o falta, descripción y tiempo tal como se ven—. Las filas de
+   *     un mismo nadador quedan juntas, en el orden en que las vería agrupadas;
+   *   - relevos (una fila por EQUIPO, no por nadador): club y la misma
+   *     `compararLineasDePrueba`. Se mantiene por equipo a propósito: ordenarlos
+   *     "por nadador" exigiría repetir cada equipo cuatro veces o elegir un
+   *     integrante arbitrario.
+   * El identificador de la inscripción es solo el ÚLTIMO desempate, para que el
+   * resultado no dependa del orden en que la base devuelva las filas.
+   *
+   * Se ordenan COPIAS: `individualRegs` y `relayRegs` conservan el orden de la
+   * base, que es el que decide la categoría y el club mostrados de cada nadador
+   * en la vista agrupada (la primera inscripción que llega, individuales antes
+   * que relevos). Ordenar esos arreglos cambiaría esa selección.
+   */
+  const ordenable = (p: { id: string; run: string; fullName: string; paternalLastName: string | null; maternalLastName: string | null; firstName: string | null }): PersonaOrdenable => ({
+    paternalLastName: p.paternalLastName,
+    maternalLastName: p.maternalLastName,
+    firstName: p.firstName,
+    fullName: p.fullName,
+    run: p.run,
+    personId: p.id,
+  });
+  const tiempoDe = (centisegundos: number | null) => (centisegundos !== null ? formatSwimTimeReadable(centisegundos) : null);
+  const lineaIndividual = (r: (typeof individualRegs)[number]) =>
+    lineaDePrueba(r.competitionEvent.displayOrder, `${r.competitionEvent.event.distance.meters}m ${r.competitionEvent.event.stroke.name}`, tiempoDe(r.seedTimeCentiseconds));
+  const lineaRelevo = (r: (typeof relayRegs)[number]) =>
+    lineaDePrueba(
+      r.competitionEvent.displayOrder,
+      `Relevo ${r.competitionEvent.event.distance.meters}m ${r.competitionEvent.event.stroke.name} (${GENDER_LABELS_ES[r.competitionEvent.event.gender]})`,
+      tiempoDe(r.seedTimeCentiseconds)
+    );
+  const individualesOrdenadas = individualRegs
+    .map((r) => ({ r, orden: { clubName: r.club.name, persona: ordenable(r.person), linea: lineaIndividual(r), id: r.id } }))
+    .sort((x, y) => compararFilasIndividuales(x.orden, y.orden))
+    .map((x) => x.r);
+  const relevosOrdenados = relayRegs
+    .map((r) => ({ r, orden: { clubName: r.club.name, linea: lineaRelevo(r), categoryName: r.category.name, id: r.id } }))
+    .sort((x, y) => compararFilasDeRelevo(x.orden, y.orden))
+    .map((x) => x.r);
+
+  const individualRows: IndividualReportRow[] = individualesOrdenadas.map((r) =>
     mapIndividualRegistrationToRow({
       competitionName: competition.name,
       clubName: r.club.name,
@@ -249,7 +301,7 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
     })
   );
 
-  const relayRows: RelayReportRow[] = relayRegs.map((r) =>
+  const relayRows: RelayReportRow[] = relevosOrdenados.map((r) =>
     mapRelayRegistrationToRow({
       competitionName: competition.name,
       clubName: r.club.name,
@@ -267,18 +319,23 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
   // Las individuales se agregan PRIMERO para que, si un nadador tiene
   // ambas, la categoría mostrada sea la de su prueba individual (más
   // específica que la del relevo, que es por edad combinada del equipo).
+  // Se arman desde `individualRegs`/`relayRegs` SIN ordenar (ver arriba): el
+  // orden de presentación no interviene en esa selección.
   const swimmerEntries: SwimmerEventEntry[] = [
     ...individualRegs.map((r): SwimmerEventEntry => ({
       personId: r.personId,
       run: r.person.run,
       fullName: r.person.fullName,
+      paternalLastName: r.person.paternalLastName,
+      maternalLastName: r.person.maternalLastName,
+      firstName: r.person.firstName,
       clubName: r.club.name,
       birthDate: r.person.birthDate,
       gender: r.person.gender,
       categoryName: r.category.name,
       eventNumber: r.competitionEvent.displayOrder,
       eventLabel: `${r.competitionEvent.event.distance.meters}m ${r.competitionEvent.event.stroke.name}`,
-      timeLabel: r.seedTimeCentiseconds !== null ? formatSwimTimeReadable(r.seedTimeCentiseconds) : null,
+      timeLabel: tiempoDe(r.seedTimeCentiseconds),
       kind: "individual",
     })),
     ...relayRegs.flatMap((r): SwimmerEventEntry[] =>
@@ -292,13 +349,16 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
           personId: m.personId,
           run: m.person.run,
           fullName: m.person.fullName,
+          paternalLastName: m.person.paternalLastName,
+          maternalLastName: m.person.maternalLastName,
+          firstName: m.person.firstName,
           clubName: r.club.name,
           birthDate: m.person.birthDate,
           gender: m.person.gender,
           categoryName: r.category.name,
           eventNumber: r.competitionEvent.displayOrder,
           eventLabel: `Relevo ${r.competitionEvent.event.distance.meters}m ${r.competitionEvent.event.stroke.name} (${GENDER_LABELS_ES[r.competitionEvent.event.gender]})`,
-          timeLabel: r.seedTimeCentiseconds !== null ? formatSwimTimeReadable(r.seedTimeCentiseconds) : null,
+          timeLabel: tiempoDe(r.seedTimeCentiseconds),
           kind: "relay",
         }))
     ),

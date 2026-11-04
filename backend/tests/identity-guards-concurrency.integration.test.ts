@@ -366,8 +366,8 @@ interface Titular {
   renombrar: string;
   /** SQL que crea una cuenta para ese titular. */
   alta: string;
-  /** Estado final del titular, para comprobar que no cambió. */
-  usernameActual: (id: string) => Promise<string>;
+  /** Estado final del titular, para comprobar que no cambió. `null` = sin nombre. */
+  usernameActual: (id: string) => Promise<string | null>;
 }
 
 const TITULARES: Titular[] = [

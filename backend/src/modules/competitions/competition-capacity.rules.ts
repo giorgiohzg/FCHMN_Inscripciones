@@ -181,3 +181,80 @@ export function evaluateCapacity(
 export function shouldCloseRegistrations(maxSwimmers: number | null, totalSwimmers: number): boolean {
   return maxSwimmers !== null && totalSwimmers >= maxSwimmers;
 }
+
+// ---------------------------------------------------------------------------
+// Máximo de nadadores POR CLUB en una PRUEBA individual
+// ---------------------------------------------------------------------------
+
+export interface EventClubLimitContext {
+  /** Nombre del club, para el mensaje. */
+  clubName?: string;
+  /** Cómo se llama la prueba para quien inscribe, p. ej. «50m Libre». */
+  eventLabel?: string;
+}
+
+export interface EventClubLimitEvaluation {
+  allowed: boolean;
+  reason?: string;
+  /**
+   * true si el alta se aceptó SOLO porque quien la hace es administrador. Es lo
+   * que dispara el registro de auditoría de la excepción.
+   */
+  exceededByOverride: boolean;
+  /** El máximo vigente (`null` = sin límite). */
+  limit: number | null;
+  /** Inscripciones confirmadas del club en la prueba tras aceptar el alta. */
+  resultingCount: number;
+}
+
+/**
+ * ¿Cabe esta alta en el máximo de nadadores por club y prueba?
+ *
+ * UNIDAD DE CONTEO: inscripciones individuales CONFIRMADAS del club en ESA prueba
+ * de competencia. Un nadador solo puede estar una vez en una prueba, así que equivale
+ * a nadadores distintos de ese club en esa prueba, sin importar en cuántas otras esté.
+ * Las canceladas no cuentan: cancelar libera el cupo.
+ *
+ * `currentClubCount` es lo ya inscrito ANTES de esta alta. Se recibe como parámetro
+ * porque la función es pura: quien llama lo cuenta dentro de la transacción que
+ * protege las altas simultáneas.
+ *
+ * LA EXCEPCIÓN ES DE ADMINISTRADOR, no de permiso. `puedeExcederCupos` de
+ * `evaluateCapacity` sale de `registrations:write:post-close`; aquí se recibe
+ * `esAdministrador`, porque la decisión fue que ni `registrations:write` ni el
+ * permiso posterior al cierre bastan sin ser administrador.
+ *
+ * Si el máximo se redujo por debajo de lo ya inscrito (`currentClubCount > limit`),
+ * nada se toca: la función solo impide altas nuevas.
+ */
+export function evaluateEventClubLimit(
+  limit: number | null,
+  currentClubCount: number,
+  esAdministrador: boolean,
+  context: EventClubLimitContext = {}
+): EventClubLimitEvaluation {
+  const resultingCount = currentClubCount + 1;
+  if (limit === null || resultingCount <= limit) {
+    return { allowed: true, exceededByOverride: false, limit, resultingCount };
+  }
+  if (esAdministrador) {
+    return { allowed: true, exceededByOverride: true, limit, resultingCount };
+  }
+
+  const club = context.clubName ? `El club ${context.clubName}` : "El club";
+  const prueba = context.eventLabel ? ` en la prueba «${context.eventLabel}»` : " en esta prueba";
+  const yaInscritos =
+    currentClubCount > limit
+      ? `ya tiene ${currentClubCount} nadador(es) inscrito(s) y el máximo por club se fijó en ${limit}`
+      : `alcanzó el máximo de ${limit} nadador(es) por club`;
+  return {
+    allowed: false,
+    exceededByOverride: false,
+    limit,
+    resultingCount,
+    reason:
+      `${club} ${yaInscritos}${prueba}. No quedan cupos para este club en esta prueba. ` +
+      "Los demás clubes, las demás pruebas y los nadadores ya inscritos no se ven afectados. " +
+      "Si necesita inscribir a más nadadores, solicite a la administración que amplíe el máximo.",
+  };
+}

@@ -1,4 +1,4 @@
-import { ValidationError } from "./errors";
+import { ConflictError, ValidationError, type AppError } from "./errors";
 import { dbFrom, type TxOption } from "./transaction";
 
 /**
@@ -66,8 +66,20 @@ export async function findUsernameOwner(username: string, options: UsernameCheck
       where: {
         username,
         deletedAt: null,
-        ...(options.excludePersonId ? { personId: { not: options.excludePersonId } } : {}),
-        ...(options.excludeClubId ? { clubId: { not: options.excludeClubId } } : {}),
+        /**
+         * Se excluye SOLO la cuenta del propio titular, y con el caso NULL
+         * explícito. `{ personId: { not: id } }` —y también `NOT`— se traduce a
+         * una comparación que en SQL es NULL, y por lo tanto falsa, para toda
+         * cuenta sin persona: las del sistema y las de los clubes. Al excluir a
+         * una persona se dejaban fuera, sin querer, todas esas cuentas, y su
+         * nombre parecía libre. Lo detectó la etapa 9 al probar la colisión con
+         * la cuenta del administrador; la base lo rechazaba igual, pero con un
+         * error sin explicación.
+         */
+        AND: [
+          ...(options.excludePersonId ? [{ OR: [{ personId: null }, { personId: { not: options.excludePersonId } }] }] : []),
+          ...(options.excludeClubId ? [{ OR: [{ clubId: null }, { clubId: { not: options.excludeClubId } }] }] : []),
+        ],
       },
       select: { id: true },
     }),
@@ -86,7 +98,75 @@ export async function assertUsernameAvailable(username: string, options: Usernam
 
   throw new ValidationError(
     `El nombre de usuario "${username}" ya está en uso por ${ETIQUETA[dueno.kind]}. ` +
-      `Los nombres de usuario son únicos entre personas, clubes y cuentas de acceso, y no se pueden cambiar después de crearlos.`,
+      `Los nombres de usuario son únicos entre personas, clubes y cuentas de acceso, y no se pueden cambiar una vez creadas las credenciales.`,
     { username, conflictWith: dueno.kind }
   );
+}
+
+/**
+ * ¿Tiene el titular una cuenta de acceso VIGENTE?
+ *
+ * Vigente = no eliminada lógicamente, cualquiera sea su estado: una cuenta
+ * bloqueada o inhabilitada sigue llamándose así y puede volver a activarse,
+ * así que también bloquea el nombre. Es el mismo criterio que aplica
+ * `titular_forbid_rename_con_cuenta` en la base.
+ */
+export async function tieneCuentaVigente(titular: { personId: string } | { clubId: string }, options: TxOption = {}): Promise<boolean> {
+  const cuenta = await dbFrom(options).user.findFirst({ where: { ...titular, deletedAt: null }, select: { id: true } });
+  return cuenta !== null;
+}
+
+/** Crear credenciales sin nombre guardado ni enviado: 400, sin escribir. */
+export const MENSAJE_FALTA_USERNAME =
+  "Indique un nombre de usuario para crear las credenciales: el titular todavía no tiene uno. " +
+  "Solo letras, números, puntos, guiones y guiones bajos, de 4 a 30 caracteres.";
+
+export const MENSAJE_NOMBRE_BLOQUEADO =
+  "El nombre de usuario ya no se puede cambiar: las credenciales de acceso se crearon con él y es el nombre con el que se entra al sistema.";
+
+/**
+ * Traduce las excepciones que lanzan los DISPARADORES de identidad.
+ *
+ * Las comprobaciones del servicio dan el mensaje en el caso normal, pero no
+ * pueden ver lo que otra transacción todavía no confirmó: en una carrera, quien
+ * decide es la base (`username_registry_reserve`, `titular_forbid_rename_con_cuenta`,
+ * `users_username_igual_al_titular`). Sin esto, ese rechazo —correcto— llegaba
+ * al usuario como error interno. Los textos que se reconocen son los de las
+ * propias migraciones del proyecto, no del motor.
+ */
+export function traducirErrorDeIdentidad(err: unknown): AppError | null {
+  const mensaje = err instanceof Error ? err.message : "";
+  /**
+   * La reserva lanza `unique_violation` desde un disparador, y Prisma lo
+   * entrega como P2002 SIN columnas (`target: null`) y sin el texto del
+   * disparador —verificado contra PostgreSQL—. Un índice único real siempre
+   * informa sus columnas, así que `target` nulo en una persona, un club o una
+   * cuenta identifica este caso sin confundirlo con otros conflictos.
+   */
+  const conocido = err as { code?: string; meta?: { target?: unknown; modelName?: string } };
+  const esReserva =
+    conocido?.code === "P2002" &&
+    (conocido.meta?.target === null || conocido.meta?.target === undefined) &&
+    ["Person", "Club", "User"].includes(conocido.meta?.modelName ?? "");
+  if (esReserva || mensaje.includes("ya está en uso por otro titular")) {
+    return new ConflictError("Ese nombre de usuario acaba de ser tomado por otro titular. Elija otro y vuelva a intentarlo.");
+  }
+  if (mensaje.includes("tiene una cuenta de acceso vigente")) {
+    return new ConflictError(MENSAJE_NOMBRE_BLOQUEADO);
+  }
+  if (mensaje.includes("debe ser el de su titular")) {
+    return new ConflictError("El nombre de usuario cambió mientras se creaban las credenciales. Recargue la ficha y vuelva a intentarlo.");
+  }
+  return null;
+}
+
+/** Ejecuta la operación traduciendo los rechazos de los disparadores de identidad. */
+export async function conErroresDeIdentidad<T>(operacion: () => Promise<T>): Promise<T> {
+  try {
+    return await operacion();
+  } catch (err) {
+    const traducido = traducirErrorDeIdentidad(err);
+    if (traducido) throw traducido;
+    throw err;
+  }
 }

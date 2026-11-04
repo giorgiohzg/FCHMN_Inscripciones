@@ -203,8 +203,8 @@ async function validateAndResolveRelayTeam(params: {
   const isPostCloseException = window.isPostCloseException;
 
   /**
-   * INVARIANTE: cada integrante necesita una inscripción individual
-   * confirmada en la MISMA competencia.
+   * INVARIANTE (cuando la competencia la exige, `requireIndividualForRelay`): cada
+   * integrante necesita una inscripción individual confirmada en la MISMA competencia.
    *
    * Se lee aquí, dentro de la transacción del alta, y eso no es un detalle:
    * es la arista que permite a PostgreSQL detectar la carrera contra una
@@ -274,7 +274,10 @@ async function validateAndResolveRelayTeam(params: {
    */
   const elegibilidad = evaluarElegibilidadDeIntegrantes(
     members.map((m) => ({ personId: m.personId, displayName: m.displayName })),
-    conIndividualConfirmada
+    conIndividualConfirmada,
+    // Se lee de la competencia que esta función ya trajo con `db`, es decir, DENTRO de la
+    // transacción del alta o de la modificación (ver `tx`).
+    competitionEvent.competition.requireIndividualForRelay
   );
   if (!elegibilidad.ok) throw new ValidationError(elegibilidad.reason!);
 

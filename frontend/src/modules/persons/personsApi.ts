@@ -7,11 +7,18 @@ export interface BulkImportRowResult {
   row: number;
   status: "created" | "error";
   fullName?: string;
+  /** Club al que quedó incorporada (solo filas creadas con club). */
+  clubName?: string;
+  /** Fecha efectiva guardada, `AAAA-MM-DD` (solo filas creadas con club). */
+  fechaEfectiva?: string;
   errors?: string[];
 }
 export interface BulkImportSummary {
   totalRows: number;
+  /** Personas creadas, con o sin club. */
   createdCount: number;
+  /** De las creadas, cuántas quedaron además incorporadas a un club. */
+  withClubCount?: number;
   errorCount: number;
   results: BulkImportRowResult[];
 }
@@ -19,7 +26,8 @@ export interface BulkImportSummary {
 export interface Person {
   id: string;
   run: string;
-  username: string;
+  /** `null` = la persona todavía no tiene nombre de usuario. */
+  username: string | null;
   firstName: string | null;
   paternalLastName: string | null;
   maternalLastName: string | null;
@@ -48,7 +56,11 @@ export interface PersonListResult {
 
 export interface PersonFormInput {
   run?: string; // solo en creación
-  username?: string; // solo en creación
+  /**
+   * Editable mientras la persona no tenga cuenta. `null` (o vacío) lo quita;
+   * omitirlo al editar lo conserva.
+   */
+  username?: string | null;
   firstName: string;
   paternalLastName: string;
   maternalLastName?: string;
@@ -105,8 +117,12 @@ export function usePersonsApi() {
         { adminAccess }
       ),
 
-    createCredentials: (id: string) =>
-      api.post<{ username: string; temporaryPassword: string }>(`/persons/${id}/credentials`),
+    /**
+     * Crea la cuenta. `username`, si se indica, se asigna en la misma operación;
+     * si no, se usa el guardado. Sin ninguno, el servidor responde 400.
+     */
+    createCredentials: (id: string, username?: string | null) =>
+      api.post<{ username: string; temporaryPassword: string }>(`/persons/${id}/credentials`, username ? { username } : {}),
 
     resetCredentials: (id: string) =>
       api.post<{ temporaryPassword: string }>(`/persons/${id}/credentials/reset`),

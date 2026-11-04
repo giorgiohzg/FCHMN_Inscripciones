@@ -6,19 +6,26 @@ import { formatRun, isValidRun } from "../persons/runValidator";
 import { PersonPicker } from "./PersonPicker";
 import { PersonMultiPicker } from "./PersonMultiPicker";
 import { ClubSwimmersSection } from "../swimmer-assignment/ClubSwimmersSection";
+import { CredencialesDeAcceso } from "../../shared/CredencialesDeAcceso";
+import { evaluarUsernameEditado, problemaDeUsername } from "../../shared/usernameFormato";
 
 /**
- * Los TRES estados de la personalidad jurídica, como los ve el formulario.
+ * Los DOS estados de la personalidad jurídica, como los ve el formulario.
  *
- * Una casilla de verificación no puede expresar tres cosas, y el estado
- * «pendiente de verificar» no es «no»: el booleano del servidor es
- * `true | false | null` y aquí vive como un valor con nombre, para que ninguna
- * comparación por veracidad pueda confundir «pendiente» con «no».
+ * Vive como un valor con nombre y no como un booleano suelto para que ninguna
+ * comparación por veracidad pueda confundir un club cuyo dato aún no llegó
+ * (`undefined`) con «No tiene».
  */
-type EstadoPj = "si" | "no" | "pendiente";
+type EstadoPj = "si" | "no";
 
-const aEstadoPj = (v: boolean | null | undefined): EstadoPj => (v === true ? "si" : v === false ? "no" : "pendiente");
-const aValorPj = (e: EstadoPj): boolean | null => (e === "si" ? true : e === "no" ? false : null);
+/**
+ * El contrato público solo admite `true` y `false`, y desde la migración 10b la
+ * base tampoco admite NULL. Se conserva la tolerancia a un valor ausente (`undefined`
+ * mientras la ficha carga, o una respuesta de una API anterior): se presenta como «No
+ * tiene», que es en lo que la migración 10a convirtió el antiguo «pendiente».
+ */
+const aEstadoPj = (v: boolean | null | undefined): EstadoPj => (v === true ? "si" : "no");
+const aValorPj = (e: EstadoPj): boolean => e === "si";
 
 export function ClubFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -29,9 +36,8 @@ export function ClubFormPage() {
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [code, setCode] = useState("");
-  // Un club nuevo nace PENDIENTE: nadie ha verificado nada todavía. Antes nacía
-  // en `false`, que afirmaba «no tiene personalidad jurídica» sin comprobarlo.
-  const [pjEstado, setPjEstado] = useState<EstadoPj>("pendiente");
+  // Un club nuevo comienza con «No tiene» seleccionado (decisión del usuario).
+  const [pjEstado, setPjEstado] = useState<EstadoPj>("no");
   const [rut, setRut] = useState("");
   const [legalName, setLegalName] = useState("");
   const [email, setEmail] = useState("");
@@ -45,18 +51,27 @@ export function ClubFormPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [credentialsMsg, setCredentialsMsg] = useState<string | null>(null);
+  const [creandoCredenciales, setCreandoCredenciales] = useState(false);
+  /**
+   * Cuenta cuya creación CONFIRMÓ el servidor, antes de volver a leer la ficha.
+   * Solo lleva lo que la respuesta del POST afirma (el nombre); el estado de la
+   * cuenta no se inventa. Bloquea el nombre y el botón aunque la lectura
+   * posterior falle o tarde.
+   */
+  const [cuentaCreada, setCuentaCreada] = useState<{ username: string } | null>(null);
+  const cuentaVigente = club?.user ?? cuentaCreada;
 
   useEffect(() => {
     if (!isEdit) return;
     api.get(id!).then((c) => {
       setClub(c);
       setName(c.name);
-      setUsername(c.username);
+      setUsername(c.username ?? "");
       setCode(c.code);
       setPjEstado(aEstadoPj(c.hasLegalStatus));
       setRut(c.rut ?? "");
       setLegalName(c.legalName ?? "");
-      setEmail(c.email);
+      setEmail(c.email ?? "");
       setDelegatePersonIds(c.staff.filter((s) => s.roleType === "delegate").map((s) => s.person.id));
       setCoachPersonIds(c.staff.filter((s) => s.roleType === "coach").map((s) => s.person.id));
       setLegalRepresentativePersonId(c.staff.find((s) => s.roleType === "legal_representative")?.person.id ?? null);
@@ -79,11 +94,6 @@ export function ClubFormPage() {
       setError("El RUT es obligatorio y debe ser válido para clubes con personalidad jurídica");
       return;
     }
-    // Pendiente: el RUT es opcional, pero si se escribe uno tiene que ser válido.
-    if (pjEstado === "pendiente" && rut.trim().length > 0 && !isValidRun(rut)) {
-      setError("El RUT ingresado no es válido. Déjelo en blanco si todavía no lo tiene.");
-      return;
-    }
     if (pjEstado !== "si" && representanteActual) {
       setError(
         `Este club tiene a ${representanteActual.person.fullName} designado(a) como representante legal. ` +
@@ -91,8 +101,13 @@ export function ClubFormPage() {
       );
       return;
     }
-    if (!isEdit && username.trim().length < 4) {
-      setError("El nombre de usuario debe tener al menos 4 caracteres");
+    // El nombre de usuario es OPCIONAL. En el alta, si se escribe debe tener
+    // formato válido. Al editar solo se valida si CAMBIÓ: un nombre antiguo sin
+    // tocar se conserva y no impide guardar otros datos.
+    const usernameEditado = evaluarUsernameEditado(club?.username, username);
+    const problemaUsername = cuentaVigente ? null : isEdit ? usernameEditado.problema : problemaDeUsername(username);
+    if (problemaUsername) {
+      setError(problemaUsername);
       return;
     }
     if (code.trim().length === 0 || code.trim().length > 5) {
@@ -109,7 +124,12 @@ export function ClubFormPage() {
           hasLegalStatus: aValorPj(pjEstado),
           rut: pjEstado === "no" ? undefined : rut.trim() || undefined,
           legalName: legalName || undefined,
-          email,
+          // Vacío = quitar el correo (`null`); nunca se envía una cadena vacía.
+          email: email.trim() || null,
+          // Solo si CAMBIÓ y mientras no haya cuenta: sin cambios no se envía
+          // (así un nombre antiguo se conserva intacto); con cuenta está
+          // bloqueado. Vacío = quitarlo.
+          ...(cuentaVigente || !usernameEditado.cambio ? {} : { username: usernameEditado.valor }),
           delegatePersonIds,
           coachPersonIds,
           legalRepresentativePersonId: pjEstado === "si" ? legalRepresentativePersonId : null,
@@ -121,12 +141,13 @@ export function ClubFormPage() {
       } else {
         await api.create({
           name,
-          username,
+          // Vacío = sin nombre de usuario: no se genera ninguno.
+          username: username.trim() || null,
           code,
           hasLegalStatus: aValorPj(pjEstado),
           rut: pjEstado === "no" ? undefined : rut.trim() || undefined,
           legalName: legalName || undefined,
-          email,
+          email: email.trim() || null,
           delegatePersonIds,
           coachPersonIds,
           legalRepresentativePersonId: pjEstado === "si" ? legalRepresentativePersonId : null,
@@ -144,14 +165,43 @@ export function ClubFormPage() {
     }
   }
 
+  /**
+   * Asigna el nombre escrito y crea la cuenta en UNA operación del servidor.
+   * Si falla, nada cambia: el campo conserva lo escrito y sigue editable.
+   */
   async function handleCreateCredentials() {
-    if (!id) return;
+    if (!id || cuentaVigente) return;
+    setError(null);
+    setCredentialsMsg(null);
+    setCreandoCredenciales(true);
+
+    // 1. Crear la cuenta. Si esto falla, nada cambió: el campo sigue editable.
+    //    Sin cambios en el campo se usa el nombre guardado (no se reenvía).
+    const editado = evaluarUsernameEditado(club?.username, username);
+    let creada: { username: string; temporaryPassword: string };
     try {
-      const result = await api.createCredentials(id);
-      setCredentialsMsg(`Credenciales creadas. Usuario: ${result.username} — Contraseña temporal: ${result.temporaryPassword}`);
-      setClub(await api.get(id));
+      creada = await api.createCredentials(id, editado.cambio ? editado.valor : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudieron crear las credenciales");
+      setCreandoCredenciales(false);
+      return;
+    }
+
+    // 2. El servidor CONFIRMÓ la creación: se registra antes de depender de
+    //    nada más. Desde aquí el nombre está bloqueado y no se ofrece repetirla.
+    setCuentaCreada({ username: creada.username });
+    setUsername(creada.username);
+    setCredentialsMsg(`Credenciales creadas. Usuario: ${creada.username} — Contraseña temporal: ${creada.temporaryPassword}`);
+    setCreandoCredenciales(false);
+
+    // 3. Releer la ficha. Un fallo aquí NO es un fallo de la creación.
+    try {
+      setClub(await api.get(id));
+    } catch (err) {
+      setError(
+        `Las credenciales se crearon correctamente, pero no se pudo actualizar la ficha${err instanceof Error ? `: ${err.message}` : ""}. ` +
+          "Recargue la página para ver el estado actual."
+      );
     }
   }
 
@@ -173,42 +223,21 @@ export function ClubFormPage() {
         <label htmlFor="name">Nombre del club</label>
         <input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
 
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "0.75rem" }}>
-          <div>
-            <label htmlFor="username">Nombre de usuario (para iniciar sesión)</label>
-            <input
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="ej: club_delfines"
-              disabled={isEdit}
-              required
-            />
-          </div>
-          <div>
-            <label htmlFor="code">Sigla (máx. 5 caracteres)</label>
-            <input
-              id="code"
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              maxLength={5}
-              placeholder="ej: SINT"
-              required
-            />
-          </div>
-        </div>
-        {isEdit && (
-          <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "-0.4rem" }}>
-            El nombre de usuario no se puede modificar una vez creado.
-          </p>
-        )}
+        <label htmlFor="code">Sigla (máx. 5 caracteres)</label>
+        <input
+          id="code"
+          value={code}
+          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          maxLength={5}
+          placeholder="ej: SINT"
+          required
+        />
 
         <label style={{ marginTop: "1rem" }}>Personalidad jurídica</label>
         <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap" }}>
           {([
             ["si", "Sí, tiene"],
             ["no", "No tiene"],
-            ["pendiente", "Pendiente de verificar"],
           ] as [EstadoPj, string][]).map(([valor, etiqueta]) => (
             <label key={valor} style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 400 }}>
               <input
@@ -222,16 +251,9 @@ export function ClubFormPage() {
             </label>
           ))}
         </div>
-        {pjEstado === "pendiente" && (
-          <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "0.25rem" }}>
-            «Pendiente de verificar» no es lo mismo que «No tiene»: queda registrado que el dato todavía no se ha comprobado.
-            El RUT es opcional y no se puede designar representante legal.
-          </p>
-        )}
-
         {pjEstado !== "no" && (
           <>
-            <label htmlFor="rut">RUT{pjEstado === "pendiente" && " (opcional mientras esté pendiente)"}</label>
+            <label htmlFor="rut">RUT</label>
             <input
               id="rut"
               value={rut}
@@ -247,8 +269,8 @@ export function ClubFormPage() {
           </>
         )}
 
-        <label htmlFor="email">Correo electrónico (contacto)</label>
-        <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <label htmlFor="email">Correo electrónico (contacto, opcional)</label>
+        <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
 
         <div style={{ marginTop: "0.9rem" }}>
           <PersonMultiPicker label="Delegado(a) — puede agregar más de uno" values={delegatePersonIds} onChange={setDelegatePersonIds} />
@@ -262,9 +284,7 @@ export function ClubFormPage() {
           </div>
         ) : (
           <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "0.9rem" }}>
-            {pjEstado === "pendiente"
-              ? "No se puede designar representante legal mientras la personalidad jurídica esté pendiente de verificar: es un rol con acceso al sistema."
-              : "Solo los clubes con personalidad jurídica pueden tener representante legal."}
+            Solo los clubes con personalidad jurídica pueden tener representante legal.
             {representanteActual &&
               ` Actualmente está designado(a) ${representanteActual.person.fullName}; hay que retirarlo con el estado en «Sí» antes de cambiarlo.`}
           </p>
@@ -302,6 +322,18 @@ export function ClubFormPage() {
           </label>
         </div>
 
+        <CredencialesDeAcceso
+          modo={isEdit ? "edicion" : "alta"}
+          username={username}
+          onUsernameChange={setUsername}
+          usernameOriginal={club?.username}
+          cuenta={cuentaVigente}
+          onCrearCredenciales={handleCreateCredentials}
+          onRestablecerContrasena={handleResetCredentials}
+          creando={creandoCredenciales}
+          mensaje={credentialsMsg}
+        />
+
         {error && <p role="alert" className="error-message">{error}</p>}
 
         <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem" }}>
@@ -309,31 +341,6 @@ export function ClubFormPage() {
           <button type="button" className="btn-secondary" onClick={() => navigate("/clubes")}>Cancelar</button>
         </div>
       </form>
-
-      {isEdit && (
-        <div style={{ marginTop: "2rem", paddingTop: "1.5rem", borderTop: "1px solid var(--brand-gray-100)", maxWidth: 560 }}>
-          <h2 style={{ fontSize: "1.05rem", color: "var(--brand-navy)" }}>Credenciales de acceso</h2>
-          {club?.user ? (
-            <>
-              <p style={{ fontSize: "0.9rem" }}>
-                Cuenta activa: <strong>{club.user.username}</strong>{" "}
-                <span className={`badge ${club.user.status === "active" ? "badge-active" : "badge-locked"}`}>{club.user.status}</span>
-              </p>
-              <button className="btn-secondary" onClick={handleResetCredentials}>Restablecer contraseña</button>
-            </>
-          ) : (
-            <>
-              <p style={{ fontSize: "0.9rem", color: "var(--brand-gray-600)" }}>Este club no tiene credenciales de acceso al sistema.</p>
-              <button className="btn-secondary" onClick={handleCreateCredentials}>Crear credenciales</button>
-            </>
-          )}
-          {credentialsMsg && (
-            <p style={{ fontSize: "0.85rem", background: "var(--brand-bg)", padding: "0.75rem", borderRadius: 6, marginTop: "0.75rem" }}>
-              {credentialsMsg}
-            </p>
-          )}
-        </div>
-      )}
 
       {isEdit && <ClubSwimmersSection clubId={id!} />}
     </AppShell>

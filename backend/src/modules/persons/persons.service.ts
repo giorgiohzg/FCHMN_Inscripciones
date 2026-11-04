@@ -1,12 +1,19 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../../shared/prisma.client";
 import { audit, withAudit } from "../audit/audit.service";
-import { assertUsernameAvailable } from "../../shared/username";
+import {
+  assertUsernameAvailable,
+  conErroresDeIdentidad,
+  MENSAJE_FALTA_USERNAME,
+  MENSAJE_NOMBRE_BLOQUEADO,
+  tieneCuentaVigente,
+} from "../../shared/username";
 import { hashPassword, generateOpaqueToken } from "../auth/password.util";
 import { normalizeRun } from "../../shared/run.util";
 import { ValidationError, NotFoundError } from "../../shared/errors";
 import { formatPersonFullName } from "../../shared/personName.util";
 import { withTranslatedPrismaErrors } from "../../shared/prismaErrors";
+import { dbFrom, type Db, type TxOption } from "../../shared/transaction";
 import {
   ROL_ADMIN,
   aplicarRolAdmin,
@@ -21,9 +28,9 @@ interface ActorContext {
   ipAddress?: string;
 }
 
-async function assertRunNotDuplicated(run: string, excludePersonId?: string) {
+async function assertRunNotDuplicated(run: string, excludePersonId?: string, db: Db = prisma) {
   const normalized = normalizeRun(run);
-  const existing = await prisma.person.findFirst({
+  const existing = await db.person.findFirst({
     where: { run: normalized, deletedAt: null, ...(excludePersonId ? { id: { not: excludePersonId } } : {}) },
   });
   if (existing) {
@@ -76,17 +83,26 @@ export async function getPersonById(id: string) {
   return person;
 }
 
-export async function createPerson(input: PersonCreateInput, actor: ActorContext) {
+/**
+ * `options.tx`: la carga masiva crea la persona DENTRO de la transacción de su fila,
+ * junto con la membresía, el rol derivado y la auditoría (etapa 6). Sin `tx` se
+ * comporta exactamente como antes.
+ */
+export async function createPerson(input: PersonCreateInput, actor: ActorContext, options?: TxOption) {
+  const db = dbFrom(options);
   const normalizedRun = normalizeRun(input.run);
-  await assertRunNotDuplicated(normalizedRun);
-  await assertUsernameAvailable(input.username);
+  await assertRunNotDuplicated(normalizedRun, undefined, db);
+  // Sin nombre de usuario la persona queda con `NULL`: no se genera ninguno ni
+  // se crea cuenta. Registrar y dar acceso son pasos separados.
+  const username = input.username ?? null;
+  if (username) await assertUsernameAvailable(username, { tx: options?.tx });
 
-  const person = await withAudit(
+  const person = await conErroresDeIdentidad(() => withAudit(
     (tx) =>
       tx.person.create({
     data: {
       run: normalizedRun,
-      username: input.username,
+      username,
       firstName: input.firstName,
       paternalLastName: input.paternalLastName,
       maternalLastName: input.maternalLastName || null,
@@ -111,8 +127,9 @@ export async function createPerson(input: PersonCreateInput, actor: ActorContext
       entityId: person.id,
       ipAddress: actor.ipAddress,
       after: person,
-    })
-  );
+    }),
+    options
+  ));
 
   return person;
 }
@@ -136,10 +153,30 @@ export async function updatePerson(id: string, input: PersonUpdateInput, actor: 
     );
   }
 
-  const person = await prisma.$transaction(async (tx) => {
+  /**
+   * Nombre de usuario: `undefined` no lo toca; un valor lo asigna o lo cambia;
+   * `null` lo quita. Solo se considera si de verdad cambia —reenviar el mismo
+   * nombre, aunque haya cuenta, no es un cambio—.
+   */
+  const cambiaUsername = input.username !== undefined && input.username !== before.username;
+
+  const person = await conErroresDeIdentidad(() => prisma.$transaction(async (tx) => {
+    if (cambiaUsername) {
+      /**
+       * Bloqueado con una cuenta VIGENTE (activa, bloqueada o inhabilitada).
+       * Se comprueba dentro de la transacción para dar el mensaje; la garantía
+       * frente a una creación de credenciales simultánea la da
+       * `titular_forbid_rename_con_cuenta` junto con el cerrojo que toma sobre
+       * esta misma fila `users_username_igual_al_titular`.
+       */
+      if (await tieneCuentaVigente({ personId: id }, { tx })) throw new ValidationError(MENSAJE_NOMBRE_BLOQUEADO);
+      if (input.username) await assertUsernameAvailable(input.username, { excludePersonId: id, tx });
+    }
+
     await tx.person.update({
       where: { id },
       data: {
+        username: cambiaUsername ? input.username : undefined,
         firstName: isEditingName ? newFirstName : undefined,
         paternalLastName: isEditingName ? newPaternalLastName : undefined,
         maternalLastName: isEditingName ? newMaternalLastName || null : undefined,
@@ -177,7 +214,7 @@ export async function updatePerson(id: string, input: PersonUpdateInput, actor: 
       { tx }
     );
     return actualizada;
-  });
+  }));
 
   return person;
 }
@@ -380,13 +417,17 @@ export async function setAdminAccess(personId: string, enabled: boolean, actor: 
 // --------------------------------------------------------------------------
 
 /**
- * Crea una cuenta de acceso para la persona, usando su `username` ya
- * definido (RUN/creación de la persona) — con contraseña temporal que
- * debe cambiarse en el primer ingreso. Retorna la contraseña en claro UNA
- * SOLA VEZ (para comunicarla fuera de banda); nunca se persiste ni se
- * vuelve a exponer.
+ * Crea una cuenta de acceso para la persona, con contraseña temporal que debe
+ * cambiarse en el primer ingreso. Retorna la contraseña en claro UNA SOLA VEZ
+ * (para comunicarla fuera de banda); nunca se persiste ni se vuelve a exponer.
+ *
+ * NOMBRE DE USUARIO: el de `opciones.username` si viene, o el que la persona
+ * ya tenga guardado. Sin ninguno de los dos, 400 y nada se escribe. Si viene
+ * uno distinto del guardado, se asigna a la persona EN LA MISMA TRANSACCIÓN
+ * que crea la cuenta: o quedan los dos, o ninguno. Un fallo en cualquier paso
+ * deja la persona exactamente como estaba, con el nombre todavía editable.
  */
-export async function createCredentials(personId: string, actor: ActorContext) {
+export async function createCredentials(personId: string, actor: ActorContext, opciones: { username?: string | null } = {}) {
   /**
    * El hash se calcula ANTES de abrir la transacción, a propósito: cuesta
    * decenas de milisegundos (medidos: unos 50 en este equipo) y no depende de
@@ -401,9 +442,11 @@ export async function createCredentials(personId: string, actor: ActorContext) {
   const passwordHash = await hashPassword(tempPassword);
 
   return withTranslatedPrismaErrors(() =>
-    prisma.$transaction(
-      async (tx) => crearCredencialesEnTransaccion(tx, personId, actor, tempPassword, passwordHash),
-      { isolationLevel: "Serializable" }
+    conErroresDeIdentidad(() =>
+      prisma.$transaction(
+        async (tx) => crearCredencialesEnTransaccion(tx, personId, actor, tempPassword, passwordHash, opciones.username ?? null),
+        { isolationLevel: "Serializable" }
+      )
     )
   );
 }
@@ -444,7 +487,8 @@ async function crearCredencialesEnTransaccion(
   personId: string,
   actor: ActorContext,
   tempPassword: string,
-  passwordHash: string
+  passwordHash: string,
+  usernameSolicitado: string | null
 ) {
   const person = await tx.person.findFirst({
     where: { id: personId, deletedAt: null },
@@ -453,8 +497,11 @@ async function crearCredencialesEnTransaccion(
   if (!person) throw new NotFoundError("Persona");
   if (person.user) throw new ValidationError("La persona ya tiene credenciales de acceso");
 
+  const username = usernameSolicitado ?? person.username;
+  if (!username) throw new ValidationError(MENSAJE_FALTA_USERNAME, { field: "username" });
+
   // Solo puede tomar el nombre de usuario su propio dueño: la persona.
-  await assertUsernameAvailable(person.username, { excludePersonId: person.id, tx });
+  await assertUsernameAvailable(username, { excludePersonId: person.id, tx });
 
   /**
    * El rol de ACCESO (login) se deriva de los roles funcionales activos.
@@ -508,11 +555,21 @@ async function crearCredencialesEnTransaccion(
     throw new ValidationError("Uno o más roles de acceso no están configurados en el sistema (revise el seed)");
   }
 
+  /**
+   * El nombre se asigna a la persona JUSTO ANTES de crear la cuenta y en la
+   * misma transacción: `users_username_igual_al_titular` exige que la cuenta
+   * nazca con el nombre de su titular, y aquí ya lo tiene. Si algo de lo que
+   * sigue falla, esta escritura se revierte con todo lo demás.
+   */
+  if (username !== person.username) {
+    await tx.person.update({ where: { id: personId }, data: { username, updatedBy: actor.userId } });
+  }
+
   const user = await withAudit(
     (tx) =>
       tx.user.create({
         data: {
-          username: person.username,
+          username,
           passwordHash,
           ownerType: "person",
           personId,
@@ -530,7 +587,8 @@ async function crearCredencialesEnTransaccion(
       // Que la cuenta nazca administrativa queda registrado: sin esto, la
       // concesión de admin de una persona sin cuenta no dejaría rastro del
       // momento en que se hizo efectiva.
-      after: { roles: loginRoleNames, administrativa: person.adminAccess },
+      // Y con qué nombre, y si se asignó en este mismo paso.
+      after: { roles: loginRoleNames, administrativa: person.adminAccess, username, usernameAnterior: person.username },
     }),
     // La auditoría va DENTRO de la misma transacción: si la creación se
     // aborta por conflicto, no queda registrada una cuenta que no existe.

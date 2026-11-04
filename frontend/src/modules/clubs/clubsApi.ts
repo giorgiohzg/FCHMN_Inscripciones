@@ -2,8 +2,8 @@ import { api } from "../../shared/apiClient";
 
 export type AccountStatus = "active" | "locked" | "disabled";
 
-/** Filtro por personalidad jurídica. Lo resuelve el servidor, no la página. */
-export type EstadoPjFiltro = "si" | "no" | "pendiente";
+/** Filtro por personalidad jurídica: `si` o `no`. Lo resuelve el servidor, no la página. */
+export type EstadoPjFiltro = "si" | "no";
 
 export interface ClubStaffMember {
   id: string;
@@ -14,13 +14,15 @@ export interface ClubStaffMember {
 export interface Club {
   id: string;
   name: string;
-  username: string;
+  /** `null` = el club todavía no tiene nombre de usuario. */
+  username: string | null;
   code: string;
-  /** `true` sí · `false` verificado que no · `null` **pendiente de verificar**. */
-  hasLegalStatus: boolean | null;
+  /** `true` sí · `false` no. Solo booleanos: el estado «pendiente de verificar» ya no existe. */
+  hasLegalStatus: boolean;
   rut: string | null;
   legalName: string | null;
-  email: string;
+  /** `null` = el club no tiene correo registrado. */
+  email: string | null;
   staff: ClubStaffMember[];
   isAchmnMember: boolean;
   isAchmnCollaborator: boolean;
@@ -39,13 +41,18 @@ export interface ClubListResult {
 
 export interface ClubFormInput {
   name: string;
-  username?: string; // solo en creación
+  /**
+   * Editable mientras el club no tenga cuenta. `null` (o vacío) lo quita;
+   * omitirlo al editar lo conserva.
+   */
+  username?: string | null;
   code: string;
-  /** `null` deja el club como «pendiente de verificar». Nunca se omite. */
-  hasLegalStatus: boolean | null;
+  /** Obligatorio: `true` o `false`. El servidor rechaza `null` y su omisión. */
+  hasLegalStatus: boolean;
   rut?: string;
   legalName?: string;
-  email: string;
+  /** `null` = sin correo. Al editar, `null` (o vacío) lo elimina; omitirlo lo conserva. */
+  email?: string | null;
   delegatePersonIds?: string[];
   coachPersonIds?: string[];
   legalRepresentativePersonId?: string | null;
@@ -84,8 +91,12 @@ export function useClubsApi() {
     reactivate: (id: string) =>
       api.post<Club>(`/clubs/${id}/reactivate`),
 
-    createCredentials: (id: string) =>
-      api.post<{ username: string; temporaryPassword: string }>(`/clubs/${id}/credentials`),
+    /**
+     * Crea la cuenta. `username`, si se indica, se asigna en la misma operación;
+     * si no, se usa el guardado. Sin ninguno, el servidor responde 400.
+     */
+    createCredentials: (id: string, username?: string | null) =>
+      api.post<{ username: string; temporaryPassword: string }>(`/clubs/${id}/credentials`, username ? { username } : {}),
 
     resetCredentials: (id: string) =>
       api.post<{ temporaryPassword: string }>(`/clubs/${id}/credentials/reset`),

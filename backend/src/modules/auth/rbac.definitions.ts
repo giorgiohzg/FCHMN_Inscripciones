@@ -43,6 +43,9 @@ export const CLUB_STAFF_PERMISSIONS = [
   "registrations:read",
   "registrations:write",
   "reports:read",
+  // Exporta el .HY3 de SU club: el alcance lo aplica `buildTeamManagerHy3Export`
+  // con el contexto del actor. También lo tiene el rol `club`; NO el `swimmer`.
+  "export:team-manager",
 ];
 
 export const ROLES: Record<string, string[]> = {
@@ -57,6 +60,9 @@ export const ROLES: Record<string, string[]> = {
     "registrations:read",
     "registrations:write",
     "reports:read",
+    // La cuenta del club exporta el .HY3 de su propio club (mismo alcance que el
+    // personal: lo aplica el servicio con el contexto del actor).
+    "export:team-manager",
   ],
   delegate: CLUB_STAFF_PERMISSIONS,
   coach: CLUB_STAFF_PERMISSIONS,

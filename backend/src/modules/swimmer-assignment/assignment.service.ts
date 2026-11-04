@@ -1,8 +1,9 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../../shared/prisma.client";
 import { audit, withAudit } from "../audit/audit.service";
 import { ValidationError, NotFoundError } from "../../shared/errors";
 import { type ActorContext, assertClubAccess } from "../../shared/actorContext";
-import { type Db } from "../../shared/transaction";
+import { dbFrom, type Db, type TxOption } from "../../shared/transaction";
 import { evaluateTransition } from "./assignment.rules";
 import type { DirectAssignmentInput, ProposeAssignmentInput, AssignmentListQuery } from "./assignment.schemas";
 import { fechaCalendarioAUtc, hoyEnZonaDelNegocio } from "../../shared/fecha.util";
@@ -102,8 +103,8 @@ async function syncSwimmerRole(personId: string, db: Db) {
   }
 }
 
-async function assertClubActive(clubId: string) {
-  const club = await prisma.club.findFirst({ where: { id: clubId, deletedAt: null } });
+async function assertClubActive(clubId: string, db: Db = prisma) {
+  const club = await db.club.findFirst({ where: { id: clubId, deletedAt: null } });
   if (!club) throw new NotFoundError("Club");
   if (club.status !== "active") throw new ValidationError("El club no está activo");
   return club;
@@ -175,17 +176,23 @@ export async function getAssignmentById(id: string) {
  * OTRO club, se bloquea con el mismo mensaje claro, en vez de hacer un
  * reemplazo silencioso.
  */
-export async function assignSwimmerDirectly(input: DirectAssignmentInput, actor: ContextoDeAuditoria) {
-  await assertClubActive(input.clubId);
+export async function assignSwimmerDirectly(input: DirectAssignmentInput, actor: ContextoDeAuditoria, options?: TxOption) {
+  // `options.tx`: la carga masiva (etapa 6) asigna DENTRO de la transacción de su fila,
+  // así que las comprobaciones y las escrituras usan ese cliente. Sin `tx`, como antes.
+  const db = dbFrom(options);
+  await assertClubActive(input.clubId, db);
 
-  const existingActiveSameClub = await prisma.clubSwimmer.findFirst({
+  const existingActiveSameClub = await db.clubSwimmer.findFirst({
     where: { clubId: input.clubId, personId: input.personId, status: "active" },
   });
   if (existingActiveSameClub) {
     throw new ValidationError("El nadador ya pertenece activamente a este club");
   }
 
-  const currentActive = await getCurrentClubForPerson(input.personId);
+  const currentActive = await db.clubSwimmer.findFirst({
+    where: { personId: input.personId, status: "active" },
+    include: { club: { select: { id: true, name: true } } },
+  });
   if (currentActive) {
     throw new ValidationError(
       `El nadador ya tiene una membresía activa en "${currentActive.club.name}". ` +
@@ -194,7 +201,7 @@ export async function assignSwimmerDirectly(input: DirectAssignmentInput, actor:
   }
 
   // La membresía y el rol derivado se escriben juntos o no se escriben.
-  const assignment = await prisma.$transaction(async (tx) => {
+  const escribir = async (tx: Prisma.TransactionClient) => {
     const created = await tx.clubSwimmer.create({
       data: {
         clubId: input.clubId,
@@ -221,9 +228,10 @@ export async function assignSwimmerDirectly(input: DirectAssignmentInput, actor:
       { tx }
     );
     return created;
-  });
+  };
 
-  return assignment;
+  // Prisma no anida transacciones: si el llamador ya abrió una, se escribe en ella.
+  return options?.tx ? escribir(options.tx) : prisma.$transaction(escribir);
 }
 
 /**

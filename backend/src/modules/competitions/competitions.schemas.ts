@@ -35,6 +35,14 @@ export const competitionCreateSchema = z
     // Opcional: si no se selecciona, la exportación a Team Manager usa
     // piscina larga por defecto (comportamiento previo, sin cambios).
     poolId: z.string().uuid().optional().nullable(),
+    /**
+     * `false` oculta la competencia SOLO de los desplegables del Panel de
+     * Inscripción y del Panel de Relevos. Omitido = visible. Booleano estricto:
+     * no se coacciona texto, para que `"false"` no se vuelva `true`.
+     */
+    visibleInRegistrationPanels: z.boolean().optional(),
+    /** Exigir una individual confirmada antes de participar en relevos. Omitido = `true`. Booleano estricto. */
+    requireIndividualForRelay: z.boolean().optional(),
   })
   .refine((d) => d.maxSwimmers == null || d.maxSwimmersPerClub == null || d.maxSwimmersPerClub <= d.maxSwimmers, {
     message: "El cupo por club no puede superar el cupo total de la competencia",
@@ -61,6 +69,10 @@ export const competitionUpdateSchema = z
     maxSwimmers: z.coerce.number().int().min(1).optional().nullable(),
     maxSwimmersPerClub: z.coerce.number().int().min(1).optional().nullable(),
     poolId: z.string().uuid().optional().nullable(),
+    // Omitido = no se toca. Booleano estricto (ver el alta).
+    visibleInRegistrationPanels: z.boolean().optional(),
+    // Omitido = no se toca. Booleano estricto (ver el alta).
+    requireIndividualForRelay: z.boolean().optional(),
   })
   /**
    * Esta comprobación solo alcanza cuando AMBAS fechas vienen en la misma
@@ -78,6 +90,21 @@ export type CompetitionUpdateInput = z.infer<typeof competitionUpdateSchema>;
 export const competitionListQuerySchema = z.object({
   search: z.string().trim().optional(),
   status: z.enum(["draft", "scheduled", "open", "closed", "in_progress", "finished", "cancelled"]).optional(),
+  /**
+   * FILTRO EXPLÍCITO por visibilidad en los paneles de inscripción y relevos.
+   *
+   * Omitido = sin filtro (el comportamiento de siempre del listado general).
+   * `true` = solo las visibles, que es lo que piden los dos paneles. `false` =
+   * solo las ocultas.
+   *
+   * Se enumeran los dos textos en vez de usar `z.coerce.boolean()`, que
+   * convierte CUALQUIER texto no vacío —incluido «false»— en `true`. Cualquier
+   * otro valor se rechaza con 400.
+   */
+  visibleInRegistrationPanels: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
@@ -129,6 +156,12 @@ export const addCompetitionEventSchema = z.object({
   competitionSessionId: z.string().uuid("Jornada inválida"),
   categoryIds: z.array(z.string().uuid()).min(1, "Debe habilitar al menos una categoría"),
   displayOrder: z.coerce.number().int().optional(),
+  /**
+   * Máximo de nadadores por club en esta prueba INDIVIDUAL. Omitido o `null` =
+   * «Sin límite». Con valor, entero positivo. En una prueba de relevo se rechaza
+   * (lo comprueba el servicio, que conoce el tipo de la prueba).
+   */
+  maxSwimmersPerClub: z.coerce.number().int("Debe ser un número entero").min(1, "El máximo por club debe ser al menos 1").optional().nullable(),
 });
 export type AddCompetitionEventInput = z.infer<typeof addCompetitionEventSchema>;
 
@@ -137,6 +170,8 @@ export const updateCompetitionEventSchema = z.object({
   categoryIds: z.array(z.string().uuid()).min(1).optional(),
   status: z.enum(["enabled", "disabled"]).optional(),
   displayOrder: z.coerce.number().int().nullable().optional(),
+  // `null` QUITA el límite; omitido no lo toca. Igual que en el alta.
+  maxSwimmersPerClub: z.coerce.number().int("Debe ser un número entero").min(1, "El máximo por club debe ser al menos 1").optional().nullable(),
 });
 export type UpdateCompetitionEventInput = z.infer<typeof updateCompetitionEventSchema>;
 

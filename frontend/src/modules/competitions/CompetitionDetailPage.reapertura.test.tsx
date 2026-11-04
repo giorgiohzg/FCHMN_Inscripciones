@@ -109,7 +109,7 @@ beforeEach(() => {
 });
 
 describe("el payload de guardado — el hecho que rompía la deducción del backend", () => {
-  it("guardar envía SIEMPRE las dos fechas, aunque solo se cambie el nombre", async () => {
+  it("guardar solo el nombre NO reenvía las fechas, y el cupo sí viaja", async () => {
     montar();
     await waitFor(() => expect(screen.getByText("Copa Cerrada")).toBeTruthy());
 
@@ -122,10 +122,12 @@ describe("el payload de guardado — el hecho que rompía la deducción del back
     const payload = update.mock.calls[0]![1] as Record<string, unknown>;
 
     expect(payload.name).toBe("Copa Renombrada");
-    // Esto es lo que hacía inútil la señal "trae fechas".
-    expect(payload.registrationStartAt, "el formulario reenvía el inicio sin tocarlo").toBeTruthy();
-    expect(payload.registrationEndAt, "y también el fin").toBeTruthy();
-    // Y lo mismo con el cupo: viaja aunque no se haya modificado.
+    // Este formulario antes reenviaba SIEMPRE las dos fechas (recortadas y sin zona horaria),
+    // y eso movía los instantes guardados. Ahora solo viajan las que se tocan. El backend no
+    // deduce nada de su presencia o ausencia: reabrir sigue siendo un acto aparte.
+    expect(payload.registrationStartAt, "el inicio no se tocó").toBeUndefined();
+    expect(payload.registrationEndAt, "el fin no se tocó").toBeUndefined();
+    // El cupo sigue viajando aunque no se haya modificado.
     expect(payload).toHaveProperty("maxSwimmers");
   });
 

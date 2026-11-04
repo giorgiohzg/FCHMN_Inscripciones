@@ -299,8 +299,10 @@ export function RegistrationWorkspacePage() {
 
   useEffect(() => {
     // Se muestran TODAS las competencias (no solo las abiertas) — permite
-    // revisar o corregir inscripciones de competencias ya cerradas.
-    traerTodasLasPaginas((page, pageSize) => competitionsApi.list({ page, pageSize }))
+    // revisar o corregir inscripciones de competencias ya cerradas — salvo las
+    // que la administración ocultó de este selector (para todos los roles; solo
+    // quita la opción del desplegable, no cambia ningún acceso ni regla).
+    traerTodasLasPaginas((page, pageSize) => competitionsApi.list({ visibleInRegistrationPanels: true, page, pageSize }))
       .then(setCompetitions)
       .catch((err) => setErrorGlobal(err instanceof Error ? err.message : "No se pudieron cargar las competencias"));
 

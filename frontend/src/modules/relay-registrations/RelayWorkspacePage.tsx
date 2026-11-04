@@ -151,8 +151,10 @@ export function RelayWorkspacePage() {
 
   useEffect(() => {
     // Se muestran TODAS las competencias (no solo las abiertas) — permite
-    // revisar o corregir equipos de competencias ya cerradas.
-    traerTodasLasPaginas((page, pageSize) => competitionsApi.list({ page, pageSize }))
+    // revisar o corregir equipos de competencias ya cerradas — salvo las que la
+    // administración ocultó de este selector (para todos los roles; solo quita
+    // la opción del desplegable, no cambia ningún acceso ni regla).
+    traerTodasLasPaginas((page, pageSize) => competitionsApi.list({ visibleInRegistrationPanels: true, page, pageSize }))
       .then(setCompetitions)
       .catch((err) => setErrorGlobal(err instanceof Error ? err.message : "No se pudieron cargar las competencias"));
 
@@ -261,12 +263,29 @@ export function RelayWorkspacePage() {
 
   const activeEvent = events.find((e) => e.id === activeEventId);
 
-  const filteredSwimmers = swimmers.filter((s) => {
+  /**
+   * La columna izquierda lista a quienes aún se pueden colocar: se excluye a
+   * quien ocupa un puesto del equipo en edición. Se calcula SOLO sobre `slots`,
+   * nunca sobre los equipos confirmados: el límite de relevos por jornada es
+   * configurable y lo comprueba el servidor por integrante, así que ocultar a
+   * quien ya integra otro equipo impediría participaciones que sí están
+   * permitidas. Como `slots` sobrevive a un guardado fallido, quien no se
+   * guardó sigue en su puesto y nunca desaparece de ambos lados.
+   */
+  const placedIds = new Set(slots.filter(Boolean));
+  const unplacedSwimmers = swimmers.filter((s) => !placedIds.has(s.id));
+  const filteredSwimmers = unplacedSwimmers.filter((s) => {
     if (activeEvent && activeEvent.event.gender !== "mixed" && activeEvent.event.gender !== s.gender) return false;
     if (!search.trim()) return true;
     const q = search.trim().toLowerCase();
     return s.fullName.toLowerCase().includes(q) || s.run.toLowerCase().includes(q);
   });
+  const emptyRosterMessage =
+    swimmers.length === 0
+      ? "Este club no tiene nadadores en su plantel."
+      : unplacedSwimmers.length === 0
+        ? "Todos los nadadores del plantel están en el equipo en edición."
+        : "Ningún nadador disponible coincide con la búsqueda o con el género de la prueba.";
 
   function resetBuilder() {
     setEditingTeamId(null);
@@ -454,8 +473,10 @@ export function RelayWorkspacePage() {
           {selectedCompetition?.status === "individual_closed" && !hasRole("admin") && (
             <div role="status" style={{ border: "1px solid var(--state-success)", borderRadius: 6, padding: "0.5rem 0.8rem", marginBottom: "0.5rem", background: "rgba(34, 197, 94, 0.08)", fontSize: "0.85rem" }}>
               <strong>Los relevos siguen abiertos.</strong> La competencia alcanzó su cupo de nadadores, así que las inscripciones
-              individuales están cerradas, pero aquí puede seguir creando, editando y cancelando equipos — siempre con nadadores que ya
-              tengan una inscripción individual confirmada en esta competencia.
+              individuales están cerradas, pero aquí puede seguir creando, editando y cancelando equipos
+              {selectedCompetition.requireIndividualForRelay === false
+                ? "."
+                : " — siempre con nadadores que ya tengan una inscripción individual confirmada en esta competencia."}
             </div>
           )}
           {relevosBloqueados && (
@@ -471,10 +492,13 @@ export function RelayWorkspacePage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: "1rem", alignItems: "start" }}>
             {/* -------- Panel izquierdo: nadadores -------- */}
-            <div style={{ border: "1px solid var(--brand-gray-100)", borderRadius: 8, padding: "0.75rem", maxHeight: "78vh", overflowY: "auto" }}>
+            <div role="region" aria-label="Nadadores disponibles" style={{ border: "1px solid var(--brand-gray-100)", borderRadius: 8, padding: "0.75rem", maxHeight: "78vh", overflowY: "auto" }}>
               <input ref={searchInputRef} placeholder="🔎 Buscar nadador o RUN... (/)" value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginBottom: "0.5rem" }} />
               {isPureSwimmer && <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)" }}>Solo puede visualizar los relevos en los que participa.</p>}
               {!isPureSwimmer && !activeEventId && <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)" }}>Elija una prueba de relevo a la derecha para empezar a armar el equipo.</p>}
+              {filteredSwimmers.length === 0 && !isPureSwimmer && (
+                <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)" }}>{emptyRosterMessage}</p>
+              )}
               {filteredSwimmers.map((s) => (
                 <div
                   key={s.id}
@@ -486,13 +510,13 @@ export function RelayWorkspacePage() {
                     marginBottom: "0.3rem",
                     borderRadius: 6,
                     border: "1px solid var(--brand-gray-100)",
-                    background: slots.includes(s.id) ? "var(--brand-bg)" : draggingRosterId === s.id ? "var(--brand-bg)" : "white",
+                    background: draggingRosterId === s.id ? "var(--brand-bg)" : "white",
                     cursor: activeEventId ? "grab" : "not-allowed",
                     fontSize: "0.85rem",
                     opacity: activeEventId ? 1 : 0.5,
                   }}
                 >
-                  ☰ {s.fullName} {slots.includes(s.id) && "✓"}
+                  ☰ {s.fullName}
                 </div>
               ))}
             </div>
@@ -592,7 +616,13 @@ export function RelayWorkspacePage() {
                                               setDragOverSlot(null);
                                               const fromRoster = e.dataTransfer.getData(DRAG_ROSTER);
                                               const fromSlot = e.dataTransfer.getData(DRAG_SLOT);
-                                              if (fromRoster) placeInSlot(i, fromRoster);
+                                              if (fromRoster) {
+                                                placeInSlot(i, fromRoster);
+                                                // La tarjeta de origen se desmonta al colocarse el nadador, y un
+                                                // elemento desmontado no recibe `dragend`: sin esto, al volver a la
+                                                // lista quedaría con el fondo de «arrastrando».
+                                                setDraggingRosterId(null);
+                                              }
                                               else if (fromSlot !== "") swapSlots(Number(fromSlot), i);
                                             }}
                                             style={{

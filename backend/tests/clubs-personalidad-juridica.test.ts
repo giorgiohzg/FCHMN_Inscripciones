@@ -1,15 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { clubCreateSchema, clubUpdateSchema } from "../src/modules/clubs/clubs.schemas";
+import { clubCreateSchema, clubUpdateSchema, clubListQuerySchema } from "../src/modules/clubs/clubs.schemas";
 import { bulkAssignSwimmersSchema, directAssignmentSchema, approveAssignmentSchema } from "../src/modules/swimmer-assignment/assignment.schemas";
 
 /**
- * Los TRES estados de la personalidad jurídica, y la regla que los separa:
- * **`null` («pendiente de verificar») no es `false`**.
+ * Los DOS estados de la personalidad jurídica (`true` / `false`), desde la
+ * etapa 10a. El tercer estado, `null` («pendiente de verificar»), se retiró del
+ * contrato público: un cliente anterior que lo envíe recibe un 400 comprensible.
  *
- * El riesgo que estas pruebas vigilan es silencioso: con `boolean | null`, un
- * `if (hasLegalStatus)` sigue compilando y trata `null` igual que `false`. No
- * hay error de tipos que lo delate, así que la única defensa es comprobar el
- * comportamiento de cada estado por separado.
+ * El riesgo que estas pruebas vigilan es silencioso: la columna física todavía
+ * admite NULL (hasta la migración 10b), así que nada en los tipos de la base
+ * impide que un `null` se cuele. Solo el contrato de la API lo cierra.
  */
 
 const CLUB_BASE = {
@@ -35,51 +35,43 @@ function mensajes(r: { success: boolean; error?: { issues: { path: (string | num
   return r.success ? [] : (r.error?.issues ?? []).map((i) => `${i.path.join(".")}: ${i.message}`);
 }
 
-describe("personalidad jurídica: el campo admite tres estados", () => {
-  it("acepta true, false y null — y nada más", () => {
-    for (const estado of [true, false, null]) {
-      const r = clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: estado, rut: estado === true ? RUT_VALIDO : undefined });
+describe("personalidad jurídica: el campo admite dos estados", () => {
+  it("acepta true y false — y nada más", () => {
+    for (const estado of [true, false]) {
+      const r = clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: estado, rut: estado ? RUT_VALIDO : undefined });
       expect(r.success, `estado ${JSON.stringify(estado)}: ${mensajes(r).join("; ")}`).toBe(true);
     }
   });
 
-  it("NO acepta que el campo se omita: dejar pendiente tiene que ser deliberado", () => {
+  it("RECHAZA null (el antiguo «pendiente de verificar») con un mensaje comprensible", () => {
+    const r = clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: null });
+    expect(r.success).toBe(false);
+    const texto = mensajes(r).join(" ");
+    expect(texto).toMatch(/hasLegalStatus/);
+    expect(texto).toMatch(/Sí o No/);
+    expect(texto).toMatch(/pendiente de verificar/);
+  });
+
+  it("NO acepta que el campo se omita: omitirlo no puede significar «No tiene»", () => {
     const r = clubCreateSchema.safeParse({ ...CLUB_BASE });
     expect(r.success).toBe(false);
     expect(mensajes(r).join(" ")).toMatch(/hasLegalStatus/);
   });
 
-  it("no acepta una cadena como estado", () => {
-    expect(clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: "pendiente" }).success).toBe(false);
+  it.each([["pendiente"], ["si"], ["no"], [1], [0]])("no acepta %j como estado", (valor) => {
+    expect(clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: valor }).success).toBe(false);
   });
 });
 
-describe("RUT según el estado (RB-02 con tres estados)", () => {
+describe("RUT según el estado (RB-02 con dos estados)", () => {
   it("con personalidad jurídica: el RUT es OBLIGATORIO", () => {
     const r = clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: true });
     expect(r.success).toBe(false);
     expect(mensajes(r).join(" ")).toMatch(/RUT es obligatorio/);
   });
 
-  it("pendiente: el RUT es OPCIONAL", () => {
-    expect(clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: null }).success).toBe(true);
-  });
-
-  it("pendiente CON RUT: se acepta y se valida igual", () => {
-    expect(clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: null, rut: RUT_VALIDO }).success).toBe(true);
-
-    const malo = clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: null, rut: RUT_DV_MALO });
-    expect(malo.success).toBe(false);
-    expect(mensajes(malo).join(" ")).toMatch(/dígito verificador/);
-  });
-
-  it("pendiente con RUT NO pasa a verificado: el estado sigue siendo null", () => {
-    const r = clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: null, rut: RUT_VALIDO });
-    expect(r.success).toBe(true);
-    if (r.success) expect(r.data.hasLegalStatus).toBeNull();
-  });
-
-  it("verificado como SIN personalidad jurídica: el RUT no se valida porque no se guarda", () => {
+  it("sin personalidad jurídica: el RUT no se valida porque no se guarda", () => {
+    expect(clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: false }).success).toBe(true);
     expect(clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: false, rut: RUT_DV_MALO }).success).toBe(true);
   });
 
@@ -88,18 +80,16 @@ describe("RUT según el estado (RB-02 con tres estados)", () => {
     expect(r.success).toBe(false);
     expect(mensajes(r).join(" ")).toMatch(/dígito verificador/);
   });
+
+  it("con personalidad jurídica y RUT válido: se acepta", () => {
+    expect(clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: true, rut: RUT_VALIDO }).success).toBe(true);
+  });
 });
 
-describe("representante legal: no se designa sin personalidad jurídica confirmada", () => {
+describe("representante legal: solo con personalidad jurídica", () => {
   it("con personalidad jurídica: se puede designar", () => {
     const r = clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: true, rut: RUT_VALIDO, legalRepresentativePersonId: UUID });
     expect(r.success, mensajes(r).join("; ")).toBe(true);
-  });
-
-  it("PENDIENTE: se rechaza la designación, con un mensaje que explica por qué", () => {
-    const r = clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: null, legalRepresentativePersonId: UUID });
-    expect(r.success).toBe(false);
-    expect(mensajes(r).join(" ")).toMatch(/pendiente de verificar/i);
   });
 
   it("sin personalidad jurídica: se rechaza la designación", () => {
@@ -108,14 +98,31 @@ describe("representante legal: no se designa sin personalidad jurídica confirma
     expect(mensajes(r).join(" ")).toMatch(/Solo los clubes con personalidad jurídica/);
   });
 
-  it("pendiente SIN designación: válido", () => {
-    expect(clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: null, legalRepresentativePersonId: null }).success).toBe(true);
+  it("sin personalidad jurídica y SIN designación: válido", () => {
+    expect(clubCreateSchema.safeParse({ ...CLUB_BASE, hasLegalStatus: false, legalRepresentativePersonId: null }).success).toBe(true);
   });
 
   it("la misma regla aplica al actualizar", () => {
-    const r = clubUpdateSchema.safeParse({ hasLegalStatus: null, legalRepresentativePersonId: UUID });
+    const r = clubUpdateSchema.safeParse({ hasLegalStatus: false, legalRepresentativePersonId: UUID });
     expect(r.success).toBe(false);
-    expect(mensajes(r).join(" ")).toMatch(/pendiente de verificar/i);
+    expect(mensajes(r).join(" ")).toMatch(/Solo los clubes con personalidad jurídica/);
+  });
+});
+
+describe("filtro del listado: solo «si» y «no»", () => {
+  it.each([["si"], ["no"]])("acepta %j", (valor) => {
+    expect(clubListQuerySchema.safeParse({ personalidadJuridica: valor }).success).toBe(true);
+  });
+
+  it("sin filtro es válido", () => {
+    expect(clubListQuerySchema.safeParse({}).success).toBe(true);
+  });
+
+  it("RECHAZA «pendiente» con un mensaje que explica que ya no existe", () => {
+    const r = clubListQuerySchema.safeParse({ personalidadJuridica: "pendiente" });
+    expect(r.success).toBe(false);
+    expect(mensajes(r).join(" ")).toMatch(/solo admite "si" o "no"/);
+    expect(mensajes(r).join(" ")).toMatch(/"pendiente" ya no existe/);
   });
 });
 
@@ -126,10 +133,10 @@ describe("al actualizar, el estado siempre viaja explícito", () => {
     expect(mensajes(r).join(" ")).toMatch(/hasLegalStatus/);
   });
 
-  it("un null explícito se conserva como null y no se confunde con «no enviado»", () => {
+  it("un null explícito se RECHAZA: no se confunde con «no enviado» ni se acepta como estado", () => {
     const r = clubUpdateSchema.safeParse({ hasLegalStatus: null });
-    expect(r.success).toBe(true);
-    if (r.success) expect(r.data.hasLegalStatus).toBeNull();
+    expect(r.success).toBe(false);
+    expect(mensajes(r).join(" ")).toMatch(/Sí o No/);
   });
 });
 

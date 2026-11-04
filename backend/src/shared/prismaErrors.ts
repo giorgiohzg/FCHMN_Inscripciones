@@ -1,4 +1,5 @@
 import { AppError, ConflictError, NotFoundError, ServiceUnavailableError, ValidationError } from "./errors";
+import { MENSAJE_SIGLA_EN_USO } from "./clubCode";
 
 /**
  * Traducción de errores de Prisma a errores de dominio.
@@ -57,6 +58,9 @@ const UNIQUE_CONFLICT_MESSAGES: Record<string, string> = {
   "Person.run": "Ya existe una persona registrada con ese RUN.",
   "Person.username": "Ya existe una persona con ese nombre de usuario.",
   "Club.username": "Ya existe un club con ese nombre de usuario.",
+  // Índice sobre una EXPRESIÓN: Prisma informa la expresión en vez de la columna. Es el
+  // respaldo para dos operaciones simultáneas que reclaman la misma sigla.
+  "Club.club_code_normalizado(code)": MENSAJE_SIGLA_EN_USO,
   // `users.username` reúne las cuentas de personas y de clubes. Los servicios
   // sí lo comprueban antes ("Ya existe una cuenta con ese nombre de usuario"),
   // así que este mensaje es el respaldo para la carrera entre dos altas

@@ -108,6 +108,24 @@ export interface Competition {
   /** Por qué se cerraron las inscripciones. null = abierta, o cerrada antes de existir este campo. */
   registrationsClosedReason: "manual" | "capacity" | "schedule" | null;
   registrationsClosedAt: string | null;
+  /**
+   * `false` = oculta SOLO de los selectores del Panel de Inscripción y del Panel de
+   * Relevos. No afecta permisos, reglas de inscripción, acceso directo, Reportes ni
+   * los asistentes.
+   */
+  visibleInRegistrationPanels: boolean;
+  /**
+   * Exigir al menos una inscripción individual confirmada antes de participar en relevos
+   * (por defecto `true`). Desmarcada, ni formar o modificar un relevo la exige ni se bloquea
+   * cancelar la última individual de quien integra un relevo.
+   */
+  requireIndividualForRelay: boolean;
+  /**
+   * Equipos de relevo CONFIRMADOS con algún integrante sin individual confirmada en la
+   * competencia (equipos distintos, no integrantes). Lo devuelven el detalle y el guardado;
+   * es solo un aviso: nada se modifica por él.
+   */
+  relayTeamsNotMeetingCondition?: number;
   poolId: string | null;
   pool?: { id: string; name: string; address: string | null; isHeated: boolean; isCovered: boolean; courseLength: "short_25m" | "long_50m" } | null;
   dates: CompetitionDate[];
@@ -140,6 +158,12 @@ export interface CompetitionEventItem {
   competitionSessionId: string;
   status: "enabled" | "disabled";
   displayOrder: number | null;
+  /**
+   * Máximo de nadadores por club en esta prueba INDIVIDUAL. `null` = «Sin límite».
+   * Cuenta las inscripciones confirmadas del club en esta prueba; solo un administrador
+   * puede excederlo. No aplica a relevos.
+   */
+  maxSwimmersPerClub: number | null;
   event: { id: string; testTypeId: string; distance: { meters: number }; stroke: { name: string }; gender: "male" | "female" | "mixed"; testType: { name: string; swimmersCount: number } };
   competitionSession: { id: string; sessionType: { name: string }; competitionDate: { date: string } };
   enabledCategories: { category: { id: string; name: string; categoryGroup: { id: string; name: string } | null } }[];
@@ -148,10 +172,23 @@ export interface CompetitionEventItem {
 export function useCompetitionsApi() {
 
   return {
-    list: (params: { search?: string; status?: CompetitionStatus; page?: number; pageSize?: number } = {}) => {
+    list: (
+      params: {
+        search?: string;
+        status?: CompetitionStatus;
+        /**
+         * Filtro EXPLÍCITO: `true` = solo las visibles en los paneles de inscripción y
+         * relevos (lo envían esos dos paneles). Omitido = sin filtro, como siempre.
+         */
+        visibleInRegistrationPanels?: boolean;
+        page?: number;
+        pageSize?: number;
+      } = {}
+    ) => {
       const qs = new URLSearchParams();
       if (params.search) qs.set("search", params.search);
       if (params.status) qs.set("status", params.status);
+      if (params.visibleInRegistrationPanels !== undefined) qs.set("visibleInRegistrationPanels", String(params.visibleInRegistrationPanels));
       if (params.page) qs.set("page", String(params.page));
       if (params.pageSize) qs.set("pageSize", String(params.pageSize));
       return api.get<CompetitionListResult>(`/competitions?${qs}`);
@@ -169,6 +206,10 @@ export function useCompetitionsApi() {
       maxRelayEventsPerSwimmerPerSession: number;
       maxSwimmers?: number | null;
       maxSwimmersPerClub?: number | null;
+      /** Omitido = visible. */
+      visibleInRegistrationPanels?: boolean;
+      /** Omitido = condición de relevos activada. */
+      requireIndividualForRelay?: boolean;
       poolId?: string;
     }) => api.post<Competition>(`/competitions`, input),
 
@@ -184,6 +225,8 @@ export function useCompetitionsApi() {
         maxRelayEventsPerSwimmerPerSession: number;
         maxSwimmers: number | null;
         maxSwimmersPerClub: number | null;
+        visibleInRegistrationPanels: boolean;
+        requireIndividualForRelay: boolean;
         poolId: string | null;
       }>
     ) => api.put<Competition>(`/competitions/${id}`, input),
@@ -222,12 +265,18 @@ export function useCompetitionsApi() {
 
     listCompetitionEvents: (competitionId: string) =>
       api.get<CompetitionEventItem[]>(`/competitions/${competitionId}/events`),
-    addCompetitionEvent: (competitionId: string, input: { eventId: string; competitionSessionId: string; categoryIds: string[]; displayOrder?: number }) =>
+    addCompetitionEvent: (
+      competitionId: string,
+      input: { eventId: string; competitionSessionId: string; categoryIds: string[]; displayOrder?: number; maxSwimmersPerClub?: number | null }
+    ) =>
       api.post<CompetitionEventItem>(`/competitions/${competitionId}/events`, input),
     removeCompetitionEvent: (ceId: string) =>
       api.delete<void>(`/competition-events/${ceId}`),
 
-    updateCompetitionEvent: (ceId: string, input: { competitionSessionId?: string; status?: "enabled" | "disabled"; categoryIds?: string[]; displayOrder?: number }) =>
+    updateCompetitionEvent: (
+      ceId: string,
+      input: { competitionSessionId?: string; status?: "enabled" | "disabled"; categoryIds?: string[]; displayOrder?: number; maxSwimmersPerClub?: number | null }
+    ) =>
       api.put<CompetitionEventItem>(`/competition-events/${ceId}`, input),
 
     // Renumera VARIAS pruebas en una sola solicitud (en vez de una por

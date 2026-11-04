@@ -76,7 +76,7 @@ describe("preflight username-colision-global — sin falsos positivos", () => {
 
   it("un club y SU PROPIA cuenta con el mismo nombre tampoco lo son", async () => {
     const club = await prisma.club.create({
-      data: { name: "Club Norte", username: "club_norte", code: "CN", email: "cn@test.local", status: "active" },
+      data: { name: "Club Norte", username: "club_norte", code: "CN", email: "cn@test.local", hasLegalStatus: false, status: "active" },
     });
     await prisma.user.create({
       data: { username: "club_norte", passwordHash: "x", ownerType: "club", clubId: club.id },
