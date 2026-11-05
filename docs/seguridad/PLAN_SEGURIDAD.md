@@ -10,7 +10,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | Fase | Contenido | Estado |
 |---|---|---|
 | **A1** | Cliente: un 401 o una renovación atrasados no cierran ni reutilizan una sesión posterior | **Cerrada y desplegada** en la web |
-| **1** | Sesiones y revocación efectiva del JWT | **Implementada y validada localmente.** Pendiente de publicación y despliegue |
+| **1** | Sesiones y revocación efectiva del JWT | **Publicada** (`4311a67`). La CI falló en las pruebas unitarias del backend por un defecto de aislamiento de una prueba; **corrección local pendiente de publicación**. La validación completa de la CI está **pendiente**, y las integraciones de este commit no corrieron allí. Sin desplegar |
 | **2** | `Cache-Control: no-store`, filtrado de excepciones, login uniforme | Pendiente |
 | **3** | Cabeceras del frontend (Nginx) | Pendiente |
 | **4** | Límites del procesamiento XLSX | Pendiente |
@@ -23,6 +23,15 @@ corrigieron. Después **solo se repitieron partes**: las tres pruebas de integra
 sesiones y administración, las dos unitarias afectadas, el typecheck y el lint. Las suites
 completas no se repitieron tras las correcciones. La suite de integración corrió solo sobre
 la base desechable de `docker-compose.test.yml`, con datos sintéticos.
+
+**La CI de `4311a67` falló** en «Pruebas unitarias» de Backend, con tres casos de
+`orden-determinista.test.ts`: `persons.service` y `clubs.service` importan ahora
+`auth/sessions`, que lee `shared/env` al importarse y exige la configuración completa de
+autenticación. Esa prueba solo pasaba donde hubiera un `backend/.env` (`@prisma/client` lo
+carga solo), que la CI no tiene. La corrección aísla la prueba con un doble del módulo de
+sesiones, sin tocar la validación del entorno, y por ahora es **local**. Como los pasos de
+integración se omitieron tras ese fallo, **la CI aún no ha ejecutado las integraciones de la
+Fase 1**: siguen validadas solo en local.
 
 El **corte de sesiones no se ha ejecutado**, y la migración no se ha aplicado a ninguna base
 que no sea la desechable. Ver [../operacion/corte-de-sesiones.md](../operacion/corte-de-sesiones.md).

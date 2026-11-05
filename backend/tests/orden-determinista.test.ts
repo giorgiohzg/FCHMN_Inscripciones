@@ -53,6 +53,26 @@ const prismaFalso: Record<string, any> = new Proxy(
 
 vi.mock("../src/shared/prisma.client", () => ({ prisma: prismaFalso }));
 
+/**
+ * AISLAMIENTO DEL MÓDULO DE SESIONES.
+ *
+ * `persons.service` y `clubs.service` importan `auth/sessions` para terminar
+ * sesiones al bloquear o eliminar una cuenta, y ese módulo lee `shared/env` AL
+ * IMPORTARSE, que exige la configuración completa de autenticación
+ * (`JWT_ACCESS_SECRET`, `DATABASE_URL`…). Estas pruebas solo miran los argumentos
+ * de paginación y de orden: no necesitan configuración de autenticación ni una
+ * base real, así que reemplazan ese módulo por un doble y la validación del
+ * entorno queda intacta.
+ *
+ * Sin el doble, la prueba solo pasaba donde hubiera un `backend/.env` —
+ * `@prisma/client` lo carga solo al importarse—, que es lo que la integración
+ * continua no tiene.
+ */
+vi.mock("../src/modules/auth/sessions", () => ({
+  terminarSesionesDelTitular: vi.fn(async () => 0),
+  terminarSesionesDelUsuario: vi.fn(async () => 0),
+}));
+
 /** Actor de alcance `admin`: sin restricción de club (ver `actorContext.ts`). */
 const ACTOR_ADMIN = {
   userId: "u-admin",
