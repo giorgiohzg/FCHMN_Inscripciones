@@ -261,12 +261,12 @@ describe("change-password → 401 → refresh → reintento", () => {
   it("un 401 del cambio NO dispara el bucle automático del cliente HTTP", async () => {
     const renovaciones: string[] = [];
     conectarSesion({
-      obtenerAccessToken: () => "token",
+      obtenerSesion: () => ({ accessToken: "token", identidad: { ciclo: "ciclo-de-prueba", userId: "uA" } }),
       renovar: async () => {
         renovaciones.push("renovar");
-        return "token-nuevo";
+        return { tipo: "renovada", accessToken: "token-nuevo" };
       },
-      cerrarPorSesionInvalida: () => undefined,
+      cerrarPorSesionInvalida: async () => true,
     });
 
     const fetchFalso = vi.fn(

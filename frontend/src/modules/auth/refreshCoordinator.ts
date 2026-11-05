@@ -48,8 +48,15 @@ export type SesionRenovada = SesionValidada;
  */
 export type ResultadoRenovacion =
   | { tipo: "renovada"; sesion: SesionRenovada }
-  /** 401 confirmado: hay que volver a entrar. */
-  | { tipo: "invalida" }
+  /**
+   * 401 confirmado: hay que volver a entrar.
+   *
+   * Lleva el `ciclo` al que pertenece el veredicto. Quien reaccione —limpiar la
+   * sesión, anunciar el cierre— debe comprobar que ese ciclo SIGUE siendo el
+   * vigente justo antes de actuar (`cerrarSiCicloVigente`): un veredicto sobre un
+   * ciclo que ya no es el actual no habla de la sesión que hay ahora.
+   */
+  | { tipo: "invalida"; ciclo: string }
   /** El ciclo cambió mientras se renovaba: no hay nada que hacer, y nada que limpiar. */
   | { tipo: "descartada" };
 
@@ -463,8 +470,23 @@ type MensajeDeSesion =
   | { tipo: "iniciada"; ciclo: string; revision: number; sesion: SesionRenovada; en: number }
   | { tipo: "cerrada"; ciclo: string; revision: number; en: number };
 
+/**
+ * Un vuelo de renovación y QUIÉNES lo esperan.
+ *
+ * Varias peticiones de la pestaña pueden fallar a la vez y comparten UNA
+ * renovación. Cada una declara una condición —«la sesión que me envió sigue
+ * siendo la vigente»— y el vuelo solo sale si ALGUNA sigue cumpliéndose cuando
+ * entra en la sección crítica. Que la decidiera solo quien lo creó permitiría que
+ * una petición antigua, llegada la primera, cancelara la renovación que necesita
+ * otra de la sesión vigente que se unió después.
+ */
+interface VueloDeRenovacion {
+  promesa: Promise<ResultadoRenovacion>;
+  interesados: Array<() => boolean>;
+}
+
 /** Renovación en curso en ESTA pestaña, si la hay. */
-let enCurso: Promise<ResultadoRenovacion> | null = null;
+let enCurso: VueloDeRenovacion | null = null;
 
 /** Última sesión anunciada, con su ciclo y marca de tiempo. */
 let ultimoAnuncio: { sesion: SesionRenovada; ciclo: string; en: number } | null = null;
@@ -902,6 +924,67 @@ export function fijarCicloDeSesion(id: string): void {
   escribirAutoridad({ ciclo: id, estado: "active", revision: revisionLocal });
 }
 
+/**
+ * ¿El ciclo `esperado` sigue siendo el vigente y sigue vivo?
+ *
+ * Se sincroniza con la autoridad del origen antes de responder, igual que al
+ * entrar en la sección crítica: el ciclo local puede estar atrasado respecto a
+ * lo que otra pestaña ya registró. Falso si el ciclo cambió o si la autoridad lo
+ * tiene enterrado.
+ *
+ * **SOLO es fiable CON EL CERROJO TOMADO**: fuera de él, otra pestaña puede
+ * cambiar el ciclo justo después de la respuesta. Para comprobar Y actuar usa
+ * `cerrarSiCicloVigente`, que une las dos cosas; esta función desnuda existe para
+ * quien ya está dentro del cerrojo (`changePassword`).
+ */
+export function cicloSigueVigente(esperado: string): boolean {
+  sincronizarConAutoridad();
+  return ciclo === esperado && !cicloLocalEnterrado();
+}
+
+/**
+ * Cierra —ejecuta `cerrar`— SOLO si el ciclo `esperado` sigue siendo el vigente
+ * Y, si se indica, `identidadCorresponde` se cumple. Devuelve si lo ejecutó.
+ *
+ * `identidadCorresponde` es la parte de la identidad que el coordinador no
+ * conoce: el USUARIO. El ciclo identifica una sesión, pero comprobar solo el
+ * ciclo deja pasar el caso de otro usuario dentro de un ciclo con el mismo
+ * identificador (un aviso de otra pestaña que reutilice el ciclo vigente), y esa
+ * sesión no es la que el veredicto rechazó. Se evalúa en la MISMA sección crítica
+ * y el mismo tramo síncrono que `cerrar`: ver abajo.
+ *
+ * La comprobación y la acción van juntas, dentro del cerrojo común de sesión y
+ * en el mismo tramo SÍNCRONO. Eso es lo que las protege frente a cambios
+ * concurrentes: login, cierre, cambio de contraseña, refresco y recepción de
+ * avisos entre pestañas piden el mismo cerrojo, así que ninguno puede colarse
+ * entre «sigue vigente» y «cierra»; y dentro de la pestaña no hay punto de
+ * suspensión entre las líneas.
+ *
+ * Es lo que impide que un 401 atrasado de la sesión A limpie y anuncie el cierre
+ * de la sesión B recién abierta. Si la identidad ya no es la esperada no se hace
+ * ni se anuncia nada: quien la cambió ya hizo lo que tocaba.
+ *
+ * NO LLAMAR DESDE DENTRO del cerrojo: Web Locks no es reentrante y esperaría a
+ * quien ya lo tiene (ver `renovarDentroDelCerrojo`).
+ *
+ * Sin Web Locks (navegadores antiguos) la exclusión ENTRE pestañas se pierde y
+ * esta función sigue evitando la intercalación dentro de la misma pestaña; ver la
+ * nota de degradación al final del archivo.
+ */
+export function cerrarSiCicloVigente(
+  esperado: string,
+  cerrar: () => void,
+  identidadCorresponde: () => boolean = () => true
+): Promise<boolean> {
+  return conCerrojoDeSesion(async () => {
+    // Primero el ciclo: sincroniza con la autoridad, de la que depende el resto.
+    if (!cicloSigueVigente(esperado)) return false;
+    if (!identidadCorresponde()) return false;
+    cerrar();
+    return true;
+  });
+}
+
 /** El estado autoritativo del origen. Se expone para las pruebas y la depuración. */
 export function autoridadActual(): AutoridadDeSesion | null {
   return leerAutoridad();
@@ -966,11 +1049,34 @@ function anuncioVigente(): SesionRenovada | null {
 /**
  * Renueva la sesión, serializando con las demás pestañas.
  *
+ * `sigueVigente` es la condición del llamador —«la sesión que provocó esta
+ * renovación sigue siendo la vigente»— y se evalúa en DOS momentos:
+ *
+ *   1. Al entrar, de forma síncrona: si ya es falsa, no se une a ningún vuelo ni
+ *      pide nada (`descartada`).
+ *   2. DENTRO de la sección crítica, tras sincronizar con la autoridad y ANTES de
+ *      reutilizar un anuncio o de emitir la petición. Es el que importa: esperar
+ *      el cerrojo puede llevar un rato —otra pestaña refrescando, un login—, y
+ *      mientras tanto la sesión pudo cambiar. Una petición antigua no puede
+ *      provocar la renovación de la sesión posterior ni recibir su anuncio.
+ *
+ * La condición no toma ningún cerrojo ni espera nada: es una lectura síncrona.
+ * Sin condición, el llamador siempre es «interesado» (restauración, renovación
+ * periódica: la renovación es para quien sea la sesión vigente).
+ *
  * @returns la sesión nueva, o `null` si ya no es válida.
  * @throws  si el fallo fue transitorio o de comprobación CSRF.
  */
-export function renovarUnaSolaVez(deps: Dependencias): Promise<ResultadoRenovacion> {
-  if (enCurso) return enCurso;
+export function renovarUnaSolaVez(
+  deps: Dependencias,
+  sigueVigente: () => boolean = () => true
+): Promise<ResultadoRenovacion> {
+  if (!sigueVigente()) return Promise.resolve({ tipo: "descartada" });
+
+  if (enCurso) {
+    enCurso.interesados.push(sigueVigente);
+    return enCurso.promesa;
+  }
 
   const reciente = anuncioVigente();
   if (reciente) return Promise.resolve({ tipo: "renovada", sesion: reciente });
@@ -986,12 +1092,31 @@ export function renovarUnaSolaVez(deps: Dependencias): Promise<ResultadoRenovaci
    */
   const renovarYAnunciar = (): Promise<ResultadoRenovacion> => ejecutarRenovacion(deps);
 
-  enCurso = (async () => {
+  const vuelo: VueloDeRenovacion = { promesa: undefined as unknown as Promise<ResultadoRenovacion>, interesados: [sigueVigente] };
+  enCurso = vuelo;
+
+  vuelo.promesa = (async () => {
     try {
       return await conCerrojoDeSesion(async () => {
         // Ya dentro de la sección crítica: el estado del origen puede haber
         // cambiado mientras se esperaba el cerrojo.
         sincronizarConAutoridad();
+
+        /**
+         * LA COMPUERTA DE IDENTIDAD, antes de reutilizar un anuncio y antes de
+         * emitir nada. Si ninguna de las peticiones que esperan este vuelo
+         * pertenece a la sesión vigente, no se renueva: ni se llama al servidor
+         * ni se les entrega el anuncio de la sesión que las reemplazó.
+         *
+         * Se libera `enCurso` AQUÍ, no solo en el `finally`: quien llegue a partir
+         * de este instante abre su propio vuelo en vez de unirse a uno que ya
+         * decidió no salir.
+         */
+        if (!vuelo.interesados.some((sigue) => sigue())) {
+          if (enCurso === vuelo) enCurso = null;
+          return { tipo: "descartada" } as ResultadoRenovacion;
+        }
+
         /**
          * Doble comprobación DENTRO del cerrojo. Aprovecha el anuncio si ya
          * llegó, pero NO se apoya en que haya llegado: la entrega es asíncrona
@@ -1006,11 +1131,12 @@ export function renovarUnaSolaVez(deps: Dependencias): Promise<ResultadoRenovaci
         return renovarYAnunciar();
       });
     } finally {
-      enCurso = null;
+      // Solo si sigue siendo ESTE vuelo: un vuelo posterior no debe perderse.
+      if (enCurso === vuelo) enCurso = null;
     }
   })();
 
-  return enCurso;
+  return vuelo.promesa;
 }
 
 /**
@@ -1033,8 +1159,24 @@ async function ejecutarRenovacion(deps: Dependencias): Promise<ResultadoRenovaci
   const cicloAlEmpezar = ciclo;
 
   const cruda = await deps.pedirRenovacion();
-  if (cruda === null) return { tipo: "invalida" };
-  if (ciclo !== cicloAlEmpezar) return { tipo: "descartada" };
+
+  /**
+   * EL CICLO SE COMPRUEBA ANTES DE CLASIFICAR, y también el 401.
+   *
+   * Antes `null` se devolvía como `invalida` sin mirar el ciclo, y quien lo
+   * recibía limpiaba la sesión y anunciaba el cierre. Pero un 401 que llega
+   * después de que el ciclo cambió —otra cuenta entró, otra pestaña cerró—
+   * describe la sesión ANTERIOR: tratarlo como «la sesión terminó» cerraba la
+   * que acababa de abrirse. Con el ciclo cambiado el resultado es `descartada`,
+   * sea cual sea la respuesta, y no hay nada que limpiar.
+   *
+   * También cuenta como «cambiado» que la autoridad haya enterrado este ciclo:
+   * otra pestaña cerró esta sesión y su aviso aún no llega. Con cerrojo no puede
+   * ocurrir mientras la petición está en vuelo, porque cerrar pide el mismo
+   * cerrojo; sin él (navegador sin Web Locks) sí.
+   */
+  if (ciclo !== cicloAlEmpezar || cicloLocalEnterrado()) return { tipo: "descartada" };
+  if (cruda === null) return { tipo: "invalida", ciclo: cicloAlEmpezar };
 
   const sesion = validarSesion({ ...(cruda as object), ciclo }, ciclo);
   if (!sesion) return { tipo: "descartada" };

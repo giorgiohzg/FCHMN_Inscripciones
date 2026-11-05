@@ -9,10 +9,19 @@ import {
   comenzarCicloDeSesion,
   conCerrojoDeSesion,
   renovarDentroDelCerrojo,
+  cicloActual,
+  cicloSigueVigente,
+  cerrarSiCicloVigente,
   type SesionRenovada,
   type ResultadoRenovacion,
 } from "./refreshCoordinator";
-import { conectarSesion, ApiError } from "../../shared/apiClient";
+import {
+  conectarSesion,
+  ApiError,
+  esMismaSesion,
+  type IdentidadDeSesion,
+  type RenovacionParaElCliente,
+} from "../../shared/apiClient";
 import { apiChangePassword } from "./authApi";
 import { asegurarTokenCsrf, renovarTokenCsrf, recordarTokenCsrf, olvidarTokenCsrf } from "./csrf";
 import { validarPerfil, validarRespuestaDeSesion, type PerfilDeSesion } from "./sessionSchema";
@@ -127,6 +136,11 @@ function esSesionInvalida(err: unknown): boolean {
    * un 403 es rehacer el bootstrap y reintentar, no borrar nada.
    */
   return err instanceof ApiError && err.status === 401;
+}
+
+/** Usuario al que pertenece un access token, o `null` si no hay token o no se puede leer. */
+function usuarioDelToken(token: string | null): string | null {
+  return token ? (decodeAccessTokenClaims(token)?.sub ?? null) : null;
 }
 
 /** Un 403 en las rutas de sesión significa "el token CSRF no cuadra". */
@@ -438,7 +452,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
            *   propaga el error original y ya está.
            */
           if (renovada.tipo === "invalida") {
-            limpiarSesion();
+            /**
+             * Se limpia SOLO si el ciclo sigue siendo el de la renovación. Aquí ya
+             * se sostiene el cerrojo, así que se usa la comprobación desnuda —la
+             * versión con cerrojo esperaría a quien ya lo tiene—: comprobar y
+             * limpiar van seguidos, sin punto de suspensión entre medias.
+             */
+            if (cicloSigueVigente(renovada.ciclo)) limpiarSesion();
             throw err;
           }
           if (renovada.tipo === "descartada") throw err;
@@ -474,7 +494,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const renovar = useCallback(
-    (): Promise<ResultadoRenovacion> => renovarUnaSolaVez(dependenciasDeRenovacion()),
+    /**
+     * `sigueVigente` es opcional: la restauración y la renovación periódica
+     * renuevan «la sesión que haya», y no la pasan. Las peticiones que reaccionan
+     * a un 401 sí la pasan —ver el puente más abajo—, y el coordinador la evalúa
+     * dentro de la sección crítica, después de esperar el cerrojo.
+     */
+    (sigueVigente?: () => boolean): Promise<ResultadoRenovacion> =>
+      renovarUnaSolaVez(dependenciasDeRenovacion(), sigueVigente),
     [dependenciasDeRenovacion]
   );
 
@@ -483,20 +510,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * poder leer el token y pedir la renovación.
    */
   useEffect(() => {
+    /** Quién es la sesión vigente AHORA: ciclo y usuario del token en memoria. */
+    const identidadAhora = (): IdentidadDeSesion => ({
+      ciclo: cicloActual(),
+      userId: usuarioDelToken(estadoRef.current.accessToken),
+    });
+
     conectarSesion({
-      obtenerAccessToken: () => estadoRef.current.accessToken,
       /**
-       * El cliente HTTP solo necesita saber si puede reintentar y con qué
-       * token. Un resultado "descartada" significa que el ciclo cambió: hay una
-       * sesión nueva vigente, y se reintenta con SU token.
+       * Token e identidad en el mismo instante: son los de la sesión bajo la que
+       * nace cada petición, y con esa identidad se compara cuando vuelva un 401.
        */
-      renovar: async () => {
-        const r = await renovar();
-        if (r.tipo === "renovada") return r.sesion.accessToken;
-        if (r.tipo === "descartada") return estadoRef.current.accessToken;
-        return null;
+      obtenerSesion: () => {
+        const identidad = identidadAhora();
+        return { accessToken: estadoRef.current.accessToken, identidad };
       },
-      cerrarPorSesionInvalida: () => limpiarSesion(),
+      /**
+       * El cliente HTTP solo necesita saber si puede reintentar y con qué token,
+       * y la respuesta es siempre sobre LA SESIÓN QUE ENVIÓ la petición.
+       *
+       * `descartada` ya no devuelve «el token que haya ahora»: significa que el
+       * ciclo cambió, es decir, que la sesión actual NO es la que falló, y
+       * reenviar con su token ejecutaría una operación de A con credenciales de B.
+       * Se responde `cambiada` y no se repite nada.
+       */
+      renovar: async (identidad): Promise<RenovacionParaElCliente> => {
+        /**
+         * La comprobación de identidad la hace el COORDINADOR, y la hace en dos
+         * momentos: al entrar —si la sesión ya es otra, ni se une a un vuelo— y
+         * DENTRO de la sección crítica, tras esperar el cerrojo y antes de
+         * reutilizar un anuncio o de emitir la renovación. Una comprobación solo
+         * previa no cubre lo que ocurre mientras se espera el cerrojo, que es
+         * justo cuando suelen cambiar las cosas (otra pestaña refrescando, un
+         * login en cola). `descartada` es lo que devuelve cuando la condición
+         * falla, y aquí significa `cambiada`.
+         *
+         * `identidadAhora()` se lee en ese momento, no se captura: es la sesión
+         * vigente al evaluar la condición, que es lo que se quiere comparar.
+         */
+        const r = await renovar(() => esMismaSesion(identidad, identidadAhora()));
+        if (r.tipo === "descartada") return { tipo: "cambiada" };
+        if (r.tipo === "invalida") {
+          return r.ciclo === identidad.ciclo ? { tipo: "invalida" } : { tipo: "cambiada" };
+        }
+
+        // Renovada: solo se entrega si es LA MISMA sesión. La respuesta puede
+        // venir de una renovación ya en curso que pertenecía a otro ciclo, o de la
+        // cookie de otro usuario.
+        const delRenovado: IdentidadDeSesion = { ciclo: r.sesion.ciclo, userId: r.sesion.user.id };
+        return esMismaSesion(identidad, delRenovado)
+          ? { tipo: "renovada", accessToken: r.sesion.accessToken }
+          : { tipo: "cambiada" };
+      },
+      /**
+       * Cierra SOLO si la sesión de `identidad` sigue siendo la vigente: el ciclo
+       * Y el usuario. Las dos comprobaciones y la limpieza ocurren juntas, en la
+       * misma sección crítica.
+       *
+       * `esMismaSesion` es lo que da el matiz: si la petición salió con usuario
+       * conocido, un usuario distinto NO pierde su sesión aunque el ciclo
+       * coincida; si salió sin sesión (`userId: null`, la restauración), la
+       * identidad se completa y el cierre procede. Esa tolerancia vale solo para
+       * el origen desconocido, no para cualquier identidad.
+       */
+      cerrarPorSesionInvalida: (identidad) =>
+        cerrarSiCicloVigente(
+          identidad.ciclo,
+          () => limpiarSesion(),
+          () => esMismaSesion(identidad, identidadAhora())
+        ),
     });
   }, [renovar, limpiarSesion]);
 
@@ -573,8 +655,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
          * seguían mostrando una sesión que el servidor ya había declarado
          * inválida. El aviso no puede rebotar en bucle porque la pestaña que lo
          * recibe cierra localmente sin reenviarlo.
+         *
+         * Y solo si el ciclo del veredicto SIGUE siendo el vigente: el 401 puede
+         * llegar cuando ya entró otra sesión (otra cuenta en esta pestaña, o
+         * una en otra), y esa no es la que el servidor rechazó. La comprobación
+         * y la limpieza van juntas, bajo el cerrojo.
          */
-        limpiarSesion();
+        await cerrarSiCicloVigente(resultado.ciclo, () => limpiarSesion());
         setRestauracionFallida(false);
       } else {
         setRestauracionFallida(false);
@@ -606,9 +693,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const intervalo = setInterval(
       () => {
         renovar()
-          .then((resultado) => {
-            // Solo un 401 confirmado cierra la sesión.
-            if (resultado.tipo === "invalida") limpiarSesion();
+          .then(async (resultado) => {
+            // Solo un 401 confirmado cierra la sesión, y solo si el ciclo del
+            // veredicto sigue siendo el vigente (ver `cerrarSiCicloVigente`).
+            if (resultado.tipo === "invalida") await cerrarSiCicloVigente(resultado.ciclo, () => limpiarSesion());
           })
           .catch(() => {
             // Fallo transitorio: se conserva la sesión y se reintenta en el

@@ -20,7 +20,7 @@ export const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 /**
  * Rutas EXCLUIDAS del bucle automático.
  *
- * Reintentar un 401 de estas tres no tiene sentido y sí tiene consecuencias:
+ * Reintentar un 401 de estas rutas no tiene sentido y sí tiene consecuencias:
  *   - `/auth/login`: un 401 significa credenciales incorrectas; renovar no
  *     arregla nada y reintentar duplicaría el intento fallido, acercando el
  *     bloqueo de cuenta por RB-15.
@@ -33,16 +33,84 @@ export const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
  *     `AuthContext.changePassword`, que renueva sin volver a pedir el cerrojo
  *     y reintenta una vez.
  */
-const RUTAS_SIN_RENOVACION = ["/auth/login", "/auth/refresh", "/auth/logout", "/auth/change-password"];
+const RUTAS_SIN_RENOVACION = ["/auth/login", "/auth/refresh", "/auth/logout", "/auth/change-password", "/auth/csrf"];
+// `/auth/csrf` está aquí por la misma razón que `/auth/change-password`: la
+// renovación la llama DENTRO del cerrojo de sesión (`asegurarTokenCsrf`) para
+// reconstruir el token CSRF (`asegurarTokenCsrf`). Si esa llamada respondiera 401
+// y entrara al bucle, la renovación pediría el cerrojo que ya sostiene quien la
+// invocó —Web Locks no es reentrante— y la promesa en curso se esperaría a sí
+// misma. Un 401 ahí se propaga tal cual.
+
+/**
+ * QUIÉN ENVIÓ UNA PETICIÓN, no solo con qué token.
+ *
+ * Un token distinto NO demuestra que sea la misma sesión: el de la sesión de B
+ * también es «otro token» respecto al de A, y reenviar con él una operación que
+ * nació bajo A la ejecutaría con credenciales ajenas. Lo que identifica una
+ * sesión es el CICLO —lo que va de un login a su cierre; ver
+ * `modules/auth/refreshCoordinator.ts`—, y el usuario dentro de él.
+ *
+ * `userId` es `null` cuando la petición salió sin sesión (antes de restaurarla).
+ * Eso no es otra identidad: es «todavía sin identificar», y puede completarse.
+ */
+export interface IdentidadDeSesion {
+  ciclo: string;
+  userId: string | null;
+}
+
+/**
+ * ¿`actual` sigue siendo la sesión bajo la que salió `origen`?
+ *
+ * El ciclo tiene que ser el mismo; el usuario, también, salvo que `origen`
+ * saliera sin sesión (`userId === null`): en ese caso la renovación que restaura
+ * la sesión lo completa, y es el flujo normal de un arranque.
+ */
+export function esMismaSesion(origen: IdentidadDeSesion, actual: IdentidadDeSesion): boolean {
+  if (origen.ciclo !== actual.ciclo) return false;
+  return origen.userId === null || origen.userId === actual.userId;
+}
+
+/**
+ * Desenlaces de una renovación vistos desde el cliente HTTP. Son TRES y no se
+ * deben confundir:
+ *
+ *   - `renovada`: la MISMA sesión (mismo ciclo y usuario) tiene un token nuevo y
+ *     válido. Es lo único con lo que se puede repetir la petición.
+ *   - `invalida`: el servidor confirmó, para esa misma sesión, que ya no vale.
+ *   - `cambiada`: mientras tanto la sesión es OTRA (otra cuenta, otro login, un
+ *     cierre en otra pestaña) o no se pudo establecer. La operación no se repite
+ *     y la sesión actual NO se toca: no es la que falló.
+ */
+export type RenovacionParaElCliente =
+  | { tipo: "renovada"; accessToken: string }
+  | { tipo: "invalida" }
+  | { tipo: "cambiada" };
 
 /** Estado de sesión que el cliente necesita; lo inyecta el AuthContext. */
 export interface PuenteDeSesion {
-  /** Token de acceso VIGENTE, o null. Vive en memoria, nunca en disco. */
-  obtenerAccessToken(): string | null;
-  /** Renueva la sesión. Devuelve el nuevo access token, o null si ya no hay sesión. */
-  renovar(): Promise<string | null>;
-  /** La sesión terminó definitivamente: limpiar y mandar al login. */
-  cerrarPorSesionInvalida(): void;
+  /**
+   * El token VIGENTE y la identidad a la que pertenece, leídos en el MISMO
+   * instante. Van juntos a propósito: leerlos por separado dejaba un hueco en el
+   * que podían describir sesiones distintas. El token vive en memoria, nunca en
+   * disco.
+   */
+  obtenerSesion(): { accessToken: string | null; identidad: IdentidadDeSesion };
+  /**
+   * Renueva la sesión SI `identidad` sigue siendo la vigente; si no, responde
+   * `cambiada` sin llegar al servidor. Nunca devuelve el token de otra sesión.
+   *
+   * La comprobación debe hacerse también DENTRO de la sección crítica, después de
+   * esperar el cerrojo y antes de emitir la renovación o reutilizar un anuncio:
+   * esperar puede llevar un rato y la sesión pudo cambiar entre medias.
+   */
+  renovar(identidad: IdentidadDeSesion): Promise<RenovacionParaElCliente>;
+  /**
+   * La sesión de `identidad` terminó: limpiar y mandar al login, pero SOLO si
+   * sigue siendo la vigente —el ciclo Y el usuario, no solo el ciclo—. Devuelve
+   * si cerró; `false` significa que ya hay otra sesión y no se tocó.
+   * Comprobación y cierre ocurren juntos, bajo el cerrojo de sesión.
+   */
+  cerrarPorSesionInvalida(identidad: IdentidadDeSesion): Promise<boolean>;
 }
 
 let puente: PuenteDeSesion | null = null;
@@ -59,6 +127,26 @@ export class ApiError extends Error {
   ) {
     super(message);
     this.name = "ApiError";
+  }
+}
+
+/**
+ * La operación se canceló porque la sesión bajo la que salió ya no es la actual.
+ *
+ * Es una cancelación del CLIENTE, no una respuesta del servidor, y por eso no
+ * lleva 401: ese código significa «esta sesión no vale» y varios flujos reaccionan
+ * a él cerrándola. Aquí la sesión que no vale es la antigua; la actual está bien
+ * y no debe cerrarse. 409 se lee como «el estado cambió bajo la operación». Quien
+ * necesite distinguirlo debe usar `instanceof SesionCambiadaError`, no el código.
+ */
+export class SesionCambiadaError extends ApiError {
+  constructor() {
+    super(
+      "La sesión cambió mientras se procesaba la solicitud, por lo que no se repitió. " +
+        "Revise el estado actual e inténtelo de nuevo si corresponde.",
+      409
+    );
+    this.name = "SesionCambiadaError";
   }
 }
 
@@ -114,25 +202,56 @@ async function enviar(path: string, init: RequestInit, accessToken: string | nul
  */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const sesion = puente;
-  const primera = await enviar(path, init, sesion?.obtenerAccessToken() ?? null);
+  // Token e identidad se leen JUNTOS, antes de enviar: son los de la sesión bajo
+  // la que nace esta operación, y con ella se compara todo lo que venga después.
+  const origen = sesion?.obtenerSesion() ?? null;
+  const primera = await enviar(path, init, origen?.accessToken ?? null);
 
   const puedeRenovar = sesion !== null && !RUTAS_SIN_RENOVACION.some((r) => path.startsWith(r));
   if (primera.status !== 401 || !puedeRenovar) {
     return interpretar<T>(primera);
   }
 
-  /**
-   * `renovar()` distingue dos desenlaces muy distintos:
-   *   - devuelve `null` → la SESIÓN ya no vale (el servidor respondió 401/403);
-   *   - LANZA           → el intento no llegó a concluir (red, timeout, 5xx).
-   *
-   * Solo el primero justifica expulsar al usuario. Tratar un corte de red como
-   * sesión inválida lo echaba al login cada vez que el wifi parpadeaba,
-   * perdiendo lo que estuviera haciendo, y la cookie seguía siendo válida.
-   */
-  let nuevoToken: string | null;
+  // Con `puedeRenovar` verdadero hay puente y, por tanto, origen.
+  const nuevoToken = await renovarParaReintentar(sesion, origen!.identidad);
+  // Sin ningún `await` entre esta comprobación y el envío (ver la función).
+  exigirLaMismaSesion(sesion, origen!.identidad);
+
+  const segunda = await enviar(path, init, nuevoToken);
+  if (segunda.status === 401) {
+    // Renovamos y AUN ASÍ nos rechaza: no es un token vencido, es una sesión
+    // que ya no vale. Si entre tanto la sesión cambió, esta respuesta es de la
+    // anterior y no se le imputa a la actual (ver `rendirse`).
+    return rendirse(sesion, origen!.identidad);
+  }
+  return interpretar<T>(segunda);
+}
+
+/**
+ * Renueva la sesión bajo la que salió una petición que recibió un 401, y
+ * devuelve el token con el que REPETIRLA. Si no hay forma legítima de repetirla,
+ * LANZA.
+ *
+ * `sesion.renovar` distingue tres desenlaces (ver `RenovacionParaElCliente`) y
+ * un cuarto sale por excepción:
+ *   - `renovada` → devuelve el token de ESA sesión;
+ *   - `invalida` → el servidor confirmó que ya no vale: se cierra, si sigue
+ *     siendo la vigente;
+ *   - `cambiada` → la sesión es otra: la operación no se repite;
+ *   - LANZA      → el intento no llegó a concluir (red, timeout, 5xx).
+ *
+ * Solo `invalida` justifica expulsar al usuario. Tratar un corte de red como
+ * sesión inválida lo echaba al login cada vez que el wifi parpadeaba, perdiendo
+ * lo que estuviera haciendo, y la cookie seguía siendo válida.
+ *
+ * Y `cambiada` ya NO devuelve «el token que haya ahora»: eso reenviaba una
+ * operación nacida bajo la cuenta A con las credenciales de la cuenta B, y un 401
+ * atrasado de A cerraba la sesión de B.
+ */
+async function renovarParaReintentar(sesion: PuenteDeSesion, identidad: IdentidadDeSesion): Promise<string> {
+  let resultado: RenovacionParaElCliente;
   try {
-    nuevoToken = await sesion.renovar();
+    resultado = await sesion.renovar(identidad);
   } catch {
     throw new ApiError(
       "No se pudo comprobar la sesión con el servidor. Compruebe su conexión e inténtelo de nuevo.",
@@ -141,19 +260,41 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     );
   }
 
-  if (!nuevoToken) {
-    sesion.cerrarPorSesionInvalida();
-    throw new ApiError("La sesión expiró. Vuelva a iniciar sesión.", 401);
-  }
+  if (resultado.tipo === "cambiada") throw new SesionCambiadaError();
+  if (resultado.tipo === "invalida") return rendirse(sesion, identidad);
+  return resultado.accessToken;
+}
 
-  const segunda = await enviar(path, init, nuevoToken);
-  if (segunda.status === 401) {
-    // Renovamos y AUN ASÍ nos rechaza: no es un token vencido, es una sesión
-    // que ya no vale.
-    sesion.cerrarPorSesionInvalida();
-    throw new ApiError("La sesión expiró. Vuelva a iniciar sesión.", 401);
-  }
-  return interpretar<T>(segunda);
+/**
+ * Última comprobación ANTES de repetir una petición: la sesión actual sigue
+ * siendo aquella bajo la que nació. Si no, la operación se cancela.
+ *
+ * Hace falta aunque `renovar` ya haya respondido `renovada`, porque esa respuesta
+ * describe la sesión en el momento en que se produjo, y para cuando el
+ * reintento sale pudieron pasar las esperas anteriores (el cerrojo, la propia
+ * renovación). Es síncrona A PROPÓSITO y se llama inmediatamente antes de
+ * `enviar`: no hay `await` entre una y otra, así que nada puede cambiar la
+ * sesión entre «sigue siendo la misma» y la salida de la petición. No pide el
+ * cerrojo —se leería de nuevo con la misma ventana— ni renueva: solo lee.
+ *
+ * No cierra nada: la sesión que hay ahora no es la que falló.
+ */
+function exigirLaMismaSesion(sesion: PuenteDeSesion, identidad: IdentidadDeSesion): void {
+  if (!esMismaSesion(identidad, sesion.obtenerSesion().identidad)) throw new SesionCambiadaError();
+}
+
+/**
+ * Da por terminada la sesión de `identidad` —y solo esa— y lanza el error que
+ * corresponde. Nunca devuelve.
+ *
+ * El cierre es condicional: si mientras tanto entró otra sesión, el 401 que nos
+ * trajo hasta aquí pertenece a la anterior. En ese caso no se cierra ni se
+ * anuncia nada, y el error es el de «la sesión cambió», no el de «expiró».
+ */
+async function rendirse(sesion: PuenteDeSesion, identidad: IdentidadDeSesion): Promise<never> {
+  const cerrada = await sesion.cerrarPorSesionInvalida(identidad);
+  if (!cerrada) throw new SesionCambiadaError();
+  throw new ApiError("La sesión expiró. Vuelva a iniciar sesión.", 401);
 }
 
 /** Atajos para no repetir `method` en cada llamada. */
@@ -179,23 +320,17 @@ export async function apiFetchArchivo(
   init: RequestInit = {}
 ): Promise<{ blob: Blob; filename: string }> {
   const sesion = puente;
-  let res = await enviar(path, init, sesion?.obtenerAccessToken() ?? null);
+  const origen = sesion?.obtenerSesion() ?? null;
+  let res = await enviar(path, init, origen?.accessToken ?? null);
 
   if (res.status === 401 && sesion) {
-    let nuevoToken: string | null;
-    try {
-      nuevoToken = await sesion.renovar();
-    } catch {
-      throw new ApiError("No se pudo comprobar la sesión con el servidor. Compruebe su conexión e inténtelo de nuevo.", 503);
-    }
-    if (!nuevoToken) {
-      sesion.cerrarPorSesionInvalida();
-      throw new ApiError("La sesión expiró. Vuelva a iniciar sesión.", 401);
-    }
+    // Mismo tratamiento que `apiFetch`: identidad capturada al enviar, una sola
+    // renovación y un solo reintento, y ninguna reacción si la sesión cambió.
+    const nuevoToken = await renovarParaReintentar(sesion, origen!.identidad);
+    exigirLaMismaSesion(sesion, origen!.identidad);
     res = await enviar(path, init, nuevoToken);
     if (res.status === 401) {
-      sesion.cerrarPorSesionInvalida();
-      throw new ApiError("La sesión expiró. Vuelva a iniciar sesión.", 401);
+      return rendirse(sesion, origen!.identidad);
     }
   }
 

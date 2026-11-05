@@ -333,7 +333,9 @@ describe("dentro de una pestaña", () => {
 
     // "invalida" = 401 confirmado. Se distingue de "descartada" (el ciclo
     // cambió), que NO debe hacer que el llamador borre la sesión.
-    expect(resultados).toEqual([{ tipo: "invalida" }, { tipo: "invalida" }, { tipo: "invalida" }]);
+    // El veredicto lleva el ciclo al que pertenece (ver `ResultadoRenovacion`).
+    const invalida = { tipo: "invalida", ciclo: expect.any(String) };
+    expect(resultados).toEqual([invalida, invalida, invalida]);
     expect(p.renovaciones).toBe(1);
   });
 
