@@ -19,8 +19,8 @@ import {
   aplicarRolAdmin,
   cuentasAfectadasPorPersona,
   exigirQueQuedeAlgunAdministrador,
-  revocarSesiones,
 } from "./admin-access";
+import { terminarSesionesDelTitular, terminarSesionesDelUsuario } from "../auth/sessions";
 import type { PersonCreateInput, PersonUpdateInput, PersonListQuery } from "./persons.schemas";
 
 interface ActorContext {
@@ -257,9 +257,8 @@ async function setStatus(id: string, status: "active" | "locked" | "disabled", a
             { status, lockedUntil: null },
     });
 
-    if (status !== "active") {
-      await tx.refreshToken.updateMany({ where: { user: { personId: id }, revokedAt: null }, data: { revokedAt: new Date() } });
-    }
+    // Reactivar no revive nada: lo que se terminó aquí sigue terminado.
+    if (status !== "active") await terminarSesionesDelTitular(tx, { personId: id }, "admin_revocation");
     await audit({ userId: actor.userId, action, entityType: "Person", entityId: id, ipAddress: actor.ipAddress, before, after: updated }, { tx });
     return updated;
   },
@@ -294,7 +293,7 @@ export async function softDeletePerson(id: string, actor: ActorContext) {
       data: { deletedAt: new Date(), status: "disabled", updatedBy: actor.userId },
     });
     await tx.user.updateMany({ where: { personId: id }, data: { status: "disabled", deletedAt: new Date(), lockedUntil: null } });
-    await tx.refreshToken.updateMany({ where: { user: { personId: id }, revokedAt: null }, data: { revokedAt: new Date() } });
+    await terminarSesionesDelTitular(tx, { personId: id }, "admin_revocation");
     await audit(
       { userId: actor.userId, action: "PERSON_DELETED", entityType: "Person", entityId: id, ipAddress: actor.ipAddress, before, after: updated },
       { tx }
@@ -382,7 +381,9 @@ export async function setAdminAccess(personId: string, enabled: boolean, actor: 
           cambioElRol = await aplicarRolAdmin(tx, cuentaId, enabled);
           // Al RETIRAR se revocan las sesiones. Al conceder no: nadie queda
           // con permisos de más por seguir con su sesión abierta.
-          if (!enabled && cambioElRol) sesionesRevocadas = await revocarSesiones(tx, cuentaId);
+          if (!enabled && cambioElRol) {
+            sesionesRevocadas = await terminarSesionesDelUsuario(tx, cuentaId, "admin_revocation");
+          }
         }
 
         if (cambioLaMarca || cambioElRol) {
@@ -615,7 +616,7 @@ export async function resetCredentials(personId: string, actor: ActorContext) {
         where: { id: person.user!.id },
         data: { passwordHash, mustChangePassword: true, failedLoginAttempts: 0, status: "active", lockedUntil: null },
       });
-      await tx.refreshToken.updateMany({ where: { userId: person.user!.id, revokedAt: null }, data: { revokedAt: new Date() } });
+      await terminarSesionesDelUsuario(tx, person.user!.id, "admin_revocation");
     },
     () => ({ userId: actor.userId, action: "PERSON_CREDENTIALS_RESET", entityType: "User", entityId: person.user!.id, ipAddress: actor.ipAddress })
   );

@@ -154,12 +154,23 @@ describe("rangos numéricos", () => {
     ["LOGIN_MAX_ATTEMPTS", "0"],
     ["LOGIN_LOCKOUT_MINUTES", "0"],
     ["JWT_REFRESH_EXPIRES_IN_DAYS", "0"],
+    ["SESSION_ABSOLUTE_HOURS", "0"],
+    ["SESSION_ABSOLUTE_HOURS", "8761"],
+    ["SESSION_ABSOLUTE_HOURS", "1.5"],
     ["RATE_LIMIT_GLOBAL_MAX", "0"],
     ["TRUST_PROXY_HOPS", "-1"],
     ["TRUST_PROXY_HOPS", "99"],
   ])("RECHAZA %s = %s", (clave, valor) => {
     const r = validar({ ...BASE, [clave]: valor });
     expect(r.ok).toBe(false);
+  });
+
+  it("SESSION_ABSOLUTE_HOURS vale 8 por omisión y es configurable", () => {
+    const omision = validar({ ...BASE });
+    const configurada = validar({ ...BASE, SESSION_ABSOLUTE_HOURS: "12" });
+
+    expect(omision.ok && omision.env.SESSION_ABSOLUTE_HOURS).toBe(8);
+    expect(configurada.ok && configurada.env.SESSION_ABSOLUTE_HOURS).toBe(12);
   });
 
   it("ACEPTA valores dentro de rango", () => {

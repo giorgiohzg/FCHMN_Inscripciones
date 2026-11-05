@@ -186,7 +186,7 @@ Es la brecha abierta más grande.
 | POST | `/auth/login` | Inicia sesión: devuelve el access token y **establece la cookie** del refresh | No |
 | POST | `/auth/refresh` | Rota el refresh token **leyéndolo de la cookie** y devuelve access token **y perfil completo** | Cookie de sesión |
 | GET | `/auth/csrf` | Devuelve el token CSRF vigente (cuerpo + cookie), o emite uno si no hay. Activo **siempre** | No |
-| POST | `/auth/logout` | Revoca el refresh token y **borra la cookie** | Cookie de sesión (su ausencia no es error) |
+| POST | `/auth/logout` | Termina la **sesión completa** de esa cookie y **la borra**: su JWT deja de valer de inmediato | Cookie de sesión (su ausencia no es error) |
 | POST | `/auth/change-password` | Cambia la contraseña y **reemplaza la cookie** por la de la sesión nueva | Sí |
 | GET | `/auth/me` | Retorna el payload del usuario autenticado (roles/permisos) | Sí |
 
@@ -202,8 +202,32 @@ sesión no viaja.
 ## Decisiones de seguridad implementadas
 
 - Contraseñas con **Argon2id** (nunca texto plano ni bcrypt).
-- **JWT de acceso** (15 min) + **refresh token opaco con rotación** (7 días); reuso de un
-  refresh token ya rotado revoca toda la sesión (indicio de robo de token).
+- **JWT de acceso** (15 min por defecto) + **refresh token opaco con rotación** (7 días por
+  defecto), ambos dentro de una **sesión** (`refresh_sessions`) identificada por el `sid` del
+  JWT. Cada petición autenticada comprueba esa sesión, sin caché, así que terminarla tiene
+  efecto inmediato. Código en `backend/src/modules/auth/sessions.ts`; despliegue y reversión
+  en [docs/operacion/corte-de-sesiones.md](docs/operacion/corte-de-sesiones.md).
+  - **Duración absoluta:** `SESSION_ABSOLUTE_HOURS` (8 por omisión) desde la creación, y
+    renovar no la extiende. No es un cierre por inactividad: la renovación proactiva del
+    frontend es un temporizador y no prueba actividad humana.
+  - **Se clasifica primero la sesión y después el token.** Token desconocido, sin sesión o
+    de una sesión terminada o vencida: 401, sin efectos sobre nadie más. Token ya rotado en
+    una sesión **activa**: es un reuso, y termina **solo esa sesión**. `replaced_by` por sí
+    solo no basta, porque un token rotado puede ser de una familia que terminó legítimamente,
+    y una cookie antigua no debe cerrar sesiones nuevas.
+  - **Alcance:** el logout termina su sesión, aunque el token presentado ya esté rotado. El
+    cambio de contraseña termina todas y crea una. Restablecer credenciales, bloquear,
+    inhabilitar, eliminar y retirar el acceso administrativo terminan todas. Reactivar una
+    cuenta no revive ninguna.
+  - **Un solo orden de bloqueos:** `persons`/`clubs` (solo operaciones administrativas) →
+    `users` → `refresh_sessions` → `refresh_tokens`. Las transacciones de sesión (login,
+    refresh, logout, cambio de contraseña e intento fallido) usan `READ COMMITTED` y plazos
+    explícitos; las operaciones administrativas de **personas** que pueden quitar un
+    administrador (bloquear, inhabilitar, eliminar y retirar el acceso) conservan
+    `Serializable` por la guarda del último administrador y pueden responder un 409 reintentable (ver
+    [docs/seguridad/PLAN_SEGURIDAD.md](docs/seguridad/PLAN_SEGURIDAD.md)). Argon2 queda fuera de los bloqueos, y lo verificado se revalida bajo bloqueo comparando
+    el hash leído: una credencial sustituida no emite sesión ni suma un intento fallido, y un
+    bloqueo administrativo, una inhabilitación o una eliminación concurrentes prevalecen.
 - **El refresh token viaja en una cookie `HttpOnly`**, no en el cuerpo de la respuesta.
   Antes se devolvía en el JSON de `/auth/login` y el frontend lo guardaba en
   `sessionStorage`, donde cualquier script de la página podía leerlo — y ese token vale
@@ -322,12 +346,10 @@ sesión no viaja.
   **no es permanente**: bajo el cerrojo se comprueba si el registro contiene ya una
   autoridad al menos tan nueva como la última revisión emitida por esta pestaña, y en ese
   caso vuelve a fiarse de él.
-  *Limitación actual, con propuesta pendiente:* el identificador se genera en el cliente,
-  de modo que dos pestañas que arrancan por separado no se reconocen y cada una renueva por
-  su cuenta. La serialización y la propagación del cierre no se ven afectadas. La solución
-  es un `session_id` emitido por el backend, que exige una columna nueva en
-  `refresh_tokens`. Está diseñada pero **sin aplicar**: no hay migración creada ni
-  cambios en `schema.prisma`.
+  *Limitación actual:* el identificador del ciclo se genera en el cliente, de modo que dos
+  pestañas que arrancan por separado no se reconocen y cada una renueva por su cuenta. La
+  serialización y la propagación del cierre no se ven afectadas. El backend ya tiene una
+  identidad de sesión (`sid`), pero el frontend no la usa como ciclo.
 - **La respuesta se adopta DESPUÉS de validar el ciclo**, nunca antes: la función que pide
   el refresco devuelve la respuesta cruda y no toca estado, CSRF ni almacenamiento. Antes
   adoptaba primero, así que un refresco terminado tras un logout dejaba la sesión escrita
@@ -430,8 +452,8 @@ sesión no viaja.
 `admin`, que es lo único que la autorización consulta en cada solicitud. La
 marca se puede poner antes de que la persona tenga cuenta —entonces no se crea
 ninguna credencial— y `POST /persons/:id/credentials` la aplica al crearla, sin
-exigir ningún rol funcional. Retirarla quita solo el rol administrativo, revoca
-los refresh tokens de esa cuenta y deja intactos los demás roles. Ninguna
+exigir ningún rol funcional. Retirarla quita solo el rol administrativo, termina
+las sesiones de esa cuenta y deja intactos los demás roles. Ninguna
 acción puede dejar el sistema sin un administrador utilizable, contando la
 cuenta `system`.
 

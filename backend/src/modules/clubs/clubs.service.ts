@@ -10,6 +10,7 @@ import {
 import { withTranslatedPrismaErrors } from "../../shared/prismaErrors";
 import { assertSiglaDisponible, normalizarSigla } from "../../shared/clubCode";
 import { hashPassword, generateOpaqueToken } from "../auth/password.util";
+import { terminarSesionesDelTitular, terminarSesionesDelUsuario } from "../auth/sessions";
 import { normalizeRun } from "../../shared/run.util";
 import { ValidationError, NotFoundError } from "../../shared/errors";
 import { LONG_TRANSACTION_OPTIONS, type Db } from "../../shared/transaction";
@@ -433,9 +434,8 @@ async function setStatus(id: string, status: "active" | "locked" | "disabled", a
       where: { clubId: id },
       data: status === "active" ? { status, lockedUntil: null, failedLoginAttempts: 0 } : { status, lockedUntil: null },
     });
-    if (status !== "active") {
-      await tx.refreshToken.updateMany({ where: { user: { clubId: id }, revokedAt: null }, data: { revokedAt: new Date() } });
-    }
+    // Reactivar no revive nada: lo que se terminó aquí sigue terminado.
+    if (status !== "active") await terminarSesionesDelTitular(tx, { clubId: id }, "admin_revocation");
     await audit({ userId: actor.userId, action, entityType: "Club", entityId: id, ipAddress: actor.ipAddress, before, after: updated }, { tx });
     return updated;
   });
@@ -454,7 +454,7 @@ export async function softDeleteClub(id: string, actor: ActorContext) {
   const club = await prisma.$transaction(async (tx) => {
     const updated = await tx.club.update({ where: { id }, data: { deletedAt: new Date(), status: "disabled", updatedBy: actor.userId } });
     await tx.user.updateMany({ where: { clubId: id }, data: { status: "disabled", deletedAt: new Date(), lockedUntil: null } });
-    await tx.refreshToken.updateMany({ where: { user: { clubId: id }, revokedAt: null }, data: { revokedAt: new Date() } });
+    await terminarSesionesDelTitular(tx, { clubId: id }, "admin_revocation");
     await audit(
       { userId: actor.userId, action: "CLUB_DELETED", entityType: "Club", entityId: id, ipAddress: actor.ipAddress, before, after: updated },
       { tx }
@@ -555,7 +555,7 @@ export async function resetClubCredentials(clubId: string, actor: ActorContext) 
         where: { id: club.user!.id },
         data: { passwordHash, mustChangePassword: true, failedLoginAttempts: 0, status: "active", lockedUntil: null },
       });
-      await tx.refreshToken.updateMany({ where: { userId: club.user!.id, revokedAt: null }, data: { revokedAt: new Date() } });
+      await terminarSesionesDelUsuario(tx, club.user!.id, "admin_revocation");
     },
     () => ({ userId: actor.userId, action: "CLUB_CREDENTIALS_RESET", entityType: "User", entityId: club.user!.id, ipAddress: actor.ipAddress })
   );

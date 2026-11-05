@@ -69,6 +69,7 @@ model User {
   person        Person?        @relation(fields: [personId], references: [id])
   club          Club?          @relation(fields: [clubId], references: [id])
   refreshTokens RefreshToken[]
+  refreshSessions RefreshSession[]
   userRoles     UserRole[]
   auditLogs     AuditLog[]
 
@@ -171,11 +172,33 @@ model RefreshToken {
   ipAddress  String?   @map("ip_address")
   userAgent  String?   @map("user_agent")
   createdAt  DateTime  @default(now()) @map("created_at")
+  // Nulo solo en los tokens anteriores a `refresh_sessions`: la API los rechaza.
+  sessionId  String?   @map("session_id")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session RefreshSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([sessionId])
   @@map("refresh_tokens")
+}
+
+// Una sesión: lo que va de un inicio de sesión a su cierre. Sobrevive a la
+// rotación del refresh token y es lo que el JWT identifica con `sid`. Ver
+// `src/modules/auth/sessions.ts`.
+model RefreshSession {
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  absoluteExpiresAt DateTime  @map("absolute_expires_at") // no se extiende al renovar
+  revokedAt         DateTime? @map("revoked_at")
+  revokedReason     String?   @map("revoked_reason")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@index([userId])
+  @@map("refresh_sessions")
 }
 
 model AuditLog {

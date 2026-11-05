@@ -144,7 +144,7 @@ docker-compose.test.yml         # base desechable para las pruebas de integraci�
 > **Revisado entero contra `prisma/schema.prisma` el 12 de septiembre de 2026.**
 > Esta sección describía el modelo *propuesto*, y el implementado se separó de él
 > en varios puntos: tablas que no se crearon, campos que cambiaron de dueño y
-> **30 modelos** donde la propuesta enumeraba una docena. La fuente de verdad es
+> **31 modelos** donde la propuesta enumeraba una docena. La fuente de verdad es
 > el esquema; aquí queda el mapa conceptual, con las diferencias señaladas donde
 > las hay. Una prueba compara la cantidad de modelos publicada con la real.
 

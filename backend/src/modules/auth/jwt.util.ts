@@ -19,7 +19,18 @@ export interface AccessTokenPayload {
   permissions: string[];
 }
 
-export function signAccessToken(payload: AccessTokenPayload): string {
+/**
+ * Lo que se firma: la identidad y la SESIÓN a la que pertenece el token.
+ *
+ * `sid` es lo que permite invalidar un JWT antes de que caduque (ver
+ * `sesionVigente` en `sessions.ts`). No forma parte de `AccessTokenPayload`
+ * porque ese tipo describe también a `req.authUser`, que `/auth/me` devuelve.
+ */
+export interface AccessTokenClaims extends AccessTokenPayload {
+  sid: string;
+}
+
+export function signAccessToken(payload: AccessTokenClaims): string {
   const options: jwt.SignOptions = {
     /**
      * Un NÚMERO, que `jsonwebtoken` siempre interpreta como segundos. El cast
@@ -33,6 +44,7 @@ export function signAccessToken(payload: AccessTokenPayload): string {
   return jwt.sign(payload, env.JWT_ACCESS_SECRET, options);
 }
 
-export function verifyAccessToken(token: string): AccessTokenPayload {
-  return jwt.verify(token, env.JWT_ACCESS_SECRET, { issuer: "natacion-api" }) as AccessTokenPayload;
+/** `sid` queda opcional en el tipo: un token anterior a las sesiones no lo trae, y quien verifica lo rechaza. */
+export function verifyAccessToken(token: string): AccessTokenPayload & { sid?: unknown } {
+  return jwt.verify(token, env.JWT_ACCESS_SECRET, { issuer: "natacion-api" }) as AccessTokenPayload & { sid?: unknown };
 }

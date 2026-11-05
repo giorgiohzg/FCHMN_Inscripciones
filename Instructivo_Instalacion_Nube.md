@@ -512,7 +512,8 @@ direcciones de conexión.
    | `ENABLE_SWAGGER` | Sin definir, la documentación en `/docs` queda **apagada en producción**, que es lo correcto. Si la pones en `true`, `PUBLIC_API_URL` pasa a ser **obligatoria** o el arranque falla. |
 
    **Opcionales — tienen valor por omisión:** `JWT_ACCESS_EXPIRES_IN` (`15m`),
-   `JWT_REFRESH_EXPIRES_IN_DAYS` (`7`), `LOGIN_MAX_ATTEMPTS` (`5`),
+   `JWT_REFRESH_EXPIRES_IN_DAYS` (`7`), `SESSION_ABSOLUTE_HOURS` (`8`),
+   `LOGIN_MAX_ATTEMPTS` (`5`),
    `LOGIN_LOCKOUT_MINUTES` (`15`), `RATE_LIMIT_GLOBAL_MAX` (`300`),
    `RATE_LIMIT_AUTH_MAX` (`20`).
 

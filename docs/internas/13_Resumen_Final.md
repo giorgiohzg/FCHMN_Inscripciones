@@ -52,7 +52,7 @@ honesto de lo que falta para llevarlo a producción.
 | Arquitectura de la solución | ✅ `01_Propuesta_Base.md` |
 | Diagrama de componentes | ✅ `01_Propuesta_Base.md` §1.3 |
 | Modelo entidad-relación | ✅ `01_Propuesta_Base.md` §2 + `prisma/schema.prisma` (fuente de verdad) |
-| Esquema de base de datos | ✅ `prisma/schema.prisma` (30 modelos) |
+| Esquema de base de datos | ✅ `prisma/schema.prisma` (31 modelos) |
 | Backend completo | ✅ 14 módulos de `src/modules`, Fastify + TypeScript estricto |
 | API REST | ✅ 117 endpoints (inventario completo en `README.md`) |
 | Documentación Swagger/OpenAPI | ✅ autogenerada en `/docs` (Módulo 1). **Deshabilitada por defecto en producción**: se publica fuera de producción o con `ENABLE_SWAGGER=true` + `PUBLIC_API_URL`. |
@@ -87,7 +87,7 @@ honesto de lo que falta para llevarlo a producción.
 | Frontend | `npm run test` | 23 | 480 |
 | **Total** | | **72** | **1.305** |
 
-- **30 modelos de Prisma**, **117 endpoints** REST, 14 módulos en `backend/src/modules`
+- **31 modelos de Prisma**, **117 endpoints** REST, 14 módulos en `backend/src/modules`
   y 13 en `frontend/src/modules`. El inventario completo de endpoints está en
   `README.md` y una prueba lo compara con el código.
 - **59 acciones distintas** auditadas a lo largo del sistema (eran 41 al cerrar el Módulo 12; crecieron con los módulos posteriores).
@@ -125,10 +125,9 @@ honesto de lo que falta para llevarlo a producción.
 4. **El `docker build` real sigue sin ejecutarse** —el análisis estático no valida
    fallos de ejecución— y tampoco hay smoke test en navegadores reales, que es lo
    que faltaría antes de usar `AUTH_COOKIE_SAMESITE=none` en producción.
-5. **El identificador de sesión se genera en el cliente**, así que dos pestañas que
-   arrancan por separado no se reconocen. La solución diseñada —un `session_id`
-   emitido por el backend, con una columna nueva en `refresh_tokens`— está **sin
-   aplicar**: no hay migración creada ni cambios en `schema.prisma`.
+5. **El ciclo de sesión del frontend se genera en el cliente**, así que dos pestañas
+   que arrancan por separado no se reconocen. El backend ya tiene una identidad de
+   sesión (`refresh_sessions`, el `sid` del JWT), pero el frontend no la usa como ciclo.
 6. **El rate limiting cuenta en memoria del proceso**: el despliegue previsto es de
    una sola instancia, y escalar horizontalmente exige un contador compartido.
 7. **La base de trabajo `natacion` está pendiente de recreación controlada.**

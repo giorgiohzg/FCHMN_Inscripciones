@@ -120,6 +120,16 @@ const envSchema = z
     /** Vigencia del refresh token opaco. La leen `session.cookie.ts` y `auth.service.ts`. */
     JWT_REFRESH_EXPIRES_IN_DAYS: enteroEnRango(1, 365, "días").default(7),
 
+    /**
+     * Duración ABSOLUTA de una sesión, en horas, contada desde su creación.
+     *
+     * No es inactividad: las renovaciones no reinician este plazo, y por eso
+     * tampoco lo extiende la renovación proactiva del frontend, que es un
+     * temporizador y no prueba que haya una persona. Cada refresh token vence en
+     * el mínimo entre `JWT_REFRESH_EXPIRES_IN_DAYS` y este límite.
+     */
+    SESSION_ABSOLUTE_HOURS: enteroEnRango(1, 8760, "horas").default(8),
+
     LOGIN_MAX_ATTEMPTS: enteroEnRango(1, 100, "intentos").default(5),
     LOGIN_LOCKOUT_MINUTES: enteroEnRango(1, 1440, "minutos").default(15),
 

@@ -974,8 +974,10 @@ describe("la API exige el rol de administrador, no solo el permiso", () => {
 
   it("a quien le retiran el rol, la MISMA sesión deja de servir", async () => {
     /**
-     * No hace falta esperar a que caduque el access token: el estado de
-     * autorización se relee de la base en cada solicitud.
+     * No hace falta esperar a que caduque el access token: retirar el acceso
+     * termina las sesiones de esa cuenta, y la sesión se comprueba en cada
+     * solicitud. Por eso es un 401 y no un 403: no le faltan permisos a una sesión
+     * viva, es que esa sesión ya no existe.
      */
     const persona = await crearPersona("Hilda", ["swimmer"]);
     await cuentaPara(persona);
@@ -992,6 +994,6 @@ describe("la API exige el rol de administrador, no solo el permiso", () => {
     await personsService.setAdminAccess(persona.id, false, ADMIN);
 
     const después = await llamarAdminAccess(objetivo.id, false, token);
-    expect(después.statusCode, "con el mismo token, ya sin el rol").toBe(403);
+    expect(después.statusCode, "con el mismo token, de una sesión ya terminada").toBe(401);
   });
 });

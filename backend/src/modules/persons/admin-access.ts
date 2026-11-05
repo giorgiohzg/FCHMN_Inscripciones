@@ -134,23 +134,3 @@ export async function aplicarRolAdmin(db: Db, userId: string, conceder: boolean)
   return false;
 }
 
-/**
- * Revoca los refresh tokens vigentes de una cuenta.
- *
- * QUÉ HACE Y QUÉ NO, con precisión, porque es fácil creer de más: impide
- * obtener un access token NUEVO. **No invalida el access token ya emitido**,
- * que sigue siendo criptográficamente válido hasta que caduque.
- *
- * Lo que sí retira los permisos de inmediato es otra cosa: `authenticate`
- * recarga roles y permisos de la base en CADA solicitud, así que la siguiente
- * petición de esa persona ya no será administrativa aunque presente el token
- * viejo. La revocación del refresh añade que, cuando ese token caduque, la
- * sesión no se pueda renovar y haya que entrar de nuevo.
- */
-export async function revocarSesiones(db: Db, userId: string): Promise<number> {
-  const { count } = await db.refreshToken.updateMany({
-    where: { userId, revokedAt: null },
-    data: { revokedAt: new Date() },
-  });
-  return count;
-}

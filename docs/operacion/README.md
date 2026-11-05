@@ -6,6 +6,7 @@ de desarrollo.
 | Documento | Para qué |
 |---|---|
 | [carga-masiva-inicial.md](carga-masiva-inicial.md) | Poblar un sistema recién instalado con clubes, personas y membresías desde planillas, por la API y sin tocar la base |
+| [corte-de-sesiones.md](corte-de-sesiones.md) | Desplegar `refresh_sessions` en un sistema en producción, y revertirlo sin reactivar sesiones invalidadas |
 | [verificacion-por-sql.md](verificacion-por-sql.md) | Comprobar por SQL de **solo lectura**, desde el servicio de mantenimiento, qué quedó de verdad en la base |
 
 ## Lo que NO está aquí, y dónde está

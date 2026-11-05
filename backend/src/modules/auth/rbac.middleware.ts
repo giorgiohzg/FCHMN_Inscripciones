@@ -1,6 +1,7 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { verifyAccessToken, type AccessTokenPayload } from "./jwt.util";
 import { loadAuthorizationState } from "./authorization";
+import { sesionVigente } from "./sessions";
 import { ForbiddenError, PasswordChangeRequiredError, UnauthorizedError } from "../../shared/errors";
 
 declare module "fastify" {
@@ -33,6 +34,9 @@ declare module "fastify" {
  * por solicitud; a cambio, revocar un permiso surte efecto de inmediato y no
  * hay que acordarse de invalidar tokens en cada punto que cambie roles o
  * asignaciones (que es justo lo que un esquema de versionado exigiría).
+ *
+ * Además de la identidad, el token aporta su sesión (`sid`), que debe seguir
+ * vigente: es lo que hace efectiva una revocación antes de que el JWT caduque.
  */
 async function authenticate(req: FastifyRequest): Promise<{ mustChangePassword: boolean }> {
   const header = req.headers.authorization;
@@ -41,11 +45,25 @@ async function authenticate(req: FastifyRequest): Promise<{ mustChangePassword: 
   }
   const token = header.slice("Bearer ".length);
 
-  let payload: AccessTokenPayload;
+  let payload: ReturnType<typeof verifyAccessToken>;
   try {
     payload = verifyAccessToken(token);
   } catch {
     throw new UnauthorizedError("Token de acceso inválido o expirado");
+  }
+
+  /**
+   * La firma dice quién emitió el token, no si su sesión sigue viva.
+   *
+   * Sin esta comprobación, un logout o un cambio de contraseña dejaban el JWT
+   * operativo durante su vigencia restante (15 minutos por defecto). Un token sin
+   * `sid` es anterior a las sesiones y se rechaza: la transición es un corte
+   * anunciado, sin compatibilidad (ver `docs/operacion/corte-de-sesiones.md`).
+   *
+   * Es una consulta más por petición, sobre clave primaria. Sin caché a propósito.
+   */
+  if (typeof payload.sid !== "string" || payload.sid.length === 0 || !(await sesionVigente(payload.sid, payload.sub))) {
+    throw new UnauthorizedError("La sesión ya no es válida. Vuelva a iniciar sesión.");
   }
 
   const state = await loadAuthorizationState(payload.sub);
