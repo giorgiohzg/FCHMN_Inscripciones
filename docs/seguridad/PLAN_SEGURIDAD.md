@@ -10,7 +10,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | Fase | Contenido | Estado |
 |---|---|---|
 | **A1** | Cliente: un 401 o una renovación atrasados no cierran ni reutilizan una sesión posterior | **Cerrada y desplegada** en la web |
-| **1** | Sesiones y revocación efectiva del JWT | **Publicada** (`4311a67`). La CI falló en las pruebas unitarias del backend por un defecto de aislamiento de una prueba; **corrección local pendiente de publicación**. La validación completa de la CI está **pendiente**, y las integraciones de este commit no corrieron allí. Sin desplegar |
+| **1** | Sesiones y revocación efectiva del JWT | **En producción desde el 2026-11-05** (`b920893`): migración aplicada y API desplegada, con el corte de sesiones ejecutado. La CI de `b920893` pasó completa, integraciones incluidas. Ver «Puesta en producción» |
 | **2** | `Cache-Control: no-store`, filtrado de excepciones, login uniforme | Pendiente |
 | **3** | Cabeceras del frontend (Nginx) | Pendiente |
 | **4** | Límites del procesamiento XLSX | Pendiente |
@@ -29,19 +29,40 @@ la base desechable de `docker-compose.test.yml`, con datos sintéticos.
 `auth/sessions`, que lee `shared/env` al importarse y exige la configuración completa de
 autenticación. Esa prueba solo pasaba donde hubiera un `backend/.env` (`@prisma/client` lo
 carga solo), que la CI no tiene. La corrección aísla la prueba con un doble del módulo de
-sesiones, sin tocar la validación del entorno, y por ahora es **local**. Como los pasos de
-integración se omitieron tras ese fallo, **la CI aún no ha ejecutado las integraciones de la
-Fase 1**: siguen validadas solo en local.
+sesiones, sin tocar la validación del entorno, y se publicó en `b920893`. La CI de ese commit
+(ejecución 42102251640) pasó completa, con las pruebas unitarias, las migraciones y las
+integraciones de la Fase 1.
 
-El **corte de sesiones no se ha ejecutado**, y la migración no se ha aplicado a ninguna base
-que no sea la desechable. Ver [../operacion/corte-de-sesiones.md](../operacion/corte-de-sesiones.md).
+### Puesta en producción (2026-11-05)
+
+Commit desplegado: `b9208932f26e17b7eb56e6beba084f977857e65c`. Solo lo usaba su titular.
+
+| Paso | Resultado |
+|---|---|
+| Historial previo | 36 migraciones aplicadas y terminadas, ninguna revertida ni inconclusa; solo faltaba `20261106000000_refresh_sessions` |
+| Respaldo | Exportación nueva de la base, descargada fuera del repositorio. Se descomprimió sin errores y su catálogo se leyó con `pg_restore --list` (herramienta de versión mayor igual o superior a la del archivo): 31 tablas con datos. **No fue una restauración completa** |
+| `fchmn-mantenimiento` | Despliegue manual de `b920893`, con Docker Command vacío; no se ejecutó nada sobre la base |
+| Migración | `prisma migrate deploy` una sola vez: «37 migrations found», se aplicó únicamente `20261106000000_refresh_sessions` y la ejecución terminó correctamente. Docker Command quedó vacío y se comprobó tras recargar |
+| `fchmn-api` | Despliegue manual de `b920893`: *Deploy succeeded* y *Live*. **Aquí ocurrió el corte de sesiones** |
+| Salud | Por el proxy de la web, `/` respondió 200 y `/api/ready` respondió 200 con `{"status":"ready","database":"ok"}` |
+
+Auto-Deploy sigue desactivado en los tres servicios, la programación del mantenimiento no
+cambió y `fchmn-web` no se desplegó (sigue en `4e6300d`).
+
+**Lo que no se comprobó:** las consultas de solo lectura posteriores al corte de
+[../operacion/corte-de-sesiones.md](../operacion/corte-de-sesiones.md) (sesiones creadas,
+tokens sin sesión, invariante de revocación), la prueba con una cuenta propia (iniciar y
+cerrar sesión, y un refresco posterior) y la confirmación por consulta de que la migración
+figura terminada en `_prisma_migrations`: la salida de `migrate deploy` es la única
+evidencia de que se aplicó. La salud comprobada es la de arranque y conexión a la base, no
+la del flujo de autenticación.
 
 ## Decisiones aprobadas
 
 1. **Duración absoluta de 8 horas** desde la creación de la sesión, configurable con
    `SESSION_ABSOLUTE_HOURS` (8 por omisión). Renovar no la extiende, y cada refresh token
    vence en el mínimo entre su plazo habitual y ese límite.
-2. **Transición mediante corte anunciado, todavía no ejecutado.** La API nueva rechaza los
+2. **Transición mediante corte anunciado, ejecutado el 2026-11-05 al desplegar la API.** La API nueva rechaza los
    JWT sin `sid` y los refresh tokens sin sesión, sin cascadas de revocación. No hay
    backfill, adopción de tokens históricos, purga, `NOT NULL` ni modos temporales.
 3. **Reutilización de un refresh token consumido:** si pertenece a una sesión todavía activa,
