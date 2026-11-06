@@ -12,24 +12,21 @@ import {
   filaTraeClub,
   normalizarSigla,
   PERSONS_IMPORT_HEADERS,
-  CELDAS_LEIDAS,
   type ClubParaSigla,
   type ResolucionDeSigla,
 } from "./persons-bulk-import.rules";
 import { neutralizeSpreadsheetFormula } from "../reports/reports.rules";
 import { ValidationError, ForbiddenError } from "../../shared/errors";
 import { mensajePublicable } from "../../shared/errorPublicable";
+import { analizarXlsxAislado } from "./xlsx/analisis-aislado";
+import { LIMITES_XLSX, PERSONS_IMPORT_SHEET, type LimitesXlsx } from "./xlsx/limites";
+
+export { PERSONS_IMPORT_SHEET };
 
 interface ActorContext {
   userId: string;
   ipAddress?: string;
 }
-
-/**
- * Nombre de la hoja de DATOS. El importador la busca por nombre; ver
- * `importPersonsFromExcel`.
- */
-export const PERSONS_IMPORT_SHEET = "Personas";
 
 /** Nombre de la hoja de AYUDA. Nunca se procesa. */
 export const PERSONS_INSTRUCTIONS_SHEET = "Instrucciones";
@@ -195,6 +192,8 @@ export interface BulkImportOptions {
    * omisión NO: así ningún llamador abre por descuido una vía de asignación.
    */
   puedeAsignarClub?: boolean;
+  /** Límites del análisis. Solo las pruebas los cambian. */
+  limites?: LimitesXlsx;
 }
 
 /**
@@ -212,48 +211,20 @@ export interface BulkImportOptions {
  * sigla cambia durante la carga. Si la sigla ya no corresponde, se rechaza esa fila y las
  * demás continúan.
  *
- * Antes de escribir nada se comprueban dos cosas sobre el ARCHIVO entero:
+ * Antes de escribir nada se comprueba el ARCHIVO entero:
+ *   - sus límites y su estructura, en un proceso aparte y con plazo (`xlsx/`): un archivo
+ *     fuera de límites no llega a crear a nadie;
  *   - el encabezado de J y K (una plantilla con «Roles» se rechaza: nunca se lee
  *     como club);
  *   - el permiso: si alguna fila trae club y quien carga no puede asignar, se
  *     rechaza el archivo completo con 403, sin crear a nadie a medias.
  */
 export async function importPersonsFromExcel(fileBuffer: Buffer, actor: ActorContext, opciones: BulkImportOptions = {}): Promise<BulkImportSummary> {
-  const workbook = new ExcelJS.Workbook();
-  try {
-    await workbook.xlsx.load(fileBuffer as any);
-  } catch {
-    throw new ValidationError("El archivo no es un Excel (.xlsx) válido.");
-  }
+  const libro = await analizarXlsxAislado(fileBuffer, opciones.limites ?? LIMITES_XLSX);
+  const { filas } = libro;
 
-  /**
-   * SE ELIGE LA HOJA POR NOMBRE, no por posición.
-   *
-   * La plantilla trae `Personas` (datos) e `Instrucciones` (ejemplo y notas),
-   * y el orden en que un editor las guarde no debe decidir cuál se importa.
-   * La primera hoja se usa SOLO como respaldo, para los archivos anteriores a
-   * ese cambio, que traían una única hoja y podían tener cualquier nombre.
-   */
-  const sheet = workbook.getWorksheet(PERSONS_IMPORT_SHEET) ?? workbook.worksheets[0];
-  if (!sheet) throw new ValidationError("El archivo no tiene ninguna hoja de cálculo.");
-
-  const leerFila = (rowNumber: number): unknown[] => {
-    const row = sheet.getRow(rowNumber);
-    const valores: unknown[] = [];
-    for (let col = 1; col <= CELDAS_LEIDAS; col++) valores.push(row.getCell(col).value);
-    return valores;
-  };
-
-  const encabezado = evaluarEncabezado(leerFila(1));
+  const encabezado = evaluarEncabezado(libro.encabezado);
   if (!encabezado.ok) throw new ValidationError(encabezado.error);
-
-  // Filas con algún dato (las completamente vacías se ignoran en silencio).
-  const filas: { row: number; valores: unknown[] }[] = [];
-  for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber++) {
-    const valores = leerFila(rowNumber);
-    if (valores.every((v) => v === null || v === undefined || String(v).trim() === "")) continue;
-    filas.push({ row: rowNumber, valores });
-  }
 
   if (encabezado.conColumnasDeClub && !opciones.puedeAsignarClub && filas.some((f) => filaTraeClub(f.valores))) {
     throw new ForbiddenError(

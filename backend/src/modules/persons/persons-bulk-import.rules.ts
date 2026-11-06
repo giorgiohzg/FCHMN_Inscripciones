@@ -2,8 +2,9 @@ import { personCreateSchema, type PersonCreateInput } from "./persons.schemas";
 import { normalizeRun } from "../../shared/run.util";
 import { esFechaCalendarioValida } from "../../shared/fecha.util";
 import { normalizarSigla } from "../../shared/clubCode";
+import { CELDAS_LEIDAS } from "./xlsx/limites";
 
-export { normalizarSigla };
+export { normalizarSigla, CELDAS_LEIDAS };
 
 /**
  * LA CARGA MASIVA NO TRAE ROLES.
@@ -58,8 +59,6 @@ export const PERSONS_IMPORT_HEADERS = [
 /** Posiciones (0-indexadas) de las dos columnas de club. */
 export const COLUMNA_SIGLA = 9;
 export const COLUMNA_FECHA_EFECTIVA = 10;
-/** Cuántas celdas se leen por fila: A-K más una de control (L) para detectar datos de sobra. */
-export const CELDAS_LEIDAS = 12;
 
 export interface PersonRowMapResult {
   ok: boolean;

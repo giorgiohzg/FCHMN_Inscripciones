@@ -13,7 +13,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **1** | Sesiones y revocación efectiva del JWT | **En producción desde el 2026-11-05** (`b920893`): migración aplicada y API desplegada, con el corte de sesiones ejecutado. La CI de `b920893` pasó completa, integraciones incluidas. Ver «Puesta en producción» |
 | **2** | `Cache-Control: no-store`, filtrado de excepciones, login uniforme | **API desplegada en producción el 2026-11-05 (`6d2dae5`)**; la CI pasó completa. Salud y cabeceras observadas; funcionalidades sin comprobar en producción. Ver «Fase 2» |
 | **3** | Cabeceras del frontend (Nginx) | **Cerrada**: desplegada en `fchmn-web` desde `1641004` (Live, Auto-Deploy Off) y validada en local (imagen real y navegador real con una API simulada). Ver «Fase 3» |
-| **4** | Límites del procesamiento XLSX | Pendiente |
+| **4** | Límites del procesamiento XLSX | **Publicada en el repositorio y validada en local**, con datos sintéticos; **sin desplegar**. Ver «Fase 4» |
 | Vite 5.4.21 | Aviso GHSA-rq7h-c2jc-7f22 en una dependencia de desarrollo | **Aplazado, fuera de estas fases** |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -360,7 +360,7 @@ las descargas y la verificación ficticia; su evidencia es la local y la de la C
 `1641004431bdcf14f8555c961d37051a4c1a676f` (Live, **Auto-Deploy en Off**; la CI de ese SHA, ejecución
 42214496430, terminó en éxito). Despliegue: https://dashboard.render.com/web/srv-dbh48scs728c73arlf8g/deploys/dep-dbmsbh3bc2fs73aqk7h0
 (variables de la web: `VITE_API_URL=/api` y `CSP_CONNECT_SRC` sin declarar, es decir `'self'`).
-La Fase 4 sigue pendiente y sin autorización. Antes del despliegue se validó
+Antes del despliegue se validó
 sobre la imagen real de Nginx y en un navegador real, con una **API simulada** y datos
 sintéticos (ver «Validación local» y «Límites»). No se tocó el backend, la autenticación, el
 esquema, las migraciones, las dependencias, Vite ni la Fase 4.
@@ -506,20 +506,207 @@ Solo lecturas HTTP y una carga pública, sin iniciar sesión:
 - Las imágenes `fchmn-frontend:fase3-*` y los contenedores `fchmn-f3*` de prueba quedan en el
   equipo local, detenidos.
 - **Recomendado:** recorrer las pantallas autenticadas con una cuenta propia y un listener de
-  `securitypolicyviolation`, sin credenciales en este repositorio. La Fase 4 sigue pendiente.
+  `securitypolicyviolation`, sin credenciales en este repositorio.
 
-## Fase 4: XLSX (pendiente)
+## Fase 4: límites del XLSX (publicada en el repositorio, validada en local; sin desplegar)
 
-- **Hallazgo:** la carga masiva abre el libro en memoria sin presupuesto propio, y el bucle de
-  filas usa el número de la última fila declarada. Es una superficie de **disponibilidad con
-  acceso administrativo**, no una vulnerabilidad de datos.
-- **Objetivo:** inspeccionar el ZIP antes de abrirlo; presupuesto de expansión real, no el
-  declarado; límites de hojas y filas antes de iterar; análisis aislado con plazo; una sola
-  carga simultánea.
-- **Calibración:** con datos sintéticos. La carga histórica de 5.071 personas es una
-  referencia y no un requisito de capacidad.
-- **Aceptación:** un archivo sintético fuera de límites se rechaza sin agotar el proceso, y
-  una carga legítima calibrada pasa.
+**Estado:** publicada en el repositorio (commit y push a `main`) y validada en local con datos
+sintéticos. **Sin desplegar:** la API de producción sigue con la versión anterior, y el
+despliegue de `fchmn-api` necesita su propia autorización.
+
+- **Hallazgo:** la carga masiva abría el libro en memoria sin presupuesto propio y dentro del
+  hilo principal. Es una superficie de **disponibilidad con acceso administrativo**
+  (`persons:write`), no una vulnerabilidad de datos.
+- **Lo que recorre ExcelJS a ciegas** (leído en su código): `<mergeCell>`, `<dataValidation>` y
+  `<definedName>` recorren su rango celda por celda (`A1:XFD1048576` son 17.000 millones de
+  vueltas), `<col max>` crea una columna por número, y el número de fila fija el recorrido de
+  las filas.
+
+### Diseño
+
+Todo está en `backend/src/modules/persons/xlsx/`. La escritura de personas no cambió.
+
+1. **Turno de carga** (`turno-de-carga.ts`). Se toma **antes de recibir el archivo** y se libera
+   al terminar, con éxito o con fallo. Una segunda carga recibe **409** en el acto, sin cola: su
+   cuerpo se descarta sin guardarlo. La garantía es **por proceso**: no coordina réplicas, y el
+   despliegue previsto es de una instancia, igual que el límite de solicitudes.
+2. **Recepción acotada.** La ruta pasa su propio `fileSize` (el flujo se corta sin acumular) y un
+   plazo de subida que cierra la conexión: un envío detenido no retiene el turno.
+3. **Proceso de análisis** (`analisis-aislado.ts`, `analizador.proceso.ts`). El análisis corre en
+   un **proceso hijo**, con el entorno vacío, `--max-old-space-size` y sin Prisma ni `shared/env`
+   (lo comprueba una prueba sobre el grafo de imports). Al vencer el plazo se le envía `SIGKILL`,
+   y la promesa no se resuelve hasta que terminó. Si el proceso no pudo crearse no hay PID: Node
+   emite `error` y `close`, nunca `exit`, y `kill` lanzaría; la solicitud termina sin esperar a
+   nadie y responde el 500 genérico. La finalización se sigue desde que el hijo nace, y la falta de
+   respuesta se decide en `close`, que llega tras vaciar el canal. Del hijo solo sale un resultado,
+   un rechazo escrito por este sistema o un fallo sin texto.
+4. **Inspección del ZIP** (`inspeccion-zip.ts`), antes de ExcelJS. Cada entrada se descomprime de
+   verdad con `inflateRawSync` y `maxOutputLength`: zlib cuenta los bytes reales y corta al superar
+   el tope, sin acumular el resto. Lo declarado no se cree: debe coincidir con lo real. La lectura
+   es más estricta que la de JSZip para que ambos vean lo mismo: se rechazan ZIP64, cifrado, el campo
+   extra de ruta Unicode y datos antes o después del archivo. JSZip toma el nombre del encabezado
+   **local** y lo normaliza, así que el nombre local y el central deben ser idénticos byte a byte,
+   UTF-8 válido y ya canónicos: `a/../x`, `./x`, `a//x`, barras invertidas, controles y colisiones
+   (`x`, `/x`, `x/`) se rechazan. Solo se admite una barra inicial, que ExcelJS retira. Eso garantiza
+   que toda hoja, libro o tabla de cadenas que ExcelJS reconozca se haya inspeccionado como tal.
+5. **Escaneo del libro** (`escaneo-xml.ts`), sobre esos mismos bytes. Un recorrido de etiquetas que
+   distingue comentarios, CDATA y atributos, y que rechaza lo que no puede medir (`<!DOCTYPE`,
+   UTF-16, entidades en un atributo medido). Mide hojas, filas, índices, celdas, columnas, cadenas
+   compartidas y el área de combinaciones, validaciones y nombres definidos. **Cada coordenada debe
+   caber por sí misma**: los dos extremos de un rango y las referencias sueltas se validan aunque el
+   área sea pequeña. Los extremos de `<col>` (`min` y `max`) tienen su **propio tope, 16.384**, y no
+   el de las celdas: ExcelJS crea un objeto de formato por columna declarada, y su número en cada
+   hoja queda acotado por ese máximo aunque haya declaraciones repetidas o solapadas. Los nombres definidos se leen con las
+   reglas de ExcelJS (solo lo que registra, sin confundir el nombre de la hoja con una referencia), y
+   un comentario o un CDATA dentro de uno se rechaza. `<dimension>` no se usa: es una declaración,
+   ExcelJS no la recorre y aquí se mide lo real.
+6. **Lectura** (`analizador.ts`). Se conserva `workbook.xlsx.load`, que da las celdas combinadas,
+   hipervínculos, fórmulas y fechas con que ya funcionaba la carga. Tras cargar y antes de recorrer
+   se comprueban las dimensiones **efectivas** de todas las hojas, como defensa si el escaneo y
+   ExcelJS divergieran. Se limitan las filas con datos y el texto por celda y total, porque una
+   cadena compartida se repite gratis en el archivo.
+
+**Por qué un proceso y no `worker_threads`.** La primera versión usaba un hilo con
+`resourceLimits`, y al medirla se reprodujo tres de tres veces un **aborto del proceso entero**
+(salida 134, `FATAL ERROR: ... JavaScript heap out of memory`, en Windows con Node 24, con el
+escaneo desactivado para la prueba): el fallo de memoria del hilo no se quedó en el hilo. Con un
+hijo, ese mismo archivo responde un rechazo y la API sigue viva, en Windows y en la imagen.
+
+### Límites vigentes
+
+| Límite | Valor | Por qué |
+|---|---|---|
+| Archivo comprimido | 4 MB | 10.000 personas ocupan 0,6 MB |
+| Entradas del ZIP | 128 | Holgura sobre las 16 hojas |
+| Expansión real por entrada / total | 16 MB / 32 MB | 10.000 personas expanden 5,5 MB; el caso al borde, 20,6 MB |
+| Hojas | 16 | |
+| Filas (`<row>`, todas las hojas) e índice de fila | 25.000 | Admite filas vacías con formato; frena la hoja dispersa |
+| Filas **con datos** | 10.000 | Casi el doble de la carga histórica, que es referencia y no requisito |
+| Columna máxima de **celdas y referencias** (combinaciones, validaciones, nombres) | 1.024 | Lo que hay más allá de la L se ignora, pero no debe costar |
+| Extremos `min` y `max` de **`<col>`** (formato de columnas) | 16.384 | Máximo físico de una hoja: Excel lo escribe al dar formato o ancho a la hoja entera. Límite aparte: declara formato, no celdas |
+| Celdas (todas las hojas) | 300.000 | 25.000 filas × 12 celdas |
+| Cadenas compartidas | 150.000 | |
+| Área declarada (suma) | 300.000 celdas | Una validación en una columna entera (1.048.576) se rechaza |
+| Caracteres por celda / en total | 2.048 / 8 MB | |
+| Plazo de análisis | 60 s | 1,6 veces el caso al borde en el perfil de producción |
+| Plazo de subida | 120 s | |
+| Montón del análisis | 128 MB | El caso al borde cabe |
+
+### Calibración
+
+Archivos sintéticos, con el **backend compilado** dentro de la imagen del backend (Node 22) y los
+recursos del plan de la API: `--cpus 0.5 --memory 512m`. El pico es el de todo el contenedor, por
+`memory.peak`; el proceso principal de esa prueba es mínimo, sin Fastify ni Prisma.
+
+| Archivo | Comprimido | Expandido | Tiempo | Pico | Resultado |
+|---|---|---|---|---|---|
+| 5.071 personas (referencia) | 0,3 MB | 2,8 MB | 6,8 s | 63 MB | Pasa |
+| 10.000 personas | 0,6 MB | 5,5 MB | 13,9 s | 90 MB | Pasa |
+| Al borde: 9.999 filas largas y otra hoja hasta 25.000 filas | 1,7 MB | 20,6 MB | 38,0 s | 164 MB | Pasa |
+| Bomba de 1 GB que declara 100 bytes | 1,0 MB | cortada en 16 MB | 1,2 s | 55 MB | Rechazo |
+| Hoja dispersa, combinación, validación, nombre definido, `<col>` | < 2 KB | | 0,8 a 1,8 s | 55 MB | Rechazo |
+
+El mayor retraso observado en el hilo principal fue de 133 ms en los casos normales y de 403 ms en
+el caso al borde.
+
+### Validación local
+
+- **Unitarias** (`xlsx-inspeccion`, `xlsx-analisis`): 114 pruebas, con ZIP construidos a mano
+  (`tests/helpers/zipSintetico.ts`) y límites reducidos. Incluyen una comparación con el JSZip real:
+  las discrepancias de nombres se comprueban primero contra lo que él lee.
+- **Integración** (`persons-bulk-import-limites`, 19 pruebas, base desechable de
+  `docker-compose.test.yml`): HTTP real con socket para las subidas a medias. Archivo legítimo y
+  plantilla; rechazos sin ninguna escritura (personas, membresías y auditoría sin cambios); plazo
+  vencido con `/health` respondiendo; segunda carga con 409; liberación tras éxito, rechazo, corte
+  de conexión, subida detenida y fallo de creación del proceso (simulado con un doble que reproduce
+  los eventos reales observados: `error` y `close`, sin `exit`).
+- **Sin regresión:** `persons-bulk-import`, `persons-bulk-import-club` y `errores-filtrados`, las
+  reglas, `exceljs-carga`, `unzipper-compatibilidad` y `dependencias-produccion`.
+- **Desarrollo y compilado:** el mismo análisis corrió con `tsx`, con Vitest y desde `dist`, en
+  Windows y en la imagen con el perfil de producción.
+- **Cancelación real:** un bucle síncrono real de ExcelJS, con el escaneo desactivado solo en la
+  prueba, se mata a los 5,0 s; el proceso principal siguió latiendo y el análisis siguiente
+  funcionó.
+- **Agotamiento real:** ese mismo archivo con un plazo largo agota el montón del hijo y responde un
+  rechazo a los 34 s, sin afectar al proceso principal.
+- **Mutaciones:** quitar el tope de zlib, la medición de filas y validaciones, el `SIGKILL`, la
+  comparación del nombre local, la validación de los extremos o el control del PID hace fallar las
+  pruebas. Las pruebas del formato de columnas cubren: la hoja entera pasa con los límites de
+  producción; extremos `min` y `max` por encima de 16.384 se rechazan; y las celdas y referencias
+  (combinaciones, validaciones, nombres definidos) por encima de 1.024 siguen rechazándose, incluso
+  con la hoja entera con formato.
+- **Compatibilidad con un editor real** (comprobación local posterior, sin base de datos):
+  - *Editor:* Microsoft Excel 16.0 (compilación 20430) de Microsoft Office, instalado en el equipo.
+    Se manejó por automatización (VBScript, instancia propia y sin ventana); la automatización
+    tipada de PowerShell falló por una biblioteca de tipos de Excel sin registrar, que no se tocó.
+  - *Caso:* plantilla actual de la carga masiva (hojas `Personas` e `Instrucciones`, encabezado A-K,
+    anchos de columna) con cuatro personas sintéticas, tres con club y fecha de membresía. Se abrió,
+    se editó (una persona nueva, una fecha efectiva como fecha nativa de Excel en dos formatos, y la
+    de nacimiento como texto) y se guardó como XLSX **desde Excel**. El punto de partida lo generó
+    ExcelJS, solo para tener algo que abrir.
+  - *Resultado:* **pasa** con el analizador compilado y los límites de producción (4 s en Windows).
+    Se conservaron la hoja `Personas` (la activa), el encabezado completo, las cuatro filas y los
+    valores; las fechas efectivas nativas llegaron como `Date` y se mapearon a `2026-03-01` y
+    `2026-05-10`; la de texto, a `2026-04-01`.
+  - *Estructuras del archivo:* 11 entradas ZIP con nombres canónicos y deflate, sin ZIP64 ni campos
+    extra; `<dimension ref="A1:K5">`; `<cols>` con una sola declaración `min=1 max=11`; sin
+    combinaciones, validaciones ni nombres definidos; cadenas compartidas y tema habituales.
+  - *Hoja entera:* el mismo libro con ancho y formato aplicados a **toda la hoja** (Excel escribe
+    `<col min="1" max="16384" width="18.7109375" style="4"/>`) se rechazaba con el tope único de 1.024
+    columnas. Tras separar los dos límites, **ese mismo archivo guardado por Excel** (sin volver a
+    automatizar Excel) pasa con el analizador compilado y conserva hoja, encabezado, filas, valores y
+    fechas (`2026-03-01`, `2026-04-01`, `2026-05-10`).
+  - *Alcance:* una versión de Excel, dos archivos, sin LibreOffice ni Google Sheets, y sin importar
+    nada. No es una garantía para otros archivos de Excel.
+- **Costo del formato de columnas** (backend compilado, imagen del backend, `--cpus 0.5 --memory
+  512m`, un contenedor por archivo; pico de todo el contenedor por `memory.peak`). Libros
+  sintéticos con `<col min=1 max=16384>` en **todas** las hojas, con 5.071 o 10.000 personas en
+  `Personas`. Los tiempos de esta máquina variaron entre tandas (el mismo caso base midió 6,8 s en la
+  calibración y 15 a 19 s después), así que solo se compara dentro de la misma tanda:
+
+  | Caso | Hojas | Tiempo | Pico | Resultado |
+  |---|---|---|---|---|
+  | 5.071 personas, sin `<col>` (base) | 2 | 15 a 19 s | 63 a 65 MB | Pasa |
+  | 5.071 personas, `<col>` hasta 16.384 | 16 | 19 a 20 s | 108 MB | Pasa |
+  | 10.000 personas, `<col>` hasta 16.384 | 16 | 29 s | 131 MB | Pasa |
+  | 5.071 personas, 12.000 `<col>` repetidas por hoja (192.000) | 16 | 42 s | 129 MB | Pasa |
+
+  El formato de columnas añade unos 45 MB y una fracción del tiempo con 16 hojas, y encaja en los
+  presupuestos existentes (montón de 128 MB, plazo de 60 s, 512 MB de la instancia). El caso de
+  declaraciones repetidas es el que menos margen deja con el plazo; ver el riesgo arriba. El mayor
+  retraso del hilo principal fue de 505 ms.
+- **Tras las correcciones de revisión** (nombres, coordenadas, finalización) no se repitió la
+  calibración ni el agotamiento: los presupuestos no cambiaron. El analizador compilado se comprobó
+  en Windows con el archivo de 5.071 personas.
+
+### Riesgos residuales
+
+- **La memoria es compartida.** `--max-old-space-size` no cubre los buffers externos, y el hijo usa
+  la misma memoria de la instancia. Los presupuestos acotan lo conocido; si la instancia se agotara,
+  el sistema podría matar a la API en vez de al hijo. La medición no incluyó una API real en reposo.
+- **Estructuras no medidas.** Lo que ExcelJS haga con estilos, temas o dibujos está acotado por el
+  tamaño de la entrada, el montón y el plazo, no por un presupuesto propio.
+- **Hijo huérfano.** Si la API muere durante un análisis, un hijo atascado en un bucle síncrono no
+  se entera. En producción, el contenedor se reinicia con ella; en desarrollo, termina al agotar su
+  montón o hay que detenerlo.
+- **Una instancia.** Con más réplicas habría una carga activa por réplica.
+- **Validaciones en columnas enteras.** Una plantilla propia con una validación hasta la fila
+  1.048.576 se rechaza con un mensaje. La plantilla descargable no trae validaciones.
+- **Otros editores.** Se comprobó **Microsoft Excel** (ver «Compatibilidad con un editor real»);
+  no se probaron LibreOffice, Google Sheets ni otras versiones de Excel. Las reglas de nombres y de
+  ZIP rechazan como inválido lo que no sea canónico.
+- **Hoja con formato o ancho en todas las columnas.** La comprobación con Excel halló que dar
+  formato o ancho a la hoja entera hace que Excel declare `<col min="1" max="16384">`, y el tope
+  único de 1.024 columnas lo rechazaba. **Corregido:** `<col>` tiene su propio tope de 16.384
+  (`columnasDeFormatoMax`) y las celdas y referencias conservan 1.024. Costo medido abajo.
+- **Declaraciones `<col>` repetidas.** Un archivo hostil puede repetir `<col min=1 max=16384>` cientos
+  de miles de veces en cada hoja: el número de objetos que crea ExcelJS sigue acotado, pero leerlas
+  cuesta tiempo (42 s en el peor caso medido, con 192.000 declaraciones en 16 hojas, bajo el plazo
+  de 60 s y con poco margen). Si se excediera, el plazo lo corta sin escribir nada. Alternativa
+  **no aplicada**: limitar el número de elementos `<col>` por hoja (Excel escribe unos pocos).
+- **Fallo real de creación.** El doble de las pruebas reproduce los eventos observados con un
+  ejecutable inexistente en Windows; en Linux no se observó ese fallo.
+- **Sin desplegar.** Publicado en GitHub, pero nada de esto se observó en Render.
 
 ## Vite
 

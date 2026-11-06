@@ -203,8 +203,9 @@ Tres detalles que no son obvios y están resueltos en
   pero el navegador las ve bajo `/api/auth`, que no empieza por `/auth`: sin
   `proxy_cookie_path`, no las devolvería nunca y la sesión no se mantendría.
 - **El límite de tamaño del cuerpo sube a 20 MB.** El de Nginx por omisión es
-  1 MB, y la API acepta archivos de hasta 15 MB: sin esto, una importación
-  mediana moriría con un 413 que la aplicación nunca vería.
+  1 MB, y la API acepta archivos de hasta 15 MB (4 MB en la carga masiva por
+  Excel): sin esto, una importación mediana moriría con un 413 que la
+  aplicación nunca vería.
 - **El destino es una variable de Nginx, no un nombre fijo.** Así se resuelve el
   DNS en cada petición y la web sigue a la API cuando cambia de dirección al
   redesplegarse. Esa forma exige una directiva `resolver`, que
@@ -274,9 +275,10 @@ proceso* (`RATE_LIMIT_GLOBAL_MAX`, `RATE_LIMIT_AUTH_MAX`), así que con dos o m�
 instancias el límite deja de valer lo que dice. No escales horizontalmente.
 
 **Persistencia de archivos: no hace falta ninguna.** Se revisó el código del
-backend y **no escribe archivos a disco** en ningún punto: las importaciones
-(`.hyv`, Excel) se procesan en memoria con un límite de 15 MB por archivo, y los
-PDF y Excel que genera se envían en la respuesta. El **único** dato que hay que
+backend y **no escribe archivos a disco** en ningún punto: las importaciones se
+procesan en memoria, con un límite de 15 MB por archivo en las de competencias
+(`.hyv`) y de 4 MB en la carga masiva por Excel, y los PDF y Excel que genera se
+envían en la respuesta. El **único** dato que hay que
 conservar es la base de datos. Por eso no se configura ningún disco persistente,
 que además se cobraría aparte.
 
@@ -1579,9 +1581,10 @@ Internal** de la API); los dos servicios en **regiones distintas**; o la **API e
 plan Free**, que no recibe tráfico por la red privada.
 
 **Una importación falla con «413» o «Request Entity Too Large»**
-→ El archivo supera el límite del proxy (20 MB). La API acepta hasta 15 MB, así
-que un archivo entre 15 y 20 MB lo rechazará la aplicación con su propio
-mensaje, y por encima de 20 MB lo corta Nginx. Si de verdad hacen falta archivos
+→ El archivo supera el límite del proxy (20 MB). La API acepta hasta 15 MB (4 MB
+en la carga masiva por Excel), así que un archivo por encima de ese límite y
+hasta 20 MB lo rechazará la aplicación con su propio mensaje, y por encima de
+20 MB lo corta Nginx. Si de verdad hacen falta archivos
 mayores, hay que subir los dos límites, no solo uno.
 
 **Después de redesplegar la API, la web da 502 un rato**

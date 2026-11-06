@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import * as personsService from "./persons.service";
 import * as bulkImportService from "./persons-bulk-import.service";
 import {
@@ -9,7 +9,29 @@ import {
   createCredentialsSchema,
 } from "./persons.schemas";
 import { requireAuth, requirePermission, requireRole } from "../auth/rbac.middleware";
-import { ValidationError } from "../../shared/errors";
+import { ConflictError, ValidationError } from "../../shared/errors";
+import { LIMITES_XLSX } from "./xlsx/limites";
+import { tomarTurnoDeCarga } from "./xlsx/turno-de-carga";
+
+/**
+ * Recibe el archivo de la carga masiva con su propio tope, que corta el flujo antes de
+ * acumularlo. El plazo cierra la conexión: un envío detenido no retiene el turno.
+ */
+async function recibirArchivoDeCarga(req: FastifyRequest): Promise<Buffer> {
+  const plazo = setTimeout(() => req.raw.destroy(), LIMITES_XLSX.plazoSubidaMs);
+  try {
+    const file = await req.file({ limits: { fileSize: LIMITES_XLSX.comprimidoMaxBytes } });
+    if (!file) throw new ValidationError("Debe adjuntar un archivo Excel (.xlsx).");
+    return await file.toBuffer();
+  } catch (err) {
+    if ((err as { code?: string }).code === "FST_REQ_FILE_TOO_LARGE") {
+      throw new ValidationError(`El archivo pesa más de ${LIMITES_XLSX.comprimidoMaxBytes / (1024 * 1024)} MB. No se importó ninguna fila.`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(plazo);
+  }
+}
 
 export async function personsRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireAuth);
@@ -120,17 +142,24 @@ export async function personsRoutes(app: FastifyInstance) {
   });
 
   app.post("/persons/bulk-import", { preHandler: [requirePermission("persons:write")] }, async (req, reply) => {
-    const file = await req.file();
-    if (!file) throw new ValidationError("Debe adjuntar un archivo Excel (.xlsx).");
-
-    const buffer = await file.toBuffer();
-    // Incorporar personas a un club exige además el permiso de asignación: se decide aquí,
-    // con el token, y el servicio rechaza el archivo entero si trae clubes sin él.
-    const summary = await bulkImportService.importPersonsFromExcel(
-      buffer,
-      { userId: req.authUser!.sub, ipAddress: req.ip },
-      { puedeAsignarClub: req.authUser!.permissions.includes(bulkImportService.PERMISO_ASIGNAR_CLUB) }
-    );
-    reply.send(summary);
+    // El turno se toma ANTES de recibir el archivo: dos cargas no acumulan buffers a la vez.
+    const liberarTurno = tomarTurnoDeCarga();
+    if (!liberarTurno) {
+      req.raw.resume(); // se descarta lo que falte del cuerpo, sin guardarlo
+      throw new ConflictError("Ya hay una carga masiva en curso. Espere a que termine y vuelva a intentarlo.");
+    }
+    try {
+      const buffer = await recibirArchivoDeCarga(req);
+      // Incorporar personas a un club exige además el permiso de asignación: se decide aquí,
+      // con el token, y el servicio rechaza el archivo entero si trae clubes sin él.
+      const summary = await bulkImportService.importPersonsFromExcel(
+        buffer,
+        { userId: req.authUser!.sub, ipAddress: req.ip },
+        { puedeAsignarClub: req.authUser!.permissions.includes(bulkImportService.PERMISO_ASIGNAR_CLUB) }
+      );
+      reply.send(summary);
+    } finally {
+      liberarTurno();
+    }
   });
 }

@@ -285,6 +285,24 @@ sesión no viaja.
   (0 violaciones de CSP) y, ya en producción, con las cabeceras y la carga pública de `/login`
   comprobadas (sin pruebas autenticadas). Detalle y límites en
   `docs/seguridad/PLAN_SEGURIDAD.md`.
+- **Fase 4 de seguridad (publicada en el repositorio y validada en local; sin desplegar):** **límites
+  de la carga masiva por Excel**. El análisis corre en un **proceso hijo** con el entorno vacío, sin
+  base de datos, con el montón acotado y un plazo de 60 s que lo mata de verdad. Antes de ExcelJS se
+  inspecciona el ZIP contando los bytes reales al descomprimir (4 MB comprimido; 16 MB por entrada,
+  32 MB en total) y se mide el libro: hojas, filas, índices, celdas y los rangos que ExcelJS recorre
+  celda por celda, con cada coordenada dentro de los límites aunque el área sea pequeña. Los nombres
+  de las entradas deben coincidir entre el directorio central y el encabezado local, y ser canónicos:
+  así, todo lo que ExcelJS lea como hoja, libro o cadenas se ha inspeccionado. Tras cargar se
+  comprueban las dimensiones efectivas. Admite hasta 10.000 personas por archivo; lo que excede se
+  rechaza entero, sin escribir nada. Hay **una sola carga activa por instancia**: la segunda recibe 409, sin cola, y la
+  garantía es por proceso, no entre réplicas. La escritura fila por fila no cambió. Comprobado con
+  datos sintéticos, también con el backend compilado en la imagen con 0,5 CPU y 512 MB; no se probó
+  en producción. Una plantilla con personas sintéticas, editada y guardada por **Microsoft Excel
+  16.0 (compilación 20430)**, pasa con los límites de producción, también con formato o ancho
+  aplicado a toda la hoja (`<col>` hasta 16.384, con tope propio; celdas y referencias siguen en
+  1.024 columnas). Medido en la imagen con 0,5 CPU y 512 MB: unos 45 MB más con 16 hojas con ese
+  formato. **No** se probaron LibreOffice, Google Sheets ni otras versiones de Excel. Diseño,
+  calibración y riesgos en `docs/seguridad/PLAN_SEGURIDAD.md`.
 - **El refresh token viaja en una cookie `HttpOnly`**, no en el cuerpo de la respuesta.
   Antes se devolvía en el JSON de `/auth/login` y el frontend lo guardaba en
   `sessionStorage`, donde cualquier script de la página podía leerlo — y ese token vale
