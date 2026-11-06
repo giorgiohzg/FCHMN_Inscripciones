@@ -270,7 +270,7 @@ sesión no viaja.
     conservan diferencias residuales. El límite por IP, los contadores, el bloqueo por cuenta,
     la auditoría y S10 no cambian. En producción solo se observaron `/api/health`, `/api/ready`
     y `/api/auth/me` sin credenciales (todas con `no-store`); lo demás se validó en local y en la CI.
-- **Fase 3 de seguridad (publicada en GitHub y validada en local; sin desplegar):** **cabeceras de
+- **Fase 3 de seguridad (cerrada: desplegada en `fchmn-web` desde `1641004`):** **cabeceras de
   seguridad en la web** (Nginx del frontend): `Content-Security-Policy` estricta
   (`default-src 'none'`, `script-src`/`style-src`/`img-src`/`font-src` en `'self'`,
   `frame-ancestors 'none'`, sin `unsafe-inline` ni `unsafe-eval`), `X-Frame-Options: DENY`,
@@ -282,7 +282,8 @@ sesión no viaja.
   `'self' http://localhost:3000` por omisión y se puede sobrescribir (ver la tabla junto a `VITE_API_URL`). No es `API_INTERNA` (la dirección de Nginx hacia la API). Un valor
   inválido, o incoherente con el `VITE_API_URL` compilado, **impide arrancar** el contenedor con
   un mensaje. Comprobada con la imagen real y un navegador real **contra una API simulada**
-  (0 violaciones de CSP); no se probó en producción. Detalle y límites en
+  (0 violaciones de CSP) y, ya en producción, con las cabeceras y la carga pública de `/login`
+  comprobadas (sin pruebas autenticadas). Detalle y límites en
   `docs/seguridad/PLAN_SEGURIDAD.md`.
 - **El refresh token viaja en una cookie `HttpOnly`**, no en el cuerpo de la respuesta.
   Antes se devolvía en el JSON de `/auth/login` y el frontend lo guardaba en

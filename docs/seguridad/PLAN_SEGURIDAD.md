@@ -12,7 +12,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **A1** | Cliente: un 401 o una renovación atrasados no cierran ni reutilizan una sesión posterior | **Cerrada y desplegada** en la web |
 | **1** | Sesiones y revocación efectiva del JWT | **En producción desde el 2026-11-05** (`b920893`): migración aplicada y API desplegada, con el corte de sesiones ejecutado. La CI de `b920893` pasó completa, integraciones incluidas. Ver «Puesta en producción» |
 | **2** | `Cache-Control: no-store`, filtrado de excepciones, login uniforme | **API desplegada en producción el 2026-11-05 (`6d2dae5`)**; la CI pasó completa. Salud y cabeceras observadas; funcionalidades sin comprobar en producción. Ver «Fase 2» |
-| **3** | Cabeceras del frontend (Nginx) | **Implementada y publicada en GitHub; validada en local** (imagen real y navegador real con una API simulada); **sin desplegar**. Ver «Fase 3» |
+| **3** | Cabeceras del frontend (Nginx) | **Cerrada**: desplegada en `fchmn-web` desde `1641004` (Live, Auto-Deploy Off) y validada en local (imagen real y navegador real con una API simulada). Ver «Fase 3» |
 | **4** | Límites del procesamiento XLSX | Pendiente |
 | Vite 5.4.21 | Aviso GHSA-rq7h-c2jc-7f22 en una dependencia de desarrollo | **Aplazado, fuera de estas fases** |
 
@@ -354,10 +354,13 @@ ni respaldo, ni corte forzado de sesiones, ni cambios de configuración. `fchmn-
 producción:** el contrato del login, el filtrado de errores en cargas masivas e importaciones,
 las descargas y la verificación ficticia; su evidencia es la local y la de la CI.
 
-## Fase 3: cabeceras del frontend (publicada en GitHub, validada en local; sin desplegar)
+## Fase 3: cabeceras del frontend (cerrada: desplegada en producción)
 
-**Estado:** publicada en GitHub (commit y push a `main`), **sin desplegar**: `fchmn-web` sigue
-con la versión anterior, sin estas cabeceras. Validada
+**Estado:** **cerrada dentro de su alcance.** `fchmn-web` se desplegó a mano en Render desde
+`1641004431bdcf14f8555c961d37051a4c1a676f` (Live, **Auto-Deploy en Off**; la CI de ese SHA, ejecución
+42214496430, terminó en éxito). Despliegue: https://dashboard.render.com/web/srv-dbh48scs728c73arlf8g/deploys/dep-dbmsbh3bc2fs73aqk7h0
+(variables de la web: `VITE_API_URL=/api` y `CSP_CONNECT_SRC` sin declarar, es decir `'self'`).
+La Fase 4 sigue pendiente y sin autorización. Antes del despliegue se validó
 sobre la imagen real de Nginx y en un navegador real, con una **API simulada** y datos
 sintéticos (ver «Validación local» y «Límites»). No se tocó el backend, la autenticación, el
 esquema, las migraciones, las dependencias, Vite ni la Fase 4.
@@ -469,10 +472,25 @@ variantes —`VITE_API_URL=/api` y la de Compose— y contenedores exclusivos de
   `avisos-terceros`, `dockerfile-mantenimiento` y `dockerignore-contexto`; `typecheck` y `lint`
   sin errores. No se repitieron las suites del backend ni las completas.
 
+### Comprobaciones en producción
+
+Solo lecturas HTTP y una carga pública, sin iniciar sesión:
+
+- Cabeceras de `/login`, `/index.html`, el JS y el CSS reales: las cinco, con los valores previstos
+  (CSP con `connect-src 'self'` y sin `localhost`); `no-store` en el HTML y caché inmutable en los
+  assets.
+- `/api/ready` responde 200 (`ready`, base `ok`), con una sola copia de las cabeceras de seguridad,
+  las de la API.
+- `/login` en un navegador: HTML, JS, CSS y logo con 200 y formulario visible. La única entrada de
+  consola fue el 401 esperado de `/api/auth/refresh` sin sesión; no hubo mensajes de bloqueo por
+  CSP. Eso **no garantiza** la ausencia total de violaciones: no había un listener de
+  `securitypolicyviolation`.
+
 ### Límites
 
-- **Sin desplegar.** Nada se probó en Render ni con el dominio real ni con HTTPS: HSTS solo se
-  comprobó como cabecera (los navegadores lo ignoran en HTTP plano).
+- **Producción:** sin pruebas autenticadas (pantallas, descargas y cargas de archivos no se
+  recorrieron), sin listener de `securitypolicyviolation` y HSTS comprobado solo como cabecera
+  (los navegadores lo ignoran en HTTP plano).
 - **API simulada.** Los datos son sintéticos y la API es un servidor mínimo escrito para la
   prueba: no ejercita al backend real, y varias pantallas (Auditoría, Catálogos, Asignaciones y
   otras con formas de datos más complejas) no se recorrieron porque el simulador no las
@@ -487,9 +505,8 @@ variantes —`VITE_API_URL=/api` y la de Compose— y contenedores exclusivos de
   Nginx. No se le hizo una prueba de mutación.
 - Las imágenes `fchmn-frontend:fase3-*` y los contenedores `fchmn-f3*` de prueba quedan en el
   equipo local, detenidos.
-- **Pendiente:** el despliegue de `fchmn-web` (que reconstruye la imagen con
-  `VITE_API_URL=/api` y, por omisión, `CSP_CONNECT_SRC='self'`), con su propia autorización. Tras desplegar conviene observar las cabeceras reales y la consola con una
-  cuenta propia, sin credenciales en este repositorio.
+- **Recomendado:** recorrer las pantallas autenticadas con una cuenta propia y un listener de
+  `securitypolicyviolation`, sin credenciales en este repositorio. La Fase 4 sigue pendiente.
 
 ## Fase 4: XLSX (pendiente)
 
