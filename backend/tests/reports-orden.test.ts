@@ -96,7 +96,7 @@ describe("nadadores: por apellido paterno", () => {
   it("empate total de nombre: desempata el RUN y, al final, el identificador", () => {
     const iguales = { fullName: "Ana Rojas Luna", paternalLastName: "Rojas", maternalLastName: "Luna", firstName: "Ana" };
     const porRun = [entry({ ...iguales, personId: "z", run: "9" }), entry({ ...iguales, personId: "a", run: "2" })];
-    expect(groupReportByClubAndSwimmer(porRun, CORTE)[0]!.swimmers.map((s) => s.run)).toEqual(["2", "9"]);
+    expect(groupReportByClubAndSwimmer(porRun, CORTE)[0]!.swimmers.map((s) => s.personId)).toEqual(["a", "z"]); // el RUN 2 es de "a"; ya no se entrega, solo desempata
     const porId = [entry({ ...iguales, personId: "z", run: "5" }), entry({ ...iguales, personId: "a", run: "5" })];
     // Con el mismo RUN el orden lo da el identificador; se comprueba con el comparador.
     expect(compararNadadores({ ...iguales, run: "5", personId: "a" }, { ...iguales, run: "5", personId: "z" })).toBeLessThan(0);
@@ -141,7 +141,7 @@ describe("nadadores: por apellido paterno", () => {
       entry({ personId: "4", run: "4", fullName: "Sin Apellido" }),
       entry({ personId: "5", run: "5", fullName: "Abel Alvear", paternalLastName: "Alvear" }),
     ];
-    const g = (es: SwimmerEventEntry[]) => groupReportByClubAndSwimmer(es, CORTE)[0]!.swimmers.map((s) => s.run);
+    const g = (es: SwimmerEventEntry[]) => groupReportByClubAndSwimmer(es, CORTE)[0]!.swimmers.map((s) => s.personId);
     const esperado = g(entradas);
     for (const orden of permutaciones(entradas)) expect(g(orden)).toEqual(esperado);
     expect(esperado).toEqual(["5", "3", "1", "2", "4"]);
@@ -406,7 +406,7 @@ describe("totales y contenido se conservan", () => {
     expect(g.totalNadadores).toBe(2);
     expect(g.totalPruebasIndividuales).toBe(3);
     expect(g.totalRelevos).toBe(1);
-    expect(g.swimmers.map((s) => s.run)).toEqual(["2", "1"]);
+    expect(g.swimmers.map((s) => s.personId)).toEqual(["2", "1"]);
     expect(g.swimmers[1]!.pruebas.map((l) => l.text)).toEqual(["I2", "I10"]);
   });
 });

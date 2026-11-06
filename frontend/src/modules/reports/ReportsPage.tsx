@@ -202,10 +202,13 @@ export function ReportsPage() {
                 </span>
               </h2>
               {club.swimmers.map((s, index) => (
-                <div key={s.run} style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--brand-gray-100)" }}>
-                  {/* Una línea: número, nadador (RUN), edad, categoría, género */}
+                // Clave: el identificador interno de la persona; nunca el nombre (puede repetirse) ni el RUN.
+                // TRANSICIÓN: con una API anterior, que aún no envía `personId`, se usa la posición dentro del club;
+                // la lista no se reordena en pantalla, así que esa clave es estable mientras se muestra.
+                <div key={s.personId ?? `posicion-${index}`} style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--brand-gray-100)" }}>
+                  {/* Una línea: número, nadador, edad, categoría, género. Sin RUN. */}
                   <div style={{ fontSize: "0.9rem" }}>
-                    {index + 1}. <strong>{s.nombreCompleto}</strong> ({s.run}) — {s.edad} años — {s.categoria} — {s.genero}
+                    {index + 1}. <strong>{s.nombreCompleto}</strong> — {s.edad} años — {s.categoria} — {s.genero}
                   </div>
                   {/* Pruebas individuales y relevos en los que está inscrito — con sangría hacia la derecha */}
                   <div style={{ fontSize: "0.82rem", color: "var(--brand-gray-600)", marginTop: "0.15rem", paddingLeft: "1.5rem" }}>

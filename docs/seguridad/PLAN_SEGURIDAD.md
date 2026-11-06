@@ -1,6 +1,6 @@
 # Plan de seguridad
 
-Plan consolidado de los hallazgos de seguridad pendientes, en cuatro fases, con su estado
+Plan consolidado de los hallazgos de seguridad pendientes, en cuatro fases más SEC-01 a SEC-03, con su estado
 de avance. Los hallazgos son de **revisión estática** del código, salvo donde se indica una
 observación de producción ya disponible: ninguno de los intercalados se ha reproducido en
 producción. Este documento no autoriza ninguna operación sobre producción.
@@ -14,7 +14,10 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **2** | `Cache-Control: no-store`, filtrado de excepciones, login uniforme | **API desplegada en producción el 2026-11-05 (`6d2dae5`)**; la CI pasó completa. Salud y cabeceras observadas; funcionalidades sin comprobar en producción. Ver «Fase 2» |
 | **3** | Cabeceras del frontend (Nginx) | **Cerrada**: desplegada en `fchmn-web` desde `1641004` (Live, Auto-Deploy Off) y validada en local (imagen real y navegador real con una API simulada). Ver «Fase 3» |
 | **4** | Límites del procesamiento XLSX | **Cerrada** dentro de su alcance: desplegada en `fchmn-api` desde `4317e0f` (Live, Auto-Deploy Off) y validada en local con datos sintéticos. Ver «Fase 4» |
-| Vite 5.4.21 | Aviso GHSA-rq7h-c2jc-7f22 en una dependencia de desarrollo | **Aplazado, fuera de estas fases** |
+| **SEC-02** | Ningún reporte entrega el RUN, para ningún rol | **Publicada en el repositorio y validada en local**; **pendiente de despliegue**. Ver «SEC-02» |
+| **SEC-01** | Topes para las listas JSON (`personIds` de relevos y otras) | **Revisada, sin implementar.** Ver «SEC-01 y SEC-03» |
+| **SEC-03** | Dependencias | **Revisada, sin cambios.** Ver «SEC-01 y SEC-03» |
+| Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Aplazado, fuera de estas fases.** Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
 ejecutaron una vez sobre la implementación, con dos fallos de expectativas desactualizadas
@@ -715,13 +718,105 @@ el caso al borde.
   ejecutable inexistente en Windows; en Linux no se observó ese fallo.
 - **Producción.** Solo se observó la disponibilidad de la API desplegada; el importador no se ejercitó allí, y las mediciones de tiempo y memoria son de Windows con Docker, no de Render. Probar otros editores (LibreOffice, Google Sheets, otras versiones de Excel) es opcional y no condiciona este cierre.
 
+## SEC-02: ningún reporte entrega el RUN (publicada en el repositorio, validada en local; pendiente de despliegue)
+
+**Decisión funcional aprobada:** ningún reporte muestra ni entrega el RUN, para ningún rol,
+administrador incluido. **Estado:** publicada en el repositorio (commit y push a `main`) y validada en local; **pendiente
+de despliegue**: producción sigue entregando el RUN en los reportes. No cambia el esquema, los datos almacenados ni los permisos.
+
+**Dónde estaba y qué ocurre ahora:**
+
+| Salida | Antes | Ahora |
+|---|---|---|
+| Pantalla de Reportes | «Nombre (RUN) — edad…», con el RUN de clave de la fila | Sin RUN; la clave es `personId` |
+| JSON, filas individuales | `run` | Sin el campo |
+| JSON, vista agrupada | `run` | `personId` en su lugar |
+| CSV y XLSX, individuales | Columna «RUN» | La columna **no existe** (12 columnas, no 13; ni vacía ni oculta) |
+| PDF | `(RUN)` tras el nombre | Sin RUN ni paréntesis |
+| Integrantes de relevo, en las cuatro salidas | «Nombre (RUN)» | Solo el nombre |
+
+- **Se conserva** lo demás: nombres, edades, categorías, filtros, totales, permisos, alcance por
+  administrador, club y nadador, y el orden. El RUN sigue **almacenado** y el backend lo usa por
+  dentro solo como desempate del orden (`compararNadadores`, tras apellidos, nombre y nombre
+  completo); no llega a ninguna salida.
+- **`personId`** es un identificador **interno** y estable, asociado a una persona concreta. **No es
+  un dato anónimo**: se entrega solo a quien ya puede ver el reporte. Reemplaza al RUN como clave de
+  la interfaz porque el nombre puede repetirse (homónimos).
+- **Team Manager no cambió.** El módulo `team-manager-export` no se tocó y sus archivos `.CL2` y
+  `.HY3` conservan el RUN con su formato vigente. Su consulta y su formato son propios y no importan
+  nada de `reports/`.
+
+**Transición (SEC-02).** El cambio es un **retiro de campos**, y la web nueva funciona con los dos
+contratos: con la API anterior, que aún envía `run` y no `personId`, ignora el RUN sin mostrarlo ni
+reenviarlo y usa la posición como clave; con la nueva, usa `personId`. El caso inverso **no**
+funciona: una pestaña con la web **antigua** abierta contra la API nueva mostraría «(undefined)» en vez
+del RUN, y sus claves de lista fallarían. Por eso el orden previsto es: 1) desplegar la web nueva; 2)
+que las pestañas abiertas se **recarguen** (no hay cierre de sesión ni cambio de autenticación; basta
+recargar o volver a entrar); 3) solo entonces desplegar la API que retira el campo. **Ese despliegue no
+está autorizado ni realizado.** Mientras tanto, la API en producción sigue entregando el RUN en los
+reportes.
+
+### Validación local
+
+- **Integración**, en la base desechable de `docker-compose.test.yml`, con datos sintéticos y
+  centinelas inconfundibles (un RUN de forma real, buscado con puntos, con guion, pegado y solo el
+  cuerpo, y cadenas con letras): JSON sin claves ni valores con RUN para administrador, club y nadador;
+  CSV con sus encabezados exactos y cada dato bajo su columna; XLSX reabierto **y** todas sus partes XML
+  (cadenas compartidas, hojas, propiedades); PDF por extracción de texto y buscando también dentro de
+  los flujos comprimidos, incluida su forma hexadecimal; por HTTP con administrador y con la cuenta del
+  club; homónimos con `personId` distinto y orden y totales intactos; el alcance de un club ajeno sigue
+  dando 403.
+- **Team Manager:** con el reloj fijo en `2026-06-15T15:00:00Z` y datos sintéticos, los archivos
+  **internos** (no el ZIP, que lleva fechas) tienen las mismas huellas SHA-256 que **antes** del
+  cambio, tomadas con el mismo montaje y estables en dos corridas; y llevan el RUN con guion en
+  ambos. No se repitió ninguna importación manual en Team Manager.
+- **Pantalla** (jsdom, no un navegador real): sin RUN ni en el texto ni en el HTML con el contrato
+  nuevo, con el anterior y con ambos campos a la vez; sin claves repetidas con homónimos; igual para un
+  delegado de club. Con el RUN restaurado a propósito, la prueba falla.
+- **Mutaciones:** concatenar de nuevo el RUN en los integrantes, o dejar la columna vacía en CSV y
+  XLSX, hace fallar las pruebas.
+- Pruebas existentes que dependían del RUN o de los índices de columna se adaptaron
+  (`reports.rules`, `reports-orden`, la integración de importación y exportación), sin relajar
+  expectativas de orden, categoría ni totales.
+
+### Límites
+
+- **No es una purga de datos:** el RUN sigue en la base, en `/persons` y en las pantallas de personas,
+  en la carga masiva y en Team Manager. Esta decisión es solo para los reportes.
+- **Quien ya descargó** un reporte conserva su copia con RUN.
+- **Planillas externas** que dependan de la posición de las columnas se desplazan una columna.
+- **Homónimos:** dos integrantes de relevo con el mismo nombre ya no se distinguen en las salidas; es
+  consecuencia de la decisión.
+- Un nombre completo almacenado que contuviera un RUN escrito a mano se entregaría tal cual: no se
+  inspeccionó.
+- Pantalla comprobada con jsdom, no con un navegador real. Publicado en GitHub, pero nada de esto se observó en Render.
+
+## SEC-01 y SEC-03: revisadas, sin implementar
+
+**SEC-01 (listas JSON).** Medido en memoria con Zod 3.25.76: `.max()` **no** corta el recorrido
+(solo marca el estado y sigue), así que un cuerpo de 1 MiB de elementos inválidos genera unos 350.000
+errores, unos 5 MB de `details` y más de 100 MB de montón retenidos por solicitud. Hay nueve listas en la API; la de
+`personIds` de relevos es la más expuesta, porque su cantidad exacta se valida después de varias
+consultas por persona. La propuesta (una comprobación previa con `.pipe()`, más un `bodyLimit` por
+ruta) está en la revisión y no se implementó.
+
+**SEC-03 (dependencias).** Corrección a una afirmación demasiado general de la revisión: **Zod tiene
+una vía identificada** (SEC-01, aviso GHSA-mrhx-c7xc-m3w5, sin parche en 3.x). Para los demás avisos
+(`fastify`, `fast-uri`, `glob`, `minimatch`, `brace-expansion`) **no se encontró una ruta
+alcanzable en el código ni en la configuración publicados, pero eso es ausencia de evidencia, no
+prueba de imposibilidad**: la revisión fue estática, sobre un árbol de producción de 275 paquetes en
+el backend y 9 en el frontend (sin avisos). Siguen siendo mantenimiento pendiente. Las dependencias
+de desarrollo (Vite, Vitest, `tinypool`, `esbuild`) no entran en las imágenes.
+
 ## Vite
 
-Vite 5.4.21 es una dependencia de **desarrollo**; el aviso exige un servidor de desarrollo
-expuesto en la red, fuera de Windows y con una coincidencia de rutas. La imagen publicada
-solo contiene el resultado de la construcción. **No es una vulnerabilidad del sitio
-publicado.** Es mantenimiento de herramientas, con una actualización de versión mayor que se
-trata aparte; queda aplazado y fuera de estas fases.
+Vite 5.4.21 es una dependencia de **desarrollo** y la imagen publicada solo contiene el resultado
+de la construcción: **no afecta al sitio publicado.** Corrección a lo que decía este apartado: los
+avisos más recientes **sí alcanzan a Windows** (filtración del hash NTLMv2 desde un sitio que visite
+quien desarrolla, y una posible inyección de comandos a través de `/__open-in-editor`, que Vite 5 trae)
+y exigen el servidor de desarrollo en marcha. Para quien trabaja en Windows, conviene no navegar por
+sitios no confiables con `npm run dev` activo. No se verificó la explotación, y Vite 5 no tiene parche
+para esa familia: la actualización de versión mayor se trata aparte y sigue fuera de estas fases.
 
 ## Validaciones futuras seguras
 

@@ -304,6 +304,16 @@ sesión no viaja.
   1.024 columnas). Medido en la imagen con 0,5 CPU y 512 MB: unos 45 MB más con 16 hojas con ese
   formato. **No** se probaron LibreOffice, Google Sheets ni otras versiones de Excel. Diseño,
   calibración y riesgos en `docs/seguridad/PLAN_SEGURIDAD.md`.
+- **SEC-02: los reportes no entregan el RUN (publicada en el repositorio y validada en local; pendiente de despliegue).**
+  Ni la pantalla de Reportes, ni el JSON, ni el CSV, el XLSX o el PDF muestran el RUN, para ningún rol,
+  administrador incluido; los integrantes de relevo salen solo por nombre. La vista agrupada entrega
+  `personId`, un identificador **interno** asociado a una persona (**no anónimo**), como clave estable de
+  cada fila, porque el nombre puede repetirse. El RUN sigue almacenado y desempata el orden por dentro.
+  **Team Manager no cambió**: sus `.CL2` y `.HY3` conservan el RUN (mismas huellas que antes). **Transición:**
+  la web nueva funciona con la API anterior y con la nueva, pero una pestaña con la web **antigua** contra la
+  API nueva mostraría «(undefined)», por lo que, antes de retirar el campo, hay que desplegar la web y
+  **recargar las pestañas abiertas**; ese despliegue no está autorizado. Comprobado con datos sintéticos,
+  en la base desechable y con jsdom, no con un navegador real. Detalle en `docs/seguridad/PLAN_SEGURIDAD.md`.
 - **El refresh token viaja en una cookie `HttpOnly`**, no en el cuerpo de la respuesta.
   Antes se devolvía en el JSON de `/auth/login` y el frontend lo guardaba en
   `sessionStorage`, donde cualquier script de la página podía leerlo — y ese token vale
@@ -940,7 +950,7 @@ Filtros soportados (sección 16): `competitionId` (obligatorio), `clubId`, `comp
 ### Reglas aplicadas en el Módulo 10
 
 - **Una sola fuente de verdad para el formato de fila**: `mapIndividualRegistrationToRow` y `mapRelayRegistrationToRow` (`reports.rules.ts`) son funciones puras que definen el "shape" exacto de cada fila una sola vez; JSON, CSV, XLSX y PDF consumen la misma salida — no hay 4 implementaciones distintas del mismo formato que puedan desincronizarse. **20 pruebas unitarias** verifican el formateo exacto de columnas (incluida la traducción de género) y el escapado CSV (RFC 4180: comillas, comas, saltos de línea).
-- **Columnas mínimas exigidas** (sección 16) todas presentes: para individuales — competencia, club, RUN, nombre, fecha de nacimiento, categoría, prueba, distancia, estilo, género, fecha, jornada, tipo de prueba; para relevos — equipo/club, prueba, categoría, y los 4 integrantes con nombre y RUN.
+- **Columnas mínimas exigidas** (sección 16) presentes, salvo el RUN, que se retiró: para individuales — competencia, club, nombre, fecha de nacimiento, categoría, prueba, distancia, estilo, género, fecha, jornada, tipo de prueba; para relevos — equipo/club, prueba, categoría, y los 4 integrantes **por nombre**. **Ningún reporte entrega el RUN** (SEC-02), para ningún rol, y la columna «RUN» ya no existe en CSV ni en XLSX; la excepción es el archivo de Team Manager, que lo conserva.
 - **Exportación real a 3 formatos**: se agregaron `exceljs` (Excel nativo, no CSV disfrazado) y `pdfkit` (PDF real) como dependencias del backend — verificado generando y reabriendo archivos de muestra antes de entregar el módulo.
 - El reporte siempre parte de `Registration`/`RelayRegistration` con `status: confirmed` — las inscripciones canceladas nunca aparecen en el listado ni en las exportaciones.
 - **Orden del reporte** (criterios puros en `reports.rules.ts`, compartidos por la vista agrupada y por las filas planas de CSV / XLSX / PDF, probados en `reports-orden.test.ts`):

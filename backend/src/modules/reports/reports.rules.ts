@@ -5,12 +5,17 @@ import { computeAge } from "../../shared/age.util";
  * puras (input plano -> fila de reporte) para poder testear el formato
  * exacto sin necesidad de base de datos, y para reutilizarlas igual en
  * JSON, CSV, XLSX y PDF (una sola fuente de verdad del "shape" de la fila).
+ *
+ * NINGUNA SALIDA DE REPORTE LLEVA EL RUN, para ningún rol, administrador incluido
+ * (decisión funcional de SEC-02). El RUN sigue almacenado y el backend lo usa
+ * internamente solo como desempate del orden (`PersonaOrdenable.run`), pero no
+ * forma parte de las filas, de la vista agrupada ni de los nombres de integrantes.
+ * La excepción es el archivo de Team Manager, que es otro módulo con su propio formato.
  */
 
 export interface IndividualReportRowInput {
   competitionName: string;
   clubName: string;
-  personRun: string;
   personFullName: string;
   personBirthDate: Date;
   categoryName: string;
@@ -25,7 +30,6 @@ export interface IndividualReportRowInput {
 export interface IndividualReportRow {
   competencia: string;
   club: string;
-  run: string;
   nombreCompleto: string;
   fechaNacimiento: string;
   categoria: string;
@@ -48,7 +52,6 @@ export function mapIndividualRegistrationToRow(input: IndividualReportRowInput):
   return {
     competencia: input.competitionName,
     club: input.clubName,
-    run: input.personRun,
     nombreCompleto: input.personFullName,
     fechaNacimiento: formatDate(input.personBirthDate),
     categoria: input.categoryName,
@@ -158,6 +161,7 @@ const REPORT_GENDER_LABELS: Record<"male" | "female", string> = { male: "Varones
 
 export interface SwimmerEventEntry {
   personId: string;
+  /** SOLO para desempatar el orden (ver `compararNadadores`). Nunca llega a una salida del reporte. */
   run: string;
   fullName: string;
   clubName: string;
@@ -183,7 +187,12 @@ export interface ReportEventLine {
 }
 
 export interface ClubGroupSwimmerRow {
-  run: string;
+  /**
+   * Identificador INTERNO de la persona, estable y único: la clave de la fila en la interfaz.
+   * No es un dato anónimo: sigue asociado a una persona concreta, así que se entrega solo a
+   * quien ya puede ver el reporte. El nombre no sirve de clave, porque puede repetirse.
+   */
+  personId: string;
   nombreCompleto: string;
   edad: number;
   categoria: string;
@@ -375,7 +384,7 @@ function formatEventLine(entry: SwimmerEventEntry): ReportEventLine {
 /**
  * Agrupa las inscripciones (individuales + relevos, ya aplanadas a una
  * entrada por nadador por prueba) en: club (subtítulo, con sus totales) ->
- * nadador (una línea, con RUN/edad/categoría/género) -> sus pruebas y
+ * nadador (una línea, con edad/categoría/género) -> sus pruebas y
  * relevos. `entries` debe traer primero las individuales y después los
  * relevos de cada nadador, para que la categoría mostrada priorice la de
  * sus pruebas individuales (más específica) sobre la de sus relevos (por
@@ -440,7 +449,7 @@ export function groupReportByClubAndSwimmer(
     byClub.get(s.clubName)!.push({
       persona: s.persona,
       fila: {
-        run: s.persona.run,
+        personId: s.persona.personId,
         nombreCompleto: s.persona.fullName,
         edad: computeAge(s.birthDate, ageCutoffDate),
         categoria: s.categoria,

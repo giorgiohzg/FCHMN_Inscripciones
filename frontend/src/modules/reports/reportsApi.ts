@@ -1,9 +1,13 @@
 import { api, descargarArchivo } from "../../shared/apiClient";
 
+/*
+ * Los reportes NO entregan el RUN (SEC-02), para ningún rol. Estos tipos no lo declaran, y la
+ * interfaz no lo lee ni lo reenvía: una API anterior a ese cambio todavía lo incluye en su JSON,
+ * y la pantalla lo ignora por completo.
+ */
 export interface IndividualReportRow {
   competencia: string;
   club: string;
-  run: string;
   nombreCompleto: string;
   fechaNacimiento: string;
   categoria: string;
@@ -36,7 +40,12 @@ export interface ReportEventLine {
 }
 
 export interface ClubGroupSwimmerRow {
-  run: string;
+  /**
+   * Identificador INTERNO de la persona: la clave estable de la fila (el nombre puede repetirse).
+   * No es un dato anónimo: sigue asociado a una persona. Opcional por la TRANSICIÓN: una API
+   * anterior no lo envía y la pantalla cae a la posición dentro del club; ver `ReportsPage`.
+   */
+  personId?: string;
   nombreCompleto: string;
   edad: number;
   categoria: string;

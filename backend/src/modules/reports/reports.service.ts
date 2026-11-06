@@ -25,7 +25,6 @@ import { NotFoundError, ValidationError } from "../../shared/errors";
 const INDIVIDUAL_HEADERS = [
   "Competencia",
   "Club",
-  "RUN",
   "Nombre completo",
   "Fecha de nacimiento",
   "Categoría",
@@ -72,7 +71,7 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
   //
   // Antes este módulo no tenía ningún alcance: cualquier usuario con
   // `reports:read` (lo tienen todos los roles de club) podía pedir el
-  // reporte completo de cualquier competencia —con RUN y fecha de nacimiento
+  // reporte completo de cualquier competencia —con la fecha de nacimiento
   // de los nadadores de todos los clubes— o el de un club ajeno pasando su
   // `clubId`.
   const clubFilter = resolveClubFilter(actor, query.clubId ?? null);
@@ -288,7 +287,6 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
     mapIndividualRegistrationToRow({
       competitionName: competition.name,
       clubName: r.club.name,
-      personRun: r.person.run,
       personFullName: r.person.fullName,
       personBirthDate: r.person.birthDate,
       categoryName: r.category.name,
@@ -311,7 +309,7 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
       gender: r.competitionEvent.event.gender,
       sessionDate: r.competitionEvent.competitionSession.competitionDate.date,
       sessionTypeName: r.competitionEvent.competitionSession.sessionType.name,
-      memberFullNames: r.members.map((m) => `${m.person.fullName} (${m.person.run})`),
+      memberFullNames: r.members.map((m) => m.person.fullName),
     })
   );
 
@@ -381,7 +379,6 @@ function individualRowToArray(r: IndividualReportRow): string[] {
   return [
     r.competencia,
     r.club,
-    r.run,
     r.nombreCompleto,
     r.fechaNacimiento,
     r.categoria,
@@ -468,7 +465,7 @@ export async function buildPdf(
     doc.moveDown(0.3);
     doc.fontSize(8);
     individualRows.forEach((r) => {
-      doc.text(`${r.club} — ${r.nombreCompleto} (${r.run}) — ${r.prueba} — ${r.categoria} — ${r.fecha} ${r.jornada}`);
+      doc.text(`${r.club} — ${r.nombreCompleto} — ${r.prueba} — ${r.categoria} — ${r.fecha} ${r.jornada}`);
     });
 
     doc.moveDown();

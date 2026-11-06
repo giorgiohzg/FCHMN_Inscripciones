@@ -6,7 +6,6 @@ describe("reports.rules — mapIndividualRegistrationToRow", () => {
     const row = mapIndividualRegistrationToRow({
       competitionName: "Campeonato Nacional Máster 2026",
       clubName: "Club Deportivo Delfines",
-      personRun: "11.111.111-1",
       personFullName: "María José Pérez",
       personBirthDate: new Date("2000-03-15"),
       categoryName: "25-29",
@@ -21,7 +20,6 @@ describe("reports.rules — mapIndividualRegistrationToRow", () => {
     expect(row).toEqual({
       competencia: "Campeonato Nacional Máster 2026",
       club: "Club Deportivo Delfines",
-      run: "11.111.111-1",
       nombreCompleto: "María José Pérez",
       fechaNacimiento: "15-03-2000",
       categoria: "25-29",
@@ -37,7 +35,7 @@ describe("reports.rules — mapIndividualRegistrationToRow", () => {
 
   it("traduce correctamente los tres valores de género", () => {
     const base = {
-      competitionName: "C", clubName: "K", personRun: "1-9", personFullName: "N",
+      competitionName: "C", clubName: "K", personFullName: "N",
       personBirthDate: new Date("2000-01-01"), categoryName: "Cat", distanceMeters: 50,
       strokeName: "Libre", sessionDate: new Date("2026-01-01"), sessionTypeName: "Mañana", testTypeName: "Individual",
     };
@@ -126,7 +124,8 @@ describe("reports.rules — groupReportByClubAndSwimmer", () => {
     expect(groups).toHaveLength(1);
     expect(groups[0]!.clubName).toBe("Delfines");
     expect(groups[0]!.swimmers).toHaveLength(1);
-    expect(groups[0]!.swimmers[0]!.run).toBe("11.111.111-1");
+    expect(groups[0]!.swimmers[0]!.personId).toBe("p1");
+    expect(groups[0]!.swimmers[0]).not.toHaveProperty("run");
     expect(groups[0]!.swimmers[0]!.nombreCompleto).toBe("María Pérez");
   });
 
