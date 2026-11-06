@@ -304,16 +304,18 @@ sesión no viaja.
   1.024 columnas). Medido en la imagen con 0,5 CPU y 512 MB: unos 45 MB más con 16 hojas con ese
   formato. **No** se probaron LibreOffice, Google Sheets ni otras versiones de Excel. Diseño,
   calibración y riesgos en `docs/seguridad/PLAN_SEGURIDAD.md`.
-- **SEC-02: los reportes no entregan el RUN (publicada en el repositorio y validada en local; pendiente de despliegue).**
+- **SEC-02: los reportes no entregan el RUN (cerrada: desplegada en web y API desde `3cf1aaf`).**
   Ni la pantalla de Reportes, ni el JSON, ni el CSV, el XLSX o el PDF muestran el RUN, para ningún rol,
   administrador incluido; los integrantes de relevo salen solo por nombre. La vista agrupada entrega
   `personId`, un identificador **interno** asociado a una persona (**no anónimo**), como clave estable de
   cada fila, porque el nombre puede repetirse. El RUN sigue almacenado y desempata el orden por dentro.
   **Team Manager no cambió**: sus `.CL2` y `.HY3` conservan el RUN (mismas huellas que antes). **Transición:**
   la web nueva funciona con la API anterior y con la nueva, pero una pestaña con la web **antigua** contra la
-  API nueva mostraría «(undefined)», por lo que, antes de retirar el campo, hay que desplegar la web y
-  **recargar las pestañas abiertas**; ese despliegue no está autorizado. Comprobado con datos sintéticos,
-  en la base desechable y con jsdom, no con un navegador real. Detalle en `docs/seguridad/PLAN_SEGURIDAD.md`.
+  API nueva mostraría «(undefined)», así que se desplegó primero la web, se recargaron las pestañas y después
+  la API. **Evidencia:** el JSON, el CSV, el XLSX y el PDF sin RUN, y el RUN conservado en Team Manager, se
+  validaron con datos sintéticos, en la base desechable y en la CI, **sin comprobación funcional de esas
+  salidas en producción**; en producción, Render informó ambos servicios Live y las consultas HTTP comprobaron
+  disponibilidad, y el usuario comprobó la pantalla de Reportes sin RUN. Detalle en `docs/seguridad/PLAN_SEGURIDAD.md`.
 - **El refresh token viaja en una cookie `HttpOnly`**, no en el cuerpo de la respuesta.
   Antes se devolvía en el JSON de `/auth/login` y el frontend lo guardaba en
   `sessionStorage`, donde cualquier script de la página podía leerlo — y ese token vale

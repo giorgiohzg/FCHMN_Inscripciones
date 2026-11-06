@@ -14,7 +14,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **2** | `Cache-Control: no-store`, filtrado de excepciones, login uniforme | **API desplegada en producción el 2026-11-05 (`6d2dae5`)**; la CI pasó completa. Salud y cabeceras observadas; funcionalidades sin comprobar en producción. Ver «Fase 2» |
 | **3** | Cabeceras del frontend (Nginx) | **Cerrada**: desplegada en `fchmn-web` desde `1641004` (Live, Auto-Deploy Off) y validada en local (imagen real y navegador real con una API simulada). Ver «Fase 3» |
 | **4** | Límites del procesamiento XLSX | **Cerrada** dentro de su alcance: desplegada en `fchmn-api` desde `4317e0f` (Live, Auto-Deploy Off) y validada en local con datos sintéticos. Ver «Fase 4» |
-| **SEC-02** | Ningún reporte entrega el RUN, para ningún rol | **Publicada en el repositorio y validada en local**; **pendiente de despliegue**. Ver «SEC-02» |
+| **SEC-02** | Ningún reporte entrega el RUN, para ningún rol | **Cerrada** dentro de su alcance: desplegada en web y API desde `3cf1aaf` (Live, Auto-Deploy Off). Ver «SEC-02» |
 | CI de SEC-02 | Pánico intermitente del motor de Prisma en las pruebas unitarias (ejecución 42269659668) | **Diagnosticado; protección publicada en el repositorio y validada en local.** La causa del pánico **no está demostrada**. Ver «CI de SEC-02» |
 | **SEC-01** | Topes para las listas JSON (`personIds` de relevos y otras) | **Revisada, sin implementar.** Ver «SEC-01 y SEC-03» |
 | **SEC-03** | Dependencias | **Revisada, sin cambios.** Ver «SEC-01 y SEC-03» |
@@ -719,11 +719,29 @@ el caso al borde.
   ejecutable inexistente en Windows; en Linux no se observó ese fallo.
 - **Producción.** Solo se observó la disponibilidad de la API desplegada; el importador no se ejercitó allí, y las mediciones de tiempo y memoria son de Windows con Docker, no de Render. Probar otros editores (LibreOffice, Google Sheets, otras versiones de Excel) es opcional y no condiciona este cierre.
 
-## SEC-02: ningún reporte entrega el RUN (publicada en el repositorio, validada en local; pendiente de despliegue)
+## SEC-02: ningún reporte entrega el RUN (cerrada: desplegada en web y API)
 
 **Decisión funcional aprobada:** ningún reporte muestra ni entrega el RUN, para ningún rol,
-administrador incluido. **Estado:** publicada en el repositorio (commit y push a `main`) y validada en local; **pendiente
-de despliegue**: producción sigue entregando el RUN en los reportes. No cambia el esquema, los datos almacenados ni los permisos.
+administrador incluido. **Estado:** **cerrada dentro de su alcance.** Desplegada a mano en Render, web y API, desde
+`3cf1aaf2234fb6ac699842301d7a0f1cf18234aa`, con Auto-Deploy en **Off** en ambos. No cambia el esquema, los datos almacenados ni los permisos.
+
+| Servicio | Despliegue | Commit |
+|---|---|---|
+| Web (`fchmn-web`) | `dep-dbn3napsrm7s73d9kba0` | `1641004` → `3cf1aaf` |
+| API (`fchmn-api`) | `dep-dbn3t6egekts738r3vc0` | `4317e0f` → `3cf1aaf` |
+
+La CI de ese SHA (ejecución 42287095793) terminó en éxito. Primero la web, luego la recarga de pestañas y
+después la API.
+
+**Evidencia de producción, por origen:**
+- **Render** informó ambos despliegues exitosos y los servicios Live, con Auto-Deploy Off. Las consultas HTTP de solo lectura
+  comprobaron **disponibilidad y cabeceras**: `/api/health` y `/api/ready` con 200 (base disponible),
+  `/api/auth/me` sin credenciales con 401, `Cache-Control: no-store`, y en la web las cabeceras de seguridad
+  con `connect-src 'self'` y el paquete JavaScript nuevo.
+- **El usuario** recargó las pestañas y comprobó que la pantalla de Reportes **no muestra el RUN**, después del
+  despliegue de la web y antes del de la API. Esa comprobación autenticada no la hizo quien implementó el cambio.
+- **Validado en local y en la CI, sin comprobación funcional en producción:** que el JSON, el CSV, el XLSX y el PDF
+  no entreguen el RUN, y que Team Manager lo conserve con su formato vigente. Eso no es una tarea pendiente para cerrar SEC-02.
 
 **Dónde estaba y qué ocurre ahora:**
 
@@ -747,15 +765,14 @@ de despliegue**: producción sigue entregando el RUN en los reportes. No cambia 
   `.HY3` conservan el RUN con su formato vigente. Su consulta y su formato son propios y no importan
   nada de `reports/`.
 
-**Transición (SEC-02).** El cambio es un **retiro de campos**, y la web nueva funciona con los dos
+**Transición (SEC-02), ya ejecutada.** El cambio es un **retiro de campos**, y la web nueva funciona con los dos
 contratos: con la API anterior, que aún envía `run` y no `personId`, ignora el RUN sin mostrarlo ni
 reenviarlo y usa la posición como clave; con la nueva, usa `personId`. El caso inverso **no**
 funciona: una pestaña con la web **antigua** abierta contra la API nueva mostraría «(undefined)» en vez
 del RUN, y sus claves de lista fallarían. Por eso el orden previsto es: 1) desplegar la web nueva; 2)
 que las pestañas abiertas se **recarguen** (no hay cierre de sesión ni cambio de autenticación; basta
-recargar o volver a entrar); 3) solo entonces desplegar la API que retira el campo. **Ese despliegue no
-está autorizado ni realizado.** Mientras tanto, la API en producción sigue entregando el RUN en los
-reportes.
+recargar o volver a entrar); 3) solo entonces desplegar la API que retira el campo. Se siguió ese orden. Entre el despliegue de la
+web y el de la API, la API anterior seguía entregando el RUN, que la web nueva ignoraba.
 
 ### Validación local
 
@@ -790,7 +807,7 @@ reportes.
   consecuencia de la decisión.
 - Un nombre completo almacenado que contuviera un RUN escrito a mano se entregaría tal cual: no se
   inspeccionó.
-- Pantalla comprobada con jsdom, no con un navegador real. Publicado en GitHub, pero nada de esto se observó en Render.
+- Pantalla comprobada con jsdom en las pruebas, y en producción por el usuario (ver «Estado»). Las demás salidas no tienen comprobación funcional en producción.
 
 ## SEC-01 y SEC-03: revisadas, sin implementar
 
