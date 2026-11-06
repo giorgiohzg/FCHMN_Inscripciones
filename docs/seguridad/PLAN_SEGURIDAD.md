@@ -15,6 +15,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **3** | Cabeceras del frontend (Nginx) | **Cerrada**: desplegada en `fchmn-web` desde `1641004` (Live, Auto-Deploy Off) y validada en local (imagen real y navegador real con una API simulada). Ver «Fase 3» |
 | **4** | Límites del procesamiento XLSX | **Cerrada** dentro de su alcance: desplegada en `fchmn-api` desde `4317e0f` (Live, Auto-Deploy Off) y validada en local con datos sintéticos. Ver «Fase 4» |
 | **SEC-02** | Ningún reporte entrega el RUN, para ningún rol | **Publicada en el repositorio y validada en local**; **pendiente de despliegue**. Ver «SEC-02» |
+| CI de SEC-02 | Pánico intermitente del motor de Prisma en las pruebas unitarias (ejecución 42269659668) | **Diagnosticado; protección publicada en el repositorio y validada en local.** La causa del pánico **no está demostrada**. Ver «CI de SEC-02» |
 | **SEC-01** | Topes para las listas JSON (`personIds` de relevos y otras) | **Revisada, sin implementar.** Ver «SEC-01 y SEC-03» |
 | **SEC-03** | Dependencias | **Revisada, sin cambios.** Ver «SEC-01 y SEC-03» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Aplazado, fuera de estas fases.** Ver «Vite» |
@@ -807,6 +808,65 @@ alcanzable en el código ni en la configuración publicados, pero eso es ausenci
 prueba de imposibilidad**: la revisión fue estática, sobre un árbol de producción de 275 paquetes en
 el backend y 9 en el frontend (sin avisos). Siguen siendo mantenimiento pendiente. Las dependencias
 de desarrollo (Vite, Vitest, `tinypool`, `esbuild`) no entran en las imágenes.
+
+## CI de SEC-02: pánico intermitente del motor de Prisma (diagnóstico y protección publicada)
+
+**Qué pasó.** La ejecución 42269659668 (commit `34acee1`, SEC-02) falló en el paso «Pruebas unitarias» del
+Backend, a los 11 s, con `Process completed with exit code 134`. La **reejecución de los trabajos
+fallidos** (intento 2, sin cambiar código ni configuración) **pasó**: 58 de 58 archivos y 1.297 pruebas, y el
+registro no tiene ningún pánico. Por tanto el fallo es **intermitente**, y **no está corregido**.
+
+**Evidencia del registro original** (conservado fuera del repositorio):
+- El proceso que abortó fue el **motor nativo de Prisma**: `thread '<unnamed>' panicked at
+  query-engine/query-engine-node-api/src/engine.rs:74:45: Failed to deserialize constructor options …
+  Error { status: PendingException }`, seguido de «panic in a function that cannot unwind … aborting» y
+  `Aborted (core dumped)`. El 134 es la consecuencia.
+- El registro muestra un pánico del motor de Prisma y no contiene mensajes de agotamiento de memoria. Esto identifica el aborto observado, pero no demuestra su causa subyacente ni descarta toda influencia de los recursos.
+- Quince archivos habían terminado en verde y ninguno falló antes del aborto. Vitest 1.6.1 usa el pool
+  `threads` por omisión.
+- **Relación con SEC-02:** no se encontró ninguna. El intento 2 pasó con el mismo commit, y SEC-02 no toca los
+  módulos que las pruebas implicadas importan. Con un fallo intermitente no puede probarse un negativo.
+
+**Lo que NO está demostrado:** qué archivo de prueba inició el motor, ni el mecanismo exacto. Hay
+explicaciones publicadas de otros proyectos para este mismo pánico (cierre del hilo de Vitest mientras el
+motor aún se construye, con Prisma 6.19.2; ver [intelliquote, PR 137](https://github.com/lucasfelsky/intelliquote/pull/137)
+y [Statly, issue 809](https://github.com/statlyaus/Statly/issues/809)), pero aquí hay Prisma 5.22.0 y **no se
+reprodujo**. Es una hipótesis compatible con la evidencia, no una causa confirmada.
+
+**Vía de entrada identificada en este repositorio.** `src/shared/prisma.client.ts` hace
+`globalThis.__prisma ?? new PrismaClient()` al importarse, y con el cliente se carga el motor nativo
+aunque no se consulte nada. `meet-import.service.ts` y `relay-registrations.service.ts` lo importan, y
+cuatro pruebas unitarias cargan esos servicios sin simular Prisma: `fixtures-sinteticos`,
+`meet-import-asignacion-por-dia`, `meet-import-jornada` y `registration-window.rules`. Son archivos de
+milisegundos.
+
+**Protección publicada en el repositorio (commit y push a `main`) y validada en local.** Es solo infraestructura de pruebas:
+- `backend/tests/helpers/prisma-guard.ts`, registrado en `setupFiles` de `vitest.config.ts` (la
+  configuración **unitaria**). Antes de cada archivo pone en `globalThis.__prisma` —el punto que el
+  singleton ya consulta— un doble que **no es un cliente real**, así que el singleton no llama al
+  constructor. No importa servicios ni `@prisma/client`, y no se tocó código de producción.
+- El doble **falla con un mensaje claro** ante cualquier uso (`prisma.person`, `$transaction`,
+  `$connect`…, o asignarle algo): no devuelve listas vacías, éxitos ni nada que esconda un fallo. Solo
+  responde a las sondas que no son uso (`then`, símbolos, `toJSON`).
+- Los **dobles explícitos** (`vi.mock(".../prisma.client")`) siguen siendo los utilizados:
+  `orden-determinista.test.ts` pasa sin cambios, y `prisma-guard-doble-explicito.test.ts` lo comprueba con un
+  servicio real.
+- **No se extiende** a la integración ni a la cobertura combinada: conservan sus configuraciones y sus
+  protecciones de base de datos (una prueba lo verifica).
+
+**Evidencia determinista del aislamiento** (`prisma-guard.test.ts`, 20 pruebas, y `prisma-guard-doble-explicito.test.ts`, 3):
+con `@prisma/client` simulado por un constructor espía, importar el singleton protegido **no llama al
+constructor**, ni tras varias importaciones; un **control de sensibilidad** borra el doble y el mismo
+`import` sí llama al constructor, así que la prueba detecta el problema; y cualquier acceso inesperado
+lanza. Con la protección desactivada a propósito, **15 de las 23 pruebas fallan**. La suite unitaria
+completa pasó una vez: 60 archivos y 1.320 pruebas. No se hicieron tandas repetidas.
+
+**Límites.**
+- Esto demuestra el **aislamiento**: las pruebas unitarias ya no construyen un cliente real. **No demuestra** que
+  el pánico intermitente haya desaparecido ni cuál era su causa; un verde, o varios, tampoco lo harían.
+- Si el pánico tuviera otro origen (por ejemplo, otro módulo que cargue el motor), la protección no lo cubriría.
+- Cualquier prueba unitaria futura que necesite datos de Prisma debe simular el singleton o ser de integración.
+- Pendiente: observar la CI en ejecuciones posteriores. Publicarla no demuestra que el fallo intermitente quedó corregido.
 
 ## Vite
 

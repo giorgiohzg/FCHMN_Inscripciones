@@ -13,6 +13,10 @@ import { defineConfig } from "vitest/config";
  */
 export default defineConfig({
   test: {
+    // Antes de CADA archivo unitario: impide que el singleton de Prisma construya un cliente real
+    // (y cargue el motor nativo). Ver tests/helpers/prisma-guard.ts. La integración y la cobertura
+    // combinada NO lo usan: tienen su propia configuración y necesitan el cliente real.
+    setupFiles: ["tests/helpers/prisma-guard.ts"],
     include: ["tests/**/*.test.ts"],
     exclude: ["**/node_modules/**", "**/dist/**", "**/*.integration.test.ts"],
   },
