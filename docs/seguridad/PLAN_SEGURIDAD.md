@@ -11,7 +11,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 |---|---|---|
 | **A1** | Cliente: un 401 o una renovación atrasados no cierran ni reutilizan una sesión posterior | **Cerrada y desplegada** en la web |
 | **1** | Sesiones y revocación efectiva del JWT | **En producción desde el 2026-11-05** (`b920893`): migración aplicada y API desplegada, con el corte de sesiones ejecutado. La CI de `b920893` pasó completa, integraciones incluidas. Ver «Puesta en producción» |
-| **2** | `Cache-Control: no-store`, filtrado de excepciones, login uniforme | **Implementada y validada EN LOCAL; publicada en el repositorio; sin desplegar.** Ver «Fase 2» |
+| **2** | `Cache-Control: no-store`, filtrado de excepciones, login uniforme | **API desplegada en producción el 2026-11-05 (`6d2dae5`)**; la CI pasó completa. Salud y cabeceras observadas; funcionalidades sin comprobar en producción. Ver «Fase 2» |
 | **3** | Cabeceras del frontend (Nginx) | Pendiente |
 | **4** | Límites del procesamiento XLSX | Pendiente |
 | Vite 5.4.21 | Aviso GHSA-rq7h-c2jc-7f22 en una dependencia de desarrollo | **Aplazado, fuera de estas fases** |
@@ -219,9 +219,9 @@ invalidadas están en [../operacion/corte-de-sesiones.md](../operacion/corte-de-
 Servicios afectados: `fchmn-mantenimiento` como ejecutor puntual de la migración y
 `fchmn-api`. `fchmn-web` no se despliega.
 
-## Fase 2: API sin esquema (implementada y validada en local; sin desplegar)
+## Fase 2: API sin esquema (desplegada en producción; funcionalidades sin comprobar allí)
 
-**Estado:** implementada, validada en local y publicada en el repositorio (commit y push), **sin desplegar**. Sin
+**Estado:** implementada, validada en local, publicada en `6d2dae5` (CI 42144375023 completa, con las migraciones sobre la base desechable y las integraciones) y **desplegada en `fchmn-api`** el 2026-11-05 (ver «Despliegue de la Fase 2»). Sin
 cambios de esquema, migraciones, dependencias, frontend ni Nginx. La evidencia es de pruebas
 locales con datos sintéticos; los hallazgos siguen siendo de revisión estática, y nada se
 reprodujo en producción.
@@ -333,8 +333,26 @@ Contra la base desechable de `docker-compose.test.yml` y con datos sintéticos:
   administrador con la fecha y hora de la carga.
 - **Riesgo:** el cálculo ficticio añade el coste de un Argon2 a los intentos que antes
   respondían sin calcularlo.
-- **Pendiente:** el resultado de la CI del commit y el despliegue de la API, cada uno con su
-  autorización.
+- **Alcance de la comprobación en producción (limitación):** solo se observaron `/api/health`, `/api/ready` y `/api/auth/me` sin credenciales. El contrato del login, las cargas y las exportaciones no se probaron allí; su evidencia es la local y la de la CI.
+
+### Despliegue de la Fase 2
+
+Solo `fchmn-api`, desde el commit exacto `6d2dae5f70fa2bac1d202048b1863c3602a7732a` (despliegue
+manual con «Deploy a specific commit»). Antes: último despliegue `b920893`, Auto-Deploy en Off
+y ningún despliegue en curso. No hubo migraciones (la entrega no cambia el esquema), ni seed,
+ni respaldo, ni corte forzado de sesiones, ni cambios de configuración. `fchmn-web` y
+`fchmn-mantenimiento` no se desplegaron.
+
+| Paso | Resultado |
+|---|---|
+| `fchmn-api` | *Deploy succeeded* (35 s) y *Live*, commit `6d2dae5`; Auto-Deploy sigue en Off |
+| `/api/health` (por el proxy de la web) | 200, `{"status":"ok"}`, `Cache-Control: no-store` |
+| `/api/ready` | 200, `{"status":"ready","database":"ok"}`, `Cache-Control: no-store` |
+| `/api/auth/me` sin credenciales | 401 `UNAUTHORIZED`, `Cache-Control: no-store` |
+
+**Observado en producción:** solo esas tres respuestas de solo lectura. **No comprobado en
+producción:** el contrato del login, el filtrado de errores en cargas masivas e importaciones,
+las descargas y la verificación ficticia; su evidencia es la local y la de la CI.
 
 ## Fase 3: cabeceras del frontend (pendiente)
 

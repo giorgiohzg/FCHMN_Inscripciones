@@ -228,7 +228,7 @@ sesión no viaja.
     [docs/seguridad/PLAN_SEGURIDAD.md](docs/seguridad/PLAN_SEGURIDAD.md)). Argon2 queda fuera de los bloqueos, y lo verificado se revalida bajo bloqueo comparando
     el hash leído: una credencial sustituida no emite sesión ni suma un intento fallido, y un
     bloqueo administrativo, una inhabilitación o una eliminación concurrentes prevalecen.
-- **Fase 2 de seguridad (implementada y validada EN LOCAL; sin desplegar):**
+- **Fase 2 de seguridad (API desplegada en producción desde `6d2dae5`; validada en local y en la CI):**
   - **`Cache-Control: no-store` en toda respuesta de la API**, incluidos errores, rutas
     inexistentes (404), el límite de solicitudes (429), la autenticación, el CSRF y las
     descargas de reportes y de Team Manager. Es un hook `onSend` registrado antes que los
@@ -253,7 +253,8 @@ sesión no viaja.
     proceso, secreto aleatorio, resultado descartado: no puede autenticar a nadie). Eso
     elimina el camino que se saltaba el cálculo; **no iguala los tiempos de respuesta**, que
     conservan diferencias residuales. El límite por IP, los contadores, el bloqueo por cuenta,
-    la auditoría y S10 no cambian.
+    la auditoría y S10 no cambian. En producción solo se observaron `/api/health`, `/api/ready`
+    y `/api/auth/me` sin credenciales (todas con `no-store`); lo demás se validó en local y en la CI.
 - **El refresh token viaja en una cookie `HttpOnly`**, no en el cuerpo de la respuesta.
   Antes se devolvía en el JSON de `/auth/login` y el frontend lo guardaba en
   `sessionStorage`, donde cualquier script de la página podía leerlo — y ese token vale
