@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { validateRun } from "../../shared/run.util";
 import { usernameOpcionalField } from "../../shared/username.schema";
+import { listaAcotada } from "../../shared/listaAcotada";
+import { LIMITES_LISTAS } from "../../shared/limites-listas";
 
 const codeField = z
   .string()
@@ -54,8 +56,9 @@ const baseClubFields = {
   // Sin .default([]) a propósito: en la actualización, "no enviado" (undefined)
   // debe significar "no tocar la lista actual" — el valor por defecto para
   // la creación se aplica aparte, solo en clubCreateSchema.
-  delegatePersonIds: z.array(z.string().uuid()).optional(),
-  coachPersonIds: z.array(z.string().uuid()).optional(),
+  // Tope de longitud comprobado ANTES de validar elementos (SEC-01); «no enviado» sigue siendo «no tocar».
+  delegatePersonIds: listaAcotada(LIMITES_LISTAS.delegadosPorClub, z.array(z.string().uuid()), "Un club admite como máximo 50 delegados").optional(),
+  coachPersonIds: listaAcotada(LIMITES_LISTAS.entrenadoresPorClub, z.array(z.string().uuid()), "Un club admite como máximo 50 entrenadores").optional(),
   // Solo aplica si hasLegalStatus === true. Con false la designación se
   // RECHAZA (ver refineRepresentanteLegal), no se descarta.
   legalRepresentativePersonId: z.string().uuid().optional().nullable(),

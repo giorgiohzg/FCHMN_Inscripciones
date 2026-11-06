@@ -1,53 +1,12 @@
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance } from "fastify";
 import * as meetImportService from "./meet-import.service";
 import { meetImportOptionsSchema, confirmacionDeRelevosSchema } from "./meet-import.schemas";
 import { requireAuth, requirePermission } from "../auth/rbac.middleware";
 import { ValidationError } from "../../shared/errors";
-import { EXTENSIONES_ADMITIDAS, extensionAdmitida } from "./meet-file-detector";
+import { leerMultipartDeImportacion } from "./meet-import.multipart";
 
 export async function meetImportRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireAuth);
-
-  /**
-   * Lee el archivo subido y devuelve la parte del multipart que interesa.
-   *
-   * Se comparte entre las dos fases para que la criba por extensión y el
-   * mensaje de "falta el archivo" sean idénticos en ambas: si divergieran, un
-   * archivo aceptado en el análisis podría rechazarse en la confirmación
-   * después de que el usuario ya tomó todas las decisiones.
-   */
-  async function leerMultipart(req: FastifyRequest) {
-    let fileBuffer: Buffer | null = null;
-    let fileName = "";
-    const campos: Record<string, string> = {};
-
-    for await (const part of req.parts()) {
-      if (part.type === "file" && part.fieldname === "file") {
-        fileBuffer = await part.toBuffer();
-        fileName = part.filename ?? "";
-      } else if (part.type === "field") {
-        campos[part.fieldname] = part.value as string;
-      }
-    }
-
-    if (!fileBuffer) {
-      throw new ValidationError(`Debe adjuntar el archivo exportado desde Meet Manager (${EXTENSIONES_ADMITIDAS.join(", ")}).`);
-    }
-
-    /**
-     * Primera barrera, por nombre: barata y suficiente para atajar un
-     * adjunto claramente equivocado. NO es la que decide — el contenido se
-     * comprueba después, en el servicio, y manda sobre esto.
-     */
-    if (fileName && !extensionAdmitida(fileName)) {
-      throw new ValidationError(
-        `La extensión de "${fileName}" no está admitida. Se aceptan: ${EXTENSIONES_ADMITIDAS.join(", ")}. ` +
-          "El contenido se verifica igualmente después de subirlo."
-      );
-    }
-
-    return { fileBuffer, fileName, campos };
-  }
 
   /**
    * FASE 1 — analizar sin importar.
@@ -61,7 +20,7 @@ export async function meetImportRoutes(app: FastifyInstance) {
    * archivo de competencia y la lista de tipos de prueba del catálogo.
    */
   app.post("/competitions/import-meet-events/analyze", { preHandler: [requirePermission("competitions:write")] }, async (req, reply) => {
-    const { fileBuffer, fileName } = await leerMultipart(req);
+    const { fileBuffer, fileName } = await leerMultipartDeImportacion(req);
 
     const analisis = await meetImportService.analizarArchivoDeImportacion(
       fileBuffer,
@@ -81,7 +40,7 @@ export async function meetImportRoutes(app: FastifyInstance) {
    *  - "maxIndividualEventsPerSwimmer": campo de texto (la competencia lo exige y el archivo no lo trae).
    */
   app.post("/competitions/import-meet-events", { preHandler: [requirePermission("competitions:write")] }, async (req, reply) => {
-    const { fileBuffer, fileName, campos } = await leerMultipart(req);
+    const { fileBuffer, fileName, campos } = await leerMultipartDeImportacion(req);
 
     const parsedOptions = meetImportOptionsSchema.safeParse({
       maxIndividualEventsPerSwimmer: campos.maxIndividualEventsPerSwimmer,

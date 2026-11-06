@@ -316,6 +316,15 @@ sesión no viaja.
   validaron con datos sintéticos, en la base desechable y en la CI, **sin comprobación funcional de esas
   salidas en producción**; en producción, Render informó ambos servicios Live y las consultas HTTP comprobaron
   disponibilidad, y el usuario comprobó la pantalla de Reportes sin RUN. Detalle en `docs/seguridad/PLAN_SEGURIDAD.md`.
+- **SEC-01: topes en las listas JSON (publicada en el repositorio, validada en local; pendiente de despliegue).** Las 11 listas de
+  9 rutas (`personIds` de relevos y de asignación masiva, delegados y entrenadores de un club, `categoryIds`, reordenamientos y las decisiones
+  de relevo de la importación de Meet Events) tienen un tope de longitud que se comprueba **antes** de validar
+  sus elementos (`listaAcotada`; el `.max()` de Zod 3 no lo hace): relevos 8, asignación masiva 10.000, 50 delegados y 50 entrenadores,
+  100 categorías, 1.000 reordenamientos y 500 decisiones. Cada ruta JSON tiene además un `bodyLimit` (4 KiB, 512 KiB, 32 KiB, 16 KiB y 256 KiB) que
+  rechaza con 413 antes de autenticar. El multipart de analizar e importar Meet Events limita campos (64 KiB), cantidad (4 campos, 1 archivo, 6 partes)
+  y **rechaza los campos truncados**, que el plugin entrega cortados sin fallar; el máximo global del archivo (15 MB) no cambió. **El tope de 8 en
+  relevos es un límite técnico nuevo** (un tipo con más de 8 nadadores no podría inscribirse hasta subirlo) y **10.000 asignaciones no garantizan una
+  duración determinada**. Se validó en local con datos sintéticos y está publicada en GitHub; **no está desplegada**, así que producción no tiene estos topes. Detalle y riesgos en `docs/seguridad/PLAN_SEGURIDAD.md`.
 - **El refresh token viaja en una cookie `HttpOnly`**, no en el cuerpo de la respuesta.
   Antes se devolvía en el JSON de `/auth/login` y el frontend lo guardaba en
   `sessionStorage`, donde cualquier script de la página podía leerlo — y ese token vale

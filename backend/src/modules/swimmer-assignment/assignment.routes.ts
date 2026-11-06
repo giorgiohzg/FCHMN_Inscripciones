@@ -13,6 +13,7 @@ import {
 import { requireAuth, requirePermission } from "../auth/rbac.middleware";
 import { ValidationError, ForbiddenError } from "../../shared/errors";
 import { buildActorContext, scopedClubId } from "../../shared/actorContext";
+import { LIMITES_CUERPO_JSON } from "../../shared/limites-listas";
 import type { FastifyRequest } from "fastify";
 
 /**
@@ -84,7 +85,7 @@ export async function swimmerAssignmentRoutes(app: FastifyInstance) {
   });
 
   /** Asigna varios nadadores al mismo club de una sola vez (solo administrador). */
-  app.post("/swimmer-assignments/bulk-assign", { preHandler: [requirePermission("swimmer-assignment:approve")] }, async (req, reply) => {
+  app.post("/swimmer-assignments/bulk-assign", { bodyLimit: LIMITES_CUERPO_JSON.asignacionMasiva, preHandler: [requirePermission("swimmer-assignment:approve")] }, async (req, reply) => {
     const parsed = bulkAssignSwimmersSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Datos inválidos", parsed.error.flatten());
     reply.send(await assignmentService.bulkAssignSwimmers(parsed.data, { userId: req.authUser!.sub, ipAddress: req.ip }));

@@ -22,6 +22,18 @@ export class UnauthorizedError extends AppError {
   }
 }
 
+/**
+ * Una solicitud, o una parte de ella, supera un límite de tamaño o de cantidad (413).
+ *
+ * Su mensaje es siempre FIJO: no reproduce contenido recibido ni nombres de campo
+ * arbitrarios, porque quien lo provoca controla ese contenido y puede hacerlo enorme.
+ */
+export class PayloadTooLargeError extends AppError {
+  constructor(message: string) {
+    super(413, "PAYLOAD_TOO_LARGE", message);
+  }
+}
+
 export class ForbiddenError extends AppError {
   constructor(message = "No tiene permisos para realizar esta acción") {
     super(403, "FORBIDDEN", message);

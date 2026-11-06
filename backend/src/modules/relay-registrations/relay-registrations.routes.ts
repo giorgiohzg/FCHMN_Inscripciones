@@ -4,6 +4,7 @@ import { createRelayRegistrationSchema, updateRelayRegistrationSchema, relayRegi
 import { requireAuth, requirePermission } from "../auth/rbac.middleware";
 import { ValidationError, ForbiddenError } from "../../shared/errors";
 import { buildActorContext } from "../../shared/actorContext";
+import { LIMITES_CUERPO_JSON } from "../../shared/limites-listas";
 
 /** Los nadadores pueden VER sus relevos, pero no inscribir, editar ni cancelar equipos. */
 function assertCanOperateOnTeams(actor: ReturnType<typeof buildActorContext>, action: string) {
@@ -27,7 +28,7 @@ export async function relayRegistrationsRoutes(app: FastifyInstance) {
     reply.send(await relayService.listRelayRegistrations(parsed.data, buildActorContext(req)));
   });
 
-  app.post("/relay-registrations", { preHandler: [requirePermission("registrations:write")] }, async (req, reply) => {
+  app.post("/relay-registrations", { bodyLimit: LIMITES_CUERPO_JSON.relevos, preHandler: [requirePermission("registrations:write")] }, async (req, reply) => {
     const actor = buildActorContext(req);
     assertCanOperateOnTeams(actor, "inscribir equipos");
     const parsed = createRelayRegistrationSchema.safeParse(req.body);
@@ -43,7 +44,7 @@ export async function relayRegistrationsRoutes(app: FastifyInstance) {
     reply.send(await relayService.cancelRelayRegistration(id, actor));
   });
 
-  app.put("/relay-registrations/:id", { preHandler: [requirePermission("registrations:write")] }, async (req, reply) => {
+  app.put("/relay-registrations/:id", { bodyLimit: LIMITES_CUERPO_JSON.relevos, preHandler: [requirePermission("registrations:write")] }, async (req, reply) => {
     const actor = buildActorContext(req);
     assertCanOperateOnTeams(actor, "editarlos");
     const { id } = req.params as { id: string };

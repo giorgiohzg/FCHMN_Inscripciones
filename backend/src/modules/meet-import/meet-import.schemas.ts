@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { listaAcotada } from "../../shared/listaAcotada";
+import { LIMITES_LISTAS } from "../../shared/limites-listas";
 
 export const meetImportOptionsSchema = z.object({
   maxIndividualEventsPerSwimmer: z.coerce
@@ -42,6 +44,7 @@ export const decisionDeRelevoSchema = z.discriminatedUnion("decision", [
  */
 export const confirmacionDeRelevosSchema = z.object({
   fileHash: z.string().regex(/^[0-9a-f]{64}$/, "La huella del archivo no es válida"),
-  decisiones: z.array(decisionDeRelevoSchema).max(500, "Demasiadas decisiones de relevo"),
+  // El mismo tope y el mismo mensaje de siempre, pero ahora corta ANTES de validar las decisiones (SEC-01).
+  decisiones: listaAcotada(LIMITES_LISTAS.decisionesDeRelevo, z.array(decisionDeRelevoSchema), "Demasiadas decisiones de relevo"),
 });
 export type ConfirmacionDeRelevos = z.infer<typeof confirmacionDeRelevosSchema>;

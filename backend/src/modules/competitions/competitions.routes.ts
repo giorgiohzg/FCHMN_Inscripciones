@@ -19,6 +19,7 @@ import {
 import { requireAuth, requirePermission } from "../auth/rbac.middleware";
 import { ValidationError } from "../../shared/errors";
 import type { CompetitionAction } from "./competitions.rules";
+import { LIMITES_CUERPO_JSON } from "../../shared/limites-listas";
 
 export async function competitionsRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireAuth);
@@ -154,7 +155,7 @@ export async function competitionsRoutes(app: FastifyInstance) {
     reply.send(await competitionEventsService.listCompetitionEvents(id));
   });
 
-  app.post("/competitions/:id/events", { preHandler: [requirePermission("competitions:write")] }, async (req, reply) => {
+  app.post("/competitions/:id/events", { bodyLimit: LIMITES_CUERPO_JSON.categoriasPorPrueba, preHandler: [requirePermission("competitions:write")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const parsed = addCompetitionEventSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Datos inválidos", parsed.error.flatten());
@@ -162,7 +163,7 @@ export async function competitionsRoutes(app: FastifyInstance) {
     reply.code(201).send(ce);
   });
 
-  app.put("/competition-events/:ceId", { preHandler: [requirePermission("competitions:write")] }, async (req, reply) => {
+  app.put("/competition-events/:ceId", { bodyLimit: LIMITES_CUERPO_JSON.categoriasPorPrueba, preHandler: [requirePermission("competitions:write")] }, async (req, reply) => {
     const { ceId } = req.params as { ceId: string };
     const parsed = updateCompetitionEventSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Datos inválidos", parsed.error.flatten());
@@ -172,7 +173,7 @@ export async function competitionsRoutes(app: FastifyInstance) {
   // Renumera VARIAS pruebas en una sola solicitud — usado al reordenar o
   // mover una prueba entre jornadas/fechas, donde un solo movimiento
   // puede afectar el número de muchas otras pruebas de la competencia.
-  app.put("/competition-events/reorder", { preHandler: [requirePermission("competitions:write")] }, async (req, reply) => {
+  app.put("/competition-events/reorder", { bodyLimit: LIMITES_CUERPO_JSON.reordenamientos, preHandler: [requirePermission("competitions:write")] }, async (req, reply) => {
     const parsed = reorderCompetitionEventsSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Datos inválidos", parsed.error.flatten());
     reply.send(await competitionEventsService.reorderCompetitionEvents(parsed.data.updates, { userId: req.authUser!.sub, ipAddress: req.ip }));

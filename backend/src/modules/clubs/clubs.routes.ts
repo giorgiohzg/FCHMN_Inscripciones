@@ -6,6 +6,7 @@ import { createCredentialsSchema } from "../persons/persons.schemas";
 import { requireAuth, requirePermission } from "../auth/rbac.middleware";
 import { ValidationError, ForbiddenError } from "../../shared/errors";
 import { buildActorContext } from "../../shared/actorContext";
+import { LIMITES_CUERPO_JSON } from "../../shared/limites-listas";
 
 export async function clubsRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireAuth);
@@ -31,7 +32,7 @@ export async function clubsRoutes(app: FastifyInstance) {
     reply.send(await clubsService.getClubById(id));
   });
 
-  app.post("/clubs", { preHandler: [requirePermission("clubs:write")] }, async (req, reply) => {
+  app.post("/clubs", { bodyLimit: LIMITES_CUERPO_JSON.clubes, preHandler: [requirePermission("clubs:write")] }, async (req, reply) => {
     const parsed = clubCreateSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Datos de club inválidos", parsed.error.flatten());
 
@@ -39,7 +40,7 @@ export async function clubsRoutes(app: FastifyInstance) {
     reply.code(201).send(club);
   });
 
-  app.put("/clubs/:id", { preHandler: [requirePermission("clubs:write")] }, async (req, reply) => {
+  app.put("/clubs/:id", { bodyLimit: LIMITES_CUERPO_JSON.clubes, preHandler: [requirePermission("clubs:write")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const parsed = clubUpdateSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Datos de club inválidos", parsed.error.flatten());

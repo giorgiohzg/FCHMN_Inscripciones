@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { esFechaCalendarioValida, FORMATO_FECHA_CALENDARIO } from "../../shared/fecha.util";
+import { listaAcotada } from "../../shared/listaAcotada";
+import { LIMITES_LISTAS } from "../../shared/limites-listas";
 
 export const proposeAssignmentSchema = z.object({
   clubId: z.string().uuid("Club inválido"),
@@ -71,7 +73,12 @@ export type SwimmersByClubFilterQuery = z.infer<typeof swimmersByClubFilterQuery
 
 export const bulkAssignSwimmersSchema = z.object({
   targetClubId: z.string().uuid("Club de destino inválido"),
-  personIds: z.array(z.string().uuid()).min(1, "Debe seleccionar al menos un nadador"),
+  // Tope de longitud comprobado ANTES de validar elementos (SEC-01). No garantiza una duración de la operación.
+  personIds: listaAcotada(
+    LIMITES_LISTAS.asignacionMasiva,
+    z.array(z.string().uuid()).min(1, "Debe seleccionar al menos un nadador"),
+    "Se pueden asignar como máximo 10.000 nadadores por operación"
+  ),
   // Una sola fecha para toda la tanda: lo que hace que 5.000 membresías
   // cargadas en una operación compartan la MISMA fecha efectiva, en vez de
   // recibir cada una el instante de su propia escritura.

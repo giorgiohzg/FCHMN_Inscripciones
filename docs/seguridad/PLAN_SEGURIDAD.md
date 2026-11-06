@@ -16,7 +16,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **4** | Límites del procesamiento XLSX | **Cerrada** dentro de su alcance: desplegada en `fchmn-api` desde `4317e0f` (Live, Auto-Deploy Off) y validada en local con datos sintéticos. Ver «Fase 4» |
 | **SEC-02** | Ningún reporte entrega el RUN, para ningún rol | **Cerrada** dentro de su alcance: desplegada en web y API desde `3cf1aaf` (Live, Auto-Deploy Off). Ver «SEC-02» |
 | CI de SEC-02 | Pánico intermitente del motor de Prisma en las pruebas unitarias (ejecución 42269659668) | **Diagnosticado; protección publicada en el repositorio y validada en local.** La causa del pánico **no está demostrada**. Ver «CI de SEC-02» |
-| **SEC-01** | Topes para las listas JSON (`personIds` de relevos y otras) | **Revisada, sin implementar.** Ver «SEC-01 y SEC-03» |
+| **SEC-01** | Topes para las listas JSON (`personIds` de relevos y otras) | **Publicada en el repositorio; pendiente de despliegue.** Validada en local con datos sintéticos. Ver «SEC-01» |
 | **SEC-03** | Dependencias | **Revisada, sin cambios.** Ver «SEC-01 y SEC-03» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Aplazado, fuera de estas fases.** Ver «Vite» |
 
@@ -809,14 +809,114 @@ web y el de la API, la API anterior seguía entregando el RUN, que la web nueva 
   inspeccionó.
 - Pantalla comprobada con jsdom en las pruebas, y en producción por el usuario (ver «Estado»). Las demás salidas no tienen comprobación funcional en producción.
 
-## SEC-01 y SEC-03: revisadas, sin implementar
+## SEC-01: topes en las listas JSON (publicada en el repositorio, validada en local; pendiente de despliegue)
 
-**SEC-01 (listas JSON).** Medido en memoria con Zod 3.25.76: `.max()` **no** corta el recorrido
-(solo marca el estado y sigue), así que un cuerpo de 1 MiB de elementos inválidos genera unos 350.000
-errores, unos 5 MB de `details` y más de 100 MB de montón retenidos por solicitud. Hay nueve listas en la API; la de
-`personIds` de relevos es la más expuesta, porque su cantidad exacta se valida después de varias
-consultas por persona. La propuesta (una comprobación previa con `.pipe()`, más un `bodyLimit` por
-ruta) está en la revisión y no se implementó.
+**Estado: publicada en el repositorio (commit y push a `main`) y validada en LOCAL, con datos sintéticos; pendiente de
+despliegue.** Producción sigue sin estos topes, y el despliegue necesita autorización propia.
+No cambia servicios de negocio, esquema de datos, migraciones, `seed`, catálogo, dependencias, frontend ni
+la configuración global de cargas.
+
+**El problema.** En Zod 3 el `.max()` de un arreglo valida todos los elementos y solo al final añade el error del
+máximo. Una lista enorme de elementos inválidos costaba cientos de miles de errores y megabytes de memoria antes
+de rechazarse; y la de relevos, además, se rechazaba por su cantidad exacta después de consultar personas.
+
+**La solución.**
+- `listaAcotada(max, esquemaDeLista, mensaje)` (`backend/src/shared/listaAcotada.ts`) comprueba la longitud con un
+  `z.custom` y solo entonces pasa la lista (`pipe`) al esquema de elementos. Con exceso hay **un único error y no
+  se valida ningún elemento**; dentro del tope el resultado es el del esquema anterior. Los números viven en
+  `backend/src/shared/limites-listas.ts`.
+- `bodyLimit` por ruta JSON: Fastify rechaza con 413 **antes de autenticar** un cuerpo mayor.
+- Un lector multipart compartido para analizar e importar Meet Events (`meet-import.multipart.ts`).
+
+**Límites vigentes** (rutas con listas JSON: **9 rutas, 11 campos**; `/analyze` comparte el lector, así que son 10 las que
+se tocan):
+
+| Ruta | Lista | Tope | Límite del cuerpo |
+|---|---|---|---|
+| `POST /relay-registrations` y `PUT /relay-registrations/:id` | `personIds` | 8 | 4 KiB |
+| `POST /swimmer-assignments/bulk-assign` | `personIds` | 10.000 | 512 KiB |
+| `POST /clubs` y `PUT /clubs/:id` | `delegatePersonIds`, `coachPersonIds` | 50 cada una | 32 KiB |
+| `POST /competitions/:id/events` y `PUT /competition-events/:ceId` | `categoryIds` | 100 | 16 KiB |
+| `PUT /competition-events/reorder` | `updates` | 1.000 | 256 KiB |
+| `POST /competitions/import-meet-events` | `decisiones` (campo `relayDecisions`) | 500 (el que ya existía) | ver multipart |
+
+**Multipart de analizar e importar Meet Events.** `@fastify/multipart` 9.4.0, `@fastify/busboy` 3.2.2 y Fastify 5.12.3:
+- **`bodyLimit` no rige para multipart** (su analizador no lee el cuerpo por Fastify): lo acotan los límites del plugin.
+- Un campo que supera `fieldSize` **no falla**: llega cortado con `valueTruncated`, y el fragmento puede seguir siendo JSON
+  válido (por ejemplo, `{"fileHash":…,"decisiones":[]}` seguido de espacios). Por eso el lector lo rechaza **antes de guardarlo o
+  interpretarlo**. `fieldnameTruncated` no llega a ser verdadero en esta versión (busboy no limita la longitud del nombre), así que
+  además se rechaza todo nombre de más de 64 caracteres.
+- Límites por llamada: campos de 64 KiB, 4 campos, 1 archivo y 6 partes. **No se indica `fileSize`**: rige el máximo global de
+  15 MB, que no se tocó; la carga masiva de personas conserva su propio límite.
+- Un archivo cuyo campo no se llama `file` se rechaza sin leerlo, y tras cualquier rechazo se deja de leer el resto de la solicitud.
+- Los campos que no son `maxIndividualEventsPerSwimmer` ni `relayDecisions` se descartan sin guardarse (nada los leía).
+- El nombre de archivo que se devuelve en el mensaje de extensión no admitida se acota a 80 caracteres.
+
+**Respuestas.**
+
+| Situación | Respuesta |
+|---|---|
+| Lista sobre su tope | 400 `VALIDATION_ERROR`, un único error en `details.fieldErrors.<campo>` |
+| Cuerpo JSON sobre el límite de su ruta | 413 de Fastify, antes de autenticar |
+| Campo multipart truncado, o nombre de más de 64 caracteres | 413 `PAYLOAD_TOO_LARGE`, texto fijo, sin reproducir lo recibido |
+| Más de 4 campos / 1 archivo / 6 partes | 413 del plugin (`FST_FIELDS_LIMIT`, `FST_FILES_LIMIT`, `FST_PARTS_LIMIT`): el primer límite alcanzado |
+| Archivo mayor a 15 MB | 413 `FST_REQ_FILE_TOO_LARGE` (sin cambio) |
+| Archivo con campo distinto de `file` | 400 `VALIDATION_ERROR` |
+
+**Contrato.**
+- **Conservado:** opcionalidad («no enviado» sigue siendo «no tocar»), mínimos, mensajes existentes (incluido «Demasiadas decisiones de relevo»),
+  permisos, alcance, validaciones de dominio y la cantidad exacta de integrantes por `swimmersCount`.
+- **Rechazos nuevos e intencionados:** listas sobre su tope; cuerpos sobre el límite de su ruta (incluidos textos absurdos en clubes, que antes
+  solo acotaba 1 MiB); campos multipart truncados; nombres de más de 64 caracteres; más de 4 campos, 1 archivo o 6 partes; archivo con campo
+  distinto de `file`; y un segundo archivo (antes el segundo `file` sobrescribía al primero).
+- **Cambio de forma intencionado:** con más de 500 decisiones **inválidas**, la respuesta trae solo el error del tope (antes, además, uno por
+  elemento). Con más de 500 decisiones válidas la respuesta es la misma de siempre.
+
+### Validación local de SEC-01
+
+Todo con datos sintéticos. Se distingue lo **simulado** de lo **observado en la base real desechable**.
+
+- **Simulado (sin base de datos; autenticación y servicios sustituidos, el resto es código real):**
+  `lista-acotada.test.ts` (13), `listas-esquemas.test.ts` (168), `listas-rutas.test.ts` (65) y `meet-import-multipart.test.ts` (48).
+  Demuestran, **de forma determinista**, que con exceso se validan **cero elementos** (un contador de validaciones queda en 0, y el mismo caso con
+  `.max()` de Zod 3 sí valida todos), que dentro del tope el resultado es idéntico al de la definición anterior, que el cuerpo mayor al límite no llega a
+  autenticarse, y, en multipart, el rechazo de campos truncados —incluido el fragmento que seguiría siendo JSON válido, con el control de que el esquema
+  lo aceptaría—, de nombres largos, de exceso de campos/archivos/partes, del archivo con campo distinto de `file` y del archivo mayor a 15 MB. Cada
+  rechazo **termina** (plazo de 5 s) y deja en cero las llamadas al servicio de importación.
+- **Observado con la aplicación real y la base desechable** (`listas-json.integration.test.ts`, 58): con `prisma.$use` se registran las consultas. Una
+  petición rechazada por SEC-01 deja **exactamente las mismas consultas que una línea base** (la autenticación y autorización, medidas con una validación
+  previa; esos controles no se modificaron), una petición válida deja consultas adicionales (control de sensibilidad), y un cuerpo mayor al límite deja **cero**
+  consultas, con 413 incluso sin token.
+- **Integraciones afectadas, una ejecución limpia** (22 archivos, 586 pruebas, solo en la base de `docker-compose.test.yml`): pasaron. (Una primera
+  ejecución se descartó: se lanzaron dos a la vez sobre la misma base y se interfirieron; se detuvieron ambas y se repitió una sola.)
+- **Suite unitaria completa, una vez:** 64 archivos, 1.614 pruebas, pasaron. **Typecheck** completo del backend y **lint**: sin errores (el lint
+  informa 51 avisos de `any` ya existentes, ninguno en archivos nuevos).
+- No se repitieron las mediciones de memoria ni cargas reales, y no se ejecutó nada contra producción.
+
+### Límites y riesgos residuales
+
+- **Relevos: 8 es un límite técnico nuevo, no una propiedad del dominio.** `TestType.swimmersCount` es un entero libre y el catálogo se
+  diseñó extensible: un tipo con más de 8 nadadores, si se creara, no podría inscribirse (400) hasta subir el tope. El catálogo de producción no se
+  consultó. La cantidad exacta por `swimmersCount` se sigue validando en el servicio.
+- **10.000 asignaciones no garantizan una duración determinada.** El servicio las procesa una por una; la carga real de 5.071 tardó unos 3
+  minutos, observado una sola vez y **sin extrapolación** a 10.000 ni repetición para medirlo. No se verificó que una operación así termine antes de
+  algún tiempo máximo de Nginx o de Render.
+- Un rechazo en mitad de un multipart no puede devolver al cliente lo que ya envió: se deja de leer el resto, pero lo ya recibido (hasta 15 MB de
+  archivo si viaja antes que un campo truncado) quedó en memoria de forma transitoria, sin trabajo de negocio.
+- El servidor no define `requestTimeout` ni `connectionTimeout` (valores por omisión de Fastify): ajeno a esta tarea, no se tocó.
+- Que un archivo con otro nombre de campo bloqueaba la solicitud se deduce de leer el código del plugin (la parte queda sin consumir). La
+  validación comprueba que **ahora** la solicitud termina; no se reprodujo el bloqueo con el código anterior.
+- Los duplicados dentro de una lista siguen aceptándose, como antes.
+- `listaAcotada` depende del comportamiento de Zod 3 (`pipe` no ejecuta la salida tras un fallo previo); una migración de Zod o de Fastify
+  (SEC-03) lo revalidaría con las mismas pruebas. SEC-01 **no** corrige el aviso de Zod: lo mitiga en las rutas alcanzables.
+
+## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
+
+**SEC-01 (listas JSON).** Medido en memoria con Zod 3.25.76 durante la revisión: `.max()` **no** corta el
+recorrido (solo marca el estado y sigue), así que un cuerpo de 1 MiB de elementos inválidos genera unos
+350.000 errores, unos 5 MB de `details` y más de 100 MB de montón retenidos por solicitud. **Ya está
+implementada y publicada en el repositorio** (pendiente de despliegue): ver la sección «SEC-01». Lo que queda aquí es la
+revisión original, como antecedente.
 
 **SEC-03 (dependencias).** Corrección a una afirmación demasiado general de la revisión: **Zod tiene
 una vía identificada** (SEC-01, aviso GHSA-mrhx-c7xc-m3w5, sin parche en 3.x). Para los demás avisos

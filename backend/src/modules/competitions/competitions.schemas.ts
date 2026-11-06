@@ -1,4 +1,8 @@
 import { z } from "zod";
+import { listaAcotada } from "../../shared/listaAcotada";
+import { LIMITES_LISTAS } from "../../shared/limites-listas";
+
+const MENSAJE_MAXIMO_CATEGORIAS = `Se admiten como máximo ${LIMITES_LISTAS.categoriasPorPrueba} categorías por prueba`;
 
 export const competitionCreateSchema = z
   .object({
@@ -154,7 +158,7 @@ export type SessionTypeCreateInput = z.infer<typeof sessionTypeCreateSchema>;
 export const addCompetitionEventSchema = z.object({
   eventId: z.string().uuid("Prueba inválida"),
   competitionSessionId: z.string().uuid("Jornada inválida"),
-  categoryIds: z.array(z.string().uuid()).min(1, "Debe habilitar al menos una categoría"),
+  categoryIds: listaAcotada(LIMITES_LISTAS.categoriasPorPrueba, z.array(z.string().uuid()).min(1, "Debe habilitar al menos una categoría"), MENSAJE_MAXIMO_CATEGORIAS),
   displayOrder: z.coerce.number().int().optional(),
   /**
    * Máximo de nadadores por club en esta prueba INDIVIDUAL. Omitido o `null` =
@@ -167,7 +171,7 @@ export type AddCompetitionEventInput = z.infer<typeof addCompetitionEventSchema>
 
 export const updateCompetitionEventSchema = z.object({
   competitionSessionId: z.string().uuid().optional(),
-  categoryIds: z.array(z.string().uuid()).min(1).optional(),
+  categoryIds: listaAcotada(LIMITES_LISTAS.categoriasPorPrueba, z.array(z.string().uuid()).min(1), MENSAJE_MAXIMO_CATEGORIAS).optional(),
   status: z.enum(["enabled", "disabled"]).optional(),
   displayOrder: z.coerce.number().int().nullable().optional(),
   // `null` QUITA el límite; omitido no lo toca. Igual que en el alta.
@@ -176,8 +180,11 @@ export const updateCompetitionEventSchema = z.object({
 export type UpdateCompetitionEventInput = z.infer<typeof updateCompetitionEventSchema>;
 
 export const reorderCompetitionEventsSchema = z.object({
-  updates: z
-    .array(z.object({ id: z.string().uuid(), displayOrder: z.coerce.number().int() }))
-    .min(1, "Debe incluir al menos una prueba a renumerar"),
+  // Tope de longitud comprobado ANTES de validar elementos (SEC-01).
+  updates: listaAcotada(
+    LIMITES_LISTAS.reordenamientos,
+    z.array(z.object({ id: z.string().uuid(), displayOrder: z.coerce.number().int() })).min(1, "Debe incluir al menos una prueba a renumerar"),
+    "Se pueden renumerar como máximo 1.000 pruebas por operación"
+  ),
 });
 export type ReorderCompetitionEventsInput = z.infer<typeof reorderCompetitionEventsSchema>;
