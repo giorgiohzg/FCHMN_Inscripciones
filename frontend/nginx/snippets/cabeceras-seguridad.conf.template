@@ -1,0 +1,59 @@
+# =============================================================================
+# CABECERAS DE SEGURIDAD DEL FRONTEND (Fase 3).
+#
+# NO es un archivo de `conf.d`: lo completa `envsubst` al arrancar (solo la
+# variable `CSP_CONNECT_SRC`) y queda en `/etc/nginx/conf.d/snippets/`, un
+# SUBDIRECTORIO que el `include /etc/nginx/conf.d/*.conf;` de la imagen NO
+# alcanza. Solo se carga donde `default.conf.template` lo incluye de forma
+# EXPLÍCITA: `location /`, `location /assets/` y `location = /index.html`.
+#
+# POR QUÉ NO A NIVEL `server` NI `http`.
+#   1. En Nginx, un `add_header` dentro de un `location` ANULA todos los
+#      heredados; como cada ubicación estática ya declara su `Cache-Control`, un
+#      `add_header` de más arriba no llegaría nunca a ellas. Hay que incluirlo en
+#      cada una.
+#   2. A ese nivel también alcanzaría a `/api/`, y la API ya envía sus propias
+#      cabeceras (helmet): el navegador recibiría cada una DOS veces, y dos
+#      `Content-Security-Policy` se INTERSECAN, de modo que la del frontend
+#      podría restringir a la de la API sin que nadie lo notara. `/api/` no
+#      incluye este fragmento.
+#
+# `always` es imprescindible: sin él, `add_header` solo se aplica a respuestas
+# 2xx y 3xx, y un 403 o un 404 saldrían SIN estas cabeceras.
+#
+# CONTENT-SECURITY-POLICY.
+#   default-src 'none'      Nada se permite por omisión.
+#   script-src 'self'       El bundle de Vite. Sin 'unsafe-inline' ni
+#                           'unsafe-eval': el HTML construido no tiene scripts en
+#                           línea.
+#   style-src 'self'        La hoja de estilos de Vite. Sin 'unsafe-inline'. Los
+#                           `style={{...}}` de React se aplican por CSSOM
+#                           (`element.style.x = ...`), que la CSP no bloquea.
+#   img-src 'self'          El logo y el favicon, servidos desde /assets/.
+#   font-src 'self'         No hay fuentes externas.
+#   connect-src             Los orígenes a los que `fetch` puede llamar: ver
+#                           `CSP_CONNECT_SRC` en el Dockerfile. Con la API bajo
+#                           el mismo origen (`/api`) basta `'self'`.
+#   base-uri 'none'         Nadie puede cambiar la base de las URL relativas.
+#   form-action 'self'      Un formulario no puede enviarse a otro sitio.
+#   frame-ancestors 'none'  Nadie puede enmarcar la web (clickjacking). Es el
+#                           equivalente moderno de X-Frame-Options.
+#   object-src 'none'       Sin <object>, <embed> ni <applet>.
+#
+# Las descargas con datos de la API usan `fetch` + `blob:` + un <a download>: ni
+# el `fetch` (cubierto por connect-src) ni la descarga necesitan permisos
+# adicionales.
+#
+# X-FRAME-OPTIONS DENY: lo mismo que `frame-ancestors 'none'` para navegadores
+# que no entienden CSP. Los dos dicen lo mismo a propósito.
+#
+# HSTS: el MISMO valor que ya envía la API con helmet (un año, con subdominios),
+# y SIN `preload`: entrar en la lista de precarga de los navegadores es una
+# decisión casi irreversible que no se toma desde una cabecera. Los navegadores
+# ignoran HSTS en HTTP plano, así que no afecta a http://localhost.
+# =============================================================================
+add_header Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src ${CSP_CONNECT_SRC}; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'" always;
+add_header X-Frame-Options "DENY" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header Referrer-Policy "no-referrer" always;
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;

@@ -12,7 +12,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **A1** | Cliente: un 401 o una renovación atrasados no cierran ni reutilizan una sesión posterior | **Cerrada y desplegada** en la web |
 | **1** | Sesiones y revocación efectiva del JWT | **En producción desde el 2026-11-05** (`b920893`): migración aplicada y API desplegada, con el corte de sesiones ejecutado. La CI de `b920893` pasó completa, integraciones incluidas. Ver «Puesta en producción» |
 | **2** | `Cache-Control: no-store`, filtrado de excepciones, login uniforme | **API desplegada en producción el 2026-11-05 (`6d2dae5`)**; la CI pasó completa. Salud y cabeceras observadas; funcionalidades sin comprobar en producción. Ver «Fase 2» |
-| **3** | Cabeceras del frontend (Nginx) | Pendiente |
+| **3** | Cabeceras del frontend (Nginx) | **Implementada y publicada en GitHub; validada en local** (imagen real y navegador real con una API simulada); **sin desplegar**. Ver «Fase 3» |
 | **4** | Límites del procesamiento XLSX | Pendiente |
 | Vite 5.4.21 | Aviso GHSA-rq7h-c2jc-7f22 en una dependencia de desarrollo | **Aplazado, fuera de estas fases** |
 
@@ -354,21 +354,142 @@ ni respaldo, ni corte forzado de sesiones, ni cambios de configuración. `fchmn-
 producción:** el contrato del login, el filtrado de errores en cargas masivas e importaciones,
 las descargas y la verificación ficticia; su evidencia es la local y la de la CI.
 
-## Fase 3: cabeceras del frontend (pendiente)
+## Fase 3: cabeceras del frontend (publicada en GitHub, validada en local; sin desplegar)
 
-- **Hallazgos:** faltan CSP, protección de enmarcado, `nosniff` y política de referencia;
-  HSTS está en la API pero no en el frontend.
-- **Objetivo:** un fragmento de Nginx incluido en las ubicaciones estáticas, con `always`.
-  **No** a nivel `server`: en Nginx, un `add_header` en `location` anula los heredados, y
-  además duplicaría las cabeceras de la API en `/api/`.
-- **Política candidata:** `default-src 'none'`; `script-src`, `style-src`, `img-src` y
-  `font-src` en `'self'`; `base-uri 'none'`; `form-action 'self'`; `frame-ancestors 'none'`;
-  `object-src 'none'`. `connect-src` requiere una variable de despliegue, porque Compose usa
-  la API en otro origen.
-- **Aceptación:** cabeceras en rutas estáticas y errores, sin duplicados en `/api/`, y la
-  aplicación sin violaciones de CSP.
-- **Riesgo:** una CSP estricta puede romper algo; los estilos en línea de React son una
-  hipótesis a validar. Se recomienda probarla primero en modo informativo.
+**Estado:** publicada en GitHub (commit y push a `main`), **sin desplegar**: `fchmn-web` sigue
+con la versión anterior, sin estas cabeceras. Validada
+sobre la imagen real de Nginx y en un navegador real, con una **API simulada** y datos
+sintéticos (ver «Validación local» y «Límites»). No se tocó el backend, la autenticación, el
+esquema, las migraciones, las dependencias, Vite ni la Fase 4.
+
+- **Hallazgos:** faltaban CSP, protección de enmarcado, `nosniff` y política de referencia;
+  HSTS estaba en la API pero no en el frontend.
+- **Dónde:** un fragmento reutilizable, `frontend/nginx/snippets/cabeceras-seguridad.conf.template`,
+  incluido de forma **explícita** en `location /`, `location /assets/` y `location = /index.html`,
+  con `always` (para que también salgan en 403 y 404). **No** a nivel `server`: en Nginx un
+  `add_header` dentro de un `location` anula los heredados, y a ese nivel alcanzaría a `/api/`,
+  duplicando las cabeceras de la API (dos CSP se *intersecan*). `/api/` no lo incluye. Las
+  plantillas se procesan con `envsubst` y el fragmento queda en `conf.d/snippets/`, un
+  subdirectorio que el `include conf.d/*.conf` de la imagen no alcanza.
+- **Política final:**
+
+  ```
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self';
+    img-src 'self'; font-src 'self'; connect-src ${CSP_CONNECT_SRC}; base-uri 'none';
+    form-action 'self'; frame-ancestors 'none'; object-src 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  ```
+
+  HSTS es el mismo valor que ya envía la API con helmet, y **sin `preload`**. Sin comodines,
+  sin `unsafe-inline`, sin `unsafe-eval`, sin `data:` ni `blob:`: no hizo falta ninguna
+  excepción.
+- **Inventario del build** (imagen real): un HTML sin scripts ni estilos en línea, un
+  JavaScript y una hoja de estilos de Vite, y el logo en PNG; **todos del mismo origen**. El
+  CSS no tiene `url()`, `@import` ni `@font-face`. No hay fuentes ni recursos externos.
+  El bundle contiene dos llamadas `fetch` (`apiClient.ts`) y una descarga por `fetch` +
+  `blob:` + un `<a download>`, que ni `connect-src` ni nada más necesita ampliar.
+- **Estilos de React:** hay 568 usos de `style={{…}}` y se confirmó la hipótesis del plan: React
+  los aplica por CSSOM (`element.style.x = …`), que `style-src` no bloquea. Con la política
+  aplicada, un `setAttribute("style", …)` sí se bloquea (`style-src-attr`) y el CSSOM no; las
+  páginas muestran sus estilos en línea sin violaciones.
+
+### Configuración por entorno
+
+`CSP_CONNECT_SRC` (variable de **arranque**, `'self'` por omisión) lista los orígenes a los que
+el **navegador** puede llamar con `fetch`. **No es `API_INTERNA`**, que es la dirección que usa
+Nginx por la red privada para reenviar `/api`. Debe ser coherente con `VITE_API_URL`, que se
+fija al **construir**:
+
+| Entorno | `VITE_API_URL` (build) | `CSP_CONNECT_SRC` (arranque) |
+|---|---|---|
+| Nube, la API bajo el mismo origen | `/api` | `'self'` (por omisión; no hay que declararla) |
+| Docker Compose, uso local | sin definir (`http://localhost:3000`) | sin definir (`'self' http://localhost:3000`, el valor por omisión de `docker-compose.yml`) |
+| API relativa en Compose | `/api` | `'self'` (declararla; con el valor local también arrancaría, pero dejaría abierto `localhost:3000`) |
+| API absoluta con ruta | `https://api.ejemplo.cl/api` | `'self' https://api.ejemplo.cl` (el origen, **sin la ruta**) |
+
+`VITE_API_URL` es una URL base (puede llevar ruta); `CSP_CONNECT_SRC` es una lista de orígenes.
+Compose ya **no** deriva una de la otra (copiar `VITE_API_URL` producía `'self' /api` o un origen
+con ruta, ambos rechazados): `CSP_CONNECT_SRC` se declara aparte, con `${CSP_CONNECT_SRC:-'self'
+http://localhost:3000}`, y se puede sobrescribir desde el entorno o el `.env` de Compose.
+
+El Dockerfile conserva el valor compilado en `API_URL_COMPILADA`, y
+`frontend/nginx/18-validar-csp.sh` corre **antes** de `20-envsubst` y **no deja arrancar** el
+contenedor, con un mensaje, si: el valor está vacío; contiene comodines, `'unsafe-*'`,
+`'none'`, `data:`/`blob:`, esquemas sueltos, rutas, consultas, comillas dobles, `;`, `$`, `\` o
+saltos de línea; o si no es coherente con el bundle (el origen de `VITE_API_URL` debe figurar,
+o `'self'` si es una ruta). El filtro de `envsubst` pasó a `^(PORT|API_INTERNA|CSP_CONNECT_SRC)$`:
+las variables de Nginx (`$uri`, `$host`…) no se tocan.
+
+### Validación local
+
+Imagen construida con el `frontend/Dockerfile` (bases de Nginx y Node sin actualizar), en dos
+variantes —`VITE_API_URL=/api` y la de Compose— y contenedores exclusivos de prueba:
+
+- **Configuración:** `nginx -t` correcto; `nginx -T` muestra el fragmento incluido solo en las
+  tres ubicaciones y el `include conf.d/*.conf` no lo alcanza; sin `${…}` sin sustituir;
+  `PORT`, `API_INTERNA` y `CSP_CONNECT_SRC` sustituidos (se probó con `PORT=8099`).
+- **Cabeceras (curl sobre la imagen real):** las cinco, en `/login`, `/`, `index.html`, una
+  ruta SPA, JS, CSS, PNG, un 404 real de `/assets/…` y `/assets/` (404). Caché de assets y
+  `no-store` de `index.html` conservados; el fallback de la SPA responde 200 con cabeceras.
+  En `/api/` hay **una sola** copia de cada cabecera, la de la API. `Set-Cookie` reescrito de
+  `/auth` a `/api/auth`.
+- **Valores inválidos:** una veintena de casos probados dentro de la imagen y 26 en la prueba automatizada
+  (aceptados y rechazados, estos con su mensaje); un contenedor con un valor inválido terminó con código 1 sin llegar a generar la
+  configuración. Se corrigió un defecto hallado al probar: sin `set -f`, un `*` se expandía
+  contra los archivos del directorio.
+- **Navegador real** (el pane de Claude, sobre Nginx), con una API simulada local:
+  1. *Modo informativo* (`Content-Security-Policy-Report-Only` con `report-uri`, solo en un
+     contenedor de prueba): login, panel, navegación, Reportes y descarga con **0 informes y
+     0 eventos `securitypolicyviolation`**. Control positivo: un script en línea inyectado
+     sí generó un informe.
+  2. *Política aplicada*, API bajo el mismo origen (`/api`): login, panel, Clubes, Personas,
+     Competencias, Inscripciones, Relevos, Reportes y una **descarga CSV con datos sintéticos
+     (blob + `<a download>`, nombre tomado de `Content-Disposition`)**; sesión mantenida al
+     recargar por la cookie reescrita; imágenes y estilos correctos; **0 violaciones**. Control
+     positivo: un script en línea, un atributo `style` y un `fetch` externo se bloquean
+     (`disposition: enforce`).
+  3. *Política aplicada*, API en otro origen (`http://localhost:3000`, el modo Compose): login con
+     CORS y cookies, panel, Reportes y descarga; **0 violaciones**; `fetch` a la API configurada
+     permitido y a un origen ajeno bloqueado por `connect-src`.
+- **Corrección de Compose (posterior):** la primera versión armaba `CSP_CONNECT_SRC` copiando
+  `VITE_API_URL`, lo que daba `'self' /api` (con `/api`) o un origen con ruta (con
+  `https://api.ejemplo.cl/api`), ambos rechazados por el validador, y declarar la variable no
+  sobrescribía el valor. Ahora se declara aparte y se puede sobrescribir. Se comprobó con
+  `docker compose config` (solo resuelve, no arranca nada) y con pruebas que resuelven el YAML
+  como Compose y pasan los valores efectivos por el guion de validación: omisión local, `/api`,
+  URL absoluta con ruta, sobrescritura y rechazo de los incoherentes. No se reconstruyó la imagen
+  ni se repitió la navegación (la política no cambió).
+- **Automatizado:** `backend/tests/frontend-cabeceras.test.ts` (55 pruebas, unitarias): las cinco
+  cabeceras con `always`, la CSP y su ausencia de comodines, HSTS igual al de helmet, dónde se
+  incluye el fragmento (y dónde no), caché y fallback conservados, filtro de `envsubst`,
+  Dockerfile, Compose y el guion de validación con `sh`. También pasaron `documentacion`,
+  `avisos-terceros`, `dockerfile-mantenimiento` y `dockerignore-contexto`; `typecheck` y `lint`
+  sin errores. No se repitieron las suites del backend ni las completas.
+
+### Límites
+
+- **Sin desplegar.** Nada se probó en Render ni con el dominio real ni con HTTPS: HSTS solo se
+  comprobó como cabecera (los navegadores lo ignoran en HTTP plano).
+- **API simulada.** Los datos son sintéticos y la API es un servidor mínimo escrito para la
+  prueba: no ejercita al backend real, y varias pantallas (Auditoría, Catálogos, Asignaciones y
+  otras con formas de datos más complejas) no se recorrieron porque el simulador no las
+  alimentaba (devolvían `TypeError` por datos, no por la política). Las violaciones de esas
+  pantallas **no están descartadas**; se cubrieron las vías que cargan recursos —las páginas
+  cargan un único bundle, una hoja de estilos y el logo— y la política no depende de la página.
+- **Cargas de archivos** (importaciones `.hyv`/`.ev3`, carga masiva) **no se probaron** en el
+  navegador: usan `FormData` por `fetch`, cubierto por `connect-src`.
+- Las páginas de error generadas por Nginx **antes** de elegir ubicación (p. ej. un 400 por una
+  petición mal formada) no llevan estas cabeceras.
+- La prueba automatizada lee archivos y ejecuta el guion; no construye la imagen ni ejecuta
+  Nginx. No se le hizo una prueba de mutación.
+- Las imágenes `fchmn-frontend:fase3-*` y los contenedores `fchmn-f3*` de prueba quedan en el
+  equipo local, detenidos.
+- **Pendiente:** el despliegue de `fchmn-web` (que reconstruye la imagen con
+  `VITE_API_URL=/api` y, por omisión, `CSP_CONNECT_SRC='self'`), con su propia autorización. Tras desplegar conviene observar las cabeceras reales y la consola con una
+  cuenta propia, sin credenciales en este repositorio.
 
 ## Fase 4: XLSX (pendiente)
 

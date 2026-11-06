@@ -52,7 +52,8 @@
 #
 # Para apuntar la web a otro backend hay que RECONSTRUIRLA: la URL queda
 # incrustada en el bundle (ver frontend/Dockerfile).
-#   docker compose build --build-arg VITE_API_URL=https://api.ejemplo.cl frontend
+#   VITE_API_URL=https://api.ejemplo.cl docker compose build frontend
+# y declarar a la vez CSP_CONNECT_SRC (ver el servicio frontend).
 # =============================================================================
 
 # ---------------------------------------------------------------------------
@@ -163,8 +164,27 @@ services:
     # por el puerto publicado, igual que siempre. El proxy queda disponible en
     # http://localhost:8080/api/... para comprobarlo, y es el camino que se usa
     # en la nube.
+    #
+    # CSP_CONNECT_SRC (Fase 3) es la lista de orígenes a los que el NAVEGADOR
+    # puede llamar con `fetch`, según la cabecera Content-Security-Policy. No es
+    # API_INTERNA (la dirección que usa Nginx por la red privada) ni es la URL de
+    # la API: son ORÍGENES (esquema://host[:puerto], sin ruta ni barra final),
+    # mientras que VITE_API_URL puede llevar ruta. Se declara APARTE, y se puede
+    # sobrescribir desde el entorno o el .env de Compose (el valor de abajo es solo
+    # el de omisión):
+    #
+    #   VITE_API_URL (al construir)       CSP_CONNECT_SRC (al arrancar)
+    #   sin definir (uso local)           sin definir: 'self' http://localhost:3000
+    #   /api  (API bajo el mismo origen)  'self'
+    #   https://api.ejemplo.cl/api        'self' https://api.ejemplo.cl
+    #
+    # Si no coinciden, el contenedor NO arranca y el registro dice por qué
+    # (frontend/nginx/18-validar-csp.sh). Ejemplo, API absoluta con ruta:
+    #   VITE_API_URL=https://api.ejemplo.cl/api \
+    #   CSP_CONNECT_SRC="'self' https://api.ejemplo.cl" docker compose up -d --build frontend
     environment:
       API_INTERNA: backend:3000
+      CSP_CONNECT_SRC: "${CSP_CONNECT_SRC:-'self' http://localhost:3000}"
     # Ídem: la web solo se sirve a este computador.
     ports:
       - "127.0.0.1:8080:80"

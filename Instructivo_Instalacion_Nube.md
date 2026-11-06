@@ -884,6 +884,12 @@ así que una ejecución accidental no rompe nada.
    | `VITE_API_URL` | `/api` |
    | `API_INTERNA` | El **nombre completo** de la API, con su puerto. **No basta `fchmn-api:3000`**: lee el recuadro «El nombre corto no sirve» antes de escribirlo |
 
+   > **No hace falta una tercera variable.** `CSP_CONNECT_SRC` (la política de seguridad
+   > de contenido de la web) vale `'self'` por omisión, que es lo correcto con
+   > `VITE_API_URL=/api`: no la declares. Solo importa si la API estuviera en otro origen.
+   > Si `VITE_API_URL` no queda en `/api` al construir, la web **no arranca** y el registro
+   > explica por qué (guion `18-validar-csp.sh`).
+
    > ### Estas dos variables son el corazón de la configuración
    >
    > Hacen que **el navegador vea una sola dirección**. La web pide la API a

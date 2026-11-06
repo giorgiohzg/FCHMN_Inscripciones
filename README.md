@@ -108,8 +108,23 @@ up -d` no lo ejecuta**. Aplicar migraciones y sembrar catálogos son operaciones
 deliberadas, no parte de encender la aplicación.
 
 > `VITE_API_URL` se resuelve **al construir** la imagen del frontend, no al ejecutarla:
-> Vite la incrusta en el bundle. Apuntar a otro backend exige reconstruir:
-> `docker compose build --build-arg VITE_API_URL=https://api.ejemplo.cl frontend`.
+> Vite la incrusta en el bundle. Apuntar a otro backend exige reconstruir. Además, la política de seguridad de contenido de la
+> web debe admitir ese destino, y se declara **aparte**: `CSP_CONNECT_SRC` lista **orígenes**
+> (`esquema://host[:puerto]`, sin ruta), mientras que `VITE_API_URL` puede llevar ruta. Docker
+> Compose lee ambas del entorno o del `.env` de Compose (el `CSP_CONNECT_SRC` por omisión es
+> `'self' http://localhost:3000`, el uso local):
+>
+> | `VITE_API_URL` (al construir) | `CSP_CONNECT_SRC` (al arrancar) |
+> |---|---|
+> | sin definir (uso local) | sin definir |
+> | `/api` (API bajo el mismo origen) | `'self'` |
+> | `https://api.ejemplo.cl/api` | `'self' https://api.ejemplo.cl` |
+>
+> ```bash
+> VITE_API_URL=https://api.ejemplo.cl/api CSP_CONNECT_SRC="'self' https://api.ejemplo.cl" docker compose up -d --build frontend
+> ```
+>
+> Si no coinciden, el contenedor **no arranca** y el registro dice por qué.
 
 La documentación interactiva de la API queda disponible en `http://localhost:3000/docs` (Swagger UI).
 En producción `/docs` está **deshabilitada por defecto**; para publicarla hay que poner
@@ -255,6 +270,20 @@ sesión no viaja.
     conservan diferencias residuales. El límite por IP, los contadores, el bloqueo por cuenta,
     la auditoría y S10 no cambian. En producción solo se observaron `/api/health`, `/api/ready`
     y `/api/auth/me` sin credenciales (todas con `no-store`); lo demás se validó en local y en la CI.
+- **Fase 3 de seguridad (publicada en GitHub y validada en local; sin desplegar):** **cabeceras de
+  seguridad en la web** (Nginx del frontend): `Content-Security-Policy` estricta
+  (`default-src 'none'`, `script-src`/`style-src`/`img-src`/`font-src` en `'self'`,
+  `frame-ancestors 'none'`, sin `unsafe-inline` ni `unsafe-eval`), `X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` y HSTS igual al de la API,
+  sin `preload`. Van en un fragmento (`frontend/nginx/snippets/`) incluido solo en las
+  ubicaciones estáticas, con `always`, y **no** en `/api/`, que ya recibe las suyas. El
+  `connect-src` sale de la variable de **arranque** `CSP_CONNECT_SRC` (`'self'` por omisión,
+  que sirve con la API bajo el mismo origen, `VITE_API_URL=/api`); Docker Compose la declara con
+  `'self' http://localhost:3000` por omisión y se puede sobrescribir (ver la tabla junto a `VITE_API_URL`). No es `API_INTERNA` (la dirección de Nginx hacia la API). Un valor
+  inválido, o incoherente con el `VITE_API_URL` compilado, **impide arrancar** el contenedor con
+  un mensaje. Comprobada con la imagen real y un navegador real **contra una API simulada**
+  (0 violaciones de CSP); no se probó en producción. Detalle y límites en
+  `docs/seguridad/PLAN_SEGURIDAD.md`.
 - **El refresh token viaja en una cookie `HttpOnly`**, no en el cuerpo de la respuesta.
   Antes se devolvía en el JSON de `/auth/login` y el frontend lo guardaba en
   `sessionStorage`, donde cualquier script de la página podía leerlo — y ese token vale

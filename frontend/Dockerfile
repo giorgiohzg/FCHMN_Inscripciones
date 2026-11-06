@@ -91,8 +91,12 @@ FROM nginx:${NGINX_VERSION}@${NGINX_DIGEST} AS runtime
 # El filtro es una expresión regular que se compara con el NOMBRE de cada
 # variable del entorno. Va anclada (`^...$`) para que no alcance por accidente a
 # cualquier otra que contenga esas palabras.
+#
+# El filtro admite TRES variables: PORT, API_INTERNA y CSP_CONNECT_SRC (la lista
+# de orígenes de `connect-src` de la cabecera Content-Security-Policy). Las
+# demás —`$uri`, `$host`, `$esquema_original`…— son de Nginx y no se tocan.
 ENV PORT=80
-ENV NGINX_ENVSUBST_FILTER="^(PORT|API_INTERNA)$"
+ENV NGINX_ENVSUBST_FILTER="^(PORT|API_INTERNA|CSP_CONNECT_SRC)$"
 
 # DIRECCIÓN INTERNA DE LA API, para el proxy de `/api`.
 #
@@ -106,6 +110,30 @@ ENV NGINX_ENVSUBST_FILTER="^(PORT|API_INTERNA)$"
 ENV API_INTERNA=backend:3000
 
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
+
+# CABECERAS DE SEGURIDAD DEL FRONTEND (Fase 3) y su `connect-src`.
+#
+# CSP_CONNECT_SRC lista los orígenes a los que el navegador puede llamar con
+# `fetch`. Se aplica al ARRANCAR (como API_INTERNA), pero DEBE SER COHERENTE con
+# `VITE_API_URL`, que se fijó al CONSTRUIR:
+#
+#   VITE_API_URL=/api  (la API bajo el mismo origen, como en la nube)
+#                         → CSP_CONNECT_SRC="'self'"   (el valor por omisión)
+#   VITE_API_URL=http://localhost:3000  (Docker Compose, otro origen)
+#                         → CSP_CONNECT_SRC="'self' http://localhost:3000"
+#
+# No lo confunda con API_INTERNA: esa es la dirección que usa ESTE Nginx, por la
+# red privada, para reenviar `/api`; CSP_CONNECT_SRC es la que usa el NAVEGADOR.
+#
+# `API_URL_COMPILADA` guarda el valor que se compiló en el bundle (ya es texto
+# visible en el JavaScript, no un secreto) para que el arranque compruebe la
+# coherencia y falle con un mensaje claro en vez de dejar una web que carga y no
+# puede llamar a la API. Ver nginx/18-validar-csp.sh.
+ARG VITE_API_URL=http://localhost:3000
+ENV API_URL_COMPILADA=${VITE_API_URL}
+ENV CSP_CONNECT_SRC="'self'"
+COPY nginx/snippets/cabeceras-seguridad.conf.template /etc/nginx/templates/snippets/cabeceras-seguridad.conf.template
+COPY --chmod=0755 nginx/18-validar-csp.sh /docker-entrypoint.d/18-validar-csp.sh
 
 # Escribe la directiva `resolver` al arrancar, leyendo /etc/resolv.conf. Hace
 # falta porque el destino del proxy se pasa por una variable de Nginx, que es lo

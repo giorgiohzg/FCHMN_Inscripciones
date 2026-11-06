@@ -12,8 +12,8 @@
 # los registros del contenedor. Fuera de esas plataformas, el Dockerfile le da
 # el valor por omisión 80.
 #
-# `NGINX_ENVSUBST_FILTER=PORT` (en el Dockerfile) limita la sustitución a esa
-# variable: sin el filtro, `envsubst` también reemplazaría `$uri`, `$host` y
+# `NGINX_ENVSUBST_FILTER` (en el Dockerfile) limita la sustitución a las
+# variables previstas (PORT, API_INTERNA y CSP_CONNECT_SRC): sin el filtro, `envsubst` también reemplazaría `$uri`, `$host` y
 # `$http_upgrade` —que son variables de NGINX, no del entorno— por cadenas
 # vacías, y la configuración dejaría de funcionar.
 #
@@ -47,6 +47,11 @@ server {
 
     # No anunciar la versión de Nginx.
     server_tokens off;
+
+    # CABECERAS DE SEGURIDAD (Fase 3). Se incluyen en `/`, `/assets/` y
+    # `= /index.html` (más abajo) y NO en `/api/`, que ya recibe las suyas de la
+    # API: ver `snippets/cabeceras-seguridad.conf.template`, que explica por qué
+    # no van a nivel `server`.
 
     # ------------------------------------------------------------------------
     # LA API, BAJO EL MISMO ORIGEN QUE LA WEB.
@@ -150,6 +155,9 @@ server {
     location /assets/ {
         expires 1y;
         add_header Cache-Control "public, immutable";
+        # Un `add_header` aquí anula los heredados, así que las cabeceras de
+        # seguridad se incluyen EXPLÍCITAMENTE en cada ubicación estática.
+        include /etc/nginx/conf.d/snippets/cabeceras-seguridad.conf;
         try_files $uri =404;
     }
 
@@ -158,11 +166,13 @@ server {
     # existen y la aplicación queda rota tras cada despliegue.
     location = /index.html {
         add_header Cache-Control "no-store";
+        include /etc/nginx/conf.d/snippets/cabeceras-seguridad.conf;
     }
 
     # Fallback de SPA: cualquier ruta desconocida entrega index.html y deja que
     # React Router resuelva.
     location / {
+        include /etc/nginx/conf.d/snippets/cabeceras-seguridad.conf;
         try_files $uri $uri/ /index.html;
     }
 
