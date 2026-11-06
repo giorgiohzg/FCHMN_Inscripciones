@@ -22,6 +22,43 @@ export async function verifyPassword(hash: string, plain: string): Promise<boole
 }
 
 /**
+ * VERIFICACIÓN FICTICIA: el mismo trabajo de Argon2 que una verificación real, contra un
+ * hash que no pertenece a nadie.
+ *
+ * El login responde igual cuando no hay una contraseña real que comprobar —usuario
+ * inexistente, persona inutilizable, bloqueo temporal vigente—, y sin este cálculo esas
+ * respuestas serían las únicas que no pagan el coste de Argon2: la diferencia de tiempo
+ * delataría qué nombres de usuario existen y cuáles están bloqueados.
+ *
+ *  - El hash se calcula UNA vez por proceso, de forma perezosa, con los mismos parámetros
+ *    que `hashPassword` (el coste de verificar lo fijan los del hash). Generar uno nuevo
+ *    por petición duplicaría el coste y abriría a cualquiera un camino barato de agotar CPU.
+ *  - Se hace sobre un secreto aleatorio de 32 bytes que nunca sale de aquí, y el resultado
+ *    se DESCARTA: la función devuelve siempre `false`, así que ninguna entrada puede
+ *    autenticar a nadie, ni siquiera por una coincidencia con ese secreto.
+ *
+ * No iguala los tiempos de respuesta: las demás consultas del login siguen existiendo.
+ * Elimina únicamente el camino que se saltaba el cálculo de la contraseña.
+ */
+let hashFicticio: Promise<string> | null = null;
+
+function obtenerHashFicticio(): Promise<string> {
+  if (!hashFicticio) {
+    hashFicticio = hashPassword(crypto.randomBytes(32).toString("hex")).catch((err) => {
+      // Un fallo no queda guardado: el siguiente intento vuelve a calcularlo.
+      hashFicticio = null;
+      throw err;
+    });
+  }
+  return hashFicticio;
+}
+
+export async function verificacionFicticia(plain: string): Promise<false> {
+  await verifyPassword(await obtenerHashFicticio(), plain);
+  return false;
+}
+
+/**
  * Política mínima de contraseña. Se aplica en el schema de validación (Zod)
  * y aquí como defensa en profundidad.
  */

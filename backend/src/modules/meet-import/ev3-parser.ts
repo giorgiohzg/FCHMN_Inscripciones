@@ -51,6 +51,8 @@
  *       catálogo. Ver la nota sobre relevos en `meet-import.service.ts`.
  */
 
+import { ValidationError } from "../../shared/errors";
+
 export type ParsedGender = "male" | "female" | "mixed";
 
 const STROKE_CODE_TO_NAME: Record<string, string> = {
@@ -121,7 +123,8 @@ export function parseUsDate(raw: string): Date | null {
 /**
  * Parsea el contenido completo de un archivo `.ev3` (ya leído como texto,
  * codificación ISO-8859-1/Latin-1 igual que el resto de los formatos
- * Hy-Tek). Lanza un error solo si el encabezado es ilegible; las pruebas
+ * Hy-Tek). Lanza un `ValidationError` —el único tipo cuyo mensaje se publica— solo si el
+ * encabezado es ilegible; las pruebas
  * individuales con datos raros se omiten con una advertencia en vez de
  * abortar todo el archivo.
  */
@@ -132,7 +135,7 @@ export function parseEv3File(content: string): ParsedMeet {
     .filter((l) => l.length > 0);
 
   if (lines.length === 0) {
-    throw new Error("El archivo .ev3 está vacío.");
+    throw new ValidationError("El archivo .ev3 está vacío.");
   }
 
   const headerFields = lines[0]!.replace(/\*>$/, "").split(";");
@@ -143,9 +146,9 @@ export function parseEv3File(content: string): ParsedMeet {
 
   const warnings: string[] = [];
   if (!name) warnings.push("No se pudo leer el nombre de la competencia desde el encabezado.");
-  if (!startDate) throw new Error(`No se pudo leer la fecha de inicio de la competencia (valor: "${headerFields[2]}").`);
-  if (!endDate) throw new Error(`No se pudo leer la fecha de fin de la competencia (valor: "${headerFields[3]}").`);
-  if (!ageCutoffDate) throw new Error(`No se pudo leer la fecha de corte de edad (valor: "${headerFields[4]}").`);
+  if (!startDate) throw new ValidationError(`No se pudo leer la fecha de inicio de la competencia (valor: "${headerFields[2]}").`);
+  if (!endDate) throw new ValidationError(`No se pudo leer la fecha de fin de la competencia (valor: "${headerFields[3]}").`);
+  if (!ageCutoffDate) throw new ValidationError(`No se pudo leer la fecha de corte de edad (valor: "${headerFields[4]}").`);
 
   const events: ParsedMeetEvent[] = [];
   for (let i = 1; i < lines.length; i++) {

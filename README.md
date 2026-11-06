@@ -228,6 +228,32 @@ sesión no viaja.
     [docs/seguridad/PLAN_SEGURIDAD.md](docs/seguridad/PLAN_SEGURIDAD.md)). Argon2 queda fuera de los bloqueos, y lo verificado se revalida bajo bloqueo comparando
     el hash leído: una credencial sustituida no emite sesión ni suma un intento fallido, y un
     bloqueo administrativo, una inhabilitación o una eliminación concurrentes prevalecen.
+- **Fase 2 de seguridad (implementada y validada EN LOCAL; sin desplegar):**
+  - **`Cache-Control: no-store` en toda respuesta de la API**, incluidos errores, rutas
+    inexistentes (404), el límite de solicitudes (429), la autenticación, el CSRF y las
+    descargas de reportes y de Team Manager. Es un hook `onSend` registrado antes que los
+    módulos; no cambia cuerpos, códigos, tipos de contenido ni nombres de archivo.
+  - **Un fallo inesperado ya no publica su texto.** En la carga masiva de personas, la
+    asignación masiva de nadadores y la importación de competencias solo se responde lo que el
+    sistema escribió para quien opera (validaciones y conflictos de dominio, incluidos los
+    errores de la base que el sistema sabe traducir); el resto devuelve un mensaje genérico y
+    deja en el registro interno una línea estructurada con la clase y el código del error,
+    sin su mensaje ni su traza (`backend/src/shared/errorPublicable.ts`). Los analizadores
+    `.ev3` y `.hyv` lanzan `ValidationError` para sus errores previstos; un `TypeError` u otro
+    `Error` ya no se publica solo por haber ocurrido durante la interpretación.
+  - **Contrato del login.** Usuario inexistente o eliminado, contraseña incorrecta,
+    incoherencia entre la persona y su cuenta (persona eliminada o estados que no se
+    corresponden) y bloqueo temporal **vigente** (aunque la contraseña sea la correcta): un 401
+    genérico, con el mismo código y mensaje, sin `lockedUntil`. Cuenta inhabilitada o
+    bloqueada por un administrador —sola, o junto a su persona con el mismo estado, que es lo
+    que dejan «bloquear» e «inhabilitar» persona—: el motivo se revela solo tras comprobar
+    una contraseña correcta y revalidarla frente al hash vigente, con la persona releída bajo
+    bloqueo. Un bloqueo temporal vencido sigue su flujo de la Fase 1. Ya no hay un 423 `ACCOUNT_LOCKED` en el login. Donde no hay un hash real que
+    comprobar se hace una **verificación ficticia de Argon2** (hash calculado una vez por
+    proceso, secreto aleatorio, resultado descartado: no puede autenticar a nadie). Eso
+    elimina el camino que se saltaba el cálculo; **no iguala los tiempos de respuesta**, que
+    conservan diferencias residuales. El límite por IP, los contadores, el bloqueo por cuenta,
+    la auditoría y S10 no cambian.
 - **El refresh token viaja en una cookie `HttpOnly`**, no en el cuerpo de la respuesta.
   Antes se devolvía en el JSON de `/auth/login` y el frontend lo guardaba en
   `sessionStorage`, donde cualquier script de la página podía leerlo — y ese token vale

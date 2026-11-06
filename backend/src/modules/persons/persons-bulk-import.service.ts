@@ -18,6 +18,7 @@ import {
 } from "./persons-bulk-import.rules";
 import { neutralizeSpreadsheetFormula } from "../reports/reports.rules";
 import { ValidationError, ForbiddenError } from "../../shared/errors";
+import { mensajePublicable } from "../../shared/errorPublicable";
 
 interface ActorContext {
   userId: string;
@@ -303,7 +304,8 @@ export async function importPersonsFromExcel(fileBuffer: Buffer, actor: ActorCon
       createdCount++;
       if (club) withClubCount++;
     } catch (err) {
-      results.push({ row: rowNumber, status: "error", errors: [err instanceof Error ? err.message : "Error desconocido al crear la persona"] });
+      // Solo lo previsto llega al archivo de resultados; lo inesperado queda en el registro interno.
+      results.push({ row: rowNumber, status: "error", errors: [mensajePublicable(err, "carga-masiva-personas", rowNumber)] });
     }
   }
 

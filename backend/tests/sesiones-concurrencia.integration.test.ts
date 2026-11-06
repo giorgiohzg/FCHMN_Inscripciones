@@ -27,7 +27,7 @@ import * as personsService from "../src/modules/persons/persons.service";
 import * as clubsService from "../src/modules/clubs/clubs.service";
 import { hashPassword, verifyPassword } from "../src/modules/auth/password.util";
 import { sesionVigente } from "../src/modules/auth/sessions";
-import { AccountLockedError, ConflictError, UnauthorizedError } from "../src/shared/errors";
+import { ConflictError, UnauthorizedError } from "../src/shared/errors";
 
 const INCORRECTA = "ClaveIncorrecta1";
 
@@ -614,7 +614,7 @@ describe("umbral de intentos fallidos con solapamiento", () => {
     expect(await prisma.auditLog.count({ where: { action: "LOGIN_FAILED" } }), "tres intentos auditados").toBe(3);
   });
 
-  it("un fallo que bloquea, delante de un login correcto: el login ve el bloqueo", async () => {
+  it("un fallo que bloquea, delante de un login correcto: el login ve el bloqueo, con la respuesta genérica", async () => {
     const usuario = await createUser({ username: "umbral_y_ok", roleNames: ["swimmer"] });
     await prisma.user.update({ where: { id: usuario.id }, data: { failedLoginAttempts: 4 } });
 
@@ -628,7 +628,10 @@ describe("umbral de intentos fallidos con solapamiento", () => {
     expect((await fallo).ok).toBe(false);
     const c = await correcto;
     expect(c.ok).toBe(false);
-    if (!c.ok) expect(c.error).toBeInstanceOf(AccountLockedError);
+    if (!c.ok) {
+      expect(c.error).toBeInstanceOf(UnauthorizedError);
+      expect((c.error as Error).message, "no revela el bloqueo temporal").toBe("Usuario o contraseña incorrectos");
+    }
     expect(await prisma.refreshSession.count({ where: { userId: usuario.id } })).toBe(0);
   });
 
@@ -648,5 +651,59 @@ describe("umbral de intentos fallidos con solapamiento", () => {
     const final = await cuenta(usuario.id);
     expect(final.status).toBe("active");
     expect(final.failedLoginAttempts).toBe(1);
+  });
+});
+
+describe("login: el motivo de un estado solo se revela con la credencial VIGENTE", () => {
+  const GENERICO = "Usuario o contraseña incorrectos";
+
+  it("cuenta inhabilitada y contraseña sustituida durante el login: genérico, no el motivo", async () => {
+    const usuario = await createUser({ username: "inhab_h0", roleNames: ["swimmer"], status: "disabled" });
+    const hashNuevo = await hashPassword("ClaveSustituta1");
+
+    const retencion = await retener(usuario.id);
+    const login = desenlace(entrar("inhab_h0"));
+    await enCola(1); // Argon2 verificó la contraseña correcta contra el hash anterior
+    await retencion.query("UPDATE users SET password_hash = $1 WHERE id = $2", [hashNuevo, usuario.id]);
+    await retencion.query("COMMIT");
+
+    const l = await login;
+    expect(l.ok).toBe(false);
+    if (!l.ok) expect((l.error as Error).message, "esa contraseña ya no es la de la cuenta: no se revela el estado").toBe(GENERICO);
+    expect(await prisma.refreshSession.count({ where: { userId: usuario.id } })).toBe(0);
+  });
+
+  it("bloqueo administrativo y contraseña sustituida durante el login: genérico, no el motivo", async () => {
+    const usuario = await createUser({ username: "admin_h0", roleNames: ["swimmer"], status: "locked", lockedUntil: null });
+    const hashNuevo = await hashPassword("ClaveSustituta1");
+
+    const retencion = await retener(usuario.id);
+    const login = desenlace(entrar("admin_h0"));
+    await enCola(1);
+    await retencion.query("UPDATE users SET password_hash = $1 WHERE id = $2", [hashNuevo, usuario.id]);
+    await retencion.query("COMMIT");
+
+    const l = await login;
+    expect(l.ok).toBe(false);
+    if (!l.ok) expect((l.error as Error).message).toBe(GENERICO);
+  });
+
+  it("bloqueo temporal aplicado durante el login con la contraseña correcta: genérico y sin sesión", async () => {
+    const usuario = await createUser({ username: "temporal_en_vuelo", roleNames: ["swimmer"] });
+
+    const retencion = await retener(usuario.id);
+    const login = desenlace(entrar("temporal_en_vuelo"));
+    await enCola(1);
+    await retencion.query("UPDATE users SET status = 'locked', locked_until = now() + interval '1 hour' WHERE id = $1", [usuario.id]);
+    await retencion.query("COMMIT");
+
+    const l = await login;
+    expect(l.ok).toBe(false);
+    if (!l.ok) {
+      expect(l.error).toBeInstanceOf(UnauthorizedError);
+      expect((l.error as Error).message, "no expone el bloqueo temporal ni su vencimiento").toBe(GENERICO);
+    }
+    expect(await prisma.refreshSession.count({ where: { userId: usuario.id } })).toBe(0);
+    expect((await cuenta(usuario.id)).status).toBe("locked");
   });
 });

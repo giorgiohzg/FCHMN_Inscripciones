@@ -62,6 +62,24 @@ export async function buildServer(config: Env = env) {
   });
 
   /**
+   * `Cache-Control: no-store` EN TODA RESPUESTA de la aplicación.
+   *
+   * Las respuestas llevan datos personales, el access token y el token CSRF, y
+   * sin esta cabecera ningún navegador ni intermediario tenía instrucción de no
+   * guardarlas. Va en `onSend` y se registra ANTES que cualquier plugin y ruta,
+   * porque los hooks solo cubren lo que se registra después de ellos: así alcanza
+   * también a los errores lanzados desde un `preHandler`, a las rutas inexistentes
+   * (404), a los 429 del límite de solicitudes —que responden antes de llegar a
+   * una ruta—, a la autenticación y al CSRF, y a las descargas de reportes y de
+   * Team Manager. Se ESTABLECE, no se añade: ninguna ruta la fija por su cuenta.
+   *
+   * No toca cuerpos, códigos, tipos de contenido ni nombres de archivo.
+   */
+  app.addHook("onSend", async (_req, reply) => {
+    reply.header("Cache-Control", "no-store");
+  });
+
+  /**
    * El manejador de errores se registra ANTES que las rutas.
    *
    * Estaba al final del archivo y no se aplicaba a los errores lanzados

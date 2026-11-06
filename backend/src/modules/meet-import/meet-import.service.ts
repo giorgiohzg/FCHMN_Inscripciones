@@ -1,7 +1,7 @@
 import { prisma } from "../../shared/prisma.client";
 import { readSingleEntryFromZip } from "../../shared/safeZip";
 import { audit } from "../audit/audit.service";
-import { AppError, ValidationError } from "../../shared/errors";
+import { ValidationError } from "../../shared/errors";
 import { LONG_TRANSACTION_OPTIONS, withSavepoint } from "../../shared/transaction";
 import { parseEv3File, type ParsedMeet, type ParsedMeetEvent } from "./ev3-parser";
 import { parseHyvFile } from "./hyv-parser";
@@ -343,7 +343,7 @@ export async function analizarArchivoDeImportacion(
     };
   } catch (err) {
     await registrarIntentoFallido(actor, etapa, parsed, err, "analisis");
-    throw traducirFalloDeImportacion(etapa, err);
+    throw traducirFalloDeImportacion(err);
   }
 }
 
@@ -411,7 +411,7 @@ export async function importCompetitionFromMeetEventsZip(
     return await ejecutarImportacion();
   } catch (err) {
     await registrarIntentoFallido(actor, etapa, parsed, err, "importacion");
-    throw traducirFalloDeImportacion(etapa, err);
+    throw traducirFalloDeImportacion(err);
   }
 
   async function ejecutarImportacion(): Promise<MeetImportSummary> {
@@ -1018,19 +1018,19 @@ function motivoDePruebaSaltada(err: unknown): string {
 }
 
 /** Error que se devuelve al cliente, sin filtrar detalles internos. */
-function traducirFalloDeImportacion(etapa: string, err: unknown): Error {
+function traducirFalloDeImportacion(err: unknown): Error {
   // Los errores de dominio ya traen un mensaje escrito para el usuario.
   if (err instanceof ValidationError) return err;
 
   /**
-   * `parseEv3File` y `parseHyvFile` lanzan `Error` corriente con mensajes
-   * redactados para quien importa ("No se pudo leer la fecha de inicio..."),
-   * así que se conservan; cualquier otra cosa se responde genérica.
+   * NO se publica el mensaje de un `Error` solo por haber ocurrido durante la
+   * interpretación del archivo. Esa regla dejaba pasar cualquier excepción del
+   * analizador —un `TypeError` por un campo inesperado, por ejemplo— con su texto.
+   * Los errores PREVISTOS de `parseEv3File` y `parseHyvFile` ("No se pudo leer la
+   * fecha de inicio...") son `ValidationError`, y esos ya salieron arriba con su
+   * mensaje; todo lo demás se responde genérico, y el detalle técnico queda en el
+   * rastro de auditoría como clase y código, sin su texto (`describirFallo`).
    */
-  if (etapa === "interpretacion-del-archivo" && err instanceof Error && !(err instanceof AppError)) {
-    return new ValidationError(err.message);
-  }
-
   return new ValidationError(
     'La importación falló y no se creó la competencia. Revise que el archivo sea el de "Meet Events" ' +
       "exportado desde Hy-Tek Meet Manager (.zip, .ev3 o .hyv). " +

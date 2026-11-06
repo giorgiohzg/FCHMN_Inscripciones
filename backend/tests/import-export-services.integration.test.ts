@@ -2462,3 +2462,89 @@ function lineasDeTextoDelPdf(pdf: Buffer): string[] {
   }
   return lineas;
 }
+
+// ---------------------------------------------------------------------------
+// Fase 2: `Cache-Control: no-store` en las descargas, sin tocar lo demás
+// ---------------------------------------------------------------------------
+
+describe("descargas de reportes y Team Manager: no-store y cabeceras propias intactas", () => {
+  type App = Awaited<ReturnType<typeof buildServer>>;
+  let app: App;
+
+  beforeEach(async () => {
+    app = await buildServer();
+    await app.ready();
+  });
+  afterEach(async () => {
+    const cerrar = app;
+    app = undefined as unknown as App;
+    await cerrar?.close();
+  });
+
+  async function tokenAdmin(): Promise<string> {
+    const res = await app.inject({ method: "POST", url: "/auth/login", payload: { username: "admin_importexport", password: TEST_PASSWORD } });
+    expect(res.statusCode).toBe(200);
+    return res.json().accessToken;
+  }
+
+  it("ZIP de Team Manager: no-store, mismo tipo y mismo nombre de archivo", async () => {
+    const { competencia, club } = await montarCompetenciaConInscripciones({ conPiscina: true });
+    const token = await tokenAdmin();
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/export/team-manager/zip?competitionId=${competencia.id}&clubId=${club.id}`,
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["cache-control"]).toBe("no-store");
+    expect(res.headers["content-type"]).toBe("application/zip");
+    expect(res.headers["content-disposition"]).toMatch(/^attachment; filename="[^"]+\.zip"$/);
+    expect(new AdmZip(res.rawPayload).getEntries().length, "el ZIP sigue siendo legible").toBeGreaterThan(0);
+  });
+
+  it("reporte exportado: no-store en CSV, XLSX y PDF, con su tipo y nombre", async () => {
+    const { competencia } = await montarCompetenciaConInscripciones({ conPiscina: true });
+    const token = await tokenAdmin();
+    const tipos: Record<string, RegExp> = {
+      csv: /^text\/csv/,
+      xlsx: /^application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet$/,
+      pdf: /^application\/pdf$/,
+    };
+
+    for (const formato of ["csv", "xlsx", "pdf"]) {
+      const res = await app.inject({
+        method: "GET",
+        url: `/reports/registrations/export?competitionId=${competencia.id}&format=${formato}`,
+        headers: { authorization: `Bearer ${token}` },
+      });
+      expect(res.statusCode, formato).toBe(200);
+      expect(res.headers["cache-control"], formato).toBe("no-store");
+      expect(res.headers["content-type"], formato).toMatch(tipos[formato]!);
+      expect(res.headers["content-disposition"], formato).toMatch(new RegExp(`^attachment; filename="Inscritos_[^"]+[.]${formato}"$`));
+      expect(res.rawPayload.length, formato).toBeGreaterThan(0);
+    }
+  });
+
+  it("plantilla de carga masiva: no-store y archivo xlsx válido", async () => {
+    const token = await tokenAdmin();
+    const res = await app.inject({ method: "GET", url: "/persons/bulk-import/template", headers: { authorization: `Bearer ${token}` } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["cache-control"]).toBe("no-store");
+    expect(res.headers["content-disposition"]).toBe('attachment; filename="Plantilla_Carga_Masiva_Personas.xlsx"');
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(res.rawPayload as unknown as ArrayBuffer);
+    expect(libro.worksheets.length).toBeGreaterThan(0);
+  });
+
+  it("un error de la exportación (400) también lleva no-store y conserva su cuerpo", async () => {
+    const token = await tokenAdmin();
+    const res = await app.inject({ method: "GET", url: "/export/team-manager/zip", headers: { authorization: `Bearer ${token}` } });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.headers["cache-control"]).toBe("no-store");
+    expect(res.json().error).toBe("VALIDATION_ERROR");
+  });
+});

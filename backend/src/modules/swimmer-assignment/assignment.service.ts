@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "../../shared/prisma.client";
 import { audit, withAudit } from "../audit/audit.service";
 import { ValidationError, NotFoundError } from "../../shared/errors";
+import { mensajePublicable } from "../../shared/errorPublicable";
 import { type ActorContext, assertClubAccess } from "../../shared/actorContext";
 import { dbFrom, type Db, type TxOption } from "../../shared/transaction";
 import { evaluateTransition } from "./assignment.rules";
@@ -332,7 +333,8 @@ export async function bulkAssignSwimmers(
       results.push({ personId, fullName, status: "assigned" });
       assignedCount++;
     } catch (err) {
-      results.push({ personId, fullName, status: "error", error: err instanceof Error ? err.message : "Error desconocido" });
+      // Solo lo previsto llega al resultado; lo inesperado queda en el registro interno.
+      results.push({ personId, fullName, status: "error", error: mensajePublicable(err, "asignacion-masiva", personId) });
     }
   }
 

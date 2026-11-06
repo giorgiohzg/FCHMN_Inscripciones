@@ -12,7 +12,7 @@ import { prisma } from "../src/shared/prisma.client";
 import { truncateAllTables } from "./helpers/testDb";
 import { hashPassword } from "../src/modules/auth/password.util";
 import * as authService from "../src/modules/auth/auth.service";
-import { AccountLockedError, UnauthorizedError } from "../src/shared/errors";
+import { UnauthorizedError } from "../src/shared/errors";
 
 const TEST_USERNAME = "test_integration_user";
 const TEST_PASSWORD = "ClaveValida123";
@@ -57,10 +57,13 @@ describe("auth.service — login", () => {
         authService.login({ username: TEST_USERNAME, password: "Incorrecta1" }, {})
       ).rejects.toBeInstanceOf(UnauthorizedError);
     }
-    // El 6to intento, incluso con la contraseña correcta, debe fallar por bloqueo.
-    await expect(
-      authService.login({ username: TEST_USERNAME, password: TEST_PASSWORD }, {})
-    ).rejects.toBeInstanceOf(AccountLockedError);
+    // El 6to intento, incluso con la contraseña correcta, falla por el bloqueo, pero con
+    // la MISMA respuesta que una credencial incorrecta: no revela que la cuenta está bloqueada.
+    await expect(authService.login({ username: TEST_USERNAME, password: TEST_PASSWORD }, {})).rejects.toMatchObject({
+      statusCode: 401,
+      code: "UNAUTHORIZED",
+      message: "Usuario o contraseña incorrectos",
+    });
   });
 });
 

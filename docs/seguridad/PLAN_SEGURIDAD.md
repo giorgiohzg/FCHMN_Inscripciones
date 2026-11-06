@@ -11,7 +11,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 |---|---|---|
 | **A1** | Cliente: un 401 o una renovación atrasados no cierran ni reutilizan una sesión posterior | **Cerrada y desplegada** en la web |
 | **1** | Sesiones y revocación efectiva del JWT | **En producción desde el 2026-11-05** (`b920893`): migración aplicada y API desplegada, con el corte de sesiones ejecutado. La CI de `b920893` pasó completa, integraciones incluidas. Ver «Puesta en producción» |
-| **2** | `Cache-Control: no-store`, filtrado de excepciones, login uniforme | Pendiente |
+| **2** | `Cache-Control: no-store`, filtrado de excepciones, login uniforme | **Implementada y validada EN LOCAL; publicada en el repositorio; sin desplegar.** Ver «Fase 2» |
 | **3** | Cabeceras del frontend (Nginx) | Pendiente |
 | **4** | Límites del procesamiento XLSX | Pendiente |
 | Vite 5.4.21 | Aviso GHSA-rq7h-c2jc-7f22 en una dependencia de desarrollo | **Aplazado, fuera de estas fases** |
@@ -169,8 +169,8 @@ No todas son `READ COMMITTED`:
 clasificación de tokens, la comparación del hash en login y cambio de contraseña, el ayudante
 único de revocación, el límite absoluto, las pruebas y la documentación del despliegue.
 
-**Excluye:** el frontend y A1, las Fases 2 a 4, las respuestas uniformes de login (los
-mensajes y el 423 se conservan), S10, la inactividad humana, la purga, Vite y la revocación
+**Excluye:** el frontend y A1, las Fases 2 a 4, las respuestas uniformes de login (en la
+Fase 1 los mensajes y el 423 se conservaron; la Fase 2 los cambia a propósito), S10, la inactividad humana, la purga, Vite y la revocación
 de la cookie anterior.
 
 ### Criterios de aceptación
@@ -187,7 +187,8 @@ de la cookie anterior.
   eliminación o un cambio de credenciales no los sobrescribe.
 - El límite de 8 horas y sus fronteras se cumplen, y renovar no lo extiende.
 - Los JWT sin `sid` y los tokens sin sesión se rechazan, sin cascadas.
-- La política del bloqueo temporal, los mensajes y el 423 no cambian.
+- La política del bloqueo temporal no cambia. (Los mensajes y el 423 se conservaron en la
+  Fase 1; la Fase 2 los reemplaza por el contrato descrito más abajo.)
 
 ### Evidencia
 
@@ -218,21 +219,122 @@ invalidadas están en [../operacion/corte-de-sesiones.md](../operacion/corte-de-
 Servicios afectados: `fchmn-mantenimiento` como ejecutor puntual de la migración y
 `fchmn-api`. `fchmn-web` no se despliega.
 
-## Fase 2: API sin esquema (pendiente)
+## Fase 2: API sin esquema (implementada y validada en local; sin desplegar)
 
-- **Hallazgos:** `Cache-Control` ausente en la API; excepciones internas devueltas por fila en
-  la carga masiva de personas y en la asignación masiva; un `TypeError` del analizador
-  podría llegar al mensaje de la importación de competencias; el login distingue estados y
-  tiempos.
-- **Objetivo:** `no-store` global (incluidos errores, 404 y exportaciones); filtrar lo
-  inesperado conservando los mensajes de validación; respuesta uniforme del login con
-  verificación ficticia de contraseña cuando no hay hash real que comprobar, manteniendo el
-  límite por IP y el bloqueo de cuenta.
-- **Dependencia:** la parte del login se apoya en la Fase 1.
-- **Aceptación:** toda respuesta lleva `no-store`; ninguna fila expone mensajes de la base de
-  datos; las respuestas del login son iguales por estado de cuenta sin contraseña válida.
-- **Sin decidir:** el texto de los mensajes de cuenta bloqueada o inhabilitada.
-- **Riesgo:** el cálculo ficticio añade costo previo a la autenticación.
+**Estado:** implementada, validada en local y publicada en el repositorio (commit y push), **sin desplegar**. Sin
+cambios de esquema, migraciones, dependencias, frontend ni Nginx. La evidencia es de pruebas
+locales con datos sintéticos; los hallazgos siguen siendo de revisión estática, y nada se
+reprodujo en producción.
+
+### Hallazgos
+
+`Cache-Control` ausente en la API; excepciones internas devueltas por fila en la carga masiva
+de personas y en la asignación masiva; un `TypeError` del analizador podía llegar al mensaje
+de la importación de competencias; el login distinguía estados, y por tiempos, entre los
+casos con y sin contraseña real que comprobar.
+
+### Comportamiento implementado
+
+1. **`no-store` global.** Un hook `onSend` registrado en `buildServer` antes de cualquier
+   plugin y ruta establece `Cache-Control: no-store` en toda respuesta: éxitos,
+   autenticación y CSRF, errores (también los lanzados desde un `preHandler`), rutas
+   inexistentes, límites de solicitudes (429), preflight CORS y las descargas de reportes,
+   de Team Manager y de la plantilla. No altera cuerpos, permisos, tipos de contenido ni
+   nombres de archivo.
+2. **Filtrado de errores** (`backend/src/shared/errorPublicable.ts`). En la carga masiva de
+   personas y en la asignación masiva, el resultado de cada fila solo lleva el texto de un
+   `AppError` o de un error de Prisma que `translatePrismaError` reconoce, con su mensaje
+   redactado. Todo lo demás responde un mensaje genérico, y el detalle queda en el registro
+   interno como una línea JSON (`fila_fallo_inesperado`) con contexto, referencia, clase y
+   código del error, **sin su mensaje ni su traza**. En la importación de competencias se
+   eliminó la regla que publicaba cualquier `Error` ocurrido durante la interpretación: los
+   errores previstos de `parseEv3File` pasaron a ser `ValidationError` (como ya lo eran los de
+   `parseHyvFile`), conservan su mensaje, y un `TypeError` u otro `Error` responde el mensaje
+   genérico y deja en la auditoría solo clase y código. Se conservan el procesamiento
+   parcial por fila, los resultados y la atomicidad de cada fila.
+3. **Contrato del login.**
+
+   | Situación | Respuesta |
+   |---|---|
+   | Usuario inexistente o eliminado | 401 genérico |
+   | Contraseña incorrecta, en cualquier estado | 401 genérico |
+   | **Incoherencia** entre la persona y su cuenta: persona eliminada, o estados que no se corresponden | 401 genérico, con cualquier contraseña |
+   | Bloqueo temporal **vigente**, aunque la contraseña sea la correcta | 401 genérico, sin `lockedUntil` y sin verificar la contraseña real |
+   | Cuenta inhabilitada o bloqueada por un administrador (sola, o con su persona en el **mismo** estado), con la contraseña correcta frente al hash vigente | 401 con el motivo |
+   | Bloqueo temporal vencido | Flujo de la Fase 1 (se levanta al entrar; un fallo cuenta un intento) |
+
+   «Genérico» es el mismo estado, código (`UNAUTHORIZED`) y mensaje («Usuario o contraseña
+   incorrectos»). El motivo de una cuenta inhabilitada o bloqueada se decide **bajo
+   bloqueo**, después de comparar el hash verificado con el vigente (H0) y de releer a la
+   persona: una contraseña sustituida durante el login produce el genérico. Con contraseña
+   incorrecta, esas dos cuentas responden el genérico sin contar intentos ni cambiar de
+   estado.
+
+   **Estado administrativo habitual frente a incoherencia.** `blockPerson` y `disablePerson`
+   cambian a la vez `persons.status` y `users.status` de la cuenta vinculada (con
+   `lockedUntil` nulo) y cortan sus sesiones: ese es el estado administrativo habitual de una
+   cuenta de persona, y recibe el motivo. Es una *incoherencia* todo lo que el sistema no
+   produce: persona eliminada o inexistente, cuenta activa con persona bloqueada o
+   inhabilitada, estados que no se corresponden, o un bloqueo temporal sobre una persona que
+   no está activa. Esas se rechazan con el genérico **antes** de comprobar la contraseña (con
+   verificación ficticia) y sin tocar la cuenta. *Corrección posterior a la primera
+   implementación:* esta ya rechazaba por el estado de la persona antes de verificar la
+   contraseña, de modo que una persona bloqueada o inhabilitada por el sistema nunca recibía
+   el motivo; las pruebas del contrato solo usaban cuentas sin persona y no lo detectaban.
+   Ahora hay regresiones que pasan por `personsService.blockPerson` y `disablePerson`. Ya no se emite
+   el 423 `ACCOUNT_LOCKED`; el frontend no lo usaba. El límite por IP (429), los errores
+   técnicos (503 y 500), los contadores, el bloqueo por cuenta, la auditoría y S10 no cambian.
+4. **Verificación ficticia de Argon2** (`verificacionFicticia`, en `password.util.ts`) donde no
+   hay hash real que comprobar: usuario inexistente o eliminado, incoherencia persona/cuenta y
+   bloqueo temporal vigente. El hash se calcula una vez por proceso (perezoso, con los mismos
+   parámetros que `hashPassword`) sobre un secreto aleatorio, y el resultado se descarta: la
+   función devuelve siempre `false`. Argon2 sigue fuera de los bloqueos, y la revalidación H0,
+   el orden de bloqueos, la revocación y las transacciones de la Fase 1 no se tocaron.
+
+### Qué elimina la verificación ficticia y qué no
+
+Elimina el camino que **no pagaba** el cálculo de Argon2. **No iguala los tiempos de
+respuesta y no se afirma que lo haga**: el usuario inexistente no hace la comprobación bajo
+bloqueo ni la auditoría, un bloqueo vigente no cuenta intentos, y la primera verificación
+ficticia de cada proceso calcula además su hash. Esas diferencias residuales no se midieron.
+
+### Validación local
+
+Contra la base desechable de `docker-compose.test.yml` y con datos sintéticos:
+
+- Pruebas nuevas: `login-contrato.integration.test.ts` (matriz por estado y contraseña,
+  respuestas idénticas, bloqueo vigente sin efectos ni fecha, verificación ficticia observada
+  en `argon2.verify` y `argon2.hash`, errores técnicos y 429),
+  `no-store.integration.test.ts`, `errores-filtrados.integration.test.ts`,
+  `error-publicable.test.ts`, `verificacion-ficticia.test.ts`, tres casos de revalidación H0 en
+  `sesiones-concurrencia.integration.test.ts` y cuatro de descargas en
+  `import-export-services.integration.test.ts`.
+- Expectativas que cambian a propósito: el 423 y los mensajes de cuenta inhabilitada o
+  bloqueada sin contraseña correcta, en `sesiones.integration.test.ts`,
+  `sesiones-concurrencia.integration.test.ts` y `auth.service.integration.test.ts`. Las
+  comprobaciones de estado, revocación y concurrencia no se debilitaron.
+- Pasada completa: unitarias 55 archivos y 1.122 pruebas; integraciones 51 archivos y 1.019
+  pruebas; `typecheck` sin errores; `lint` sin errores (con las advertencias que ya existían).
+  Una primera pasada de integración dio 137 fallos porque se solaparon dos ejecuciones sobre la
+  misma base; se repitió una sola ejecución y pasó completa.
+- Corrección del estado de la persona (ver arriba): se añadieron 17 regresiones a
+  `login-contrato.integration.test.ts` (persona con cuenta bloqueada o inhabilitada mediante
+  `personsService`, por HTTP, más las incoherencias). Sobre el código anterior fallaban
+  exactamente las dos de «contraseña correcta → motivo»; con la corrección pasan las 53 del
+  archivo. Se repitieron solo las suites afectadas de login, sesiones, concurrencia y
+  administradores (`typecheck` y `lint` sin errores); no se repitieron las suites completas.
+
+### Límites
+
+- Nada de esto se probó en producción ni con un navegador real.
+- La clase `AccountLockedError` y el código `ACCOUNT_LOCKED` siguen definidos pero ya no los
+  emite ningún camino del login.
+- El mensaje genérico de las filas no distingue la causa; quien opera debe acudir al
+  administrador con la fecha y hora de la carga.
+- **Riesgo:** el cálculo ficticio añade el coste de un Argon2 a los intentos que antes
+  respondían sin calcularlo.
+- **Pendiente:** el resultado de la CI del commit y el despliegue de la API, cada uno con su
+  autorización.
 
 ## Fase 3: cabeceras del frontend (pendiente)
 

@@ -4,7 +4,7 @@ import { env } from "../../shared/env";
 import { audit } from "../audit/audit.service";
 import { signAccessToken, verifyAccessToken, type SessionOwnerType } from "./jwt.util";
 import { loadRolesAndPermissions, resolvePersonClubId } from "./authorization";
-import { hashPassword, verifyPassword, generateOpaqueToken, hashOpaqueToken } from "./password.util";
+import { hashPassword, verifyPassword, verificacionFicticia, generateOpaqueToken, hashOpaqueToken } from "./password.util";
 import {
   OPCIONES_TX_SESION,
   bloquearSesion,
@@ -16,7 +16,7 @@ import {
   vencimientoDeRefresh,
   type UsuarioBloqueado,
 } from "./sessions";
-import { AccountLockedError, ConflictError, UnauthorizedError, ValidationError, type AppError } from "../../shared/errors";
+import { ConflictError, UnauthorizedError, ValidationError, type AppError } from "../../shared/errors";
 import type { LoginInput, ChangePasswordInput } from "./auth.schemas";
 
 interface RequestContext {
@@ -81,37 +81,75 @@ async function registerFailedAttempt(userId: string, hashVerificado: string, ip?
   }, OPCIONES_TX_SESION);
 }
 
+/** Un bloqueo temporal (RB-15) que sigue vigente. El administrativo no tiene `lockedUntil`. */
+function bloqueoTemporalVigente(cuenta: Pick<UsuarioBloqueado, "status" | "lockedUntil">, ahora: Date): boolean {
+  return cuenta.status === "locked" && cuenta.lockedUntil !== null && cuenta.lockedUntil > ahora;
+}
+
+/** Respuesta única de credenciales rechazadas: no distingue usuario, contraseña ni estado. */
+const MENSAJE_CREDENCIALES = "Usuario o contraseña incorrectos";
+const credencialesRechazadas = () => new UnauthorizedError(MENSAJE_CREDENCIALES);
+
 /**
- * Por qué esta cuenta no puede iniciar sesión, o `null` si puede.
+ * El rechazo ESPECÍFICO de una cuenta cuyo estado impide entrar, o `null` si puede.
  *
- * Se evalúa antes de verificar la contraseña y otra vez bajo bloqueo, para que
- * un estado aplicado entre medias responda exactamente igual. Un bloqueo temporal
- * vencido no impide entrar: se levanta al confirmar.
+ * Solo se llama BAJO BLOQUEO y después de comprobar que la contraseña verificada es la
+ * vigente: el estado de la cuenta únicamente se revela a quien probó conocerla. Quien no
+ * la prueba recibe `credencialesRechazadas`, igual que si el usuario no existiera.
+ *
+ *  - Inhabilitada y bloqueada por un administrador: mensaje específico.
+ *  - Bloqueo temporal VIGENTE: siempre el genérico, aunque la contraseña sea la correcta, y
+ *    sin `lockedUntil`. Revelar «bloqueada hasta…» dejaba a cualquiera averiguar que el
+ *    usuario existe y cuándo vence. Un bloqueo temporal ya vencido no impide entrar: se
+ *    levanta al confirmar.
+ *
+ * Se distinguen DOS bloqueos que antes se trataban igual: el temporal tiene `lockedUntil` y
+ * al vencer la cuenta se reactiva sola; el administrativo no lo tiene, es indefinido y solo
+ * un administrador puede levantarlo. Antes el administrativo caía en la rama de «el bloqueo
+ * expiró» (porque `lockedUntil` es null) y la cuenta se reactivaba sola.
  */
 function rechazoDeLogin(cuenta: Pick<UsuarioBloqueado, "status" | "lockedUntil">, ahora: Date): AppError | null {
   if (cuenta.status === "disabled") {
     return new UnauthorizedError("Cuenta inhabilitada. Contacte al administrador.");
   }
-
   if (cuenta.status === "locked") {
-    // Se distinguen DOS bloqueos distintos que antes se trataban igual:
-    //
-    //  - Temporal (RB-15, N intentos fallidos): tiene `lockedUntil`. Al
-    //    vencer, la cuenta se reactiva sola.
-    //  - Administrativo (un admin bloqueó la cuenta): NO tiene `lockedUntil`,
-    //    es indefinido y solo un administrador puede levantarlo.
-    //
-    // Antes, el bloqueo administrativo caía en la rama de "el bloqueo
-    // expiró" (porque `lockedUntil` es null) y la cuenta se reactivaba sola
-    // en el siguiente intento de login: el bloqueo no servía de nada.
     if (!cuenta.lockedUntil) {
       return new UnauthorizedError("Cuenta bloqueada por un administrador. Contacte al administrador.");
     }
-    if (cuenta.lockedUntil > ahora) {
-      return new AccountLockedError(cuenta.lockedUntil);
-    }
+    if (cuenta.lockedUntil > ahora) return credencialesRechazadas();
   }
   return null;
+}
+
+/** Lo que el login necesita saber de la persona dueña de una cuenta. */
+type PersonaDeCuenta = { status: "active" | "locked" | "disabled"; deletedAt: Date | null };
+
+/**
+ * Cómo está la persona dueña respecto de su cuenta, para decidir el login.
+ *
+ *  - `utilizable`: la cuenta no tiene persona, o la persona está activa y no eliminada.
+ *  - `administrativa`: la persona está bloqueada o inhabilitada Y su cuenta tiene el MISMO
+ *    estado, con bloqueo indefinido (`lockedUntil` nulo). Es lo que dejan `blockPerson` y
+ *    `disablePerson`, que cambian ambas filas a la vez: el estado administrativo HABITUAL.
+ *    El login le da el motivo, igual que a una cuenta sin persona, pero solo tras comprobar
+ *    la contraseña vigente.
+ *  - `incoherente`: cualquier otra cosa: persona eliminada o inexistente, o estados que no se
+ *    corresponden (cuenta activa con persona inhabilitada, persona bloqueada con cuenta
+ *    inhabilitada, bloqueo temporal sobre persona no activa…). Nada de esto lo produce el
+ *    sistema; es la red de seguridad. Se responde SIEMPRE el genérico, con cualquier
+ *    contraseña, y sin tocar la cuenta.
+ */
+type SituacionDePersona = "utilizable" | "administrativa" | "incoherente";
+
+function situacionDePersona(
+  personId: string | null,
+  persona: PersonaDeCuenta | null,
+  cuenta: Pick<UsuarioBloqueado, "status" | "lockedUntil">
+): SituacionDePersona {
+  if (!personId) return "utilizable";
+  if (!persona || persona.deletedAt !== null) return "incoherente";
+  if (persona.status === "active") return "utilizable";
+  return cuenta.status === persona.status && cuenta.lockedUntil === null ? "administrativa" : "incoherente";
 }
 
 /**
@@ -213,9 +251,31 @@ export async function login(input: LoginInput, ctx: RequestContext) {
   });
 
   // Mensaje genérico: no revelar si el usuario existe o no (evita user enumeration).
-  const genericError = () => new UnauthorizedError("Usuario o contraseña incorrectos");
+  const genericError = credencialesRechazadas;
 
+  /**
+   * CONTRATO DEL LOGIN. Qué se responde depende de lo que quien llama PROBÓ:
+   *
+   *   | Situación                                         | Respuesta                          |
+   *   |---------------------------------------------------|------------------------------------|
+   *   | Usuario inexistente o eliminado                   | 401 genérico                       |
+   *   | Contraseña incorrecta, sea cual sea el estado     | 401 genérico                       |
+   *   | Incoherencia persona/cuenta (persona eliminada, o | 401 genérico                       |
+   *   |   estados que no se corresponden)                 |                                    |
+   *   | Bloqueo temporal VIGENTE, aunque la clave sea ok  | 401 genérico, sin `lockedUntil`    |
+   *   | Inhabilitada o bloqueada por un administrador     | 401 con el motivo, solo tras       |
+   *   |   —cuenta sola, o persona y cuenta con el mismo   |   comprobar la contraseña vigente  |
+   *   |   estado, como dejan blockPerson/disablePerson—,  |   y revalidarla bajo bloqueo       |
+   *   |   y contraseña correcta                           |                                    |
+   *   | Bloqueo temporal vencido                          | flujo normal (se levanta al entrar)|
+   *
+   * Donde no hay una contraseña real que comprobar se hace una verificación FICTICIA de
+   * Argon2: sin ella esas respuestas serían las únicas que no pagan su coste, y el tiempo
+   * delataría qué usuarios existen o están bloqueados. No iguala los tiempos —quedan las
+   * demás consultas—, solo elimina ese camino rápido.
+   */
   if (!user || user.deletedAt) {
+    await verificacionFicticia(input.password);
     throw genericError();
   }
 
@@ -226,24 +286,38 @@ export async function login(input: LoginInput, ctx: RequestContext) {
    * base obliga a que coincidan. Bastaba una incoherencia —una persona
    * inhabilitada o eliminada cuya cuenta siguiera activa— para que entrara
    * con normalidad. Los caminos que inhabilitan a una persona ya inhabilitan
-   * su cuenta, así que esto no debería ocurrir; precisamente por eso es una
-   * red de seguridad y no una comprobación de rutina.
+   * su cuenta, así que esa incoherencia no debería ocurrir; por eso rechazarla
+   * es una red de seguridad y no una comprobación de rutina.
    *
-   * Se responde con el error GENÉRICO, no con «cuenta inhabilitada»: por qué
-   * no puede entrar es asunto de la administración, no de quien lo intenta.
+   * DOS situaciones distintas, que antes se trataban igual:
+   *
+   *  - Estado administrativo HABITUAL: `blockPerson` / `disablePerson` dejan a la persona y
+   *    a su cuenta con el mismo estado. Sigue el flujo normal —se verifica la contraseña—
+   *    y el motivo se decide bajo bloqueo, como para una cuenta sin persona. Rechazar aquí,
+   *    antes de comprobar la contraseña, hacía que ninguna persona bloqueada o inhabilitada
+   *    por el sistema recibiera jamás el mensaje específico.
+   *  - INCOHERENCIA (persona eliminada, estados que no se corresponden): error GENÉRICO
+   *    con cualquier contraseña. Por qué no puede entrar es asunto de la administración.
    *
    * Las cuentas `system` y `club` no tienen persona, así que para ellas esto
    * no cambia nada.
    */
-  if (user.person && (user.person.status !== "active" || user.person.deletedAt !== null)) {
+  if (situacionDePersona(user.personId, user.person, user) === "incoherente") {
+    await verificacionFicticia(input.password);
     throw genericError();
   }
 
-  const previo = rechazoDeLogin(user, new Date());
-  if (previo) throw previo;
+  // Bloqueo temporal vigente: genérico SIEMPRE, sin mirar la contraseña real. Verificarla
+  // aquí haría que acertar o no cambiara la respuesta de una cuenta bloqueada.
+  if (bloqueoTemporalVigente(user, new Date())) {
+    await verificacionFicticia(input.password);
+    throw genericError();
+  }
 
   // Argon2, fuera de cualquier bloqueo. `user.passwordHash` es H0: lo que se
   // verifique aquí vale solo mientras ese siga siendo el hash de la cuenta.
+  // Una cuenta inhabilitada o bloqueada por un administrador también se verifica: su
+  // motivo solo se revela tras comprobar la contraseña, dentro de la transacción de abajo.
   const validPassword = await verifyPassword(user.passwordHash, input.password);
   if (!validPassword) {
     await registerFailedAttempt(user.id, user.passwordHash, ctx.ipAddress);
@@ -272,9 +346,17 @@ export async function login(input: LoginInput, ctx: RequestContext) {
     const ahora = new Date();
 
     if (!cuenta || cuenta.deletedAt !== null || cuenta.passwordHash !== user.passwordHash) throw genericError();
+
+    // La persona se relee AQUÍ, en una sentencia aparte de la que bloqueó la cuenta, y se
+    // decide ANTES de dar un motivo: el estado de la cuenta solo se revela si la persona
+    // dueña es coherente con él. Una incoherencia es siempre el genérico.
+    const persona = cuenta.personId
+      ? await tx.person.findUnique({ where: { id: cuenta.personId }, select: { status: true, deletedAt: true } })
+      : null;
+    if (situacionDePersona(cuenta.personId, persona, cuenta) === "incoherente") throw genericError();
+
     const rechazo = rechazoDeLogin(cuenta, ahora);
     if (rechazo) throw rechazo;
-    if (!(await personaUtilizable(tx, cuenta.personId))) throw genericError();
 
     // Login exitoso: resetear contador, actualizar último acceso y, si había un
     // bloqueo temporal ya vencido, levantarlo aquí, con el estado releído.

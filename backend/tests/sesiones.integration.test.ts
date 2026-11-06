@@ -20,7 +20,7 @@ import * as authService from "../src/modules/auth/auth.service";
 import * as personsService from "../src/modules/persons/persons.service";
 import * as clubsService from "../src/modules/clubs/clubs.service";
 import { OPCIONES_TX_SESION, sesionVigente, vencimientoDeRefresh } from "../src/modules/auth/sessions";
-import { AccountLockedError, UnauthorizedError } from "../src/shared/errors";
+import { UnauthorizedError } from "../src/shared/errors";
 
 const HORA = 3_600_000;
 const NUEVA_CLAVE = "ClaveNuevaSintetica1";
@@ -482,27 +482,31 @@ describe("corte: JWT sin `sid` y tokens sin sesión", () => {
   });
 });
 
-describe("CONTRASTE: la política del bloqueo temporal y las respuestas de login no cambian", () => {
+describe("la política del bloqueo temporal no cambia; las respuestas de login siguen el contrato de la Fase 2", () => {
   const login = (username: string, password: string) =>
     app.inject({ method: "POST", url: "/auth/login", payload: { username, password } });
 
+  // La matriz completa por estado y contraseña está en `login-contrato.integration.test.ts`.
   it("mensajes y códigos de cada estado de cuenta", async () => {
     await createUser({ username: "inhabilitada", roleNames: ["swimmer"], status: "disabled" });
     await createUser({ username: "bloqueada_admin", roleNames: ["swimmer"], status: "locked", lockedUntil: null });
     await createUser({ username: "bloqueada_temporal", roleNames: ["swimmer"], status: "locked", lockedUntil: new Date(Date.now() + HORA) });
     await createUser({ username: "normal", roleNames: ["swimmer"] });
 
-    const inhabilitada = await login("inhabilitada", "cualquiera");
+    // El motivo solo se revela a quien presenta la contraseña correcta.
+    const inhabilitada = await login("inhabilitada", TEST_PASSWORD);
     expect(inhabilitada.statusCode).toBe(401);
     expect(inhabilitada.json().message).toBe("Cuenta inhabilitada. Contacte al administrador.");
 
-    const admin = await login("bloqueada_admin", "cualquiera");
+    const admin = await login("bloqueada_admin", TEST_PASSWORD);
     expect(admin.statusCode).toBe(401);
     expect(admin.json().message).toBe("Cuenta bloqueada por un administrador. Contacte al administrador.");
 
-    const temporal = await login("bloqueada_temporal", "cualquiera");
-    expect(temporal.statusCode).toBe(423);
-    expect(temporal.json().error).toBe("ACCOUNT_LOCKED");
+    // Bloqueo temporal vigente: genérico, ya no 423, y sin `lockedUntil`.
+    const temporal = await login("bloqueada_temporal", TEST_PASSWORD);
+    expect(temporal.statusCode).toBe(401);
+    expect(temporal.json().error).toBe("UNAUTHORIZED");
+    expect(temporal.json().message).toBe("Usuario o contraseña incorrectos");
 
     const incorrecta = await login("normal", "ClaveIncorrecta1");
     expect(incorrecta.statusCode).toBe(401);
@@ -539,7 +543,7 @@ describe("CONTRASTE: la política del bloqueo temporal y las respuestas de login
   it("con el bloqueo temporal vigente, ni la contraseña correcta entra", async () => {
     await createUser({ username: "vigente", roleNames: ["swimmer"], status: "locked", lockedUntil: new Date(Date.now() + HORA) });
 
-    await expect(entrar("vigente")).rejects.toBeInstanceOf(AccountLockedError);
+    await expect(entrar("vigente")).rejects.toMatchObject({ statusCode: 401, message: "Usuario o contraseña incorrectos" });
   });
 
   it("bloqueo temporal VENCIDO + contraseña correcta: entra y se levanta", async () => {
