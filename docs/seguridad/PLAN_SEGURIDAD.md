@@ -16,7 +16,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **4** | Límites del procesamiento XLSX | **Cerrada** dentro de su alcance: desplegada en `fchmn-api` desde `4317e0f` (Live, Auto-Deploy Off) y validada en local con datos sintéticos. Ver «Fase 4» |
 | **SEC-02** | Ningún reporte entrega el RUN, para ningún rol | **Cerrada** dentro de su alcance: desplegada en web y API desde `3cf1aaf` (Live, Auto-Deploy Off). Ver «SEC-02» |
 | CI de SEC-02 | Pánico intermitente del motor de Prisma en las pruebas unitarias (ejecución 42269659668) | **Diagnosticado; protección publicada en el repositorio y validada en local.** La causa del pánico **no está demostrada**. Ver «CI de SEC-02» |
-| **SEC-01** | Topes para las listas JSON (`personIds` de relevos y otras) | **Publicada en el repositorio; pendiente de despliegue.** Validada en local con datos sintéticos. Ver «SEC-01» |
+| **SEC-01** | Topes para las listas JSON (`personIds` de relevos y otras) | **Cerrada** dentro de su alcance: desplegada en `fchmn-api` desde `120e29d` (Live, Auto-Deploy Off) y validada en local y en la CI con datos sintéticos. Ver «SEC-01» |
 | **SEC-03** | Dependencias | **Revisada, sin cambios.** Ver «SEC-01 y SEC-03» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Aplazado, fuera de estas fases.** Ver «Vite» |
 
@@ -809,10 +809,23 @@ web y el de la API, la API anterior seguía entregando el RUN, que la web nueva 
   inspeccionó.
 - Pantalla comprobada con jsdom en las pruebas, y en producción por el usuario (ver «Estado»). Las demás salidas no tienen comprobación funcional en producción.
 
-## SEC-01: topes en las listas JSON (publicada en el repositorio, validada en local; pendiente de despliegue)
+## SEC-01: topes en las listas JSON (cerrada: desplegada en `fchmn-api`)
 
-**Estado: publicada en el repositorio (commit y push a `main`) y validada en LOCAL, con datos sintéticos; pendiente de
-despliegue.** Producción sigue sin estos topes, y el despliegue necesita autorización propia.
+**Estado: cerrada dentro de su alcance.** Desplegada a mano en Render, solo `fchmn-api`, desde
+`120e29d64a708d8a3841a97e41cf0b3a0f63eecc`, con Auto-Deploy en **Off**.
+
+| Servicio | Despliegue | Commit |
+|---|---|---|
+| API (`fchmn-api`) | `dep-dbn637ec6qcc73cooe20` ([enlace](https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80/deploys/dep-dbn637ec6qcc73cooe20)) | `3cf1aaf` → `120e29d` |
+
+La CI del código (ejecución 42306423042) terminó en éxito. Render informó «Deploy succeeded» y Live. La web no cambia.
+
+**Evidencia de producción, por origen:**
+- **Observado en producción:** `/api/health` y `/api/ready` con 200 (base disponible), `/api/auth/me` sin credenciales con 401 y
+  `Cache-Control: no-store`. Es disponibilidad, no validación funcional.
+- **Validado en local y en la CI, con datos sintéticos:** los límites de listas, de cuerpos y del multipart. **No se hicieron pruebas funcionales ni
+  solicitudes excesivas en producción**; esa limitación no es una tarea pendiente para cerrar SEC-01.
+- SEC-01 mitiga las rutas identificadas y **no elimina el aviso de la versión instalada de Zod**; SEC-03 sigue pendiente.
 No cambia servicios de negocio, esquema de datos, migraciones, `seed`, catálogo, dependencias, frontend ni
 la configuración global de cargas.
 
@@ -915,7 +928,7 @@ Todo con datos sintéticos. Se distingue lo **simulado** de lo **observado en la
 **SEC-01 (listas JSON).** Medido en memoria con Zod 3.25.76 durante la revisión: `.max()` **no** corta el
 recorrido (solo marca el estado y sigue), así que un cuerpo de 1 MiB de elementos inválidos genera unos
 350.000 errores, unos 5 MB de `details` y más de 100 MB de montón retenidos por solicitud. **Ya está
-implementada y publicada en el repositorio** (pendiente de despliegue): ver la sección «SEC-01». Lo que queda aquí es la
+implementada y desplegada en `fchmn-api`** (cerrada): ver la sección «SEC-01». Lo que queda aquí es la
 revisión original, como antecedente.
 
 **SEC-03 (dependencias).** Corrección a una afirmación demasiado general de la revisión: **Zod tiene
