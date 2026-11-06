@@ -13,7 +13,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **1** | Sesiones y revocación efectiva del JWT | **En producción desde el 2026-11-05** (`b920893`): migración aplicada y API desplegada, con el corte de sesiones ejecutado. La CI de `b920893` pasó completa, integraciones incluidas. Ver «Puesta en producción» |
 | **2** | `Cache-Control: no-store`, filtrado de excepciones, login uniforme | **API desplegada en producción el 2026-11-05 (`6d2dae5`)**; la CI pasó completa. Salud y cabeceras observadas; funcionalidades sin comprobar en producción. Ver «Fase 2» |
 | **3** | Cabeceras del frontend (Nginx) | **Cerrada**: desplegada en `fchmn-web` desde `1641004` (Live, Auto-Deploy Off) y validada en local (imagen real y navegador real con una API simulada). Ver «Fase 3» |
-| **4** | Límites del procesamiento XLSX | **Publicada en el repositorio y validada en local**, con datos sintéticos; **sin desplegar**. Ver «Fase 4» |
+| **4** | Límites del procesamiento XLSX | **Cerrada** dentro de su alcance: desplegada en `fchmn-api` desde `4317e0f` (Live, Auto-Deploy Off) y validada en local con datos sintéticos. Ver «Fase 4» |
 | Vite 5.4.21 | Aviso GHSA-rq7h-c2jc-7f22 en una dependencia de desarrollo | **Aplazado, fuera de estas fases** |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -508,11 +508,18 @@ Solo lecturas HTTP y una carga pública, sin iniciar sesión:
 - **Recomendado:** recorrer las pantallas autenticadas con una cuenta propia y un listener de
   `securitypolicyviolation`, sin credenciales en este repositorio.
 
-## Fase 4: límites del XLSX (publicada en el repositorio, validada en local; sin desplegar)
+## Fase 4: límites del XLSX (cerrada: desplegada en `fchmn-api`)
 
-**Estado:** publicada en el repositorio (commit y push a `main`) y validada en local con datos
-sintéticos. **Sin desplegar:** la API de producción sigue con la versión anterior, y el
-despliegue de `fchmn-api` necesita su propia autorización.
+**Estado:** **cerrada dentro de su alcance.** `fchmn-api` se desplegó a mano en Render desde
+`4317e0fc7d824407fe028808319c14c936e0e7f4` (Live, **Auto-Deploy en Off**; la CI de ese SHA, ejecución
+42250202229, terminó en éxito). Despliegue: https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80/deploys/dep-dbmvvr7f3r2c73bpfgkg
+(una instancia, plan de 0,5 CPU y 512 MB, el de la calibración).
+
+**Producción: disponibilidad observada, no validación funcional.** Tras el despliegue se hicieron solo
+solicitudes de lectura por la web: `/api/health` y `/api/ready` operativos (base de datos disponible),
+y `/api/auth/me` sin credenciales rechazado con 401, todos con `Cache-Control: no-store`. **No se
+realizó ninguna carga ni importación en producción:** el funcionamiento del importador con los nuevos
+límites está validado **en local**, con datos sintéticos (ver «Validación local»).
 
 - **Hallazgo:** la carga masiva abría el libro en memoria sin presupuesto propio y dentro del
   hilo principal. Es una superficie de **disponibilidad con acceso administrativo**
@@ -706,7 +713,7 @@ el caso al borde.
   **no aplicada**: limitar el número de elementos `<col>` por hoja (Excel escribe unos pocos).
 - **Fallo real de creación.** El doble de las pruebas reproduce los eventos observados con un
   ejecutable inexistente en Windows; en Linux no se observó ese fallo.
-- **Sin desplegar.** Publicado en GitHub, pero nada de esto se observó en Render.
+- **Producción.** Solo se observó la disponibilidad de la API desplegada; el importador no se ejercitó allí, y las mediciones de tiempo y memoria son de Windows con Docker, no de Render. Probar otros editores (LibreOffice, Google Sheets, otras versiones de Excel) es opcional y no condiciona este cierre.
 
 ## Vite
 
