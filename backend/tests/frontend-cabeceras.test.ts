@@ -207,8 +207,9 @@ describe("Docker Compose", () => {
     });
   const linea = (clave: string) => {
     const m = COMPOSE.match(new RegExp(String.raw`^\s+${clave}:\s*(.+)$`, "m"));
-    if (!m) throw new Error(`falta ${clave} en docker-compose.yml`);
-    return m[1].trim().replace(/^"(.*)"$/, "$1");
+    const valor = m?.[1];
+    if (valor === undefined) throw new Error(`falta ${clave} en docker-compose.yml`);
+    return valor.trim().replace(/^"(.*)"$/, "$1");
   };
   const efectivos = (entorno: Record<string, string>) => ({
     compilada: resolver(linea("VITE_API_URL"), entorno),
