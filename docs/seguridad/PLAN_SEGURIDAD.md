@@ -17,8 +17,8 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **SEC-02** | Ningún reporte entrega el RUN, para ningún rol | **Cerrada** dentro de su alcance: desplegada en web y API desde `3cf1aaf` (Live, Auto-Deploy Off). Ver «SEC-02» |
 | CI de SEC-02 | Pánico intermitente del motor de Prisma en las pruebas unitarias (ejecución 42269659668) | **Diagnosticado; protección publicada en el repositorio y validada en local.** La causa del pánico **no está demostrada**. Ver «CI de SEC-02» |
 | **SEC-01** | Topes para las listas JSON (`personIds` de relevos y otras) | **Cerrada** dentro de su alcance: desplegada en `fchmn-api` desde `120e29d` (Live, Auto-Deploy Off) y validada en local y en la CI con datos sintéticos. Ver «SEC-01» |
-| **SEC-03** | Dependencias, en tres entregas (A backend compatible, B Vite/Vitest, C Zod) | **A cerrada** dentro de su alcance: desplegada solo en `fchmn-api` desde `dab3690` (Live, Auto-Deploy Off). **B publicada en el repositorio, validada en local** (ver «SEC-03, entrega B»); Las herramientas de desarrollo del backend de B viajan en el commit `64e2122` desplegado en la API (sin efecto en su código de producción); la web, que lleva las de Vite, **no** se redesplegó. **C (Zod del backend 3 → 4.6.7) cerrada** dentro de su alcance: desplegada solo en `fchmn-api` desde `64e2122` (Live, Auto-Deploy Off; ver «SEC-03, entrega C»). **SEC-03 sigue abierta:** el aviso de desarrollo de `minimatch`; mantenimiento y web no están actualizados. Ver «SEC-03, entrega A» |
-| Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Aplazado, fuera de estas fases.** Ver «Vite» |
+| **SEC-03** | Dependencias, en tres entregas (A backend compatible, B Vite/Vitest, C Zod) | **A cerrada** dentro de su alcance: desplegada solo en `fchmn-api` desde `dab3690` (Live, Auto-Deploy Off). **B publicada en el repositorio, validada en local y desplegada** (API en `64e2122`, web en `2de9dea`; ver «SEC-03, entrega B»). **C (Zod del backend 3 → 4.6.7) cerrada:** API en `64e2122` (Live, Auto-Deploy Off), mantenimiento y web en `2de9dea` (ver «SEC-03, entrega C»). **SEC-03 sigue abierta:** solo por el aviso de desarrollo de `minimatch`. Ver «SEC-03, entrega A» |
+| Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
 ejecutaron una vez sobre la implementación, con dos fallos de expectativas desactualizadas
@@ -942,9 +942,9 @@ desplegaron**: los artefactos, inventarios y avisos de mantenimiento preparados 
 - **Lo que ejecuta la CI** (su workflow): los avisos publicados y sus copias al día, el `Dockerfile` de mantenimiento, y en el backend `npm ci`, `prisma generate`, tipos, lint, pruebas unitarias, migraciones sobre la base desechable y pruebas de integración; en el frontend, tipos, lint, pruebas y la construcción. **No construye las imágenes candidatas ni extrae inventarios de imágenes.**
 - **No se hicieron pruebas funcionales en producción**; esa limitación no es una tarea obligatoria para cerrar A.
 - **Pendiente tras A:** `zod` sigue como aviso residual del árbol de producción de la API (entrega C); `vite`, `vitest`, `esbuild`, `tinypool` y el `minimatch` de `eslint` siguen como avisos de
-  desarrollo (entrega B). (Situación posterior: B está publicada en el repositorio y sin desplegar; C tiene su propia sección.)
+  desarrollo (entrega B). (Estado al cerrar A.)
 
-Las entregas **B** (Vite, Vitest y herramientas) y **C** (Zod) **no están autorizadas** y no se tocaron: ni Zod, ni Vite,
+Las entregas **B** (Vite, Vitest y herramientas) y **C** (Zod) quedaron fuera de A y se hicieron después, en sus propias secciones; aquí no se tocaron: ni Zod, ni Vite,
 ni Vitest, ni Prisma, ni React, ni las imágenes base, ni el frontend. No cambia código de negocio.
 
 **Qué se hizo.** `package.json`: `fastify` `^5.12.3` → `^5.12.8` y `@fastify/swagger-ui` `^6.1.1` → `^6.1.3` (solo se subieron los mínimos).
@@ -1045,10 +1045,9 @@ Todo con datos sintéticos, sobre el árbol ya reinstalado con `npm ci` y **sin 
 - El inventario de avisos de terceros ya incluye los paquetes anidados; sigue sin tener prueba la profundidad máxima del recorrido (32). La excepción de `isarray` se retiró porque el texto original existe en su README.
 - Esta entrega mitiga lo que el bloqueo de producción declara; no demuestra que los avisos de producción fueran alcanzables.
 
-## SEC-03, entrega B: Vite, Vitest y herramientas de ambos proyectos (publicada en el repositorio, validada en local; sin desplegar)
+## SEC-03, entrega B: Vite, Vitest y herramientas de ambos proyectos (publicada en el repositorio, validada en local y desplegada: API en `64e2122` y web en `2de9dea`)
 
-**Estado: publicada en el repositorio (commit y push a `main`) y validada en LOCAL; sin desplegar.** *(Antecedente: Las herramientas de desarrollo del backend de B viajan en el commit `64e2122` desplegado en la API (sin efecto en su código de producción); la web, que lleva las de Vite, **no** se redesplegó.)* Producción sigue con las versiones anteriores y el despliegue necesita autorización propia. El resultado de la CI se anota aparte, tras observarlo. La entrega **C** (Zod del backend) **no está autorizada** y no se
-tocó. No cambia código de producción, ni ninguna versión del árbol de producción de ninguno de los dos proyectos (Fastify, Zod del backend, Prisma, React, React Router…): la comparación de los
+**Estado: publicada en el repositorio, validada en LOCAL y desplegada:** la API corre el commit `64e2122` (las herramientas de desarrollo del backend de B viajan en él, sin efecto en su código de producción) y la web corre `2de9dea`, con una compilación hecha con Vite 7; mantenimiento está en `2de9dea` (ver «SEC-03, entrega C»). *(Antecedente, al publicar B: sin desplegar, con producción en las versiones anteriores; la entrega C no estaba autorizada y no se tocó.)* No cambia código de producción, ni ninguna versión del árbol de producción de ninguno de los dos proyectos (Fastify, Zod del backend, Prisma, React, React Router…): la comparación de los
 bloqueos antes y después da **0 entradas de producción** cambiadas, añadidas o retiradas en el backend y en el frontend. Tampoco se cambió ninguna imagen, `Dockerfile` ni imagen base, y no se construyó
 ninguna imagen en esta entrega.
 
@@ -1115,7 +1114,7 @@ Todo con datos sintéticos, una vez cada comprobación, sin relajar ninguna expe
 
 ### Avisos
 - **Resueltos:** `vite` (8 avisos), `vitest` (crítico), `tinypool` (2 críticos), `esbuild`, `source-map-js`, `undici` (8) y, en el frontend, el `zod` de lint y `brace-expansion`.
-- **Pendientes:** **`zod` del backend** (producción; entrega C) y **`minimatch` 10.2.6**, dependencia de desarrollo de `eslint` y `typescript-estree` en ambos proyectos, sin corrección compatible: la 11.0.1 exige que `eslint` la adopte.
+- **Pendientes al cerrar B (antecedente; C ya se cerró):** **`zod` del backend** (producción; entrega C) y **`minimatch` 10.2.6**, dependencia de desarrollo de `eslint` y `typescript-estree` en ambos proyectos, sin corrección compatible: la 11.0.1 exige que `eslint` la adopte.
   Reconsultados con el endpoint de avisos de npm sobre los dos bloqueos resultantes.
 
 ### Material distribuido y avisos de terceros
@@ -1135,17 +1134,19 @@ Todo con datos sintéticos, una vez cada comprobación, sin relajar ninguna expe
 - El objetivo de navegadores se conserva por configuración, no por prueba en navegadores reales; el paquete resultante no se ejecutó en Edge 88, Firefox 78, Chrome 87 ni Safari 14. Las dependencias del frontend (React, etc.) también deciden qué
   navegadores funcionan, y este objetivo no las cambia.
 - Las pruebas con enlaces del recorrido de carpetas prohibidas dependen de que el sistema permita crear enlaces a directorios; si no, se omiten y constan como omitidas.
-- (Situación al publicar B; después, B se publicó y C se cerró: ver las secciones de C y de estado.) **SEC-03 sigue abierta:** `minimatch` de `eslint`.
+- (Antecedente al publicar B.) **SEC-03 sigue abierta:** `minimatch` de `eslint`.
 
-## SEC-03, entrega C: Zod del backend 3.25.76 → 4.6.7 (cerrada dentro de su alcance: desplegada solo en `fchmn-api`)
+## SEC-03, entrega C: Zod del backend 3.25.76 → 4.6.7 (cerrada: API en `64e2122`; mantenimiento y web en `2de9dea`)
 
-**Estado: cerrada dentro de su alcance: validada en local y en la CI, y desplegada solo en `fchmn-api`.** Validada en LOCAL, publicada en `main` (`64e2122`) y desplegada a mano en Render; el antecedente (implementada y validada localmente, sin publicar ni desplegar) queda en las secciones siguientes como historial.
+**Estado: cerrada: validada en local y en la CI; la API corre `64e2122` y mantenimiento y web corren `2de9dea`.** Publicada en `main` y desplegada a mano en Render; las secciones siguientes conservan como historial el estado en que se implementó (validada localmente, sin publicar ni desplegar).
 
 | Servicio | Despliegue | Commit |
 |---|---|---|
 | API (`fchmn-api`) | [`dep-dbnkbotg1s2s73cupeeg`](https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80/deploys/dep-dbnkbotg1s2s73cupeeg), «Deploy succeeded» y Live, Auto-Deploy Off | `dab3690` → `64e2122` |
+| Mantenimiento (`fchmn-mantenimiento`, Cron Job) | [`dep-dbnl1k49v7es73d2mu10`](https://dashboard.render.com/cron/crn-dbh500bl550s73c5n2o0/deploys/dep-dbnl1k49v7es73d2mu10), construcción exitosa, Auto-Deploy Off | `b920893` → `2de9dea` |
+| Web (`fchmn-web`) | [`dep-dbnla79srm7s739ot2h0`](https://dashboard.render.com/web/srv-dbh48scs728c73arlf8g/deploys/dep-dbnla79srm7s739ot2h0), «Deploy succeeded» y operativa, Auto-Deploy Off | `3cf1aaf` → `2de9dea` |
 
-La CI del código (ejecución 42381732030) terminó en éxito. **Observado en producción, sin credenciales y por el proxy de la web:** `/api/health` 200, `/api/ready` 200 (base disponible) y `/api/auth/me` 401, todas con `Cache-Control: no-store` (el `uptime` de health descartó una respuesta de la instancia anterior). **Es disponibilidad, no validación funcional:** la validación funcional de Zod 4 fue local y en la CI; en producción solo se comprobó disponibilidad, limitación que se conserva sin ser una tarea obligatoria. **No todos los servicios están actualizados:** `fchmn-mantenimiento` sigue con su imagen antigua y Zod 3 (en `b920893`; las candidatas locales con Zod 4 no están desplegadas) y `fchmn-web` continúa en `3cf1aaf`, sin redesplegarse. El Deploy Hook de la API se regeneró tras aparecer en una salida de herramienta; no se reproduce ningún valor secreto.
+La CI del código (ejecución 42381732030) terminó en éxito. **Observado en producción, sin credenciales y por el proxy de la web:** `/api/health` 200, `/api/ready` 200 (base disponible) y `/api/auth/me` 401, todas con `Cache-Control: no-store` (el `uptime` de health descartó una respuesta de la instancia anterior). **Es disponibilidad, no validación funcional:** la validación funcional de Zod 4 fue local y en la CI; en producción solo se comprobó disponibilidad, limitación que se conserva sin ser una tarea obligatoria. Mantenimiento y web se desplegaron después (tabla anterior y párrafo siguiente). El Deploy Hook de la API se regeneró tras aparecer en una salida de herramienta; no se reproduce ningún valor secreto.
 
 *Antecedente de esta sección:* producción seguía con Zod 3.25.76 hasta ese despliegue. Cierra, en el código del repositorio, el último aviso de **producción** del backend
 (GHSA-mrhx-c7xc-m3w5 / CVE-2023-54404, alta, CWE-770: agotamiento de memoria al validar listas enormes; afecta a Zod anterior a 4.6.6; no hay corrección para la serie 3).
@@ -1201,8 +1202,10 @@ sin ejecuciones simultáneas: 54 archivos, 1.127 pruebas**. (Antes de C eran 65/
 - La imagen de la API pasa de 410 a 414 MB y la de mantenimiento de 476 a 480 MB (Zod 4 es más grande).
 - **Calculado, no comprobado en imágenes:** el frontend y su imagen no cambian (su Zod es solo de lint y no se distribuye); no se reconstruyeron.
 
+**Mantenimiento y web (despliegue conjunto posterior, a mano y con Auto-Deploy Off).** `fchmn-mantenimiento` (Cron Job) pasó de `b920893` a `2de9dea`, despliegue [`dep-dbnl1k49v7es73d2mu10`](https://dashboard.render.com/cron/crn-dbh500bl550s73c5n2o0/deploys/dep-dbnl1k49v7es73d2mu10), construcción exitosa (el servicio queda con `2de9dea` como última construcción exitosa), Docker Command vacío, programación `0 6 1 1 *` y Auto-Deploy Off sin cambios; **no se ejecutó el cron** (el historial seguía en 26 ejecuciones antes y después). `fchmn-web` pasó de `3cf1aaf` a `2de9dea`, despliegue [`dep-dbnla79srm7s739ot2h0`](https://dashboard.render.com/web/srv-dbh48scs728c73arlf8g/deploys/dep-dbnla79srm7s739ot2h0), «Deploy succeeded» y operativa, Auto-Deploy Off; ahora sirve el paquete `index-Cw6aswfZ.js` (antes `index-DwjQ-YM9.js`), compilado con Vite 7. Vite es una herramienta de construcción, no un servidor que se ejecute en producción. `2de9dea` solo difiere de `64e2122` en documentación: `backend/` es idéntico; no se afirma identidad binaria entre imágenes. **Comprobaciones HTTP en la web (solo lectura, disponibilidad y cabeceras):** `/login` e `index.html` responden 200 con `Cache-Control: no-store`, la CSP con `connect-src 'self'` y sin `localhost`, `Strict-Transport-Security: max-age=31536000; includeSubDomains`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` y `Referrer-Policy: no-referrer`; el JavaScript nuevo y su hoja de estilos responden 200 y el JavaScript trae dos líneas `Cache-Control` (`max-age=31536000` y `public, immutable`); la ruta del paquete anterior responde 404; `/api/ready` 200 y `/api/auth/me` sin credenciales 401, con `Cache-Control: no-store`. **Sin pruebas funcionales autenticadas de esta actualización.** **Limpieza local completada:** 41 contenedores temporales eliminados (28 `sec03-` y 13 `sec03c-`, todos detenidos) y los seis del proyecto preservados con su ID y estado, sin borrar imágenes ni volúmenes.
+
 **Límites y riesgos.**
-- C está desplegada solo en `fchmn-api` (producción de la API ya no lleva el aviso de `zod`). El servicio de mantenimiento conserva su imagen antigua con Zod 3 y su despliegue, igual que el de la web, requiere autorización propia; la imagen de mantenimiento candidata lleva el mismo árbol que la API.
+- C está desplegada en la API (producción de la API ya no lleva el aviso de `zod`), y mantenimiento y web corren `2de9dea`. La imagen de mantenimiento lleva Zod 4: el cron de enero la ejecutará por primera vez con esa versión; hoy no se ejecutó.
 - Los mensajes genéricos de Zod cambian de texto en las respuestas 400 de campos sin mensaje propio (se aceptó); el frontend los muestra tal cual (`extractApiErrorMessage`).
 - La caracterización cubre los esquemas con casos representativos, no todas las combinaciones de entrada. Se validó la versión 4.6.7 con las comprobaciones descritas en esta sección; no se compararon exhaustivamente las versiones 4.6.6 y 4.6.7 (la 4.6.7 no trae notas de versión).
 - No se verificó la atestación de procedencia del paquete. Queda abierto el aviso de desarrollo de `minimatch` (`eslint`).
@@ -1287,8 +1290,7 @@ completa pasó una vez: 60 archivos y 1.320 pruebas. No se hicieron tandas repet
 
 Vite es una dependencia de **desarrollo** y la imagen publicada solo contiene el resultado
 de la construcción: **no afecta al sitio publicado.** Estado: la entrega B (SEC-03) actualizó Vite de 5.4.21 a 7.3.7
-en las herramientas de ambos proyectos; está publicada en el repositorio y validada en local (compilación local con Vite 7), pero
-**sin desplegar**: el sitio en producción sigue construido con la versión anterior hasta un despliegue autorizado aparte.
+en las herramientas de ambos proyectos; está publicada en el repositorio, validada en local y **desplegada con la web**: `fchmn-web` sirve desde `2de9dea` una compilación hecha con Vite 7 (paquete `index-Cw6aswfZ.js`). Vite no es un servidor que se ejecute en producción.
 Corrección a lo que decía este apartado respecto de Vite 5: los
 avisos más recientes **sí alcanzan a Windows** (filtración del hash NTLMv2 desde un sitio que visite
 quien desarrolla, y una posible inyección de comandos a través de `/__open-in-editor`, que Vite 5 trae)
