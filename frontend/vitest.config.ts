@@ -16,19 +16,19 @@ export default defineConfig({
     /**
      * UNIVERSO ESTABLE DE ARCHIVOS.
      *
-     * Sin `all`, el proveedor v8 solo informa de los archivos que alguna prueba
-     * llega a cargar: un archivo sin ninguna prueba **no aparece**, no suma al
+     * Sin un `include` que fije el universo, el proveedor v8 solo informaría de los
+     * archivos que alguna prueba llega a cargar: un archivo sin ninguna prueba **no aparece**, no suma al
      * denominador y por tanto no baja el porcentaje. Eso hacía que la cifra
      * subiera o bajara sola según qué módulos importara la suite, y una medición
      * así no sirve como suelo antirregresión: escribir la primera prueba de un
      * módulo grande podía **empeorar** el número.
      *
-     * Con `all: true` el denominador es todo el código productivo, siempre el
-     * mismo, y la cifra solo se mueve por lo que se prueba.
+     * Con `include` el denominador es todo el código productivo, siempre el
+     * mismo, y la cifra solo se mueve por lo que se prueba. (Vitest 4 retiró la
+     * opción `coverage.all`: ahora ese universo lo define `include`.)
      */
     coverage: {
       provider: "v8",
-      all: true,
       include: ["src/**/*.{ts,tsx}"],
       exclude: [
         // Las propias pruebas: medir cuánto de una prueba se ejecuta no dice

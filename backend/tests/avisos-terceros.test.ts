@@ -12,11 +12,17 @@
  * Se comprueban los dos sentidos. Un generador que solo se ha visto aprobar no
  * está probado: hay casos que lo ven FALLAR ante un inventario divergente.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { spawnSync } from "node:child_process";
 import { readFileSync, existsSync, readdirSync, writeFileSync, rmSync, copyFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
+
+
+// Cada generación arranca un proceso de Node sobre inventarios de cientos de paquetes y avisos de más de 600 KB: con todas las suites en paralelo supera 5 s.
+// El límite por omisión (5 s) depende de la velocidad de la máquina; se sigue el criterio de `xlsx-analisis.test.ts` y de las configuraciones de integración (30 s).
+// No cambia ninguna expectativa: solo cuánto se espera antes de declarar el fallo.
+vi.setConfig({ testTimeout: 30_000 });
 
 const RAIZ = join(__dirname, "..", "..");
 const NOTICES = join(RAIZ, "notices");

@@ -18,9 +18,27 @@
  * campo `license` que registra es un dato de conveniencia, así que la prueba
  * exige además que exista el texto distribuido cuando ese campo falta.
  */
-import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { describe, it, expect, vi, afterAll } from "vitest";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, relative, sep } from "node:path";
+
+
+// Tres pruebas recorren TODO node_modules (más de 13.000 entradas): medido en esta máquina, un recorrido simple tarda unos 8 s.
+// El límite por omisión (5 s) depende de la velocidad de la máquina; se sigue el criterio de `xlsx-analisis.test.ts` y de las configuraciones de integración (30 s).
+// No cambia ninguna expectativa: solo cuánto se espera antes de declarar el fallo.
+vi.setConfig({ testTimeout: 30_000 });
 
 const BACKEND = join(__dirname, "..");
 
@@ -88,6 +106,56 @@ function textoDeLicenciaDistribuido(ruta: string): { existe: boolean; archivo?: 
   return { existe: true, archivo, texto: readFileSync(join(dir, archivo), "utf8") };
 }
 
+/**
+ * UN solo recorrido de todo node_modules, compartido por las tres pruebas. Antes cada una lo recorría entero
+ * y llamaba a `readdirSync` sobre cada archivo (que falla por no ser directorio): decenas de miles de excepciones
+ * por recorrido, que con todas las suites en paralelo agotaban el tiempo. Aquí solo se lee cada directorio una vez,
+ * con los tipos de entrada. La condición es la misma: una carpeta con el nombre del paquete, directamente dentro
+ * de un `node_modules` (en la raíz o anidado).
+ *
+ * ENLACES. El recorrido anterior los seguía (`readdirSync` resuelve los enlaces a directorios), y `Dirent.isDirectory()`
+ * no: un paquete prohibido instalado mediante un enlace (workspaces, `npm link`, `file:`) habría pasado inadvertido.
+ * Aquí un enlace se resuelve con `statSync`: si apunta a un directorio, se trata como tal (se comprueba su nombre y
+ * se desciende); si está roto, se ignora. Para no girar en círculo, se lleva la cadena de rutas REALES de los
+ * directorios en curso: un enlace cuyo destino ya es uno de sus ancestros no se recorre. El cálculo de la ruta real
+ * solo se hace para los enlaces (en un directorio normal es la del padre más su nombre), de modo que el recorrido
+ * sigue siendo de una sola lectura por directorio.
+ */
+const PROHIBIDAS = ["binary", "buffers", "chainsaw"];
+function buscarCarpetasProhibidas(raiz: string, prohibidas: readonly string[] = PROHIBIDAS): Map<string, string[]> {
+  const encontradas = new Map<string, string[]>(prohibidas.map((p) => [p, []]));
+  const recorrer = (dir: string, real: string, ancestros: ReadonlySet<string>): void => {
+    let entradas;
+    try {
+      entradas = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    const cadena = new Set(ancestros).add(real);
+    for (const entrada of entradas) {
+      const abs = join(dir, entrada.name);
+      let realHijo: string;
+      if (entrada.isDirectory()) {
+        realHijo = join(real, entrada.name);
+      } else if (entrada.isSymbolicLink()) {
+        try {
+          if (!statSync(abs).isDirectory()) continue;
+          realHijo = realpathSync(abs);
+        } catch {
+          continue; // enlace roto o ilegible
+        }
+      } else {
+        continue;
+      }
+      if (dir.endsWith("node_modules")) encontradas.get(entrada.name)?.push(abs);
+      if (cadena.has(realHijo)) continue; // el enlace vuelve a un ancestro: ciclo
+      recorrer(abs, realHijo, cadena);
+    }
+  };
+  recorrer(raiz, realpathSync(raiz), new Set());
+  return encontradas;
+}
+
 describe("árbol de producción — la cadena que traía `buffers` no puede volver", () => {
   it("el override está declarado, acotado a `exceljs` y con versión exacta", () => {
     const overrides = PAQUETE.overrides ?? {};
@@ -119,29 +187,128 @@ describe("árbol de producción — la cadena que traía `buffers` no puede volv
     expect(encontradas, `${paquete} volvió al árbol`).toEqual([]);
   });
 
-  it.each(["binary", "buffers", "chainsaw"])("no queda ninguna carpeta de `%s` instalada, ni anidada", (paquete) => {
-    const encontradas: string[] = [];
-    const recorrer = (dir: string): void => {
-      let entradas: string[];
-      try {
-        entradas = readdirSync(dir);
-      } catch {
-        return;
-      }
-      for (const nombre of entradas) {
-        const abs = join(dir, nombre);
-        let hijos: string[];
-        try {
-          hijos = readdirSync(abs);
-        } catch {
-          continue; // no es un directorio legible
-        }
-        if (nombre === paquete && dir.endsWith("node_modules")) encontradas.push(abs);
-        if (hijos.length > 0) recorrer(abs);
-      }
-    };
-    recorrer(join(BACKEND, "node_modules"));
-    expect(encontradas, `${paquete} sigue instalada`).toEqual([]);
+  let carpetasProhibidas: Map<string, string[]> | undefined;
+  it.each(PROHIBIDAS)("no queda ninguna carpeta de `%s` instalada, ni anidada", (paquete) => {
+    carpetasProhibidas ??= buscarCarpetasProhibidas(join(BACKEND, "node_modules"));
+    expect(carpetasProhibidas.get(paquete), `${paquete} sigue instalada`).toEqual([]);
+  });
+});
+
+/**
+ * El propio recorrido, probado con árboles SINTÉTICOS en directorios temporales propios: nada se planta en el
+ * `node_modules` real. Los enlaces a directorios necesitan permisos en algunos sistemas (Windows crea "junctions",
+ * que no los exigen); si el entorno no deja crearlos, las pruebas con enlaces se OMITEN y quedan registradas como
+ * omitidas, no como comprobadas.
+ */
+describe("recorrido de carpetas prohibidas — enlaces y ciclos (árboles sintéticos)", () => {
+  const prohibidas = ["chainsaw", "buffers"] as const;
+  const raices: string[] = [];
+
+  function arbol(): string {
+    const raiz = mkdtempSync(join(tmpdir(), "fchmn-recorrido-"));
+    raices.push(raiz);
+    return raiz;
+  }
+  const dir = (...partes: string[]): void => void mkdirSync(join(...partes), { recursive: true });
+  const nombresRelativos = (raiz: string, rutas: string[] | undefined): string[] =>
+    (rutas ?? []).map((r) => relative(raiz, r).split(sep).join("/")).sort();
+
+  /** Crea un enlace a directorio (junction en Windows); devuelve false si el entorno no lo permite. */
+  function enlazar(destino: string, ruta: string): boolean {
+    try {
+      symlinkSync(destino, ruta, "junction");
+      return statSync(ruta).isDirectory();
+    } catch {
+      return false;
+    }
+  }
+
+  afterAll(() => {
+    for (const raiz of raices) rmSync(raiz, { recursive: true, force: true });
+  });
+
+  it("detecta una carpeta prohibida directa y otra anidada, sin enlaces (control de sensibilidad)", () => {
+    const raiz = arbol();
+    dir(raiz, "node_modules", "chainsaw");
+    dir(raiz, "node_modules", "a", "node_modules", "buffers");
+    const r = buscarCarpetasProhibidas(join(raiz, "node_modules"), prohibidas);
+    expect(nombresRelativos(raiz, r.get("chainsaw"))).toEqual(["node_modules/chainsaw"]);
+    expect(nombresRelativos(raiz, r.get("buffers"))).toEqual(["node_modules/a/node_modules/buffers"]);
+  });
+
+  it("no cuenta un archivo ni una carpeta fuera de un `node_modules` con ese nombre", () => {
+    const raiz = arbol();
+    dir(raiz, "node_modules", "a", "chainsaw"); // dentro de un paquete, no directamente en node_modules
+    writeFileSync(join(raiz, "node_modules", "buffers"), "no soy una carpeta");
+    const r = buscarCarpetasProhibidas(join(raiz, "node_modules"), prohibidas);
+    expect(r.get("chainsaw")).toEqual([]);
+    expect(r.get("buffers")).toEqual([]);
+  });
+
+  it("detecta una carpeta prohibida que está en node_modules mediante un enlace a un directorio", (ctx) => {
+    const raiz = arbol();
+    dir(raiz, "almacen", "chainsaw");
+    dir(raiz, "node_modules");
+    if (!enlazar(join(raiz, "almacen", "chainsaw"), join(raiz, "node_modules", "chainsaw"))) {
+      ctx.skip(); // limitación del entorno: no se registra como comprobado
+      return;
+    }
+    const r = buscarCarpetasProhibidas(join(raiz, "node_modules"), prohibidas);
+    expect(nombresRelativos(raiz, r.get("chainsaw"))).toEqual(["node_modules/chainsaw"]);
+  });
+
+  it("desciende por un enlace y encuentra una prohibida dentro del destino", (ctx) => {
+    const raiz = arbol();
+    dir(raiz, "externo", "node_modules", "buffers");
+    dir(raiz, "node_modules");
+    if (!enlazar(join(raiz, "externo"), join(raiz, "node_modules", "paquete-enlazado"))) {
+      ctx.skip();
+      return;
+    }
+    const r = buscarCarpetasProhibidas(join(raiz, "node_modules"), prohibidas);
+    expect(nombresRelativos(raiz, r.get("buffers"))).toEqual(["node_modules/paquete-enlazado/node_modules/buffers"]);
+  });
+
+  it("termina ante un enlace que apunta a un ancestro y sigue encontrando lo demás", (ctx) => {
+    const raiz = arbol();
+    dir(raiz, "node_modules", "a", "b");
+    dir(raiz, "node_modules", "chainsaw");
+    if (!enlazar(join(raiz, "node_modules"), join(raiz, "node_modules", "a", "b", "ciclo"))) {
+      ctx.skip();
+      return;
+    }
+    const r = buscarCarpetasProhibidas(join(raiz, "node_modules"), prohibidas);
+    expect(nombresRelativos(raiz, r.get("chainsaw"))).toEqual(["node_modules/chainsaw"]);
+  });
+
+  it("termina ante dos enlaces que se apuntan entre sí", (ctx) => {
+    const raiz = arbol();
+    dir(raiz, "node_modules", "x");
+    dir(raiz, "node_modules", "y");
+    dir(raiz, "node_modules", "x", "node_modules", "buffers");
+    const ok1 = enlazar(join(raiz, "node_modules", "y"), join(raiz, "node_modules", "x", "hacia-y"));
+    const ok2 = enlazar(join(raiz, "node_modules", "x"), join(raiz, "node_modules", "y", "hacia-x"));
+    if (!ok1 || !ok2) {
+      ctx.skip();
+      return;
+    }
+    const r = buscarCarpetasProhibidas(join(raiz, "node_modules"), prohibidas);
+    // La del directorio real se encuentra; las repeticiones por el ciclo no son infinitas (el recorrido terminó).
+    expect(r.get("buffers")).toContain(join(raiz, "node_modules", "x", "node_modules", "buffers"));
+    expect(r.get("buffers")!.length).toBeLessThan(10);
+  });
+
+  it("ignora un enlace roto sin fallar", (ctx) => {
+    const raiz = arbol();
+    dir(raiz, "node_modules");
+    dir(raiz, "destino-temporal");
+    const ruta = join(raiz, "node_modules", "roto");
+    if (!enlazar(join(raiz, "destino-temporal"), ruta)) {
+      ctx.skip();
+      return;
+    }
+    rmSync(join(raiz, "destino-temporal"), { recursive: true, force: true });
+    expect(() => buscarCarpetasProhibidas(join(raiz, "node_modules"), prohibidas)).not.toThrow();
   });
 });
 

@@ -37,9 +37,9 @@ El logo se encuentra en `frontend/src/assets/logo-fchmn.png` y se usa en la pant
 
 ## Requisitos
 
-- Node.js **20.11+**; **22 LTS recomendado**, que es el que usan las imágenes Docker
-  (`node:22-alpine`). Las herramientas de prueba del frontend (jsdom 30, undici 8) declaran
-  Node ≥22, así que con 20 `npm install` emite advertencias `EBADENGINE`.
+- Node.js **22.22.2 o posterior de la serie 22, 24.15 o posterior, o 26+**. Es lo que exige el árbol completo: `jsdom` 30.0.1 (frontend) pide `^22.22.2 || ^24.15.0 || >=26.0.0`, y el backend
+  declara `^22.13.0 || >=24` (su producción ya exigía Node ≥22). Las imágenes Docker usan `node:22-alpine` fijada por digest (Node 22.23.2). Con un Node anterior `npm install` emite advertencias `EBADENGINE`
+  (`engine-strict` no está activado, así que no bloquea).
 - Docker y Docker Compose (para PostgreSQL local)
 
 ## Instalación (entorno local)
@@ -332,6 +332,12 @@ sesión no viaja.
   están autorizadas, y **SEC-03 no está completa**. **Despliegue:** solo `fchmn-api` (Render informó éxito y Live; Auto-Deploy Off); la web y el servicio de mantenimiento **no** se desplegaron, y los artefactos de
   mantenimiento del repositorio no son su actualización. En producción solo se observó disponibilidad y el 401 sin credenciales, **sin pruebas funcionales**. Las construcciones de imágenes y sus inventarios
   se verificaron en local, no en CI. Detalle y riesgos en `docs/seguridad/PLAN_SEGURIDAD.md`.
+- **SEC-03, entrega B: Vite, Vitest y herramientas (publicada en el repositorio, validada en local; sin desplegar).** `vite` 5.4.21 → 7.3.7 (en el backend, ahora `devDependency` explícita), `vitest` y `@vitest/coverage-v8` 1.6.1 → 4.1.12 en ambos proyectos,
+  y transitivas dentro de rango (`undici` 8.12.4, `source-map-js` 1.2.2, el `zod` de lint del frontend 4.6.7); `@vitejs/plugin-react` 4.7.0 y `jsdom` 30.0.1 se conservan. Ninguna versión de producción cambia. Se adaptaron las configuraciones
+  (Vitest 4 retiró `coverage.all`), el orden de un par de `afterEach`, la firma de `Mock` y los tiempos de espera de tres pruebas pesadas (el recorrido optimizado de carpetas prohibidas sigue enlaces, con guardia de ciclos), se fijó en `vite.config.ts` el objetivo de navegadores que aplicaba Vite 5.4.21 (`es2020`, `edge88`, `firefox78`,
+  `chrome87`, `safari14`; sin polyfills y sin probarlo en navegadores reales), y se actualizaron los `engines` y los requisitos de Node. **No se presenta el cambio de pool como
+  corrección del pánico intermitente de Prisma.** Pasaron la suite unitaria y la de integración del backend, la del frontend y su construcción; no se construyó ninguna imagen ni se desplegó nada: producción sigue con las versiones anteriores hasta un despliegue autorizado aparte. Siguen pendientes la entrega C (Zod del backend)
+  y el aviso de `minimatch` de `eslint`. Detalle y riesgos en `docs/seguridad/PLAN_SEGURIDAD.md`.
 - **El refresh token viaja en una cookie `HttpOnly`**, no en el cuerpo de la respuesta.
   Antes se devolvía en el JSON de `/auth/login` y el frontend lo guardaba en
   `sessionStorage`, donde cualquier script de la página podía leerlo — y ese token vale

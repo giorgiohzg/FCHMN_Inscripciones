@@ -46,8 +46,8 @@ const SESION_A: IdentidadDeSesion = { ciclo: "ciclo-A", userId: "uA" };
 const SESION_B: IdentidadDeSesion = { ciclo: "ciclo-B", userId: "uB" };
 
 let fetchSpy: ReturnType<typeof vi.fn>;
-let renovar: Mock<[IdentidadDeSesion], Promise<RenovacionParaElCliente>>;
-let cerrar: Mock<[IdentidadDeSesion], Promise<boolean>>;
+let renovar: Mock<(identidad: IdentidadDeSesion) => Promise<RenovacionParaElCliente>>;
+let cerrar: Mock<(identidad: IdentidadDeSesion) => Promise<boolean>>;
 let token: string | null;
 /** La identidad "vigente" del puente simulado; las pruebas la cambian a mano. */
 let identidad: IdentidadDeSesion;

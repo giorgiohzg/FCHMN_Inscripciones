@@ -11,11 +11,11 @@ import { defineConfig } from "vitest/config";
  * premia escribir pruebas superficiales de código que la integración ya prueba a
  * fondo.
  *
- * Por qué NO se fusionan dos informes. Vitest 1.6 no tiene `--merge-reports`
- * —llegó en 2.1—, y fusionar informes de v8 a mano exigiría una herramienta
- * nueva. No hace falta ninguna de las dos cosas: basta con ejecutar TODO junto,
- * que es lo que hace este archivo, y dejar que el proveedor de cobertura sume
- * una sola vez.
+ * Por qué NO se fusionan dos informes. Esta configuración nació con Vitest 1.6,
+ * que no tenía `--merge-reports` (llegó en 2.1); con Vitest 4 existe, pero no hace
+ * falta: basta con ejecutar TODO junto, que es lo que hace este archivo, y dejar
+ * que el proveedor de cobertura sume una sola vez, sin fusionar informes ni
+ * introducir otra herramienta.
  *
  * LAS PROTECCIONES DE LA BASE SE CONSERVAN ÍNTEGRAS. `globalSetup` y
  * `setupFiles` son exactamente los de `vitest.integration.config.ts`: se carga
@@ -45,9 +45,10 @@ export default defineConfig({
       // que decide cupos, permisos y elegibilidad.
       reporter: ["text", "json-summary", "html"],
       reportsDirectory: "coverage-combinada",
+      // Vitest 4 retiró `coverage.all`: el universo de archivos lo define `include`, y los
+      // archivos que ninguna prueba carga siguen figurando en el denominador.
       include: ["src/**/*.ts"],
       exclude: ["src/**/*.d.ts", "src/**/index.ts"],
-      all: true,
     },
   },
 });

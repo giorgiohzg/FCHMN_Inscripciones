@@ -51,7 +51,7 @@
     "@types/node": "^20.12.12",
     "@types/pdfkit": "^0.13.4",
     "@types/pg": "^8.23.1",
-    "@vitest/coverage-v8": "^1.6.1",
+    "@vitest/coverage-v8": "^4.1.12",
     "dotenv": "^17.4.2",
     "dotenv-cli": "^11.0.0",
     "eslint": "^10.10.0",
@@ -63,14 +63,14 @@
     "tsx": "^4.10.5",
     "typescript": "^5.4.5",
     "typescript-eslint": "^8.69.0",
-    "vitest": "^1.6.0"
+    "vite": "^7.3.7",
+    "vitest": "^4.1.12"
   },
   "allowScripts": {
     "@prisma/client@5.22.0": true,
     "@prisma/engines@5.22.0": true,
     "argon2@0.40.3": true,
     "esbuild@0.28.2": true,
-    "esbuild@0.21.5": true,
     "prisma@5.22.0": true
   },
   "overrides": {
@@ -83,6 +83,6 @@
     "seed": "tsx prisma/seed.ts"
   },
   "engines": {
-    "node": ">=20.11"
+    "node": "^22.13.0 || >=24"
   }
 }

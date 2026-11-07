@@ -494,14 +494,18 @@ describe("la ventana entre el commit y los efectos pasivos, sin `act`", () => {
     console.error = (...args: unknown[]) => void avisos.push(String(args[0]));
   });
 
+  /**
+   * UN solo `afterEach`, con el orden explícito: primero se desmonta (que es donde React emite el aviso) y
+   * solo después se restaura `console.error` y se afirma lo capturado. Con dos `afterEach` separados el orden
+   * dependía de `sequence.hooks`: Vitest 1 los lanzaba en el orden de declaración y Vitest 2+ usa por omisión
+   * `stack` (los de después, primero), con lo que la aserción corría antes del desmontaje y no veía el aviso.
+   */
   afterEach(() => {
     root?.unmount();
     contenedor?.remove();
     root = null;
     contenedor = null;
-  });
 
-  afterEach(() => {
     console.error = errorOriginal;
     expect(
       avisos.filter((a) => a.includes("not wrapped in act")).length,

@@ -17,7 +17,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **SEC-02** | Ningún reporte entrega el RUN, para ningún rol | **Cerrada** dentro de su alcance: desplegada en web y API desde `3cf1aaf` (Live, Auto-Deploy Off). Ver «SEC-02» |
 | CI de SEC-02 | Pánico intermitente del motor de Prisma en las pruebas unitarias (ejecución 42269659668) | **Diagnosticado; protección publicada en el repositorio y validada en local.** La causa del pánico **no está demostrada**. Ver «CI de SEC-02» |
 | **SEC-01** | Topes para las listas JSON (`personIds` de relevos y otras) | **Cerrada** dentro de su alcance: desplegada en `fchmn-api` desde `120e29d` (Live, Auto-Deploy Off) y validada en local y en la CI con datos sintéticos. Ver «SEC-01» |
-| **SEC-03** | Dependencias, en tres entregas (A backend compatible, B Vite/Vitest, C Zod) | **A cerrada** dentro de su alcance: desplegada solo en `fchmn-api` desde `dab3690` (Live, Auto-Deploy Off). **SEC-03 sigue abierta:** B, C y los avisos residuales. B y C sin autorización. Ver «SEC-03, entrega A» |
+| **SEC-03** | Dependencias, en tres entregas (A backend compatible, B Vite/Vitest, C Zod) | **A cerrada** dentro de su alcance: desplegada solo en `fchmn-api` desde `dab3690` (Live, Auto-Deploy Off). **B publicada en el repositorio, validada en local; sin desplegar** (ver «SEC-03, entrega B»). **SEC-03 sigue abierta:** C (Zod, sin autorización) y los avisos residuales. Ver «SEC-03, entrega A» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Aplazado, fuera de estas fases.** Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -1045,6 +1045,98 @@ Todo con datos sintéticos, sobre el árbol ya reinstalado con `npm ci` y **sin 
 - El inventario de avisos de terceros ya incluye los paquetes anidados; sigue sin tener prueba la profundidad máxima del recorrido (32). La excepción de `isarray` se retiró porque el texto original existe en su README.
 - Esta entrega mitiga lo que el bloqueo de producción declara; no demuestra que los avisos de producción fueran alcanzables.
 
+## SEC-03, entrega B: Vite, Vitest y herramientas de ambos proyectos (publicada en el repositorio, validada en local; sin desplegar)
+
+**Estado: publicada en el repositorio (commit y push a `main`) y validada en LOCAL; sin desplegar.** Producción sigue con las versiones anteriores y el despliegue necesita autorización propia. El resultado de la CI se anota aparte, tras observarlo. La entrega **C** (Zod del backend) **no está autorizada** y no se
+tocó. No cambia código de producción, ni ninguna versión del árbol de producción de ninguno de los dos proyectos (Fastify, Zod del backend, Prisma, React, React Router…): la comparación de los
+bloqueos antes y después da **0 entradas de producción** cambiadas, añadidas o retiradas en el backend y en el frontend. Tampoco se cambió ninguna imagen, `Dockerfile` ni imagen base, y no se construyó
+ninguna imagen en esta entrega.
+
+**Versiones, antes → después** (todas de desarrollo):
+
+| Paquete | Antes | Después | Notas |
+|---|---|---|---|
+| `vite` | 5.4.21 (frontend, directa; backend, transitiva de `vitest`) | **7.3.7** en ambos | en el backend es ahora una `devDependency` explícita (`^7.3.7`): `vitest` 4 la acepta de la 6 a la 8 y npm habría elegido la 8 |
+| `vitest` | 1.6.1 | **4.1.12** | sin `tinypool` ni `vite-node`, que dejan de existir en el árbol |
+| `@vitest/coverage-v8` | 1.6.1 | **4.1.12** | |
+| `esbuild` | 0.21.5 (bajo Vite 5) | 0.28.2 | el mismo que ya traía `tsx` en el backend |
+| `undici` (frontend, vía `jsdom`) | 8.10.2 | **8.12.4** | |
+| `zod` (frontend, vía `eslint-plugin-react-hooks`; solo lint) | 4.5.4 | **4.6.7** | no es el Zod del backend |
+| `source-map-js` | 1.2.1 en el frontend | 1.2.2 | el backend ya lo tenía por la entrega A |
+| `brace-expansion` (frontend, bajo `eslint`) | 5.0.9 (3 copias anidadas) | 5.0.12 (una) | se retiraron del bloqueo las entradas anidadas y npm las resolvió al último valor admitido |
+| `@vitejs/plugin-react` | 4.7.0 | 4.7.0 | se conserva: su par admite Vite 7 |
+| `jsdom` | 30.0.1 | 30.0.1 | se conserva |
+
+Cambian además, en consecuencia, las transitivas de Vitest 4 (`chai` 6, `std-env` 4, `pathe` 2, `magicast` 0.5, `@bcoe/v8-coverage` 1…), todas de desarrollo. Las operaciones fueron dirigidas
+(`npm install --package-lock-only` y `npm update` sobre paquetes nombrados), no una actualización global.
+
+**Requisitos de Node** (contrastados con el árbol completo, no solo con Vite):
+- **Backend:** `engines` pasa de `>=20.11` a **`^22.13.0 || >=24`**. El árbol de **producción** ya exigía Node ≥ 22 (`cookie` 2.0.1 y, desde la entrega A, `content-disposition` 3.0.0), así que `>=20.11`
+  no era cierto; en desarrollo, `eslint` pide `^20.19 || ^22.13 || >=24` y Vite 7, `^20.19 || >=22.12`.
+- **Frontend:** se añade `engines` **`^22.22.2 || ^24.15.0 || >=26.0.0`**. El límite lo pone `jsdom` 30.0.1; además `undici` 8.12.4 pide ≥ 22.19 y `whatwg-url` 17.1, `^22.14 || >=24`. No basta con declarar Node ≥ 22.19.
+- **Contraste:** el Node local es 24.19.0 (cumple ambos); la imagen base fijada por digest lleva **Node 22.23.2** (leído de los metadatos de la imagen local; cumple ambos); la CI usa `node-version: "22"`, que
+  resuelve al último 22.x al ejecutarse: **no está fijado y no verifiqué qué parche usa el ejecutor**. `engine-strict` no está activado, así que los `engines` documentan pero no bloquean una instalación.
+  El README (requisitos) se corrigió en consecuencia.
+
+**Autorizaciones de scripts de instalación (`allowScripts`):** solo cambió la de `esbuild`. En el backend se retiró `esbuild@0.21.5` (ya no existe); en el frontend `esbuild@0.21.5` pasó a `esbuild@0.28.2`. Las de
+Prisma y `argon2` no se tocaron y no se aprobó nada más. `npm ci` con npm 11.17.0 (que reconoce `allowScripts`) instaló ambos árboles; **no se comprobó que el npm 10.9.8 de las imágenes lo aplique**.
+
+**Adaptaciones a Vitest 4** (ninguna cambia una expectativa funcional):
+- `coverage.all` desaparece en Vitest 4: se retiró de `backend/vitest.coverage.config.ts` y de `frontend/vitest.config.ts`. El universo de archivos lo sigue fijando `coverage.include` (con el frontend, un archivo de prueba suelto
+  sigue midiéndose sobre las 4.006 sentencias de todo `src`).
+- **Orden de los `afterEach`:** Vitest 2+ ejecuta por omisión los `afterEach` en orden inverso (`sequence.hooks: "stack"`). `PanelDeHistorial.test.tsx` tenía dos, y su aserción corría antes del desmontaje que emite el aviso de
+  `act` que comprueba (8 pruebas fallaron en cascada). Se unieron en uno, con el orden explícito, en vez de cambiar el orden global.
+- `apiClient.test.ts`: la firma de `Mock` cambió (`Mock<(args) => R>` en vez de `Mock<[args], R>`); se adaptaron los dos tipos sin conversiones.
+- **Tiempos de espera.** Tres archivos superaron los 5 s por omisión: `avisos-terceros` (cada generación arranca un proceso sobre inventarios y avisos de más de 600 KB), `dependencias-produccion` (recorría todo `node_modules`) y
+  `xlsx-inspeccion` (una bomba de 512 MiB que solo comprimir lleva unos 3,7 s en esta máquina). Se les aplicó el mismo criterio que ya usan `xlsx-analisis.test.ts` y las configuraciones de integración
+  (`vi.setConfig({ testTimeout: 30_000 })`), y además el recorrido de `dependencias-produccion` se hizo de una sola pasada con tipos de entrada (`readdirSync(…, { withFileTypes: true })`): pasó de unos 8 s por recorrido a unas
+  décimas de segundo (217 ms el recorrido completo en la última ejecución local), con la misma condición: una carpeta con el nombre del paquete directamente dentro de un `node_modules`.
+- **Corrección del recorrido (enlaces).** La primera versión optimizada filtraba con `Dirent.isDirectory()`, que es falso para un enlace a un directorio, mientras que el recorrido original (`readdirSync` por nombre) sí los seguía: un paquete
+  prohibido instalado mediante un enlace (workspaces, `npm link`, `file:`) habría pasado inadvertido. Ahora `buscarCarpetasProhibidas(raiz, prohibidas)` resuelve cada enlace con `statSync`: si apunta a un directorio lo trata como tal (comprueba
+  su nombre y desciende), y si está roto lo ignora. Para no girar en círculo lleva la cadena de **rutas reales** de los directorios en curso y no recorre un enlace cuyo destino ya es uno de ellos. La ruta real solo se calcula
+  para los enlaces (en un directorio normal es la del padre más su nombre), así que se conserva una lectura por directorio.
+  **Prueba:** siete casos sintéticos en directorios temporales propios (`os.tmpdir()`, que se borran al terminar); **no se planta nada en el `node_modules` real**: control sin enlaces, archivo o carpeta que no cuenta, detección por enlace del
+  propio paquete prohibido, descenso por un enlace hasta una prohibida del destino, ciclo hacia un ancestro, dos enlaces que se apuntan entre sí y enlace roto. En Windows se usan *junctions*, que no exigen privilegios; si un entorno no
+  permitiera crearlos, esos casos se **omiten** (`ctx.skip()`) y constan como omitidos, no como comprobados. En esta ejecución local no se omitió ninguno. **Sensibilidad comprobada con mutantes temporales** (restaurados byte a byte): sin
+  seguir enlaces fallan los dos casos de detección por enlace; sin la guardia de ciclos falla el de enlaces cruzados (el de ciclo hacia un ancestro sigue terminando porque la ruta recursiva acaba en un error de sistema que el recorrido
+  captura, así que ese caso no distingue la guardia). La terminación ante ciclos se prueba, por tanto, sobre todo con los enlaces cruzados.
+- Sin cambios: la protección de Prisma de las pruebas unitarias, las protecciones de la base desechable, `fileParallelism: false` y `globalSetup` de las integraciones. **El cambio de pool por omisión de Vitest (de `threads` a `forks`) no se presenta
+  como corrección demostrada del pánico intermitente de Prisma**: su causa sigue sin demostrarse.
+
+### Validación local de B
+Todo con datos sintéticos, una vez cada comprobación, sin relajar ninguna expectativa funcional:
+- **Backend:** typecheck y lint sin errores (51 avisos de `any` ya existentes). Suite unitaria completa: **65 archivos, 1.641 pruebas**. Integración completa, solo contra la base desechable y sin ejecuciones simultáneas: **53 archivos, 1.122 pruebas**.
+- **Frontend:** typecheck y lint sin errores (63 avisos), suite completa **45 archivos, 811 pruebas**, y la construcción de producción con Vite 7.3.7.
+- **Segunda ronda (correcciones locales posteriores a la revisión):** se corrigió el recorrido de carpetas prohibidas y se fijó el objetivo de compilación del frontend (ver abajo). Se reejecutaron solo `dependencias-produccion` (25 pruebas, ninguna omitida),
+  typecheck y lint de backend y frontend (0 errores; 51 y 63 avisos, los mismos) y la construcción del frontend. No se repitieron las suites completas, la integración, la cobertura ni las auditorías: las versiones no cambiaron.
+- **Cobertura:** una comprobación representativa en cada proyecto (un archivo de prueba, con los informes escritos fuera del repositorio): el proveedor funciona en ambos y respeta `include`. Vitest 4 remapea la cobertura de v8 con un análisis
+  por árbol sintáctico, así que **las cifras no son comparables con las anteriores**; no se hizo una comparación completa.
+- Una primera ejecución del backend falló por los tiempos de espera descritos; se corrigieron y se repitió la suite completa. Lo mismo con el frontend y el orden de los `afterEach`.
+
+### Avisos
+- **Resueltos:** `vite` (8 avisos), `vitest` (crítico), `tinypool` (2 críticos), `esbuild`, `source-map-js`, `undici` (8) y, en el frontend, el `zod` de lint y `brace-expansion`.
+- **Pendientes:** **`zod` del backend** (producción; entrega C) y **`minimatch` 10.2.6**, dependencia de desarrollo de `eslint` y `typescript-estree` en ambos proyectos, sin corrección compatible: la 11.0.1 exige que `eslint` la adopte.
+  Reconsultados con el endpoint de avisos de npm sobre los dos bloqueos resultantes.
+
+### Material distribuido y avisos de terceros
+- El árbol de producción no cambia, así que los inventarios y avisos **no se modificaron**: `generar-avisos --verificar` y `distribuir-avisos --verificar` siguen devolviendo 0. Para el frontend se contrastó el inventario `frontend-web` con
+  `npm ls --omit=dev --all`: los mismos 9 paquetes. Es una comprobación **calculada del árbol, no verificada contra una imagen**: en esta entrega no se construyó ninguna.
+- **El paquete que se envía al navegador sí cambia**, porque lo construye Vite 7. No se comparó con el de Vite 5 ni se probó en un navegador. Desplegarlo no es necesario por seguridad (Vite no corre en producción).
+- **Objetivo de navegadores (fijado).** Vite 7 cambió el valor por omisión de `build.target` a `baseline-widely-available` (Chrome y Edge 107, Firefox 104, Safari 16; leído del propio paquete 7.3.7). Para que la actualización no eleve en silencio los
+  navegadores mínimos, `frontend/vite.config.ts` fija `build.target: ["es2020", "edge88", "firefox78", "chrome87", "safari14"]`. **Confirmado que es el efectivo de Vite 5.4.21:** el paquete 5.4.21 (obtenido de la caché local de npm, sin red) resuelve
+  el `build.target: "modules"` por omisión a la constante `ESBUILD_MODULES_TARGET`, con exactamente esos cinco valores. Con la configuración resuelta por Vite 7.3.7 (`resolveConfig`, modo de producción) `build.target` y `build.cssTarget` salen
+  con esa lista. No se añaden polyfills ni dependencias, y no se elevan requisitos de navegador. La construcción local con ese objetivo es correcta (`index` de 433,39 kB, 119,19 kB comprimido; con el valor por omisión de Vite 7 había sido 430,82 kB y 118,54 kB).
+  **Esa construcción no es una prueba de compatibilidad con esos navegadores:** solo demuestra que el empaquetado termina y fija qué sintaxis se transpila; no se ejecutó en ninguno de ellos ni se midió la compatibilidad real del paquete resultante.
+
+### Límites y riesgos de B
+- La CI instala Node 22 sin fijar el parche; con un 22.x anterior a 22.22.2, `jsdom` 30.0.1 declararía una advertencia.
+- Los tres tiempos de espera dependen de la velocidad de la máquina; cualquiera puede volver a quedarse corto en un equipo más lento.
+- La cobertura de v8 cambia de método: no comparar porcentajes con los anteriores sin anotarlo.
+- El objetivo de navegadores se conserva por configuración, no por prueba en navegadores reales; el paquete resultante no se ejecutó en Edge 88, Firefox 78, Chrome 87 ni Safari 14. Las dependencias del frontend (React, etc.) también deciden qué
+  navegadores funcionan, y este objetivo no las cambia.
+- Las pruebas con enlaces del recorrido de carpetas prohibidas dependen de que el sistema permita crear enlaces a directorios; si no, se omiten y constan como omitidas.
+- B no está publicada ni desplegada. **SEC-03 sigue abierta:** C (Zod) y `minimatch` de `eslint`.
+
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 
 **SEC-01 (listas JSON).** Medido en memoria con Zod 3.25.76 durante la revisión: `.max()` **no** corta el
@@ -1122,13 +1214,16 @@ completa pasó una vez: 60 archivos y 1.320 pruebas. No se hicieron tandas repet
 
 ## Vite
 
-Vite 5.4.21 es una dependencia de **desarrollo** y la imagen publicada solo contiene el resultado
-de la construcción: **no afecta al sitio publicado.** Corrección a lo que decía este apartado: los
+Vite es una dependencia de **desarrollo** y la imagen publicada solo contiene el resultado
+de la construcción: **no afecta al sitio publicado.** Estado: la entrega B (SEC-03) actualizó Vite de 5.4.21 a 7.3.7
+en las herramientas de ambos proyectos; está publicada en el repositorio y validada en local (compilación local con Vite 7), pero
+**sin desplegar**: el sitio en producción sigue construido con la versión anterior hasta un despliegue autorizado aparte.
+Corrección a lo que decía este apartado respecto de Vite 5: los
 avisos más recientes **sí alcanzan a Windows** (filtración del hash NTLMv2 desde un sitio que visite
 quien desarrolla, y una posible inyección de comandos a través de `/__open-in-editor`, que Vite 5 trae)
 y exigen el servidor de desarrollo en marcha. Para quien trabaja en Windows, conviene no navegar por
 sitios no confiables con `npm run dev` activo. No se verificó la explotación, y Vite 5 no tiene parche
-para esa familia: la actualización de versión mayor se trata aparte y sigue fuera de estas fases.
+para esa familia; la actualización de versión mayor se hizo en la entrega B de SEC-03 (ver su sección).
 
 ## Validaciones futuras seguras
 

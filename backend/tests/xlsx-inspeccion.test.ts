@@ -2,12 +2,18 @@
  * Fase 4: inspección del ZIP y escaneo del libro, ANTES de ExcelJS. Unitarias y sin base:
  * archivos sintéticos pequeños contra límites reducidos.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import ExcelJS from "exceljs";
 import JSZip from "jszip";
 import { inspeccionarArchivo, leerDirectorio } from "../src/modules/persons/xlsx/inspeccion-zip";
 import { LIMITES_XLSX, MENSAJE_XLSX_INVALIDO, RechazoXlsx, type LimitesXlsx } from "../src/modules/persons/xlsx/limites";
 import { construirZip, libroCrudo, partesDeLibro, hojaXml, type EntradaSintetica } from "./helpers/zipSintetico";
+
+
+// Una prueba construye una bomba de 512 MiB: solo comprimirla tarda unos 3,7 s en esta máquina (la aserción de 1 s mide la inspección, no esa construcción).
+// El límite por omisión (5 s) depende de la velocidad de la máquina; se sigue el criterio de `xlsx-analisis.test.ts` y de las configuraciones de integración (30 s).
+// No cambia ninguna expectativa: solo cuánto se espera antes de declarar el fallo.
+vi.setConfig({ testTimeout: 30_000 });
 
 const KIB = 1024;
 const limites = (cambios: Partial<LimitesXlsx> = {}): LimitesXlsx => ({ ...LIMITES_XLSX, ...cambios });
