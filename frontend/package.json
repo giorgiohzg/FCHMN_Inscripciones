@@ -43,6 +43,17 @@
     "vite": "^7.3.7",
     "vitest": "^4.1.12"
   },
+  "overrides": {
+    "eslint": {
+      "minimatch": "11.0.5"
+    },
+    "@eslint/config-array": {
+      "minimatch": "11.0.5"
+    },
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.5"
+    }
+  },
   "engines": {
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
   },

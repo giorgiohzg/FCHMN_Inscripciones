@@ -1069,7 +1069,7 @@
       "repositorio": "git://github.com/juliangruber/balanced-match.git",
       "base": "/app/node_modules",
       "rutas": [
-        "glob/node_modules/balanced-match"
+        "minimatch/node_modules/balanced-match"
       ],
       "archivosLicencia": [
         "LICENSE.md"
@@ -1224,7 +1224,7 @@
       "repositorio": "git+https://github.com/juliangruber/brace-expansion.git",
       "base": "/app/node_modules",
       "rutas": [
-        "glob/node_modules/brace-expansion"
+        "minimatch/node_modules/brace-expansion"
       ],
       "archivosLicencia": [
         "LICENSE"
@@ -3977,7 +3977,7 @@
       "repositorio": "git@github.com:isaacs/minimatch",
       "base": "/app/node_modules",
       "rutas": [
-        "glob/node_modules/minimatch"
+        "minimatch"
       ],
       "archivosLicencia": [
         "LICENSE.md"
