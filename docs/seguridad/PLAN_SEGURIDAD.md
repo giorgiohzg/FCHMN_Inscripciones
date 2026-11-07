@@ -17,7 +17,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **SEC-02** | Ningún reporte entrega el RUN, para ningún rol | **Cerrada** dentro de su alcance: desplegada en web y API desde `3cf1aaf` (Live, Auto-Deploy Off). Ver «SEC-02» |
 | CI de SEC-02 | Pánico intermitente del motor de Prisma en las pruebas unitarias (ejecución 42269659668) | **Diagnosticado; protección publicada en el repositorio y validada en local.** La causa del pánico **no está demostrada**. Ver «CI de SEC-02» |
 | **SEC-01** | Topes para las listas JSON (`personIds` de relevos y otras) | **Cerrada** dentro de su alcance: desplegada en `fchmn-api` desde `120e29d` (Live, Auto-Deploy Off) y validada en local y en la CI con datos sintéticos. Ver «SEC-01» |
-| **SEC-03** | Dependencias, en tres entregas (A backend compatible, B Vite/Vitest, C Zod) | **A publicada en el repositorio, validada en local; pendiente de despliegue.** B y C sin autorización. Ver «SEC-03, entrega A» |
+| **SEC-03** | Dependencias, en tres entregas (A backend compatible, B Vite/Vitest, C Zod) | **A cerrada** dentro de su alcance: desplegada solo en `fchmn-api` desde `dab3690` (Live, Auto-Deploy Off). **SEC-03 sigue abierta:** B, C y los avisos residuales. B y C sin autorización. Ver «SEC-03, entrega A» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Aplazado, fuera de estas fases.** Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -923,10 +923,28 @@ Todo con datos sintéticos. Se distingue lo **simulado** de lo **observado en la
 - `listaAcotada` depende del comportamiento de Zod 3 (`pipe` no ejecuta la salida tras un fallo previo); una migración de Zod o de Fastify
   (SEC-03) lo revalidaría con las mismas pruebas. SEC-01 **no** corrige el aviso de Zod: lo mitiga en las rutas alcanzables.
 
-## SEC-03, entrega A: actualizaciones compatibles del backend (publicada en el repositorio, validada en local; pendiente de despliegue)
+## SEC-03, entrega A: actualizaciones compatibles del backend (cerrada: desplegada en `fchmn-api`)
 
-**Estado: publicada en el repositorio (commit y push a `main`) y validada en LOCAL; pendiente de despliegue**: producción sigue con las
-versiones anteriores y el despliegue necesita autorización propia. Las entregas **B** (Vite, Vitest y herramientas) y **C** (Zod) **no están autorizadas** y no se tocaron: ni Zod, ni Vite,
+**Estado: cerrada dentro de su alcance. SEC-03 NO está completa.** La entrega A está desplegada a mano en Render, **solo `fchmn-api`**, desde
+`dab36909efc7b40d81cdd27111c3a62c539e5026`, con Auto-Deploy en **Off**.
+
+| Servicio | Despliegue | Commit |
+|---|---|---|
+| API (`fchmn-api`) | `dep-dbn8lsnf3r2c73ftvglg` ([enlace](https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80/deploys/dep-dbn8lsnf3r2c73ftvglg)) | `120e29d` → `dab3690` |
+
+La CI del código (ejecución 42326891737) terminó en éxito. Render informó «Deploy succeeded» y Live. **La web (`fchmn-web`) y el servicio de mantenimiento (`fchmn-mantenimiento`) no se
+desplegaron**: los artefactos, inventarios y avisos de mantenimiento preparados en el repositorio no representan una actualización de ese servicio en Render.
+
+**Evidencia, por origen:**
+- **Observado en producción:** `/api/health` y `/api/ready` con 200 (base disponible), `/api/auth/me` sin credenciales con 401 y `Cache-Control: no-store`, con la instancia nueva (la primera
+  lectura tras marcarse Live vino de la instancia anterior y se descartó). Es disponibilidad, no validación funcional.
+- **Verificado en local, no en CI:** la construcción de las imágenes candidatas (API y mantenimiento), la extracción de sus inventarios y la regeneración de los avisos.
+- **Lo que ejecuta la CI** (su workflow): los avisos publicados y sus copias al día, el `Dockerfile` de mantenimiento, y en el backend `npm ci`, `prisma generate`, tipos, lint, pruebas unitarias, migraciones sobre la base desechable y pruebas de integración; en el frontend, tipos, lint, pruebas y la construcción. **No construye las imágenes candidatas ni extrae inventarios de imágenes.**
+- **No se hicieron pruebas funcionales en producción**; esa limitación no es una tarea obligatoria para cerrar A.
+- **Pendiente tras A:** `zod` sigue como aviso residual del árbol de producción de la API (entrega C); `vite`, `vitest`, `esbuild`, `tinypool` y el `minimatch` de `eslint` siguen como avisos de
+  desarrollo (entrega B). B y C no están autorizadas.
+
+Las entregas **B** (Vite, Vitest y herramientas) y **C** (Zod) **no están autorizadas** y no se tocaron: ni Zod, ni Vite,
 ni Vitest, ni Prisma, ni React, ni las imágenes base, ni el frontend. No cambia código de negocio.
 
 **Qué se hizo.** `package.json`: `fastify` `^5.12.3` → `^5.12.8` y `@fastify/swagger-ui` `^6.1.1` → `^6.1.3` (solo se subieron los mínimos).
