@@ -53,3 +53,7 @@ Distingue las pruebas simuladas de las observaciones reales.
 - Graphify es opcional y sirve para arquitectura, dependencias y relaciones entre módulos (`graphify query`, `path`, `explain`). Confirma lo que indique en el código y la configuración.
 - `graphify-out/` es salida local regenerable, ignorada por Git. Puede faltar, fallar o estar desactualizada, y eso nunca bloquea el trabajo: se lee el código directamente.
 - No lo regeneres (`graphify update .`) en tareas de solo lectura. Si tras cambios estructurales hace falta, actualízalo una sola vez al terminar el bloque de trabajo, no después de cada edición.
+
+## Atribuciones
+
+- No agregues atribuciones automáticas a Claude, líneas `Co-Authored-By` de Claude ni enlaces de sesión en commits o pull requests.
