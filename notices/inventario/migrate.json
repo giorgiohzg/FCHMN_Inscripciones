@@ -181,6 +181,9 @@
       "autor": "doug-martin <doug@dougamartin.com>",
       "repositorio": "git+https://github.com/C2FO/fast-csv.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fast-csv/format"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -200,6 +203,9 @@
       "autor": "doug-martin <doug@dougamartin.com>",
       "repositorio": "git+https://github.com/C2FO/fast-csv.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fast-csv/parse"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -219,6 +225,9 @@
       "autor": "Aras Abbasi <aras.abbasi@gmail.com>",
       "repositorio": "git+https://github.com/fastify/accept-negotiator.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/accept-negotiator"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -233,11 +242,14 @@
     },
     {
       "nombre": "@fastify/ajv-compiler",
-      "version": "4.0.6",
+      "version": "4.0.7",
       "expresion": "MIT",
       "autor": "Manuel Spigolon <behemoth89@gmail.com> (https://github.com/Eomm)",
       "repositorio": "git+https://github.com/fastify/ajv-compiler.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/ajv-compiler"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -257,6 +269,9 @@
       "autor": "Brian White <mscdex@mscdex.net>",
       "repositorio": "git+https://github.com/fastify/busboy.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/busboy"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -276,6 +291,9 @@
       "autor": "James Sumners <james.sumners@gmail.com>",
       "repositorio": "git+https://github.com/fastify/fastify-cookie.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/cookie"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -295,6 +313,9 @@
       "autor": "Tomas Della Vedova - @delvedor (https://delvedor.dev)",
       "repositorio": "git+https://github.com/fastify/fastify-cors.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/cors"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -314,6 +335,9 @@
       "autor": "Aras Abbasi <aras.abbasi@gmail.com>",
       "repositorio": "git+https://github.com/fastify/deepmerge.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/deepmerge"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -333,6 +357,9 @@
       "autor": "Tomas Della Vedova",
       "repositorio": "git+https://github.com/fastify/fastify-error.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/error"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -352,6 +379,9 @@
       "autor": "Manuel Spigolon <manuel.spigolon@nearform.com> (https://github.com/Eomm)",
       "repositorio": "git+https://github.com/fastify/fast-json-stringify-compiler.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/fast-json-stringify-compiler"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -371,6 +401,9 @@
       "autor": "Douglas Christopher Wilson <doug@somethingdoug.com>",
       "repositorio": "git+https://github.com/fastify/forwarded.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/forwarded"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -390,6 +423,9 @@
       "autor": "Matteo Collina <hello@matteocollina.com>",
       "repositorio": "git+https://github.com/fastify/fastify-helmet.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/helmet"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -409,6 +445,9 @@
       "autor": "Ivan Tymoshenko <ivan@tymoshenko.me>",
       "repositorio": "git+https://github.com/fastify/merge-json-schemas.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/merge-json-schemas"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -428,6 +467,9 @@
       "autor": "Matteo Collina <hello@matteocollina.com>",
       "repositorio": "git+https://github.com/fastify/fastify-multipart.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/multipart"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -447,6 +489,9 @@
       "autor": "Douglas Christopher Wilson <doug@somethingdoug.com>",
       "repositorio": "git+https://github.com/fastify/proxy-addr.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/proxy-addr"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -466,6 +511,9 @@
       "autor": "Tomas Della Vedova - @delvedor (http://delved.org)",
       "repositorio": "git+https://github.com/fastify/fastify-rate-limit.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/rate-limit"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -480,11 +528,14 @@
     },
     {
       "nombre": "@fastify/send",
-      "version": "4.1.1",
+      "version": "4.2.1",
       "expresion": "MIT",
       "autor": "TJ Holowaychuk <tj@vision-media.ca>",
       "repositorio": "git+https://github.com/fastify/send.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/send"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -499,11 +550,36 @@
     },
     {
       "nombre": "@fastify/static",
-      "version": "10.1.3",
+      "version": "10.1.10",
       "expresion": "MIT",
       "autor": "Tommaso Allevi - @allevo",
       "repositorio": "git+https://github.com/fastify/fastify-static.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/static"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ba9677e5a34c2738c26b36bb478f95e0369cac48fbe68a01a91fd5c7972f2043",
+          "bytes": 1123
+        }
+      ]
+    },
+    {
+      "nombre": "@fastify/swagger",
+      "version": "9.9.3",
+      "expresion": "MIT",
+      "autor": "Tomas Della Vedova - @delvedor (https://delvedor.dev)",
+      "repositorio": "git+https://github.com/fastify/fastify-swagger.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/swagger"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -518,11 +594,14 @@
     },
     {
       "nombre": "@fastify/swagger-ui",
-      "version": "6.1.1",
+      "version": "6.1.3",
       "expresion": "MIT",
       "autor": "Aras Abbasi <aras.abbasi@gmail.com>",
       "repositorio": "git+https://github.com/fastify/fastify-swagger-ui.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/swagger-ui"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -536,21 +615,24 @@
       ]
     },
     {
-      "nombre": "@fastify/swagger",
-      "version": "9.8.1",
-      "expresion": "MIT",
-      "autor": "Tomas Della Vedova - @delvedor (https://delvedor.dev)",
-      "repositorio": "git+https://github.com/fastify/fastify-swagger.git",
+      "nombre": "@isaacs/nonrecursive-glob-match",
+      "version": "1.1.0",
+      "expresion": "BlueOak-1.0.0",
+      "autor": null,
+      "repositorio": null,
       "base": "/app/node_modules",
+      "rutas": [
+        "@isaacs/nonrecursive-glob-match"
+      ],
       "archivosLicencia": [
-        "LICENSE"
+        "LICENSE.md"
       ],
       "tieneNotice": false,
       "licencias": [
         {
-          "archivo": "LICENSE",
-          "sha256": "ba9677e5a34c2738c26b36bb478f95e0369cac48fbe68a01a91fd5c7972f2043",
-          "bytes": 1123
+          "archivo": "LICENSE.md",
+          "sha256": "8a1af140fdfbf5afd3df27f7e662f989c5b963a300020dfafce42033cae9e004",
+          "bytes": 1552
         }
       ]
     },
@@ -561,6 +643,9 @@
       "autor": "Luke Edwards",
       "repositorio": "lukeed/ms",
       "base": "/app/node_modules",
+      "rutas": [
+        "@lukeed/ms"
+      ],
       "archivosLicencia": [
         "license"
       ],
@@ -580,6 +665,9 @@
       "autor": "Simone Primarosa <simonepri@outlook.com> (https://simoneprimarosa.com)",
       "repositorio": "github:simonepri/phc-format",
       "base": "/app/node_modules",
+      "rutas": [
+        "@phc/format"
+      ],
       "archivosLicencia": [
         "license"
       ],
@@ -599,6 +687,9 @@
       "autor": "Matteo Collina <hello@matteocollina.com>",
       "repositorio": "git+https://github.com/pinojs/redact.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@pinojs/redact"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -618,101 +709,9 @@
       "autor": "Tim Suchanek <suchanek@prisma.io>",
       "repositorio": "https://github.com/prisma/prisma.git",
       "base": "/app/node_modules",
-      "archivosLicencia": [
-        "LICENSE"
+      "rutas": [
+        "@prisma/client"
       ],
-      "tieneNotice": false,
-      "licencias": [
-        {
-          "archivo": "LICENSE",
-          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
-          "bytes": 11357
-        }
-      ]
-    },
-    {
-      "nombre": "@prisma/debug",
-      "version": "5.22.0",
-      "expresion": "Apache-2.0",
-      "autor": "Tim Suchanek <suchanek@prisma.io>",
-      "repositorio": "https://github.com/prisma/prisma.git",
-      "base": "/opt/prisma-cli/node_modules",
-      "archivosLicencia": [
-        "LICENSE"
-      ],
-      "tieneNotice": false,
-      "licencias": [
-        {
-          "archivo": "LICENSE",
-          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
-          "bytes": 11357
-        }
-      ]
-    },
-    {
-      "nombre": "@prisma/engines-version",
-      "version": "5.22.0-44.605197351a3c8bdd595af2d2a9bc3025bca48ea2",
-      "expresion": "Apache-2.0",
-      "autor": "Tim Suchanek <suchanek@prisma.io>",
-      "repositorio": "https://github.com/prisma/engines-wrapper.git",
-      "base": "/opt/prisma-cli/node_modules",
-      "archivosLicencia": [
-        "LICENSE"
-      ],
-      "tieneNotice": false,
-      "licencias": [
-        {
-          "archivo": "LICENSE",
-          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
-          "bytes": 11357
-        }
-      ]
-    },
-    {
-      "nombre": "@prisma/engines",
-      "version": "5.22.0",
-      "expresion": "Apache-2.0",
-      "autor": "Tim Suchanek <suchanek@prisma.io>",
-      "repositorio": "https://github.com/prisma/prisma.git",
-      "base": "/opt/prisma-cli/node_modules",
-      "archivosLicencia": [
-        "LICENSE"
-      ],
-      "tieneNotice": false,
-      "licencias": [
-        {
-          "archivo": "LICENSE",
-          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
-          "bytes": 11357
-        }
-      ]
-    },
-    {
-      "nombre": "@prisma/fetch-engine",
-      "version": "5.22.0",
-      "expresion": "Apache-2.0",
-      "autor": "Tim Suchanek <suchanek@prisma.io>",
-      "repositorio": "https://github.com/prisma/prisma.git",
-      "base": "/opt/prisma-cli/node_modules",
-      "archivosLicencia": [
-        "LICENSE"
-      ],
-      "tieneNotice": false,
-      "licencias": [
-        {
-          "archivo": "LICENSE",
-          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
-          "bytes": 11357
-        }
-      ]
-    },
-    {
-      "nombre": "@prisma/get-platform",
-      "version": "5.22.0",
-      "expresion": "Apache-2.0",
-      "autor": "Tim Suchanek <suchanek@prisma.io>",
-      "repositorio": "https://github.com/prisma/prisma.git",
-      "base": "/opt/prisma-cli/node_modules",
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -732,9 +731,35 @@
       "autor": "강동윤 <kdy1997.dev@gmail.com>",
       "repositorio": "git+https://github.com/swc-project/swc.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "@swc/helpers"
+      ],
       "archivosLicencia": [],
       "tieneNotice": false,
       "licencias": []
+    },
+    {
+      "nombre": "@types/node",
+      "version": "14.18.63",
+      "expresion": "MIT",
+      "autor": null,
+      "repositorio": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "@fast-csv/format/node_modules/@types/node",
+        "@fast-csv/parse/node_modules/@types/node"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+          "bytes": 1141
+        }
+      ]
     },
     {
       "nombre": "abstract-logging",
@@ -743,6 +768,9 @@
       "autor": "James Sumners <james.sumners@gmail.com>",
       "repositorio": "git+https://github.com/jsumners/abstract-logging.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "abstract-logging"
+      ],
       "archivosLicencia": [],
       "tieneNotice": false,
       "licencias": []
@@ -754,6 +782,9 @@
       "autor": "Nasca Iacob <adm-zip@pm.me> (https://github.com/cthackers)",
       "repositorio": "https://github.com/cthackers/adm-zip.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "adm-zip"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -767,31 +798,15 @@
       ]
     },
     {
-      "nombre": "ajv-formats",
-      "version": "3.0.1",
-      "expresion": "MIT",
-      "autor": "Evgeny Poberezkin",
-      "repositorio": "git+https://github.com/ajv-validator/ajv-formats.git",
-      "base": "/app/node_modules",
-      "archivosLicencia": [
-        "LICENSE"
-      ],
-      "tieneNotice": false,
-      "licencias": [
-        {
-          "archivo": "LICENSE",
-          "sha256": "9df3bb69929a3b650ed73b3bfa1756725aaff0ac296461605753547004eafeaf",
-          "bytes": 1074
-        }
-      ]
-    },
-    {
       "nombre": "ajv",
       "version": "8.20.0",
       "expresion": "MIT",
       "autor": "Evgeny Poberezkin",
       "repositorio": "ajv-validator/ajv",
       "base": "/app/node_modules",
+      "rutas": [
+        "ajv"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -805,12 +820,15 @@
       ]
     },
     {
-      "nombre": "archiver-utils",
-      "version": "2.1.0",
+      "nombre": "ajv-formats",
+      "version": "3.0.1",
       "expresion": "MIT",
-      "autor": "Chris Talkington",
-      "repositorio": "https://github.com/archiverjs/archiver-utils.git",
+      "autor": "Evgeny Poberezkin",
+      "repositorio": "git+https://github.com/ajv-validator/ajv-formats.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "ajv-formats"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -818,8 +836,8 @@
       "licencias": [
         {
           "archivo": "LICENSE",
-          "sha256": "19a37eba4fee8b33d904c46235c30bd668cff139f50b1fa5c7c57d2f920e6a4f",
-          "bytes": 1081
+          "sha256": "9df3bb69929a3b650ed73b3bfa1756725aaff0ac296461605753547004eafeaf",
+          "bytes": 1074
         }
       ]
     },
@@ -830,6 +848,9 @@
       "autor": "Chris Talkington",
       "repositorio": "https://github.com/archiverjs/node-archiver.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "archiver"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -843,12 +864,59 @@
       ]
     },
     {
+      "nombre": "archiver-utils",
+      "version": "2.1.0",
+      "expresion": "MIT",
+      "autor": "Chris Talkington",
+      "repositorio": "https://github.com/archiverjs/archiver-utils.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "archiver-utils"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "19a37eba4fee8b33d904c46235c30bd668cff139f50b1fa5c7c57d2f920e6a4f",
+          "bytes": 1081
+        }
+      ]
+    },
+    {
+      "nombre": "archiver-utils",
+      "version": "3.0.4",
+      "expresion": "MIT",
+      "autor": "Chris Talkington",
+      "repositorio": "https://github.com/archiverjs/archiver-utils.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "zip-stream/node_modules/archiver-utils"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "9fe335fb097fbff0b7f709ee14a77b1d1cf739d3400cd0b0e19118946772ea56",
+          "bytes": 1060
+        }
+      ]
+    },
+    {
       "nombre": "argon2",
       "version": "0.40.3",
       "expresion": "MIT",
       "autor": "Ranieri Althoff <ranisalt+argon2@gmail.com>",
       "repositorio": "https://github.com/ranisalt/node-argon2.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "argon2"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -868,6 +936,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/inspect-js/array-buffer-byte-length.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "array-buffer-byte-length"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -887,6 +958,9 @@
       "autor": "Caolan McMahon",
       "repositorio": "https://github.com/caolan/async.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "async"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -906,6 +980,9 @@
       "autor": "David Mark Clements (@davidmarkclem)",
       "repositorio": "git+https://github.com/davidmarkclements/atomic-sleep.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "atomic-sleep"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -925,6 +1002,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/inspect-js/available-typed-arrays.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "available-typed-arrays"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -944,6 +1024,9 @@
       "autor": "Matteo Collina <hello@matteocollina.com>",
       "repositorio": "git+https://github.com/fastify/avvio.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "avvio"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -963,6 +1046,9 @@
       "autor": "Julian Gruber",
       "repositorio": "git://github.com/juliangruber/balanced-match.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "balanced-match"
+      ],
       "archivosLicencia": [
         "LICENSE.md"
       ],
@@ -976,12 +1062,59 @@
       ]
     },
     {
+      "nombre": "balanced-match",
+      "version": "4.0.4",
+      "expresion": "MIT",
+      "autor": null,
+      "repositorio": "git://github.com/juliangruber/balanced-match.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "glob/node_modules/balanced-match"
+      ],
+      "archivosLicencia": [
+        "LICENSE.md"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.md",
+          "sha256": "d408f38ffa3355c5faec517153295338892eb0f1ea43f57874bb23c6075979b5",
+          "bytes": 1155
+        }
+      ]
+    },
+    {
+      "nombre": "base64-js",
+      "version": "0.0.8",
+      "expresion": "MIT",
+      "autor": "T. Jameson Little <t.jameson.little@gmail.com>",
+      "repositorio": "git://github.com/beatgammit/base64-js.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "linebreak/node_modules/base64-js"
+      ],
+      "archivosLicencia": [
+        "LICENSE.MIT"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE.MIT",
+          "sha256": "136239d1783a151cdbf6fd7935dd945082b9d0ee2cbb8497cc0ae49e8a743a47",
+          "bytes": 1066
+        }
+      ]
+    },
+    {
       "nombre": "base64-js",
       "version": "1.5.1",
       "expresion": "MIT",
       "autor": "T. Jameson Little <t.jameson.little@gmail.com>",
       "repositorio": "git://github.com/beatgammit/base64-js.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "base64-js"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1001,6 +1134,9 @@
       "autor": null,
       "repositorio": "https://github.com/rvagg/bl.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "bl"
+      ],
       "archivosLicencia": [
         "LICENSE.md"
       ],
@@ -1020,6 +1156,9 @@
       "autor": "Petka Antonov",
       "repositorio": "git://github.com/petkaantonov/bluebird.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "bluebird"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1034,11 +1173,15 @@
     },
     {
       "nombre": "brace-expansion",
-      "version": "2.1.4",
+      "version": "1.1.21",
       "expresion": "MIT",
       "autor": "Julian Gruber",
       "repositorio": "git://github.com/juliangruber/brace-expansion.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "archiver-utils/node_modules/brace-expansion",
+        "zip-stream/node_modules/brace-expansion"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1052,12 +1195,59 @@
       ]
     },
     {
+      "nombre": "brace-expansion",
+      "version": "2.1.7",
+      "expresion": "MIT",
+      "autor": "Julian Gruber",
+      "repositorio": "git://github.com/juliangruber/brace-expansion.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "brace-expansion"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "68f12f6e2c33688699249c01d8f9623c534da20aa71989c57b061b7bc1676d14",
+          "bytes": 1096
+        }
+      ]
+    },
+    {
+      "nombre": "brace-expansion",
+      "version": "5.0.12",
+      "expresion": "MIT",
+      "autor": null,
+      "repositorio": "git+https://github.com/juliangruber/brace-expansion.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "glob/node_modules/brace-expansion"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "9c63a23124d68cd30cd316a94a1a0bca34f032786df6df69fc4b5f136bac8d2e",
+          "bytes": 1144
+        }
+      ]
+    },
+    {
       "nombre": "brotli",
       "version": "1.3.3",
       "expresion": "MIT",
       "autor": "Devon Govett <devongovett@gmail.com>",
       "repositorio": "https://github.com/devongovett/brotli.js.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "brotli"
+      ],
       "archivosLicencia": [],
       "tieneNotice": false,
       "licencias": []
@@ -1069,6 +1259,9 @@
       "autor": "Devon Govett <devongovett@gmail.com>",
       "repositorio": "git+https://github.com/devongovett/browserify-zlib.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "browserify-zlib"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1082,12 +1275,37 @@
       ]
     },
     {
+      "nombre": "buffer",
+      "version": "5.7.1",
+      "expresion": "MIT",
+      "autor": "Feross Aboukhadijeh",
+      "repositorio": "git://github.com/feross/buffer.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "buffer"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "06bafa45fdad2579ba0e43b0c9b2c6290287c99c4203c300254a462b38a307f6",
+          "bytes": 1106
+        }
+      ]
+    },
+    {
       "nombre": "buffer-crc32",
       "version": "0.2.13",
       "expresion": "MIT",
       "autor": "Brian J. Brennan <brianloveswords@gmail.com>",
       "repositorio": "git://github.com/brianloveswords/buffer-crc32.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "buffer-crc32"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1107,6 +1325,9 @@
       "autor": "GoInstant Inc., a salesforce.com company",
       "repositorio": "git@github.com:goinstant/buffer-equal-constant-time.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "buffer-equal-constant-time"
+      ],
       "archivosLicencia": [
         "LICENSE.txt"
       ],
@@ -1120,50 +1341,15 @@
       ]
     },
     {
-      "nombre": "buffer",
-      "version": "5.7.1",
-      "expresion": "MIT",
-      "autor": "Feross Aboukhadijeh",
-      "repositorio": "git://github.com/feross/buffer.git",
-      "base": "/app/node_modules",
-      "archivosLicencia": [
-        "LICENSE"
-      ],
-      "tieneNotice": false,
-      "licencias": [
-        {
-          "archivo": "LICENSE",
-          "sha256": "06bafa45fdad2579ba0e43b0c9b2c6290287c99c4203c300254a462b38a307f6",
-          "bytes": 1106
-        }
-      ]
-    },
-    {
-      "nombre": "call-bind-apply-helpers",
-      "version": "1.0.2",
-      "expresion": "MIT",
-      "autor": "Jordan Harband <ljharb@gmail.com>",
-      "repositorio": "git+https://github.com/ljharb/call-bind-apply-helpers.git",
-      "base": "/app/node_modules",
-      "archivosLicencia": [
-        "LICENSE"
-      ],
-      "tieneNotice": false,
-      "licencias": [
-        {
-          "archivo": "LICENSE",
-          "sha256": "5e325595b4ea8cfec3802f545b1def5d7b73e4a5b8e9ba63e32a320f67732292",
-          "bytes": 1071
-        }
-      ]
-    },
-    {
       "nombre": "call-bind",
       "version": "1.0.9",
       "expresion": "MIT",
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/call-bind.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "call-bind"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1177,12 +1363,37 @@
       ]
     },
     {
+      "nombre": "call-bind-apply-helpers",
+      "version": "1.0.2",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/call-bind-apply-helpers.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "call-bind-apply-helpers"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "5e325595b4ea8cfec3802f545b1def5d7b73e4a5b8e9ba63e32a320f67732292",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
       "nombre": "call-bound",
       "version": "1.0.4",
       "expresion": "MIT",
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/call-bound.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "call-bound"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1202,6 +1413,9 @@
       "autor": "Paul Vorbach <paul@vorba.ch> (http://paul.vorba.ch/)",
       "repositorio": "git://github.com/pvorb/node-clone.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "clone"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1221,6 +1435,9 @@
       "autor": "Chris Talkington",
       "repositorio": "https://github.com/archiverjs/node-compress-commons.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "compress-commons"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1240,6 +1457,9 @@
       "autor": "James Halliday",
       "repositorio": "git://github.com/substack/node-concat-map.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "concat-map"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1254,11 +1474,14 @@
     },
     {
       "nombre": "content-disposition",
-      "version": "2.0.1",
+      "version": "3.0.0",
       "expresion": "MIT",
       "autor": "Douglas Christopher Wilson <doug@somethingdoug.com>",
       "repositorio": "jshttp/content-disposition",
       "base": "/app/node_modules",
+      "rutas": [
+        "content-disposition"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1278,6 +1501,31 @@
       "autor": "Roman Shtylman <shtylman@gmail.com>",
       "repositorio": "jshttp/cookie",
       "base": "/app/node_modules",
+      "rutas": [
+        "cookie"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c02110eedc16c7114f1a9bdc026c65626ce1d9c7e27fd51a8e0feee8a48a6858",
+          "bytes": 1175
+        }
+      ]
+    },
+    {
+      "nombre": "cookie",
+      "version": "2.0.1",
+      "expresion": "MIT",
+      "autor": "Roman Shtylman <shtylman@gmail.com>",
+      "repositorio": "jshttp/cookie",
+      "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/cookie/node_modules/cookie"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1297,6 +1545,9 @@
       "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
       "repositorio": "git://github.com/isaacs/core-util-is",
       "base": "/app/node_modules",
+      "rutas": [
+        "core-util-is"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1316,6 +1567,9 @@
       "autor": "sheetjs",
       "repositorio": "git://github.com/SheetJS/js-crc32.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "crc-32"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1335,6 +1589,9 @@
       "autor": "Chris Talkington",
       "repositorio": "https://github.com/archiverjs/node-crc32-stream.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "crc32-stream"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1354,6 +1611,9 @@
       "autor": "Evan Vosberg",
       "repositorio": "http://github.com/brix/crypto-js.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "crypto-js"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1373,6 +1633,9 @@
       "autor": "iamkun",
       "repositorio": "https://github.com/iamkun/dayjs.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "dayjs"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1392,6 +1655,9 @@
       "autor": "Josh Junon (https://github.com/qix-)",
       "repositorio": "git://github.com/debug-js/debug.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "debug"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1411,6 +1677,9 @@
       "autor": "James Halliday",
       "repositorio": "http://github.com/inspect-js/node-deep-equal.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "deep-equal"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1430,6 +1699,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/define-data-property.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "define-data-property"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1449,6 +1721,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git://github.com/ljharb/define-properties.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "define-properties"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1468,6 +1743,9 @@
       "autor": "Douglas Christopher Wilson <doug@somethingdoug.com>",
       "repositorio": "dougwilson/nodejs-depd",
       "base": "/app/node_modules",
+      "rutas": [
+        "depd"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1487,6 +1765,9 @@
       "autor": "Luke Edwards",
       "repositorio": "lukeed/dequal",
       "base": "/app/node_modules",
+      "rutas": [
+        "dequal"
+      ],
       "archivosLicencia": [
         "license"
       ],
@@ -1506,6 +1787,9 @@
       "autor": "Devon Govett <devongovett@gmail.com>",
       "repositorio": "git+ssh://git@github.com/devongovett/dfa.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "dfa"
+      ],
       "archivosLicencia": [],
       "tieneNotice": false,
       "licencias": []
@@ -1517,6 +1801,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/es-shims/dunder-proto.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "dunder-proto"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1536,6 +1823,9 @@
       "autor": "Conrad Pankoff <deoxxa@fknsrs.biz> (http://www.fknsrs.biz/)",
       "repositorio": "deoxxa/duplexer2",
       "base": "/app/node_modules",
+      "rutas": [
+        "duplexer2"
+      ],
       "archivosLicencia": [
         "LICENSE.md"
       ],
@@ -1555,6 +1845,9 @@
       "autor": "D2L Corporation",
       "repositorio": "git+ssh://git@github.com/Brightspace/node-ecdsa-sig-formatter.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "ecdsa-sig-formatter"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1574,6 +1867,9 @@
       "autor": "Mathias Buus <mathiasbuus@gmail.com>",
       "repositorio": "git://github.com/mafintosh/end-of-stream.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "end-of-stream"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1593,6 +1889,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/es-define-property.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "es-define-property"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1612,6 +1911,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/es-errors.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "es-errors"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1631,6 +1933,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/es-get-iterator.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "es-get-iterator"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1650,6 +1955,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/es-object-atoms.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "es-object-atoms"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1669,6 +1977,9 @@
       "autor": null,
       "repositorio": "component/escape-html",
       "base": "/app/node_modules",
+      "rutas": [
+        "escape-html"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1688,6 +1999,9 @@
       "autor": "Guyon Roche",
       "repositorio": "https://github.com/exceljs/exceljs.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "exceljs"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1707,6 +2021,9 @@
       "autor": "Doug Martin",
       "repositorio": "git+https://github.com/C2FO/fast-csv.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "fast-csv"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1726,6 +2043,9 @@
       "autor": "Tomas Della Vedova - @delvedor (http://delved.org)",
       "repositorio": "git+https://github.com/delvedor/fast-decode-uri-component.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "fast-decode-uri-component"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1745,6 +2065,9 @@
       "autor": "Evgeny Poberezkin",
       "repositorio": "git+https://github.com/epoberezkin/fast-deep-equal.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "fast-deep-equal"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1764,6 +2087,9 @@
       "autor": "Matteo Collina <hello@matteocollina.com>",
       "repositorio": "git+https://github.com/fastify/fast-json-stringify.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "fast-json-stringify"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1783,6 +2109,9 @@
       "autor": "Yagiz Nizipli <yagiz@nizipli.com>",
       "repositorio": "git+https://github.com/anonrig/fast-querystring.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "fast-querystring"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1797,11 +2126,15 @@
     },
     {
       "nombre": "fast-uri",
-      "version": "4.1.4",
+      "version": "3.1.9",
       "expresion": "BSD-3-Clause",
       "autor": "Vincent Le Goff <vince.legoff@gmail.com> (https://github.com/zekth)",
       "repositorio": "git+https://github.com/fastify/fast-uri.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "ajv/node_modules/fast-uri",
+        "json-schema-resolver/node_modules/fast-uri"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1815,12 +2148,15 @@
       ]
     },
     {
-      "nombre": "fastify-plugin",
-      "version": "6.0.0",
-      "expresion": "MIT",
-      "autor": "Tomas Della Vedova - @delvedor (http://delved.org)",
-      "repositorio": "git+https://github.com/fastify/fastify-plugin.git",
+      "nombre": "fast-uri",
+      "version": "4.2.3",
+      "expresion": "BSD-3-Clause",
+      "autor": "Vincent Le Goff <vince.legoff@gmail.com> (https://github.com/zekth)",
+      "repositorio": "git+https://github.com/fastify/fast-uri.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "fast-uri"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1828,18 +2164,21 @@
       "licencias": [
         {
           "archivo": "LICENSE",
-          "sha256": "ba9677e5a34c2738c26b36bb478f95e0369cac48fbe68a01a91fd5c7972f2043",
-          "bytes": 1123
+          "sha256": "b010b0dfdfdb23d7396e03b82cd4621fc9bb8f95d6b0aea70b9c24e12074c786",
+          "bytes": 1813
         }
       ]
     },
     {
       "nombre": "fastify",
-      "version": "5.12.3",
+      "version": "5.12.8",
       "expresion": "MIT",
       "autor": "Matteo Collina <hello@matteocollina.com>",
       "repositorio": "git+https://github.com/fastify/fastify.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "fastify"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1853,12 +2192,60 @@
       ]
     },
     {
+      "nombre": "fastify-plugin",
+      "version": "5.1.0",
+      "expresion": "MIT",
+      "autor": "Tomas Della Vedova - @delvedor (http://delved.org)",
+      "repositorio": "git+https://github.com/fastify/fastify-plugin.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "@fastify/multipart/node_modules/fastify-plugin",
+        "@fastify/rate-limit/node_modules/fastify-plugin"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "fe26044de416cf0cdb2cfd12ed299e5756d05b5d2ee6c59d3fd25ed304635d58",
+          "bytes": 1162
+        }
+      ]
+    },
+    {
+      "nombre": "fastify-plugin",
+      "version": "6.0.0",
+      "expresion": "MIT",
+      "autor": "Tomas Della Vedova - @delvedor (http://delved.org)",
+      "repositorio": "git+https://github.com/fastify/fastify-plugin.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "fastify-plugin"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ba9677e5a34c2738c26b36bb478f95e0369cac48fbe68a01a91fd5c7972f2043",
+          "bytes": 1123
+        }
+      ]
+    },
+    {
       "nombre": "fastq",
       "version": "1.20.3",
       "expresion": "ISC",
       "autor": "Matteo Collina <hello@matteocollina.com>",
       "repositorio": "git+https://github.com/mcollina/fastq.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "fastq"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1873,11 +2260,14 @@
     },
     {
       "nombre": "find-my-way",
-      "version": "9.9.0",
+      "version": "9.10.0",
       "expresion": "MIT",
       "autor": "Tomas Della Vedova - @delvedor (http://delved.org)",
       "repositorio": "git+https://github.com/delvedor/find-my-way.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "find-my-way"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1897,6 +2287,9 @@
       "autor": "Devon Govett <devongovett@gmail.com>",
       "repositorio": "git://github.com/foliojs/fontkit.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "fontkit"
+      ],
       "archivosLicencia": [],
       "tieneNotice": false,
       "licencias": []
@@ -1908,6 +2301,9 @@
       "autor": "Raynos <raynos2@gmail.com>",
       "repositorio": "https://github.com/Raynos/for-each.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "for-each"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1927,6 +2323,9 @@
       "autor": "Mathias Buus (@mafintosh)",
       "repositorio": "https://github.com/mafintosh/fs-constants.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "fs-constants"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1946,6 +2345,9 @@
       "autor": "JP Richardson <jprichardson@gmail.com>",
       "repositorio": "https://github.com/jprichardson/node-fs-extra",
       "base": "/app/node_modules",
+      "rutas": [
+        "fs-extra"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1965,6 +2367,9 @@
       "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
       "repositorio": "git+https://github.com/isaacs/fs.realpath.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "fs.realpath"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -1984,6 +2389,9 @@
       "autor": "Raynos <raynos2@gmail.com>",
       "repositorio": "https://github.com/Raynos/function-bind.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "function-bind"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2003,6 +2411,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/inspect-js/functions-have-names.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "functions-have-names"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2022,6 +2433,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/get-intrinsic.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "get-intrinsic"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2041,6 +2455,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/get-proto.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "get-proto"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2055,11 +2472,14 @@
     },
     {
       "nombre": "glob",
-      "version": "13.0.6",
+      "version": "14.0.4",
       "expresion": "BlueOak-1.0.0",
       "autor": "Isaac Z. Schlueter <i@izs.me> (https://blog.izs.me/)",
       "repositorio": "git@github.com:isaacs/node-glob.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "glob"
+      ],
       "archivosLicencia": [
         "LICENSE.md"
       ],
@@ -2073,12 +2493,38 @@
       ]
     },
     {
+      "nombre": "glob",
+      "version": "7.2.3",
+      "expresion": "ISC",
+      "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
+      "repositorio": "git://github.com/isaacs/node-glob.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "archiver-utils/node_modules/glob",
+        "zip-stream/node_modules/glob"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "6236fa0b88a4a0cce3dda0367979491b2052b3c8d6b1c10b3668de083e86a7f0",
+          "bytes": 976
+        }
+      ]
+    },
+    {
       "nombre": "gopd",
       "version": "1.2.0",
       "expresion": "MIT",
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/gopd.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "gopd"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2098,6 +2544,9 @@
       "autor": null,
       "repositorio": "https://github.com/isaacs/node-graceful-fs",
       "base": "/app/node_modules",
+      "rutas": [
+        "graceful-fs"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2117,6 +2566,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/has-bigints.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "has-bigints"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2136,6 +2588,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/inspect-js/has-property-descriptors.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "has-property-descriptors"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2155,6 +2610,9 @@
       "autor": "Jordan Harband",
       "repositorio": "git://github.com/inspect-js/has-symbols.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "has-symbols"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2174,6 +2632,9 @@
       "autor": "Jordan Harband",
       "repositorio": "git+https://github.com/inspect-js/has-tostringtag.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "has-tostringtag"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2193,6 +2654,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/inspect-js/hasOwn.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "hasown"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2212,6 +2676,9 @@
       "autor": "Adam Baldwin <adam@npmjs.com> (https://evilpacket.net)",
       "repositorio": "git://github.com/helmetjs/helmet.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "helmet"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2231,6 +2698,9 @@
       "autor": "Jonathan Ong <me@jongleberry.com> (http://jongleberry.com)",
       "repositorio": "jshttp/http-errors",
       "base": "/app/node_modules",
+      "rutas": [
+        "http-errors"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2250,6 +2720,9 @@
       "autor": "Feross Aboukhadijeh",
       "repositorio": "git://github.com/feross/ieee754.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "ieee754"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2269,6 +2742,9 @@
       "autor": null,
       "repositorio": "git://github.com/calvinmetcalf/immediate.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "immediate"
+      ],
       "archivosLicencia": [
         "LICENSE.txt"
       ],
@@ -2288,6 +2764,9 @@
       "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
       "repositorio": "https://github.com/npm/inflight.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "inflight"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2307,6 +2786,9 @@
       "autor": null,
       "repositorio": "git://github.com/isaacs/inherits",
       "base": "/app/node_modules",
+      "rutas": [
+        "inherits"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2326,6 +2808,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/internal-slot.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "internal-slot"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2345,6 +2830,9 @@
       "autor": "whitequark <whitequark@whitequark.org>",
       "repositorio": "git+https://github.com/whitequark/ipaddr.js.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "ipaddr.js"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2364,6 +2852,9 @@
       "autor": "Jordan Harband",
       "repositorio": "git://github.com/inspect-js/is-arguments.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "is-arguments"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2383,6 +2874,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/inspect-js/is-array-buffer.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "is-array-buffer"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2402,6 +2896,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/inspect-js/is-bigint.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "is-bigint"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2421,6 +2918,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git://github.com/inspect-js/is-boolean-object.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "is-boolean-object"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2440,6 +2940,9 @@
       "autor": "Jordan Harband",
       "repositorio": "git://github.com/inspect-js/is-callable.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "is-callable"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2459,6 +2962,9 @@
       "autor": "Jordan Harband",
       "repositorio": "git://github.com/inspect-js/is-date-object.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "is-date-object"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2478,6 +2984,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/inspect-js/is-map.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "is-map"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2497,6 +3006,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git://github.com/inspect-js/is-number-object.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "is-number-object"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2516,6 +3028,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git://github.com/inspect-js/is-regex.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "is-regex"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2535,6 +3050,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/inspect-js/is-set.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "is-set"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2554,6 +3072,9 @@
       "autor": "Jordan Harband",
       "repositorio": "git+https://github.com/inspect-js/is-shared-array-buffer.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "is-shared-array-buffer"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2573,6 +3094,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git://github.com/inspect-js/is-string.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "is-string"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2592,6 +3116,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git://github.com/inspect-js/is-symbol.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "is-symbol"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2611,6 +3138,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/inspect-js/is-weakmap.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "is-weakmap"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2630,6 +3160,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/inspect-js/is-weakset.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "is-weakset"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2644,11 +3177,38 @@
     },
     {
       "nombre": "isarray",
+      "version": "1.0.0",
+      "expresion": "MIT",
+      "autor": "Julian Gruber",
+      "repositorio": "git://github.com/juliangruber/isarray.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "archiver-utils/node_modules/isarray",
+        "duplexer2/node_modules/isarray",
+        "jszip/node_modules/isarray",
+        "lazystream/node_modules/isarray"
+      ],
+      "archivosLicencia": [],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "README.md",
+          "seccion": "License",
+          "sha256": "66aa9feab8bb39aceebd69f2a357015d57ceab486d3c7a19ff8d3d4110a6d101",
+          "bytes": 1108
+        }
+      ]
+    },
+    {
+      "nombre": "isarray",
       "version": "2.0.5",
       "expresion": "MIT",
       "autor": "Julian Gruber",
       "repositorio": "git://github.com/juliangruber/isarray.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "isarray"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2668,6 +3228,9 @@
       "autor": "s@zhso.net",
       "repositorio": "https://github.com/zhso/jpeg-exif.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "jpeg-exif"
+      ],
       "archivosLicencia": [
         "LICENSE.txt"
       ],
@@ -2687,6 +3250,9 @@
       "autor": "Ivan Tymoshenko <ivan@tymoshenko.me>",
       "repositorio": "git+https://github.com/fastify/json-schema-ref-resolver.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "json-schema-ref-resolver"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2706,6 +3272,9 @@
       "autor": "Manuel Spigolon <behemoth89@gmail.com> (https://github.com/Eomm)",
       "repositorio": "git+https://github.com/Eomm/json-schema-resolver.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "json-schema-resolver"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2725,6 +3294,9 @@
       "autor": "Evgeny Poberezkin",
       "repositorio": "git+https://github.com/epoberezkin/json-schema-traverse.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "json-schema-traverse"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2744,6 +3316,9 @@
       "autor": "JP Richardson <jprichardson@gmail.com>",
       "repositorio": "git@github.com:jprichardson/node-jsonfile.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "jsonfile"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2763,6 +3338,9 @@
       "autor": "auth0",
       "repositorio": "https://github.com/auth0/node-jsonwebtoken",
       "base": "/app/node_modules",
+      "rutas": [
+        "jsonwebtoken"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2782,6 +3360,9 @@
       "autor": "Stuart Knightley <stuart@stuartk.com>",
       "repositorio": "https://github.com/Stuk/jszip.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "jszip"
+      ],
       "archivosLicencia": [
         "LICENSE.markdown"
       ],
@@ -2801,6 +3382,9 @@
       "autor": "Brian J. Brennan <brianloveswords@gmail.com>",
       "repositorio": "git://github.com/brianloveswords/node-jwa.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "jwa"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2820,6 +3404,9 @@
       "autor": "Brian J Brennan",
       "repositorio": "git://github.com/brianloveswords/node-jws.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "jws"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2839,6 +3426,9 @@
       "autor": "Jonas Pommerening",
       "repositorio": "https://github.com/jpommerening/node-lazystream.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "lazystream"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2858,6 +3448,9 @@
       "autor": null,
       "repositorio": "https://github.com/calvinmetcalf/lie.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "lie"
+      ],
       "archivosLicencia": [
         "license.md"
       ],
@@ -2877,6 +3470,9 @@
       "autor": "Tomas Della Vedova - @delvedor (http://delved.org)",
       "repositorio": "git+https://github.com/fastify/light-my-request.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "light-my-request"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2896,6 +3492,9 @@
       "autor": "Devon Govett <devongovett@gmail.com>",
       "repositorio": "https://github.com/devongovett/linebreaker.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "linebreak"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2915,6 +3514,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.defaults"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2934,6 +3536,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.difference"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2953,6 +3558,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.escaperegexp"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2972,6 +3580,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.flatten"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -2991,6 +3602,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.groupby"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3010,6 +3624,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.includes"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3029,6 +3646,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.isboolean"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3048,6 +3668,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.isequal"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3067,6 +3690,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.isfunction"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3086,6 +3712,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.isinteger"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3105,6 +3734,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.isnil"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3124,6 +3756,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.isnumber"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3143,6 +3778,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.isplainobject"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3162,6 +3800,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.isstring"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3181,6 +3822,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.isundefined"
+      ],
       "archivosLicencia": [
         "LICENSE.txt"
       ],
@@ -3200,6 +3844,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.once"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3219,6 +3866,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.union"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3238,6 +3888,9 @@
       "autor": "John-David Dalton <john.david.dalton@gmail.com> (http://allyoucanleet.com/)",
       "repositorio": "lodash/lodash",
       "base": "/app/node_modules",
+      "rutas": [
+        "lodash.uniq"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3252,11 +3905,14 @@
     },
     {
       "nombre": "lru-cache",
-      "version": "11.5.2",
+      "version": "11.5.3",
       "expresion": "BlueOak-1.0.0",
       "autor": "Isaac Z. Schlueter <i@izs.me>",
       "repositorio": "git+ssh://git@github.com/isaacs/node-lru-cache.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "lru-cache"
+      ],
       "archivosLicencia": [
         "LICENSE.md"
       ],
@@ -3276,6 +3932,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/es-shims/math-intrinsics.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "math-intrinsics"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3295,6 +3954,9 @@
       "autor": "Robert Kieffer",
       "repositorio": "https://github.com/broofa/mime",
       "base": "/app/node_modules",
+      "rutas": [
+        "mime"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3309,11 +3971,14 @@
     },
     {
       "nombre": "minimatch",
-      "version": "10.2.6",
+      "version": "11.0.5",
       "expresion": "BlueOak-1.0.0",
       "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)",
       "repositorio": "git@github.com:isaacs/minimatch",
       "base": "/app/node_modules",
+      "rutas": [
+        "glob/node_modules/minimatch"
+      ],
       "archivosLicencia": [
         "LICENSE.md"
       ],
@@ -3327,12 +3992,60 @@
       ]
     },
     {
+      "nombre": "minimatch",
+      "version": "3.1.5",
+      "expresion": "ISC",
+      "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)",
+      "repositorio": "git://github.com/isaacs/minimatch.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "archiver-utils/node_modules/minimatch",
+        "zip-stream/node_modules/minimatch"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b",
+          "bytes": 765
+        }
+      ]
+    },
+    {
+      "nombre": "minimatch",
+      "version": "5.1.9",
+      "expresion": "ISC",
+      "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)",
+      "repositorio": "git://github.com/isaacs/minimatch.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "readdir-glob/node_modules/minimatch"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "d11323827fa4edeaafc437cc5b91b6971b335f0127efeeb42bf5122fe8657e8f",
+          "bytes": 775
+        }
+      ]
+    },
+    {
       "nombre": "minipass",
       "version": "7.1.3",
       "expresion": "BlueOak-1.0.0",
       "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
       "repositorio": "https://github.com/isaacs/minipass",
       "base": "/app/node_modules",
+      "rutas": [
+        "minipass"
+      ],
       "archivosLicencia": [
         "LICENSE.md"
       ],
@@ -3352,6 +4065,9 @@
       "autor": null,
       "repositorio": "vercel/ms",
       "base": "/app/node_modules",
+      "rutas": [
+        "ms"
+      ],
       "archivosLicencia": [
         "license.md"
       ],
@@ -3371,6 +4087,9 @@
       "autor": null,
       "repositorio": "git://github.com/nodejs/node-addon-api.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "node-addon-api"
+      ],
       "archivosLicencia": [
         "LICENSE.md"
       ],
@@ -3390,6 +4109,9 @@
       "autor": "Mathias Buus (@mafintosh)",
       "repositorio": "https://github.com/prebuild/node-gyp-build.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "node-gyp-build"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3409,6 +4131,9 @@
       "autor": "Robert Kieffer <robert@broofa.com>",
       "repositorio": "https://github.com/broofa/node-int64",
       "base": "/app/node_modules",
+      "rutas": [
+        "node-int64"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3428,6 +4153,9 @@
       "autor": "Jon Schlinkert (https://github.com/jonschlinkert)",
       "repositorio": "jonschlinkert/normalize-path",
       "base": "/app/node_modules",
+      "rutas": [
+        "normalize-path"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3447,6 +4175,9 @@
       "autor": "James Halliday",
       "repositorio": "git://github.com/inspect-js/object-inspect.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "object-inspect"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3466,6 +4197,9 @@
       "autor": "Jordan Harband",
       "repositorio": "git://github.com/es-shims/object-is.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "object-is"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3485,6 +4219,9 @@
       "autor": "Jordan Harband",
       "repositorio": "git://github.com/ljharb/object-keys.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "object-keys"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3504,6 +4241,9 @@
       "autor": "Jordan Harband",
       "repositorio": "git://github.com/ljharb/object.assign.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "object.assign"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3523,6 +4263,9 @@
       "autor": "Matteo Collina <hello@matteocollina.com>",
       "repositorio": "git+https://github.com/mcollina/on-exit-or-gc.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "on-exit-leak-free"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3542,6 +4285,9 @@
       "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
       "repositorio": "git://github.com/isaacs/once",
       "base": "/app/node_modules",
+      "rutas": [
+        "once"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3561,6 +4307,9 @@
       "autor": "Joseph Spencer",
       "repositorio": "https://github.com/kogosoftwarellc/open-api/tree/master/packages/openapi-types",
       "base": "/app/node_modules",
+      "rutas": [
+        "openapi-types"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3575,11 +4324,36 @@
     },
     {
       "nombre": "pako",
+      "version": "0.2.9",
+      "expresion": "MIT",
+      "autor": null,
+      "repositorio": "nodeca/pako",
+      "base": "/app/node_modules",
+      "rutas": [
+        "unicode-trie/node_modules/pako"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "3bc404ffa7888053253eedcc5a667619aa08dc1be0bea400e5ff28c51602180f",
+          "bytes": 1084
+        }
+      ]
+    },
+    {
+      "nombre": "pako",
       "version": "1.0.11",
       "expresion": "(MIT AND Zlib)",
       "autor": null,
       "repositorio": "nodeca/pako",
       "base": "/app/node_modules",
+      "rutas": [
+        "pako"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3599,6 +4373,9 @@
       "autor": "Sindre Sorhus",
       "repositorio": "sindresorhus/path-is-absolute",
       "base": "/app/node_modules",
+      "rutas": [
+        "path-is-absolute"
+      ],
       "archivosLicencia": [
         "license"
       ],
@@ -3613,11 +4390,14 @@
     },
     {
       "nombre": "path-scurry",
-      "version": "2.0.2",
+      "version": "3.0.0",
       "expresion": "BlueOak-1.0.0",
       "autor": "Isaac Z. Schlueter <i@izs.me> (https://blog.izs.me)",
       "repositorio": "git+https://github.com/isaacs/path-scurry",
       "base": "/app/node_modules",
+      "rutas": [
+        "path-scurry"
+      ],
       "archivosLicencia": [
         "LICENSE.md"
       ],
@@ -3637,6 +4417,9 @@
       "autor": "Devon Govett",
       "repositorio": "https://github.com/foliojs/pdfkit.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "pdfkit"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3650,12 +4433,37 @@
       ]
     },
     {
+      "nombre": "pino",
+      "version": "9.14.0",
+      "expresion": "MIT",
+      "autor": "Matteo Collina <hello@matteocollina.com>",
+      "repositorio": "git+https://github.com/pinojs/pino.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "pino"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "d4eb00c3ef2fa54cdf05d167b15e994bc67226a7998e090e22a0bc8b16223a6c",
+          "bytes": 1209
+        }
+      ]
+    },
+    {
       "nombre": "pino-abstract-transport",
       "version": "2.0.0",
       "expresion": "MIT",
       "autor": "Matteo Collina <hello@matteocollina.com>",
       "repositorio": "git+https://github.com/pinojs/pino-abstract-transport.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "pino-abstract-transport"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3675,6 +4483,9 @@
       "autor": "James Sumners <james.sumners@gmail.com>",
       "repositorio": "git+ssh://git@github.com/pinojs/pino-std-serializers.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "pino-std-serializers"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3688,31 +4499,15 @@
       ]
     },
     {
-      "nombre": "pino",
-      "version": "9.14.0",
-      "expresion": "MIT",
-      "autor": "Matteo Collina <hello@matteocollina.com>",
-      "repositorio": "git+https://github.com/pinojs/pino.git",
-      "base": "/app/node_modules",
-      "archivosLicencia": [
-        "LICENSE"
-      ],
-      "tieneNotice": false,
-      "licencias": [
-        {
-          "archivo": "LICENSE",
-          "sha256": "d4eb00c3ef2fa54cdf05d167b15e994bc67226a7998e090e22a0bc8b16223a6c",
-          "bytes": 1209
-        }
-      ]
-    },
-    {
       "nombre": "png-js",
       "version": "1.1.0",
       "expresion": null,
       "autor": "Devon Govett",
       "repositorio": "https://github.com/devongovett/png.js.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "png-js"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3732,6 +4527,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/possible-typed-array-names.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "possible-typed-array-names"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3745,31 +4543,15 @@
       ]
     },
     {
-      "nombre": "prisma",
-      "version": "5.22.0",
-      "expresion": "Apache-2.0",
-      "autor": "Tim Suchanek <suchanek@prisma.io>",
-      "repositorio": "https://github.com/prisma/prisma.git",
-      "base": "/opt/prisma-cli/node_modules",
-      "archivosLicencia": [
-        "LICENSE"
-      ],
-      "tieneNotice": false,
-      "licencias": [
-        {
-          "archivo": "LICENSE",
-          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
-          "bytes": 11357
-        }
-      ]
-    },
-    {
       "nombre": "process-nextick-args",
       "version": "2.0.1",
       "expresion": "MIT",
       "autor": "",
       "repositorio": "https://github.com/calvinmetcalf/process-nextick-args.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "process-nextick-args"
+      ],
       "archivosLicencia": [
         "license.md"
       ],
@@ -3784,11 +4566,36 @@
     },
     {
       "nombre": "process-warning",
+      "version": "4.0.1",
+      "expresion": "MIT",
+      "autor": "Tomas Della Vedova",
+      "repositorio": "git+https://github.com/fastify/process-warning.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "light-my-request/node_modules/process-warning"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "d9726abc9eff9496f3ecb5302e70756f310db24a01c7ddd20f541143bf5576ad",
+          "bytes": 1059
+        }
+      ]
+    },
+    {
+      "nombre": "process-warning",
       "version": "5.1.0",
       "expresion": "MIT",
       "autor": "Tomas Della Vedova",
       "repositorio": "git+https://github.com/fastify/process-warning.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "process-warning"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3808,6 +4615,9 @@
       "autor": "David Mark Clements",
       "repositorio": "git+https://github.com/davidmarkclements/quick-format.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "quick-format-unescaped"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3822,11 +4632,39 @@
     },
     {
       "nombre": "readable-stream",
+      "version": "2.3.8",
+      "expresion": "MIT",
+      "autor": null,
+      "repositorio": "git://github.com/nodejs/readable-stream",
+      "base": "/app/node_modules",
+      "rutas": [
+        "archiver-utils/node_modules/readable-stream",
+        "duplexer2/node_modules/readable-stream",
+        "jszip/node_modules/readable-stream",
+        "lazystream/node_modules/readable-stream"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "ec62dc96da0099b87f4511736c87309335527fb7031639493e06c95728dc8c54",
+          "bytes": 2337
+        }
+      ]
+    },
+    {
+      "nombre": "readable-stream",
       "version": "3.6.2",
       "expresion": "MIT",
       "autor": null,
       "repositorio": "git://github.com/nodejs/readable-stream",
       "base": "/app/node_modules",
+      "rutas": [
+        "readable-stream"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3846,6 +4684,9 @@
       "autor": "Yann Armelin",
       "repositorio": "git://github.com/Yqnn/node-readdir-glob.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "readdir-glob"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3865,6 +4706,9 @@
       "autor": "Paolo Insogna <shogun@cowtech.it>",
       "repositorio": "git+https://github.com/pinojs/real-require.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "real-require"
+      ],
       "archivosLicencia": [
         "LICENSE.md"
       ],
@@ -3884,6 +4728,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git://github.com/es-shims/RegExp.prototype.flags.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "regexp.prototype.flags"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3903,6 +4750,9 @@
       "autor": "Vsevolod Strukchinsky",
       "repositorio": "floatdrop/require-from-string",
       "base": "/app/node_modules",
+      "rutas": [
+        "require-from-string"
+      ],
       "archivosLicencia": [
         "license"
       ],
@@ -3922,6 +4772,9 @@
       "autor": "Devon Govett <devongovett@gmail.com>",
       "repositorio": "git://github.com/devongovett/restructure.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "restructure"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3936,11 +4789,14 @@
     },
     {
       "nombre": "ret",
-      "version": "0.5.0",
+      "version": "0.5.1",
       "expresion": "MIT",
       "autor": "fent <fentbox@gmail.com> (https://github.com/fent)",
       "repositorio": "git://github.com/fent/ret.js.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "ret"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3960,6 +4816,9 @@
       "autor": "Matteo Collina <hello@matteocollina.com>",
       "repositorio": "git+https://github.com/mcollina/reusify.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "reusify"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3979,6 +4838,9 @@
       "autor": "David Mark Clements <david.clements@nearform.com>",
       "repositorio": "git+https://github.com/davidmarkclements/rfdc.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "rfdc"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -3993,11 +4855,39 @@
     },
     {
       "nombre": "safe-buffer",
+      "version": "5.1.2",
+      "expresion": "MIT",
+      "autor": "Feross Aboukhadijeh",
+      "repositorio": "git://github.com/feross/safe-buffer.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "archiver-utils/node_modules/safe-buffer",
+        "duplexer2/node_modules/safe-buffer",
+        "jszip/node_modules/safe-buffer",
+        "lazystream/node_modules/safe-buffer"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c7cc929b57080f4b9d0c6cf57669f0463fc5b39906344dfc8d3bc43426b30eac",
+          "bytes": 1081
+        }
+      ]
+    },
+    {
+      "nombre": "safe-buffer",
       "version": "5.2.1",
       "expresion": "MIT",
       "autor": "Feross Aboukhadijeh",
       "repositorio": "git://github.com/feross/safe-buffer.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "safe-buffer"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4017,6 +4907,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/safe-regex-test.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "safe-regex-test"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4031,11 +4924,14 @@
     },
     {
       "nombre": "safe-regex2",
-      "version": "5.1.1",
+      "version": "5.1.2",
       "expresion": "MIT",
       "autor": "James Halliday",
-      "repositorio": "git://github.com/fastify/safe-regex2.git",
+      "repositorio": "git+https://github.com/fastify/safe-regex2.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "safe-regex2"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4055,6 +4951,9 @@
       "autor": "Ruben Bridgewater",
       "repositorio": "git+https://github.com/BridgeAR/safe-stable-stringify.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "safe-stable-stringify"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4074,6 +4973,9 @@
       "autor": "Louis-Dominique Dubeau <ldd@lddubeau.com>",
       "repositorio": "https://github.com/lddubeau/saxes.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "saxes"
+      ],
       "archivosLicencia": [],
       "tieneNotice": false,
       "licencias": []
@@ -4085,6 +4987,9 @@
       "autor": "Eran Hammer <eran@sideway.com>",
       "repositorio": "git+https://github.com/fastify/secure-json-parse.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "secure-json-parse"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4104,6 +5009,9 @@
       "autor": "GitHub Inc.",
       "repositorio": "git+https://github.com/npm/node-semver.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "semver"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4123,6 +5031,9 @@
       "autor": "Nathan Friedly",
       "repositorio": "nfriedly/set-cookie-parser",
       "base": "/app/node_modules",
+      "rutas": [
+        "set-cookie-parser"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4142,6 +5053,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/set-function-length.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "set-function-length"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4161,6 +5075,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/set-function-name.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "set-function-name"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4180,6 +5097,9 @@
       "autor": "YuzuJS",
       "repositorio": "YuzuJS/setImmediate",
       "base": "/app/node_modules",
+      "rutas": [
+        "setimmediate"
+      ],
       "archivosLicencia": [
         "LICENSE.txt"
       ],
@@ -4199,6 +5119,9 @@
       "autor": "Wes Todd",
       "repositorio": "https://github.com/wesleytodd/setprototypeof.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "setprototypeof"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4212,12 +5135,37 @@
       ]
     },
     {
+      "nombre": "side-channel",
+      "version": "1.1.1",
+      "expresion": "MIT",
+      "autor": "Jordan Harband <ljharb@gmail.com>",
+      "repositorio": "git+https://github.com/ljharb/side-channel.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "side-channel"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "cfc3f455254c0af0655cc3ff46a41ed644b67599f6043346169d285bf2b3cf3b",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
       "nombre": "side-channel-list",
       "version": "1.0.1",
       "expresion": "MIT",
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/side-channel-list.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "side-channel-list"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4237,6 +5185,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/side-channel-map.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "side-channel-map"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4256,25 +5207,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/side-channel-weakmap.git",
       "base": "/app/node_modules",
-      "archivosLicencia": [
-        "LICENSE"
+      "rutas": [
+        "side-channel-weakmap"
       ],
-      "tieneNotice": false,
-      "licencias": [
-        {
-          "archivo": "LICENSE",
-          "sha256": "cfc3f455254c0af0655cc3ff46a41ed644b67599f6043346169d285bf2b3cf3b",
-          "bytes": 1071
-        }
-      ]
-    },
-    {
-      "nombre": "side-channel",
-      "version": "1.1.1",
-      "expresion": "MIT",
-      "autor": "Jordan Harband <ljharb@gmail.com>",
-      "repositorio": "git+https://github.com/ljharb/side-channel.git",
-      "base": "/app/node_modules",
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4294,6 +5229,9 @@
       "autor": "Matteo Collina <hello@matteocollina.com>",
       "repositorio": "git+https://github.com/pinojs/sonic-boom.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "sonic-boom"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4313,6 +5251,9 @@
       "autor": "Matteo Collina <hello@matteocollina.com>",
       "repositorio": "https://github.com/mcollina/split2.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "split2"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4332,6 +5273,9 @@
       "autor": null,
       "repositorio": "jshttp/statuses",
       "base": "/app/node_modules",
+      "rutas": [
+        "statuses"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4351,6 +5295,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/ljharb/stop-iteration-iterator.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "stop-iteration-iterator"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4365,11 +5312,39 @@
     },
     {
       "nombre": "string_decoder",
+      "version": "1.1.1",
+      "expresion": "MIT",
+      "autor": null,
+      "repositorio": "git://github.com/nodejs/string_decoder.git",
+      "base": "/app/node_modules",
+      "rutas": [
+        "archiver-utils/node_modules/string_decoder",
+        "duplexer2/node_modules/string_decoder",
+        "jszip/node_modules/string_decoder",
+        "lazystream/node_modules/string_decoder"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "11f2aafb37d06b3ee5bdaf06e9811141d0da05263c316f3d627f45c20d43261b",
+          "bytes": 2338
+        }
+      ]
+    },
+    {
+      "nombre": "string_decoder",
       "version": "1.3.0",
       "expresion": "MIT",
       "autor": null,
       "repositorio": "git://github.com/nodejs/string_decoder.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "string_decoder"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4389,6 +5364,9 @@
       "autor": "Mathias Buus <mathiasbuus@gmail.com>",
       "repositorio": "git+https://github.com/mafintosh/tar-stream.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "tar-stream"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4408,6 +5386,9 @@
       "autor": "Matteo Collina <hello@matteocollina.com>",
       "repositorio": "git+https://github.com/mcollina/thread-stream.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "thread-stream"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4427,6 +5408,9 @@
       "autor": "Devon Govett <devongovett@gmail.com>",
       "repositorio": "git://github.com/devongovett/tiny-inflate.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "tiny-inflate"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4446,6 +5430,9 @@
       "autor": "KARASZI István <github@spam.raszi.hu>",
       "repositorio": "https://github.com/raszi/node-tmp.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "tmp"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4465,6 +5452,9 @@
       "autor": "Igor Savin <kibertoad@gmail.com>",
       "repositorio": "git+https://github.com/kibertoad/toad-cache.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "toad-cache"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4484,6 +5474,9 @@
       "autor": "Douglas Christopher Wilson <doug@somethingdoug.com>",
       "repositorio": "component/toidentifier",
       "base": "/app/node_modules",
+      "rutas": [
+        "toidentifier"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4503,6 +5496,9 @@
       "autor": "Microsoft Corp.",
       "repositorio": "https://github.com/Microsoft/tslib.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "tslib"
+      ],
       "archivosLicencia": [
         "LICENSE.txt"
       ],
@@ -4522,6 +5518,9 @@
       "autor": "Devon Govett <devongovett@gmail.com>",
       "repositorio": "git://github.com/devongovett/unicode-properties.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "unicode-properties"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4541,6 +5540,9 @@
       "autor": "Devon Govett <devongovett@gmail.com>",
       "repositorio": "git://github.com/devongovett/unicode-trie.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "unicode-trie"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4560,6 +5562,9 @@
       "autor": "Ryan Zimmerman <opensrc@ryanzim.com>",
       "repositorio": "git+https://github.com/RyanZim/universalify.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "universalify"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4579,6 +5584,9 @@
       "autor": "Ziggy Jonsson <ziggy.jonsson.nyc@gmail.com>",
       "repositorio": "https://github.com/ZJONSSON/node-unzipper.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "unzipper"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4598,6 +5606,9 @@
       "autor": "Nathan Rajlich <nathan@tootallnate.net> (http://n8.io/)",
       "repositorio": "git://github.com/TooTallNate/util-deprecate.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "util-deprecate"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4617,6 +5628,9 @@
       "autor": null,
       "repositorio": "https://github.com/uuidjs/uuid.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "uuid"
+      ],
       "archivosLicencia": [
         "LICENSE.md"
       ],
@@ -4636,6 +5650,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/inspect-js/which-boxed-primitive.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "which-boxed-primitive"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4655,6 +5672,9 @@
       "autor": "Jordan Harband <ljharb@gmail.com>",
       "repositorio": "git+https://github.com/inspect-js/which-collection.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "which-collection"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4674,6 +5694,9 @@
       "autor": "Jordan Harband",
       "repositorio": "git://github.com/inspect-js/which-typed-array.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "which-typed-array"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4693,6 +5716,9 @@
       "autor": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me/)",
       "repositorio": "https://github.com/npm/wrappy",
       "base": "/app/node_modules",
+      "rutas": [
+        "wrappy"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4712,6 +5738,9 @@
       "autor": "Louis-Dominique Dubeau <ldd@lddubeau.com>",
       "repositorio": "https://github.com/lddubeau/xmlchars.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "xmlchars"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4731,6 +5760,9 @@
       "autor": "Eemeli Aro <eemeli@gmail.com>",
       "repositorio": "github:eemeli/yaml",
       "base": "/app/node_modules",
+      "rutas": [
+        "yaml"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4750,6 +5782,9 @@
       "autor": "Chris Talkington",
       "repositorio": "https://github.com/archiverjs/node-zip-stream.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "zip-stream"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4769,6 +5804,9 @@
       "autor": "Colin McDonnell <zod@colinhacks.com>",
       "repositorio": "git+https://github.com/colinhacks/zod.git",
       "base": "/app/node_modules",
+      "rutas": [
+        "zod"
+      ],
       "archivosLicencia": [
         "LICENSE"
       ],
@@ -4778,6 +5816,138 @@
           "archivo": "LICENSE",
           "sha256": "3f1189b28e3866e0d979968d466b78f813f76827cfdca1fbb124cc0a5c8841f8",
           "bytes": 1072
+        }
+      ]
+    },
+    {
+      "nombre": "@prisma/debug",
+      "version": "5.22.0",
+      "expresion": "Apache-2.0",
+      "autor": "Tim Suchanek <suchanek@prisma.io>",
+      "repositorio": "https://github.com/prisma/prisma.git",
+      "base": "/opt/prisma-cli/node_modules",
+      "rutas": [
+        "@prisma/debug"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "bytes": 11357
+        }
+      ]
+    },
+    {
+      "nombre": "@prisma/engines",
+      "version": "5.22.0",
+      "expresion": "Apache-2.0",
+      "autor": "Tim Suchanek <suchanek@prisma.io>",
+      "repositorio": "https://github.com/prisma/prisma.git",
+      "base": "/opt/prisma-cli/node_modules",
+      "rutas": [
+        "@prisma/engines"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "bytes": 11357
+        }
+      ]
+    },
+    {
+      "nombre": "@prisma/engines-version",
+      "version": "5.22.0-44.605197351a3c8bdd595af2d2a9bc3025bca48ea2",
+      "expresion": "Apache-2.0",
+      "autor": "Tim Suchanek <suchanek@prisma.io>",
+      "repositorio": "https://github.com/prisma/engines-wrapper.git",
+      "base": "/opt/prisma-cli/node_modules",
+      "rutas": [
+        "@prisma/engines-version"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "bytes": 11357
+        }
+      ]
+    },
+    {
+      "nombre": "@prisma/fetch-engine",
+      "version": "5.22.0",
+      "expresion": "Apache-2.0",
+      "autor": "Tim Suchanek <suchanek@prisma.io>",
+      "repositorio": "https://github.com/prisma/prisma.git",
+      "base": "/opt/prisma-cli/node_modules",
+      "rutas": [
+        "@prisma/fetch-engine"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "bytes": 11357
+        }
+      ]
+    },
+    {
+      "nombre": "@prisma/get-platform",
+      "version": "5.22.0",
+      "expresion": "Apache-2.0",
+      "autor": "Tim Suchanek <suchanek@prisma.io>",
+      "repositorio": "https://github.com/prisma/prisma.git",
+      "base": "/opt/prisma-cli/node_modules",
+      "rutas": [
+        "@prisma/get-platform"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "bytes": 11357
+        }
+      ]
+    },
+    {
+      "nombre": "prisma",
+      "version": "5.22.0",
+      "expresion": "Apache-2.0",
+      "autor": "Tim Suchanek <suchanek@prisma.io>",
+      "repositorio": "https://github.com/prisma/prisma.git",
+      "base": "/opt/prisma-cli/node_modules",
+      "rutas": [
+        "prisma"
+      ],
+      "archivosLicencia": [
+        "LICENSE"
+      ],
+      "tieneNotice": false,
+      "licencias": [
+        {
+          "archivo": "LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "bytes": 11357
         }
       ]
     }

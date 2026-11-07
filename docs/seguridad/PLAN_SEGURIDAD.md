@@ -17,7 +17,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **SEC-02** | Ningún reporte entrega el RUN, para ningún rol | **Cerrada** dentro de su alcance: desplegada en web y API desde `3cf1aaf` (Live, Auto-Deploy Off). Ver «SEC-02» |
 | CI de SEC-02 | Pánico intermitente del motor de Prisma en las pruebas unitarias (ejecución 42269659668) | **Diagnosticado; protección publicada en el repositorio y validada en local.** La causa del pánico **no está demostrada**. Ver «CI de SEC-02» |
 | **SEC-01** | Topes para las listas JSON (`personIds` de relevos y otras) | **Cerrada** dentro de su alcance: desplegada en `fchmn-api` desde `120e29d` (Live, Auto-Deploy Off) y validada en local y en la CI con datos sintéticos. Ver «SEC-01» |
-| **SEC-03** | Dependencias | **Revisada, sin cambios.** Ver «SEC-01 y SEC-03» |
+| **SEC-03** | Dependencias, en tres entregas (A backend compatible, B Vite/Vitest, C Zod) | **A publicada en el repositorio, validada en local; pendiente de despliegue.** B y C sin autorización. Ver «SEC-03, entrega A» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Aplazado, fuera de estas fases.** Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -922,6 +922,110 @@ Todo con datos sintéticos. Se distingue lo **simulado** de lo **observado en la
 - Los duplicados dentro de una lista siguen aceptándose, como antes.
 - `listaAcotada` depende del comportamiento de Zod 3 (`pipe` no ejecuta la salida tras un fallo previo); una migración de Zod o de Fastify
   (SEC-03) lo revalidaría con las mismas pruebas. SEC-01 **no** corrige el aviso de Zod: lo mitiga en las rutas alcanzables.
+
+## SEC-03, entrega A: actualizaciones compatibles del backend (publicada en el repositorio, validada en local; pendiente de despliegue)
+
+**Estado: publicada en el repositorio (commit y push a `main`) y validada en LOCAL; pendiente de despliegue**: producción sigue con las
+versiones anteriores y el despliegue necesita autorización propia. Las entregas **B** (Vite, Vitest y herramientas) y **C** (Zod) **no están autorizadas** y no se tocaron: ni Zod, ni Vite,
+ni Vitest, ni Prisma, ni React, ni las imágenes base, ni el frontend. No cambia código de negocio.
+
+**Qué se hizo.** `package.json`: `fastify` `^5.12.3` → `^5.12.8` y `@fastify/swagger-ui` `^6.1.1` → `^6.1.3` (solo se subieron los mínimos).
+El bloqueo se actualizó **solo para los paquetes de la entrega**, con `npm update --package-lock-only` dentro de los rangos de sus padres, y se
+reinstaló con `npm ci`. Una copia anidada de desarrollo (`brace-expansion` bajo el `minimatch` de `eslint`) no se movía con `npm update`; se
+retiró su entrada del bloqueo y `npm install --package-lock-only` la resolvió al último valor admitido. Los `override` de `uuid` y `unzipper` no cambiaron.
+
+**Versiones, antes → después (producción, salvo indicación).**
+
+| Paquete | Antes | Después | Cadena |
+|---|---|---|---|
+| `fastify` | 5.12.3 | 5.12.8 | directa |
+| `@fastify/swagger` / `@fastify/swagger-ui` | 9.8.1 / 6.1.1 | 9.9.3 / 6.1.3 | directas |
+| `@fastify/static` | 10.1.3 | 10.1.10 | `@fastify/swagger-ui` |
+| `@fastify/send`, `@fastify/ajv-compiler`, `find-my-way` | 4.1.1, 4.0.6, 9.9.0 | 4.2.1, 4.0.7, 9.10.0 | `fastify`, `@fastify/static` |
+| `fast-uri` | 4.1.4 y 3.1.7 (×2) | 4.2.3 y 3.1.9 (×2) | `@fastify/ajv-compiler`; `ajv`; `json-schema-resolver` |
+| `glob` | 13.0.6 | 14.0.4 | `@fastify/static` |
+| `minimatch` (el de producción) | 10.2.6 | 11.0.5, anidado bajo `glob` | `glob` |
+| `brace-expansion` | 2.1.4; 1.1.18 (×2, anidados) | 2.1.7; 1.1.21 (×2); 5.0.12 nuevo, anidado bajo `glob` | `minimatch`; `exceljs` → `archiver` |
+| `path-scurry`, `content-disposition` | 2.0.2, 2.0.1 | 3.0.0, 3.0.0 | `glob`; `@fastify/static` |
+| `lru-cache`, `ret`, `safe-regex2` | 11.5.2, 0.5.0, 5.1.1 | 11.5.3, 0.5.1, 5.1.2 | transitivas dentro de rango |
+| nuevos | | `@isaacs/nonrecursive-glob-match` 1.1.0; `balanced-match` 4.0.4 (anidado bajo `glob`) | `glob` |
+| desarrollo | `source-map-js` 1.2.1; `brace-expansion` 1.1.18 y 5.0.9 | 1.2.2; 1.1.21 y 5.0.12 | `postcss`; `test-exclude`; `eslint` |
+
+**Versiones mayores transitivas que cambian, siempre dentro de los rangos de su padre** (`@fastify/static` 10.1.10 exige `glob` ^14 y
+`content-disposition` ^3; `glob` 14 exige `minimatch` ^11 y `path-scurry` ^3): `glob` 13 → 14, `minimatch` 10 → 11 (en producción),
+`path-scurry` 2 → 3 y `content-disposition` 2 → 3. Las versiones mayores **directas** no cambian.
+
+**Corrección al inventario del plan.** `minimatch` 10.2.6 **sí estaba en producción**: `glob` 13.0.6 lo exigía (`^10.2.2`) y estaba en la raíz del
+árbol sin la marca de desarrollo. El plan lo había presentado solo como dependencia de `eslint`. Ahora la copia de producción es la 11.0.5 y la 10.2.6 queda
+solo para `eslint` (desarrollo), donde no tiene corrección posible hasta que `eslint` y `typescript-estree` adopten `minimatch` 11.
+
+**Avisos.**
+- **Resueltos en producción:** `fastify` (GHSA-4mh8-r7rc-xpvc y GHSA-389g-gv7q-r4x8), seis avisos de `fast-uri`, los de `brace-expansion`, `glob`
+  (GHSA-3g3m-2fjr-6pw4) y `minimatch` (GHSA-g3hv-75wg-m249).
+- **Resueltos en desarrollo:** `source-map-js` y `brace-expansion` 5.x.
+- **Pendiente en producción:** solo **`zod`** (GHSA-mrhx-c7xc-m3w5), entrega C. SEC-01 lo mitiga en las rutas identificadas y no lo elimina. Reconsultado con el endpoint de
+  avisos de npm sobre el bloqueo resultante y con `npm audit --omit=dev`: un único aviso, `zod`.
+- **Pendiente en desarrollo:** `vite`, `esbuild`, `vitest` y `tinypool` (entrega B) y `minimatch` 10.2.6 bajo `eslint` (sin corrección disponible).
+
+**Compatibilidad de npm.** El bloqueo se regeneró con **npm 11.17.0** (Node 24.19, local). Las imágenes usan Node 22.23.2 con **npm 10.9.8**, y
+`npm ci` con esa versión instaló el bloqueo sin errores en las dos candidatas (`--omit=dev --omit=optional`). `allowScripts` lo reconoce npm 11.17.0
+(trae `npm approve-scripts`); **no se comprobó que npm 10.9.8 lo aplique**, así que en las imágenes no se afirma que rija: la construcción conserva sus propias guardas.
+Las imágenes se construyeron pasando la CA de la red (inspección TLS) como **secreto de construcción**, que no queda en ellas.
+
+**Para B (registrado, sin implementar):** `undici` 8.12.4 exige Node ≥ 22.19.0 (la base fijada es 22.23.2, que lo cumple).
+
+### Artefactos: calculado frente a extraído de imágenes
+- **Calculado del bloqueo:** las versiones y cadenas de las tablas anteriores y el resultado de los avisos.
+- **Extraído de imágenes construidas** (etapa API y etapa de mantenimiento): los inventarios `notices/inventario/backend.json` y `migrate.json` salen de la sonda
+  `scripts/inventario/extraer-de-imagen.cjs` ejecutada dentro de cada imagen; `notices/backend.txt` y `migrate.txt` se regeneraron y se copiaron a `backend/avisos/`
+  (`frontend/avisos` no cambia). Procedimiento de dos pasadas: la candidata final (`fchmn-backend:sec03a-candidato3` y `fchmn-migrate:sec03a-candidato3`),
+  construida con los avisos definitivos, tiene el mismo hash de aviso que el repositorio y su **nueva extracción da cero cambios** (inventarios idénticos byte a byte);
+  `generar-avisos --verificar` y `distribuir-avisos --verificar` devuelven 0. Las construcciones no ejecutan migraciones, `seed` ni comandos de la aplicación.
+- **La sonda recorre ahora los `node_modules` anidados.** Antes solo leía el primer nivel, así que `minimatch` 11.0.5, `brace-expansion` 5.0.12 y `balanced-match` 4.0.4
+  (bajo `glob`) y otros **16 paquetes más** de cada artefacto no figuraban en los avisos, y que dos extracciones coincidieran no lo detectaba: las dos omitían igual. Cambios:
+  recorre cada raíz declarada y, de cada paquete, **solo** su `node_modules` (con y sin ámbito), sin salir de la raíz (cada paquete se resuelve con `realpath`), sin visitar dos veces
+  el mismo directorio real (ciclos) y con un tope de profundidad de 32; ordena de forma determinista; y **agrupa los duplicados**: el mismo paquete, versión, raíz, expresión y textos
+  de licencia es **una** entrada con todas sus `rutas` (campo nuevo del inventario); versiones distintas, o la misma versión con otra licencia, son entradas distintas.
+  Pruebas sintéticas en `backend/tests/inventario-sonda.test.ts` (27): raíz, anidados, ámbito, versiones distintas, duplicados, enlaces y carpetas ajenas, con una reproducción del
+  lector anterior que demuestra que la prueba detecta la omisión. La profundidad máxima no tiene prueba propia (exigiría un árbol de más de 32 niveles).
+- **Diferencias de inventario** respecto al de primer nivel: API 239 → 258 entradas y mantenimiento 245 → 264, **19 nuevas en cada una y ninguna perdida**, sin cambios de metadatos
+  en las existentes. Las 19: `@types/node` 14.18.63, `archiver-utils` 3.0.4, `balanced-match` 4.0.4, `base64-js` 0.0.8, `brace-expansion` 1.1.21 y 5.0.12, `cookie` 2.0.1, `fast-uri` 3.1.9,
+  `fastify-plugin` 5.1.0, `glob` 7.2.3, `isarray` 1.0.0, `minimatch` 3.1.5, 5.1.9 y 11.0.5, `pako` 0.2.9, `process-warning` 4.0.1, `readable-stream` 2.3.8, `safe-buffer` 5.1.2 y
+  `string_decoder` 1.1.1 (las mismas en mantenimiento). Hay 258 entradas en 276 ubicaciones (API) y 264 en 282 (mantenimiento).
+- **Cobertura contrastada con una enumeración independiente** del árbol instalado (no solo dos salidas de la misma sonda): en las imágenes finales, `find` y `grep` de la propia
+  imagen dan **276** paquetes en la API y **282** en mantenimiento, idénticos en ruta y versión a los de la sonda (0 de más, 0 de menos, 0 con versión distinta); y los 276 de la API
+  coinciden con lo que el bloqueo declara como producción. Las tres que faltaban (`minimatch` 11.0.5, `brace-expansion` 5.0.12 y `balanced-match` 4.0.4) aparecen.
+- **`isarray` 1.0.0: el texto de licencia existe en el artefacto.** Solo existe anidado (cuatro copias) y no trae archivo de licencia, pero su README incluye la licencia MIT completa en
+  la sección «License», con el copyright de 2013 de Julian Gruber, la concesión y la exclusión de garantías. Una primera versión de este trabajo la trató como un paquete sin texto y le añadió
+  una excepción canónica con riesgo residual y una solicitud de confirmación: **era un error** (no se había leído el README). Esa excepción se retiró y `notices/excepciones.json`
+  quedó idéntico al anterior. Procedencia verificada: las cuatro copias instaladas, el tarball oficial (integridad `sha512-VLghIWNM…` igual a la del bloqueo) y el README en el commit
+  `2a23a281f369e9ae06394c0fb4d2381355a6ba33` (el `gitHead` del registro) son **idénticos** (README completo: sha256 `ff138e68…2ec7`, 1.890 bytes). El inventario registra el texto efectivamente:
+  `licencias: [{ archivo: "README.md", seccion: "License", sha256: "66aa9fea…d101", bytes: 1108 }]`, con el texto íntegro y sin tocar en `notices/textos/` (incluidas las entidades `&lt;` y `&gt;`
+  que trae el README). No queda ninguna decisión pendiente.
+  La solución es acotada: una tabla explícita en la sonda (`LICENCIA_EN_README`, hoy solo `isarray` 1.0.0), que solo se aplica si el paquete no trae ningún archivo de licencia y toma la sección desde su
+  encabezado hasta el siguiente del mismo nivel o superior; no es un detector genérico y un paquete que no esté en la tabla sigue exigiendo su excepción. Los avisos dicen de dónde sale ese texto.
+  Hay 10 textos de licencia nuevos en `notices/textos/` (9 de paquetes anidados y este).
+- `verificar-archivos-de-imagen` dio «conforme» (nada sin versionar bajo `/app/prisma`) sobre las primeras candidatas; no se repitió, porque lo que comprueba no cambió. Esa
+  herramienta usa `--rm` internamente: sus contenedores efímeros los creó y eliminó ella misma.
+
+### Validación local de A
+Todo con datos sintéticos, sobre el árbol ya reinstalado con `npm ci` y **sin relajar ninguna expectativa**.
+
+- **Typecheck** completo del backend y **lint**: sin errores (el lint informa los 51 avisos de `any` que ya existían).
+- **Suite unitaria completa, una vez:** 64 archivos, 1.614 pruebas, pasaron. Incluyen las guardas de dependencias de producción y de árbol instalado, los avisos
+  de terceros y las regresiones de SEC-01 (listas, rutas y multipart).
+- **Integración completa, una vez, solo en la base desechable de `docker-compose.test.yml`** (sin ejecuciones simultáneas): 53 archivos, 1.122 pruebas,
+  pasaron. Cubren autenticación, importaciones, exportaciones, inscripciones y las rutas de SEC-01, que son las que Fastify atraviesa.
+- **Candidatas:** las etapas API y mantenimiento se construyeron dos veces (descubrimiento y candidata final) con `npm ci` de la imagen (npm 10.9.8) y
+  su guarda de árbol instalado; ver «Artefactos».
+- No se repitieron mediciones de memoria ni cargas reales, y no se ejecutó nada contra producción.
+
+### Límites y riesgos de A
+- Un cambio de versión mayor transitiva (`glob` 14, `path-scurry` 3, `content-disposition` 3, `minimatch` 11) no se ejercita más que por las rutas que usan
+  `@fastify/static` y `swagger-ui` (documentación de la API); la validación local cubre los arranques y las pruebas, no un uso prolongado.
+- Las dos candidatas finales y las anteriores siguen en Docker local; los contenedores de diagnóstico, hash, extracción y enumeración quedaron detenidos y con nombre.
+- El inventario de avisos de terceros ya incluye los paquetes anidados; sigue sin tener prueba la profundidad máxima del recorrido (32). La excepción de `isarray` se retiró porque el texto original existe en su README.
+- Esta entrega mitiga lo que el bloqueo de producción declara; no demuestra que los avisos de producción fueran alcanzables.
 
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 

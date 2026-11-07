@@ -50,6 +50,22 @@ cd frontend && npm ls --omit=dev --all --json
 En Windows, `git-bash` convierte las rutas POSIX de los argumentos a rutas de
 Windows y la sonda no se encuentra. Anteponer `MSYS_NO_PATHCONV=1`.
 
+## Qué recorre la sonda
+
+Recorre cada raíz `node_modules` que se le indique **y los `node_modules` anidados** de sus paquetes
+(`<paquete>/node_modules`, con o sin ámbito), pero no el resto de carpetas de un paquete. No sale de la raíz
+(resuelve cada paquete con `realpath`), no visita dos veces un mismo directorio real y se detiene a 32 niveles.
+
+El mismo paquete y versión en varios sitios es **una** entrada con todas sus `rutas`; versiones distintas, o la misma
+versión con otra licencia, son entradas distintas. Hay un caso acotado de licencia en el README: la tabla `LICENCIA_EN_README` de la sonda (hoy solo `isarray` 1.0.0) toma la
+sección `License` del README de un paquete sin archivo de licencia, y la anota en `licencias` con su `archivo`, `seccion`,
+`sha256` y `bytes`. No es un detector genérico: cada caso se verifica a mano contra el lanzamiento exacto antes de entrar en la tabla.
+
+Que dos extracciones coincidan **no demuestra que estén completas**:
+conviene contrastarla con una enumeración independiente, por ejemplo `find <raíz> -name package.json` filtrado por
+`node_modules/(@ámbito/)?paquete/package.json`, ejecutada en la misma imagen. Sus pruebas están en
+`backend/tests/inventario-sonda.test.ts`.
+
 ## Después de extraer
 
 Los metadatos van a `notices/inventario/<artefacto>.json` y los textos a

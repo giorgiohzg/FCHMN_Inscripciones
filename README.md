@@ -325,6 +325,11 @@ sesión no viaja.
   y **rechaza los campos truncados**, que el plugin entrega cortados sin fallar; el máximo global del archivo (15 MB) no cambió. **El tope de 8 en
   relevos es un límite técnico nuevo** (un tipo con más de 8 nadadores no podría inscribirse hasta subirlo) y **10.000 asignaciones no garantizan una
   duración determinada**. Se validó en local y en la CI con datos sintéticos, y está desplegada en `fchmn-api` (Live, Auto-Deploy Off); en producción solo se observó disponibilidad, **sin pruebas funcionales de los límites**. SEC-01 mitiga las rutas identificadas y **no elimina el aviso de Zod**; SEC-03 sigue pendiente. Detalle y riesgos en `docs/seguridad/PLAN_SEGURIDAD.md`.
+- **SEC-03, entrega A: actualizaciones compatibles del backend (publicada en el repositorio, validada en local; pendiente de despliegue).** `fastify` 5.12.3 → 5.12.8, `@fastify/swagger-ui` 6.1.3 y sus
+  transitivas dentro de rango (`@fastify/static` 10.1.10 y, con él, `glob` 14, `minimatch` 11, `fast-uri` 4.2.3 y 3.1.9, `brace-expansion`); los `override` de `uuid` y `unzipper` no cambian. En
+  producción el único aviso que queda es **`zod`** (entrega C); `vite`, `vitest`, `esbuild`, `tinypool` y el `minimatch` de `eslint` siguen como avisos de desarrollo. Las candidatas de la API y de
+  mantenimiento se construyeron y sus avisos de terceros se regeneraron desde inventarios extraídos de las imágenes (la sonda ahora recorre también los `node_modules` anidados: 19 paquetes más por artefacto, contrastados con una enumeración independiente del árbol instalado). Las entregas B y C no
+  están autorizadas. Detalle y riesgos en `docs/seguridad/PLAN_SEGURIDAD.md`.
 - **El refresh token viaja en una cookie `HttpOnly`**, no en el cuerpo de la respuesta.
   Antes se devolvía en el JSON de `/auth/login` y el frontend lo guardaba en
   `sessionStorage`, donde cualquier script de la página podía leerlo — y ese token vale

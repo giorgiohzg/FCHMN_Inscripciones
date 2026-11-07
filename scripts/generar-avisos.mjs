@@ -156,6 +156,8 @@ function bloqueNode(paquetes, excepciones) {
     if (p.licencias && p.licencias.length > 0) {
       for (const l of p.licencias) {
         if (p.licencias.length > 1) partes.push(`--- ${l.archivo} ---`);
+        // Un texto que no es un archivo de licencia, sino una seccion del README, dice de donde sale.
+        if (l.seccion) partes.push(`(Texto tomado de la seccion "${l.seccion}" de ${l.archivo} del paquete, que no incluye archivo de licencia.)`, "");
         partes.push(recortar(textoPorSha(l.sha256)));
         partes.push("");
       }
