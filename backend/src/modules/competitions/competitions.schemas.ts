@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { uuidField } from "../../shared/uuid.schema";
 import { listaAcotada } from "../../shared/listaAcotada";
 import { LIMITES_LISTAS } from "../../shared/limites-listas";
 
@@ -8,12 +9,13 @@ export const competitionCreateSchema = z
   .object({
     name: z.string().trim().min(3, "El nombre de la competencia es obligatorio"),
     description: z.string().trim().optional(),
-    registrationStartAt: z.coerce.date({ errorMap: () => ({ message: "Fecha de inicio de inscripción inválida" }) }),
-    registrationEndAt: z.coerce.date({ errorMap: () => ({ message: "Fecha de fin de inscripción inválida" }) }),
-    ageCutoffDate: z.coerce.date({ errorMap: () => ({ message: "Fecha de corte de edad inválida" }) }),
+    registrationStartAt: z.coerce.date({ error: "Fecha de inicio de inscripción inválida" }),
+    registrationEndAt: z.coerce.date({ error: "Fecha de fin de inscripción inválida" }),
+    ageCutoffDate: z.coerce.date({ error: "Fecha de corte de edad inválida" }),
+    // Con Zod 3 el mensaje del esquema también cubría a `.int()` (que no trae el suyo); en Zod 4 hay que darlo explícitamente.
     maxIndividualEventsPerSwimmer: z.coerce
-      .number({ errorMap: () => ({ message: "Debe ingresar la cantidad máxima de pruebas individuales por nadador" }) })
-      .int()
+      .number({ error: "Debe ingresar la cantidad máxima de pruebas individuales por nadador" })
+      .int("Debe ingresar la cantidad máxima de pruebas individuales por nadador")
       .min(1, "Debe ser al menos 1"),
     /**
      * Máximo de relevos por nadador y jornada. Antes era una constante "1"
@@ -21,8 +23,8 @@ export const competitionCreateSchema = z
      * competencia. 0 = no se admiten relevos en esta competencia.
      */
     maxRelayEventsPerSwimmerPerSession: z.coerce
-      .number({ errorMap: () => ({ message: "Debe indicar el máximo de relevos por nadador y jornada" }) })
-      .int()
+      .number({ error: "Debe indicar el máximo de relevos por nadador y jornada" })
+      .int("Debe indicar el máximo de relevos por nadador y jornada")
       .min(0, "No puede ser negativo")
       .default(1),
     /**
@@ -38,7 +40,7 @@ export const competitionCreateSchema = z
     maxSwimmersPerClub: z.coerce.number().int().min(1, "El cupo por club debe ser al menos 1").optional().nullable(),
     // Opcional: si no se selecciona, la exportación a Team Manager usa
     // piscina larga por defecto (comportamiento previo, sin cambios).
-    poolId: z.string().uuid().optional().nullable(),
+    poolId: uuidField().optional().nullable(),
     /**
      * `false` oculta la competencia SOLO de los desplegables del Panel de
      * Inscripción y del Panel de Relevos. Omitido = visible. Booleano estricto:
@@ -72,7 +74,7 @@ export const competitionUpdateSchema = z
     // con lo guardado — aquí solo llegaría la mitad del par.
     maxSwimmers: z.coerce.number().int().min(1).optional().nullable(),
     maxSwimmersPerClub: z.coerce.number().int().min(1).optional().nullable(),
-    poolId: z.string().uuid().optional().nullable(),
+    poolId: uuidField().optional().nullable(),
     // Omitido = no se toca. Booleano estricto (ver el alta).
     visibleInRegistrationPanels: z.boolean().optional(),
     // Omitido = no se toca. Booleano estricto (ver el alta).
@@ -122,7 +124,7 @@ export const duplicateCompetitionSchema = z
     ageCutoffDate: z.coerce.date().optional(), // si se omite, se copia de la competencia original
     maxIndividualEventsPerSwimmer: z.coerce.number().int().min(1).optional(), // si se omite, se copia de la original
     maxRelayEventsPerSwimmerPerSession: z.coerce.number().int().min(0).optional(), // si se omite, se copia de la original
-    poolId: z.string().uuid().optional().nullable(), // si se omite, se copia de la original
+    poolId: uuidField().optional().nullable(), // si se omite, se copia de la original
   })
   .refine((d) => d.registrationEndAt > d.registrationStartAt, {
     message: "La fecha de fin de inscripción debe ser posterior a la de inicio",
@@ -133,12 +135,12 @@ export type DuplicateCompetitionInput = z.infer<typeof duplicateCompetitionSchem
 // ---------------- Fechas y Jornadas ----------------
 
 export const addDateSchema = z.object({
-  date: z.coerce.date({ errorMap: () => ({ message: "Fecha inválida" }) }),
+  date: z.coerce.date({ error: "Fecha inválida" }),
 });
 export type AddDateInput = z.infer<typeof addDateSchema>;
 
 export const addSessionSchema = z.object({
-  sessionTypeId: z.string().uuid("Tipo de jornada inválido"),
+  sessionTypeId: uuidField("Tipo de jornada inválido"),
 });
 export type AddSessionInput = z.infer<typeof addSessionSchema>;
 
@@ -156,9 +158,9 @@ export type SessionTypeCreateInput = z.infer<typeof sessionTypeCreateSchema>;
 // ---------------- Pruebas asignadas a la competencia ----------------
 
 export const addCompetitionEventSchema = z.object({
-  eventId: z.string().uuid("Prueba inválida"),
-  competitionSessionId: z.string().uuid("Jornada inválida"),
-  categoryIds: listaAcotada(LIMITES_LISTAS.categoriasPorPrueba, z.array(z.string().uuid()).min(1, "Debe habilitar al menos una categoría"), MENSAJE_MAXIMO_CATEGORIAS),
+  eventId: uuidField("Prueba inválida"),
+  competitionSessionId: uuidField("Jornada inválida"),
+  categoryIds: listaAcotada(LIMITES_LISTAS.categoriasPorPrueba, z.array(uuidField()).min(1, "Debe habilitar al menos una categoría"), MENSAJE_MAXIMO_CATEGORIAS),
   displayOrder: z.coerce.number().int().optional(),
   /**
    * Máximo de nadadores por club en esta prueba INDIVIDUAL. Omitido o `null` =
@@ -170,8 +172,8 @@ export const addCompetitionEventSchema = z.object({
 export type AddCompetitionEventInput = z.infer<typeof addCompetitionEventSchema>;
 
 export const updateCompetitionEventSchema = z.object({
-  competitionSessionId: z.string().uuid().optional(),
-  categoryIds: listaAcotada(LIMITES_LISTAS.categoriasPorPrueba, z.array(z.string().uuid()).min(1), MENSAJE_MAXIMO_CATEGORIAS).optional(),
+  competitionSessionId: uuidField().optional(),
+  categoryIds: listaAcotada(LIMITES_LISTAS.categoriasPorPrueba, z.array(uuidField()).min(1), MENSAJE_MAXIMO_CATEGORIAS).optional(),
   status: z.enum(["enabled", "disabled"]).optional(),
   displayOrder: z.coerce.number().int().nullable().optional(),
   // `null` QUITA el límite; omitido no lo toca. Igual que en el alta.
@@ -183,7 +185,7 @@ export const reorderCompetitionEventsSchema = z.object({
   // Tope de longitud comprobado ANTES de validar elementos (SEC-01).
   updates: listaAcotada(
     LIMITES_LISTAS.reordenamientos,
-    z.array(z.object({ id: z.string().uuid(), displayOrder: z.coerce.number().int() })).min(1, "Debe incluir al menos una prueba a renumerar"),
+    z.array(z.object({ id: uuidField(), displayOrder: z.coerce.number().int() })).min(1, "Debe incluir al menos una prueba a renumerar"),
     "Se pueden renumerar como máximo 1.000 pruebas por operación"
   ),
 });

@@ -56,7 +56,8 @@ const baseClub = {
   isFchmnCollaborator: false,
 };
 const decisionValida = (n: number) => ({ eventNumber: n, decision: "tipo", testTypeId: uuid(n) });
-const uuidLista = z.array(z.string().uuid());
+// `z.guid()` es el identificador que aceptaba el `.uuid()` de Zod 3 (ver `src/shared/uuid.schema.ts`): la definición «anterior» conserva esa regla.
+const uuidLista = z.array(z.guid());
 
 const CASOS: CasoDeLista[] = [
   {
@@ -173,7 +174,7 @@ const CASOS: CasoDeLista[] = [
     base: {},
     campo: "updates",
     anterior: z
-      .array(z.object({ id: z.string().uuid(), displayOrder: z.coerce.number().int() }))
+      .array(z.object({ id: z.guid(), displayOrder: z.coerce.number().int() }))
       .min(1, "Debe incluir al menos una prueba a renumerar"),
     tope: LIMITES_LISTAS.reordenamientos,
     mensajeDelTope: "Se pueden renumerar como máximo 1.000 pruebas por operación",
@@ -271,12 +272,14 @@ describe("decisiones de relevo: la diferencia intencionada de forma", () => {
     if (!ahora.success && !antes.success) expect(ahora.error.flatten().fieldErrors).toEqual(antes.error.flatten().fieldErrors);
   });
 
-  it("501 decisiones INVÁLIDAS: antes traían además un error por elemento; ahora solo el del tope", () => {
+  it("501 decisiones INVÁLIDAS: un único error del tope (con Zod 3 la definición anterior traía además uno por elemento)", () => {
     const invalida = Array.from({ length: 501 }, () => ({ eventNumber: -1, decision: "inventada" }));
     const antes = z.object({ decisiones: z.array(decisionDeRelevoSchema).max(500, "Demasiadas decisiones de relevo") }).safeParse({ decisiones: invalida });
     const ahora = confirmar(invalida);
+    // Con Zod 4.6.6+ (GHSA-mrhx-c7xc-m3w5) el `.max()` de la definición anterior YA rechaza antes de recorrer los elementos, así que
+    // aquí también hay un solo error: es la corrección del aviso, no una propiedad de `listaAcotada`, que se conserva igualmente.
     expect(antes.success).toBe(false);
-    if (!antes.success) expect(antes.error.issues.length).toBeGreaterThan(500);
+    if (!antes.success) expect(antes.error.issues).toHaveLength(1);
     expect(ahora.success).toBe(false);
     if (!ahora.success) expect(ahora.error.issues).toHaveLength(1);
   });

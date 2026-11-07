@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { uuidField } from "../../shared/uuid.schema";
 
 export const teamManagerExportQuerySchema = z.object({
-  competitionId: z.string().uuid("Debe seleccionar una competencia"),
-  clubId: z.string().uuid("Debe seleccionar un club"),
+  competitionId: uuidField("Debe seleccionar una competencia"),
+  clubId: uuidField("Debe seleccionar un club"),
 });
 export type TeamManagerExportQuery = z.infer<typeof teamManagerExportQuerySchema>;

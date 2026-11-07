@@ -1,11 +1,12 @@
 import { z } from "zod";
+import { uuidField } from "../../shared/uuid.schema";
 import { esFechaCalendarioValida, FORMATO_FECHA_CALENDARIO } from "../../shared/fecha.util";
 import { listaAcotada } from "../../shared/listaAcotada";
 import { LIMITES_LISTAS } from "../../shared/limites-listas";
 
 export const proposeAssignmentSchema = z.object({
-  clubId: z.string().uuid("Club inválido"),
-  personId: z.string().uuid("Nadador inválido"),
+  clubId: uuidField("Club inválido"),
+  personId: uuidField("Nadador inválido"),
 });
 export type ProposeAssignmentInput = z.infer<typeof proposeAssignmentSchema>;
 
@@ -47,8 +48,8 @@ export const rejectAssignmentSchema = z.object({
 export type RejectAssignmentInput = z.infer<typeof rejectAssignmentSchema>;
 
 export const assignmentListQuerySchema = z.object({
-  clubId: z.string().uuid().optional(),
-  personId: z.string().uuid().optional(),
+  clubId: uuidField().optional(),
+  personId: uuidField().optional(),
   status: z.enum(["pending", "active", "rejected", "ended"]).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
@@ -72,11 +73,11 @@ export const swimmersByClubFilterQuerySchema = z.object({
 export type SwimmersByClubFilterQuery = z.infer<typeof swimmersByClubFilterQuerySchema>;
 
 export const bulkAssignSwimmersSchema = z.object({
-  targetClubId: z.string().uuid("Club de destino inválido"),
+  targetClubId: uuidField("Club de destino inválido"),
   // Tope de longitud comprobado ANTES de validar elementos (SEC-01). No garantiza una duración de la operación.
   personIds: listaAcotada(
     LIMITES_LISTAS.asignacionMasiva,
-    z.array(z.string().uuid()).min(1, "Debe seleccionar al menos un nadador"),
+    z.array(uuidField()).min(1, "Debe seleccionar al menos un nadador"),
     "Se pueden asignar como máximo 10.000 nadadores por operación"
   ),
   // Una sola fecha para toda la tanda: lo que hace que 5.000 membresías
@@ -87,7 +88,7 @@ export const bulkAssignSwimmersSchema = z.object({
 export type BulkAssignSwimmersInput = z.infer<typeof bulkAssignSwimmersSchema>;
 
 export const reassignSwimmerSchema = z.object({
-  newClubId: z.string().uuid("Club inválido"),
+  newClubId: uuidField("Club inválido"),
   fechaEfectiva: fechaEfectivaField,
 });
 export type ReassignSwimmerInput = z.infer<typeof reassignSwimmerSchema>;

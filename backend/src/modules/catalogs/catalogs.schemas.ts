@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { uuidField } from "../../shared/uuid.schema";
 
 export const distanceCreateSchema = z.object({
   meters: z.coerce.number().int().positive("La distancia debe ser un número positivo de metros"),
@@ -16,8 +17,8 @@ export const categoryGroupCreateSchema = z.object({
 export type CategoryGroupCreateInput = z.infer<typeof categoryGroupCreateSchema>;
 
 const categoryBase = {
-  testTypeId: z.string().uuid("Tipo de prueba inválido"),
-  categoryGroupId: z.string().uuid("Grupo de categorías inválido").optional().nullable(),
+  testTypeId: uuidField("Tipo de prueba inválido"),
+  categoryGroupId: uuidField("Grupo de categorías inválido").optional().nullable(),
   name: z.string().trim().min(2, "El nombre de la categoría es obligatorio"),
   minAge: z.coerce.number().int().min(0, "La edad mínima no puede ser negativa"),
   maxAge: z.coerce.number().int().min(0),
@@ -38,8 +39,8 @@ export const categoryUpdateSchema = z
 export type CategoryUpdateInput = z.infer<typeof categoryUpdateSchema>;
 
 export const categoryListQuerySchema = z.object({
-  testTypeId: z.string().uuid().optional(),
-  categoryGroupId: z.string().uuid().optional(),
+  testTypeId: uuidField().optional(),
+  categoryGroupId: uuidField().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(50),
 });
@@ -48,9 +49,9 @@ export type CategoryListQuery = z.infer<typeof categoryListQuerySchema>;
 const eventGenderEnum = z.enum(["male", "female", "mixed"]);
 
 export const eventCreateSchema = z.object({
-  testTypeId: z.string().uuid("Tipo de prueba inválido"),
-  distanceId: z.string().uuid("Distancia inválida"),
-  strokeId: z.string().uuid("Estilo inválido"),
+  testTypeId: uuidField("Tipo de prueba inválido"),
+  distanceId: uuidField("Distancia inválida"),
+  strokeId: uuidField("Estilo inválido"),
   gender: eventGenderEnum,
 });
 export type EventCreateInput = z.infer<typeof eventCreateSchema>;
@@ -61,9 +62,9 @@ export const eventUpdateSchema = z.object({
 export type EventUpdateInput = z.infer<typeof eventUpdateSchema>;
 
 export const eventListQuerySchema = z.object({
-  testTypeId: z.string().uuid().optional(),
-  distanceId: z.string().uuid().optional(),
-  strokeId: z.string().uuid().optional(),
+  testTypeId: uuidField().optional(),
+  distanceId: uuidField().optional(),
+  strokeId: uuidField().optional(),
   gender: eventGenderEnum.optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(50),

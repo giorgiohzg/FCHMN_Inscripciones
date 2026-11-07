@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { uuidField } from "../../shared/uuid.schema";
 
 export const auditLogListQuerySchema = z.object({
-  userId: z.string().uuid().optional(),
+  userId: uuidField().optional(),
   entityType: z.string().trim().optional(),
   entityId: z.string().optional(),
   action: z.string().trim().optional(),

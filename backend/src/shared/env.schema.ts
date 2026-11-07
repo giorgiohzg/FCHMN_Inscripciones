@@ -61,7 +61,7 @@ const duracionDeToken = z
   .default("15m")
   .transform((valor, ctx): number => {
     const invalido = (message: string): typeof z.NEVER => {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+      ctx.addIssue({ code: "custom", message });
       return z.NEVER;
     };
 
@@ -232,7 +232,7 @@ const envSchema = z
     const secure = valores.AUTH_COOKIE_SECURE ?? valores.NODE_ENV === "production";
     if (valores.AUTH_COOKIE_SAMESITE === "none" && !secure) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["AUTH_COOKIE_SAMESITE"],
         message:
           "AUTH_COOKIE_SAMESITE=none exige AUTH_COOKIE_SECURE=true: los navegadores descartan una cookie SameSite=None que no sea Secure.",
@@ -247,7 +247,7 @@ const envSchema = z
      */
     if (valores.AUTH_COOKIE_SAMESITE === "none" && valores.CORS_ORIGINS.length === 0) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["CORS_ORIGINS"],
         message:
           "Con AUTH_COOKIE_SAMESITE=none hay que declarar CORS_ORIGINS con los orígenes exactos: " +
@@ -271,7 +271,7 @@ const envSchema = z
      */
     if (valores.AUTH_COOKIE_SECURE === false) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["AUTH_COOKIE_SECURE"],
         message:
           "AUTH_COOKIE_SECURE=false no se admite en producción: la cookie del refresh token viajaría por HTTP sin cifrar. " +
@@ -281,7 +281,7 @@ const envSchema = z
 
     if (valores.CORS_ORIGINS.length === 0) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["CORS_ORIGINS"],
         message:
           "En producción hay que declarar los orígenes permitidos (CORS_ORIGINS), separados por coma. " +
@@ -292,7 +292,7 @@ const envSchema = z
     for (const origen of valores.CORS_ORIGINS) {
       if (!/^https?:\/\/[^/]+$/.test(origen)) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: ["CORS_ORIGINS"],
           message: `Origen inválido: "${origen}". Use esquema y host sin ruta final, por ejemplo https://inscripciones.fchmn.cl`,
         });
@@ -307,7 +307,7 @@ const envSchema = z
      */
     if (swaggerHabilitadoEn(valores as Env) && !valores.PUBLIC_API_URL) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["PUBLIC_API_URL"],
         message:
           "Con la documentación habilitada (ENABLE_SWAGGER=true) hay que declarar PUBLIC_API_URL: " +
@@ -319,7 +319,7 @@ const envSchema = z
     // Los prefijos son los de los valores que trae esa plantilla.
     if (/^(reemplazar|replace|cambiar|change|example|ejemplo|secret|test)/i.test(valores.JWT_ACCESS_SECRET)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["JWT_ACCESS_SECRET"],
         message: "JWT_ACCESS_SECRET parece un valor de ejemplo. Genere uno con: openssl rand -hex 32",
       });

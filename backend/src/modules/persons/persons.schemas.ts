@@ -6,7 +6,7 @@ const runField = z.string().superRefine((val, ctx) => {
   const result = validateRun(val);
   if (!result.valid) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: "custom",
       message:
         result.reason === "FORMAT"
           ? "Formato de RUN inválido (use 12345678-9)"
@@ -25,9 +25,9 @@ export const personCreateSchema = z.object({
   firstName: z.string().trim().min(2, "El nombre es obligatorio"),
   paternalLastName: z.string().trim().min(2, "El apellido paterno es obligatorio"),
   maternalLastName: z.string().trim().optional(),
-  birthDate: z.coerce.date({ errorMap: () => ({ message: "Fecha de nacimiento inválida" }) }),
-  gender: z.enum(["male", "female"], { errorMap: () => ({ message: "Debe indicar el género de la persona" }) }),
-  email: z.union([z.string().trim().email("Correo electrónico inválido"), z.literal("")]).optional().transform((v) => (v ? v : undefined)),
+  birthDate: z.coerce.date({ error: "Fecha de nacimiento inválida" }),
+  gender: z.enum(["male", "female"], { error: "Debe indicar el género de la persona" }),
+  email: z.union([z.string().trim().email("Correo electrónico inválido"), z.literal("")]).optional().transform((v) => (v ? v : undefined)).optional(),
   phone: z.string().trim().optional(),
   /**
    * `roles` SE RECHAZA, no se ignora.
@@ -43,7 +43,7 @@ export const personCreateSchema = z.object({
    * Excel ya rechaza su columna en desuso por el mismo motivo; esto lo iguala.
    */
   roles: z
-    .undefined({ errorMap: () => ({ message: "Los roles no se asignan desde la ficha de la persona: son derivados. El de nadador se obtiene al incorporarla al plantel de un club, y los de delegado, entrenador y representante legal al nombrarla en la ficha del club. Quite el campo `roles` de la petición." }) })
+    .undefined({ error: "Los roles no se asignan desde la ficha de la persona: son derivados. El de nadador se obtiene al incorporarla al plantel de un club, y los de delegado, entrenador y representante legal al nombrarla en la ficha del club. Quite el campo `roles` de la petición." })
     .optional(),
 });
 export type PersonCreateInput = z.infer<typeof personCreateSchema>;
@@ -54,11 +54,11 @@ export const personUpdateSchema = z.object({
   maternalLastName: z.string().trim().optional(),
   birthDate: z.coerce.date().optional(),
   gender: z.enum(["male", "female"]).optional(),
-  email: z.union([z.string().trim().email("Correo electrónico inválido"), z.literal("")]).optional().transform((v) => (v === "" ? null : v)),
+  email: z.union([z.string().trim().email("Correo electrónico inválido"), z.literal("")]).optional().transform((v) => (v === "" ? null : v)).optional(),
   phone: z.string().trim().optional(),
   // `roles` se rechaza igual que en la creación, y por lo mismo. Ver allí.
   roles: z
-    .undefined({ errorMap: () => ({ message: "Los roles no se asignan desde la ficha de la persona: son derivados. El de nadador se obtiene al incorporarla al plantel de un club, y los de delegado, entrenador y representante legal al nombrarla en la ficha del club. Quite el campo `roles` de la petición." }) })
+    .undefined({ error: "Los roles no se asignan desde la ficha de la persona: son derivados. El de nadador se obtiene al incorporarla al plantel de un club, y los de delegado, entrenador y representante legal al nombrarla en la ficha del club. Quite el campo `roles` de la petición." })
     .optional(),
   /**
    * Nombre de usuario: editable SOLO mientras la persona no tenga una cuenta
@@ -95,7 +95,7 @@ export type PersonListQuery = z.infer<typeof personListQuerySchema>;
  * error de quien llama.
  */
 export const adminAccessSchema = z.object({
-  adminAccess: z.boolean({ errorMap: () => ({ message: "Indique si la persona debe tener permisos de administrador" }) }),
+  adminAccess: z.boolean({ error: "Indique si la persona debe tener permisos de administrador" }),
 });
 export type AdminAccessInput = z.infer<typeof adminAccessSchema>;
 

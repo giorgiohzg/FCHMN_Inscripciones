@@ -1,11 +1,13 @@
 import { z } from "zod";
+import { uuidField } from "../../shared/uuid.schema";
 import { listaAcotada } from "../../shared/listaAcotada";
 import { LIMITES_LISTAS } from "../../shared/limites-listas";
 
 export const meetImportOptionsSchema = z.object({
+  // Con Zod 3 el mensaje del esquema también cubría a `.int()`; en Zod 4 se da explícitamente.
   maxIndividualEventsPerSwimmer: z.coerce
-    .number({ errorMap: () => ({ message: "Debe ingresar la cantidad máxima de pruebas individuales por nadador" }) })
-    .int()
+    .number({ error: "Debe ingresar la cantidad máxima de pruebas individuales por nadador" })
+    .int("Debe ingresar la cantidad máxima de pruebas individuales por nadador")
     .min(1, "Debe ser al menos 1"),
   /** Opcional: si no se indica, la competencia importada usa el valor por defecto (1). */
   maxRelayEventsPerSwimmerPerSession: z.coerce.number().int().min(0).optional(),
@@ -24,7 +26,7 @@ export const decisionDeRelevoSchema = z.discriminatedUnion("decision", [
   z.object({
     eventNumber: z.number().int().positive(),
     decision: z.literal("tipo"),
-    testTypeId: z.string().uuid("El tipo de relevo elegido no es válido"),
+    testTypeId: uuidField("El tipo de relevo elegido no es válido"),
   }),
   z.object({
     eventNumber: z.number().int().positive(),

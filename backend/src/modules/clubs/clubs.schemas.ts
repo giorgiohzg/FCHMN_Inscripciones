@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { uuidField } from "../../shared/uuid.schema";
 import { validateRun } from "../../shared/run.util";
 import { usernameOpcionalField } from "../../shared/username.schema";
 import { listaAcotada } from "../../shared/listaAcotada";
@@ -46,10 +47,7 @@ const baseClubFields = {
    * tampoco admite «pendiente». Este rechazo con mensaje claro sigue siendo la
    * respuesta de la API (400) a un cuerpo anterior que envíe `null` u omita el campo.
    */
-  hasLegalStatus: z.boolean({
-    required_error: MENSAJE_PERSONALIDAD_OBLIGATORIA,
-    invalid_type_error: MENSAJE_PERSONALIDAD_OBLIGATORIA,
-  }),
+  hasLegalStatus: z.boolean({ error: MENSAJE_PERSONALIDAD_OBLIGATORIA }),
   rut: z.string().trim().optional(),
   legalName: z.string().trim().optional(),
   email: emailOpcional,
@@ -57,15 +55,18 @@ const baseClubFields = {
   // debe significar "no tocar la lista actual" — el valor por defecto para
   // la creación se aplica aparte, solo en clubCreateSchema.
   // Tope de longitud comprobado ANTES de validar elementos (SEC-01); «no enviado» sigue siendo «no tocar».
-  delegatePersonIds: listaAcotada(LIMITES_LISTAS.delegadosPorClub, z.array(z.string().uuid()), "Un club admite como máximo 50 delegados").optional(),
-  coachPersonIds: listaAcotada(LIMITES_LISTAS.entrenadoresPorClub, z.array(z.string().uuid()), "Un club admite como máximo 50 entrenadores").optional(),
+  delegatePersonIds: listaAcotada(LIMITES_LISTAS.delegadosPorClub, z.array(uuidField()), "Un club admite como máximo 50 delegados").optional(),
+  coachPersonIds: listaAcotada(LIMITES_LISTAS.entrenadoresPorClub, z.array(uuidField()), "Un club admite como máximo 50 entrenadores").optional(),
   // Solo aplica si hasLegalStatus === true. Con false la designación se
   // RECHAZA (ver refineRepresentanteLegal), no se descarta.
-  legalRepresentativePersonId: z.string().uuid().optional().nullable(),
-  isAchmnMember: z.boolean().default(false),
-  isAchmnCollaborator: z.boolean().default(false),
-  isFchmnMember: z.boolean().default(false),
-  isFchmnCollaborator: z.boolean().default(false),
+  legalRepresentativePersonId: uuidField().optional().nullable(),
+  // SIN valor por omisión a propósito (SEC-03 C): Zod 4 aplica los `.default()` también dentro de campos opcionales, así que
+  // si estos cuatro lo llevaran, `.partial()` en la actualización los rellenaría con `false` y restablecería las membresías
+  // de un club que solo cambió su nombre. El `false` de la CREACIÓN se declara en `clubCreateSchema`.
+  isAchmnMember: z.boolean(),
+  isAchmnCollaborator: z.boolean(),
+  isFchmnMember: z.boolean(),
+  isFchmnCollaborator: z.boolean(),
 };
 
 /**
@@ -82,14 +83,14 @@ function refineRut<T extends { hasLegalStatus: boolean; rut?: string }>(schema: 
     const rut = data.rut?.trim() ?? "";
 
     if (rut.length === 0) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["rut"], message: "El RUT es obligatorio para clubes con personalidad jurídica" });
+      ctx.addIssue({ code: "custom", path: ["rut"], message: "El RUT es obligatorio para clubes con personalidad jurídica" });
       return;
     }
 
     const result = validateRun(rut);
     if (!result.valid) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["rut"],
         message: result.reason === "FORMAT" ? "Formato de RUT inválido (use 12345678-9)" : "El dígito verificador del RUT no es válido",
       });
@@ -114,7 +115,7 @@ function refineRepresentanteLegal<T extends { hasLegalStatus: boolean; legalRepr
     if (!data.legalRepresentativePersonId) return;
     if (data.hasLegalStatus === true) return;
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: "custom",
       path: ["legalRepresentativePersonId"],
       message: "Solo los clubes con personalidad jurídica pueden tener representante legal",
     });
@@ -131,19 +132,39 @@ function refineMembershipExclusivity<T extends { isAchmnMember?: boolean; isAchm
 ) {
   return schema.superRefine((data, ctx) => {
     if (data.isAchmnMember && data.isAchmnCollaborator) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["isAchmnCollaborator"], message: "Un club no puede ser Socio y Colaborador ACHMN a la vez" });
+      ctx.addIssue({ code: "custom", path: ["isAchmnCollaborator"], message: "Un club no puede ser Socio y Colaborador ACHMN a la vez" });
     }
     if (data.isFchmnMember && data.isFchmnCollaborator) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["isFchmnCollaborator"], message: "Un club no puede ser Socio y Colaborador FCHMN a la vez" });
+      ctx.addIssue({ code: "custom", path: ["isFchmnCollaborator"], message: "Un club no puede ser Socio y Colaborador FCHMN a la vez" });
     }
   });
 }
 
 export const clubCreateSchema = refineMembershipExclusivity(
   // `username` opcional: registrar un club no exige darle nombre de acceso.
-  refineRepresentanteLegal(refineRut(z.object({ ...baseClubFields, email: emailOpcional.optional(), username: usernameOpcionalField.optional() })))
+  refineRepresentanteLegal(
+    refineRut(
+      z.object({
+        ...baseClubFields,
+        // En la creación, omitir una membresía equivale a «ninguna» (false). En la actualización, omitirla es «no modificar».
+        isAchmnMember: z.boolean().default(false),
+        isAchmnCollaborator: z.boolean().default(false),
+        isFchmnMember: z.boolean().default(false),
+        isFchmnCollaborator: z.boolean().default(false),
+        email: emailOpcional.optional(),
+        username: usernameOpcionalField.optional(),
+      })
+    )
+  )
 );
-export type ClubCreateInput = z.infer<typeof clubCreateSchema>;
+type ClubCreateSalida = z.infer<typeof clubCreateSchema>;
+type IndicadoresDeMembresia = "isAchmnMember" | "isAchmnCollaborator" | "isFchmnMember" | "isFchmnCollaborator";
+/**
+ * Con Zod 3 los indicadores de membresía eran opcionales en este tipo (la entrada los admite omitidos y la creación los pone en
+ * `false`); con Zod 4 la inferencia los volvería obligatorios. Se conserva la forma histórica: quien llama al servicio sin pasar
+ * por HTTP puede omitirlos. Los datos que salen de `clubCreateSchema.parse` siempre los traen.
+ */
+export type ClubCreateInput = Omit<ClubCreateSalida, IndicadoresDeMembresia> & Partial<Pick<ClubCreateSalida, IndicadoresDeMembresia>>;
 
 export const clubUpdateSchema = refineMembershipExclusivity(
   refineRepresentanteLegal(
@@ -177,9 +198,7 @@ export const clubListQuerySchema = z.object({
    */
   personalidadJuridica: z
     .enum(["si", "no"], {
-      errorMap: () => ({
-        message: 'El filtro de personalidad jurídica solo admite "si" o "no". El estado "pendiente" ya no existe.',
-      }),
+      error: 'El filtro de personalidad jurídica solo admite "si" o "no". El estado "pendiente" ya no existe.',
     })
     .optional(),
   page: z.coerce.number().int().min(1).default(1),

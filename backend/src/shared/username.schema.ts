@@ -37,6 +37,6 @@ export const usernameOpcionalField = z
     if (valor === null) return;
     const resultado = usernameField.safeParse(valor);
     if (!resultado.success) {
-      for (const issue of resultado.error.issues) ctx.addIssue({ code: z.ZodIssueCode.custom, message: issue.message });
+      for (const issue of resultado.error.issues) ctx.addIssue({ code: "custom", message: issue.message });
     }
   });

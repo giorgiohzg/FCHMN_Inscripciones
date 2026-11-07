@@ -17,7 +17,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **SEC-02** | Ningún reporte entrega el RUN, para ningún rol | **Cerrada** dentro de su alcance: desplegada en web y API desde `3cf1aaf` (Live, Auto-Deploy Off). Ver «SEC-02» |
 | CI de SEC-02 | Pánico intermitente del motor de Prisma en las pruebas unitarias (ejecución 42269659668) | **Diagnosticado; protección publicada en el repositorio y validada en local.** La causa del pánico **no está demostrada**. Ver «CI de SEC-02» |
 | **SEC-01** | Topes para las listas JSON (`personIds` de relevos y otras) | **Cerrada** dentro de su alcance: desplegada en `fchmn-api` desde `120e29d` (Live, Auto-Deploy Off) y validada en local y en la CI con datos sintéticos. Ver «SEC-01» |
-| **SEC-03** | Dependencias, en tres entregas (A backend compatible, B Vite/Vitest, C Zod) | **A cerrada** dentro de su alcance: desplegada solo en `fchmn-api` desde `dab3690` (Live, Auto-Deploy Off). **B publicada en el repositorio, validada en local; sin desplegar** (ver «SEC-03, entrega B»). **SEC-03 sigue abierta:** C (Zod, sin autorización) y los avisos residuales. Ver «SEC-03, entrega A» |
+| **SEC-03** | Dependencias, en tres entregas (A backend compatible, B Vite/Vitest, C Zod) | **A cerrada** dentro de su alcance: desplegada solo en `fchmn-api` desde `dab3690` (Live, Auto-Deploy Off). **B publicada en el repositorio, validada en local; sin desplegar** (ver «SEC-03, entrega B»). **C (Zod del backend 3 → 4.6.7) publicada en el repositorio y validada localmente; pendiente de despliegue** (ver «SEC-03, entrega C»). **SEC-03 sigue abierta:** B y C sin desplegar y el aviso de desarrollo de `minimatch`. Ver «SEC-03, entrega A» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Aplazado, fuera de estas fases.** Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -942,7 +942,7 @@ desplegaron**: los artefactos, inventarios y avisos de mantenimiento preparados 
 - **Lo que ejecuta la CI** (su workflow): los avisos publicados y sus copias al día, el `Dockerfile` de mantenimiento, y en el backend `npm ci`, `prisma generate`, tipos, lint, pruebas unitarias, migraciones sobre la base desechable y pruebas de integración; en el frontend, tipos, lint, pruebas y la construcción. **No construye las imágenes candidatas ni extrae inventarios de imágenes.**
 - **No se hicieron pruebas funcionales en producción**; esa limitación no es una tarea obligatoria para cerrar A.
 - **Pendiente tras A:** `zod` sigue como aviso residual del árbol de producción de la API (entrega C); `vite`, `vitest`, `esbuild`, `tinypool` y el `minimatch` de `eslint` siguen como avisos de
-  desarrollo (entrega B). B y C no están autorizadas.
+  desarrollo (entrega B). (Situación posterior: B está publicada en el repositorio y sin desplegar; C tiene su propia sección.)
 
 Las entregas **B** (Vite, Vitest y herramientas) y **C** (Zod) **no están autorizadas** y no se tocaron: ni Zod, ni Vite,
 ni Vitest, ni Prisma, ni React, ni las imágenes base, ni el frontend. No cambia código de negocio.
@@ -1136,6 +1136,69 @@ Todo con datos sintéticos, una vez cada comprobación, sin relajar ninguna expe
   navegadores funcionan, y este objetivo no las cambia.
 - Las pruebas con enlaces del recorrido de carpetas prohibidas dependen de que el sistema permita crear enlaces a directorios; si no, se omiten y constan como omitidas.
 - B no está publicada ni desplegada. **SEC-03 sigue abierta:** C (Zod) y `minimatch` de `eslint`.
+
+## SEC-03, entrega C: Zod del backend 3.25.76 → 4.6.7 (publicada en el repositorio y validada localmente; pendiente de despliegue)
+
+**Estado: publicada en el repositorio y validada localmente; pendiente de despliegue.** Se valida en LOCAL y se publica en el repositorio (commit y push a `main`); su resultado en la CI se consulta aparte y no se anticipa aquí. No hay despliegue ni se tocó Render: producción sigue con Zod 3.25.76. Cierra, en el código del repositorio, el último aviso de **producción** del backend
+(GHSA-mrhx-c7xc-m3w5 / CVE-2023-54404, alta, CWE-770: agotamiento de memoria al validar listas enormes; afecta a Zod anterior a 4.6.6; no hay corrección para la serie 3).
+
+**Versión y bloqueo.** `backend/package.json`: `zod` `^3.23.8` → `^4.6.7`; el bloqueo resuelve exactamente **4.6.7** (`node_modules/zod`, integridad `sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==`, la que informa el registro). La diferencia del bloqueo es **una sola entrada**: `zod` (más la línea del
+manifiesto raíz); ningún otro paquete cambió, y la comparación contra el bloqueo anterior da una entrada de producción cambiada (la propia `zod`). `zod` 4.6.7 no tiene dependencias ni `engines`, y su `LICENSE` es idéntico al de la 3.25.76. Se instaló con `npm ci` (npm 11.17.0).
+**No se verificó la atestación de procedencia** (SLSA) que el registro dice tener para esta versión: solo se leyó el metadato.
+
+**Decisiones aplicadas.**
+- **D1, identificadores:** `z.guid()` (nuevo `src/shared/uuid.schema.ts`, `uuidField(mensaje?)`) sustituye a los 62 `.uuid()`, con sus mensajes. `z.uuid()` de Zod 4 exige versión y variante RFC y rechazaría identificadores que la API siempre aceptó.
+- **D2, mensajes:** los **mensajes personalizados en español se conservan**; los genéricos de Zod cambian (por ejemplo `Required` → `Invalid input: expected …`) y se aceptan, sin mapa global.
+- **D3, enteros:** `.int()` de Zod 4 solo admite enteros seguros; `"1e20"` o `"9007199254740993"` pasan a rechazarse en el borde (antes fallaban después, en la base).
+- **D4:** `z.ZodIssueCode.custom` → `"custom"`. **D5:** se conserva `.flatten()` y su forma `{formErrors, fieldErrors}` (obsoleto en Zod 4 pero vigente; las ~40 rutas no se tocan). **D6:** `^4.6.7`, resuelto en 4.6.7.
+
+**Cambios silenciosos de Zod 4 que se encontraron y se corrigieron** (medidos con la 4.6.7 instalada, no supuestos):
+1. **`errorMap`, `required_error` e `invalid_type_error` se ignoran sin avisar** (el compilador sí los marca). 16 usos en 5 archivos pasan a `error`, con el mismo texto. Con Zod 3 el mensaje del esquema numérico también cubría a `.int()` (que no trae el suyo); se
+   verificó contra el paquete 3.25.76 y se conserva dándolo explícitamente a `.int()` en las tres cantidades afectadas (pruebas individuales de competencia e importación, relevos por jornada).
+2. **`.partial()` aplica los valores por omisión.** `poolUpdateSchema = poolCreateSchema.partial()` y `clubUpdateSchema` (`.partial({isAchmnMember…})`) habrían rellenado `isHeated`, `isCovered` y las cuatro membresías con `false`: una edición que solo cambiara el nombre
+   habría restablecido esos datos. Ahora los esquemas de actualización **se definen sin valores por omisión** (`pools.schemas.ts`; en `clubs.schemas.ts` los indicadores base son `z.boolean()` y el `false` se declara solo en `clubCreateSchema`).
+3. **`ZodError.errors` ya no existe:** `persons-bulk-import.rules.ts` usa `.issues` (mismo formato `campo: mensaje` en el informe de filas rechazadas).
+4. **Tipos:** `ZodTypeDef` desapareció (firma de `listaAcotada`), y `z.ZodType<T>` ya no infiere desde la entrada: `ClubCreateInput` conserva su forma histórica (membresías opcionales para quien llama al servicio sin pasar por HTTP) y `personCreateSchema`/`personUpdateSchema`
+   mantienen `email` opcional (`.optional()` tras la transformación).
+
+**SEC-01 íntegra.** Topes (`LIMITES_LISTAS`), `listaAcotada`, `bodyLimit` por ruta y límites del multipart **no se retiraron**. `listaAcotada` solo cambia de firma (`z.ZodType<z.output<S>, z.input<S>>`) y usa `{ error }` en vez de `{ message }`; su lógica es la misma: la longitud se
+comprueba antes de tocar un elemento. Con Zod 4.6.6+ el `.max()` también rechaza antes de validar elementos (corrección del aviso), pero el control propio se conserva como defensa en profundidad. No se importa ningún subpath de Zod (`zod/v3`…): lo comprueba una prueba.
+
+**Pruebas.**
+- **Caracterización primero, con Zod 3.25.76** (`tests/zod-contrato-esquemas.test.ts`, 40 pruebas, y `tests/zod-actualizaciones.integration.test.ts`, 5): pasaron antes de actualizar (dos expectativas se corrigieron en esa primera ejecución con Zod 3, que mostró el comportamiento real) y siguen pasando después, sin cambiar sus expectativas salvo lo indicado abajo. Fijan los mensajes
+  personalizados, las claves que salen de cada esquema (omitido = «no tocar»), los valores por omisión de la creación, `undefined`/`null`/vacío/espacios, el informe de la carga masiva, `ValidationError` con `{formErrors, fieldErrors}` y la configuración inválida por variable.
+  Los dos añadidos posteriores (mensaje del esquema también en decimales, comprobado aparte contra 3.25.76; y la diferencia aceptada D3) solo se ejecutaron con Zod 4.
+- **Editar sin indicadores conserva lo guardado** (integración, HTTP + base desechable): una piscina con `isHeated` e `isCovered` en `true` editada con `{name}` los conserva; un club con `isAchmnMember` e `isFchmnCollaborator` en `true` editado con `{hasLegalStatus, name}` conserva las membresías; enviar un indicador en
+  `false` sí lo cambia y no toca los demás.
+- **Aviso:** `tests/zod-version.test.ts` (4 pruebas): una sola Zod en el bloqueo, de la serie 4 y no anterior a 4.6.6; lo instalado coincide con el bloqueo; el manifiesto declara `^4.6.6` o posterior; ninguna fuente importa un subpath de Zod. Y en `lista-acotada.test.ts` el control
+  de sensibilidad pasó a demostrar la corrección: con datos de cuatro elementos, `z.array(...).max(3)` por sí solo ya hace 0 validaciones de elemento y devuelve un error (con Zod 3 eran 4 validaciones). Sin pruebas de agotamiento.
+- **Expectativas que cambiaron, con su razón:** (a) `lista-acotada.test.ts`: los textos `Required` y `Expected array, received …` eran de Zod 3; ahora se comprueba que el rechazo sea el error de tipo del esquema interno (`expected array, received …`) y no el del tope. (b) `lista-acotada.test.ts`: el control
+  «`.max()` de Zod 3 valida todos los elementos» ya no es cierto, ver arriba. (c) `listas-esquemas.test.ts`: la definición «anterior» usa `z.guid()` (el `.uuid()` de Zod 3), y en «501 decisiones inválidas» la definición anterior ya devuelve un solo error, no más de 500
+  (corrección del aviso). (d) `clubs-personalidad-juridica.test.ts`: solo el tipo auxiliar (`path` es `PropertyKey[]`). **Se conservan sin cambio:** todos los mensajes personalizados, los topes y sus mensajes, los códigos HTTP y las transformaciones.
+
+**Validación local** (una vez cada una, datos sintéticos): typecheck completo (`tsconfig.json` y `tsconfig.check.json`) sin errores; lint sin errores (51 avisos de `any`, los de antes); **suite unitaria completa: 67 archivos, 1.694 pruebas**; **integración completa, solo contra la base desechable y
+sin ejecuciones simultáneas: 54 archivos, 1.127 pruebas**. (Antes de C eran 65/1.641 y 53/1.122; la diferencia son las pruebas nuevas.)
+
+**Avisos de npm** (endpoint de avisos sobre el bloqueo resultante, 466 paquetes): el aviso de `zod` **desaparece**. Queda **un** aviso en el backend: `minimatch` 10.2.6 (GHSA-g3hv-75wg-m249, moderado), **solo desarrollo** (bajo `eslint`); sin corrección compatible. **No queda ningún aviso de producción.**
+
+**Imágenes candidatas, inventarios y avisos** (comprobado en imágenes construidas en local, no en la CI). Se siguió el procedimiento de dos pasadas con las imágenes de la API (`--target runtime`) y de mantenimiento (`--target migrate`; el `Dockerfile.mantenimiento` derivado coincide con su fuente). No se modificó ningún `Dockerfile`.
+- Pasada 1 (descubrimiento) y pasada 2 (final, con los avisos ya regenerados): la salida de la sonda de la pasada 2 es **byte a byte idéntica** a la de la 1, de modo que regenerar desde las finales produce cero cambios; `generar-avisos --verificar`, `distribuir-avisos --verificar` y `generar-dockerfile-mantenimiento --verificar` devuelven 0.
+- **Comparado con el inventario anterior (SEC-03 A) paquete por paquete:** API 258 paquetes distintos (276 rutas) y mantenimiento 264 (282 rutas); **el único cambio es `zod` 3.25.76 → 4.6.7**; las demás entradas (rutas, licencia declarada, autor, repositorio, archivos y hashes de licencia) y los componentes del sistema y sueltos son idénticos.
+  El texto de licencia de `zod` es el mismo archivo (`LICENSE`, 1.072 bytes, sha256 `3f1189b2…`) y sigue íntegro.
+- **Cobertura:** la sonda coincide con una enumeración independiente (`find` + `grep`/`sed` dentro de la misma imagen): 276/276 en la API y 282/282 en mantenimiento, sin diferencias de ruta ni de versión; la API coincide además con el bloqueo (producción, 276/276). `zod` 4.6.7 está instalada en `node_modules/zod` de ambas.
+- **Cambios en archivos distribuidos:** una línea en `notices/inventario/{backend,migrate}.json` (la versión) y el encabezado de `zod` en `notices/{backend,migrate}.txt` y en sus copias `backend/avisos/*.txt`; nada más (sin textos nuevos; `sources.json` y los avisos del frontend no cambian).
+  El `THIRD-PARTY-NOTICES.txt` de cada imagen tiene el mismo sha256 que `notices/` y que `backend/avisos/` (API `100eb6bf…`, mantenimiento `64b2e0a3…`).
+- Los archivos de `/app/prisma` de la API corresponden todos a rutas versionadas en Git (equivalente manual de la comprobación de `verificar-archivos-de-imagen.mjs`, que **no se ejecutó** porque lanza contenedores con `--rm`).
+- **Prueba de humo dentro de la imagen de la API:** los esquemas compilados cargan con Zod 4.6.7; una edición de club y una de piscina sin indicadores no los traen; el tope de una lista da su mensaje propio. Es un humo sobre el código compilado, no una prueba funcional del servicio.
+- La imagen de la API pasa de 410 a 414 MB y la de mantenimiento de 476 a 480 MB (Zod 4 es más grande).
+- **Calculado, no comprobado en imágenes:** el frontend y su imagen no cambian (su Zod es solo de lint y no se distribuye); no se reconstruyeron.
+
+**Límites y riesgos.**
+- C está publicada en el repositorio pero no desplegada: **producción conserva Zod 3.25.76 y el aviso**, y Render no se tocó. Llevarla a producción exige un despliegue manual de `fchmn-api` (y, si se decide, del servicio de mantenimiento, cuya imagen lleva el mismo árbol), con autorización propia.
+- Los mensajes genéricos de Zod cambian de texto en las respuestas 400 de campos sin mensaje propio (se aceptó); el frontend los muestra tal cual (`extractApiErrorMessage`).
+- La caracterización cubre los esquemas con casos representativos, no todas las combinaciones de entrada. Se validó la versión 4.6.7 con las comprobaciones descritas en esta sección; no se compararon exhaustivamente las versiones 4.6.6 y 4.6.7 (la 4.6.7 no trae notas de versión).
+- No se verificó la atestación de procedencia del paquete. Queda abierto el aviso de desarrollo de `minimatch` (`eslint`).
+- Contenedores detenidos creados por las extracciones (sin `--rm`) y las cuatro imágenes `fchmn-{backend,migrate}:sec03c-*` quedan en el equipo.
 
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 

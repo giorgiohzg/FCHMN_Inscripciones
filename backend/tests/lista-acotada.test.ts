@@ -2,8 +2,9 @@
  * `listaAcotada` (SEC-01): el tope de longitud se comprueba ANTES de validar elementos.
  *
  * La demostración es DETERMINISTA: un esquema de elemento que cuenta cuántas veces se le pide validar.
- * Con exceso, el contador queda en CERO. No depende de tiempos ni de memoria; el control de
- * sensibilidad muestra que la misma entrada con `.max()` de Zod 3 SÍ valida todos los elementos.
+ * Con exceso, el contador queda en CERO. No depende de tiempos ni de memoria. Con Zod 3 el control de
+ * sensibilidad mostraba que `.max()` SÍ validaba todos los elementos; con Zod 4.6.6+ (GHSA-mrhx-c7xc-m3w5) ya no lo hace,
+ * y el control pasó a demostrar esa corrección. `listaAcotada` se conserva como defensa propia.
  */
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
@@ -46,15 +47,27 @@ describe("rechazo temprano: con exceso NO se valida ningún elemento", () => {
     if (!resultado.success) expect(resultado.error.issues).toHaveLength(1);
   });
 
-  it("CONTROL DE SENSIBILIDAD: con `.max()` de Zod 3 la misma entrada SÍ valida todos los elementos", () => {
+  it("CORRECCIÓN DEL AVISO (GHSA-mrhx-c7xc-m3w5): con Zod 4.6.6+ el `.max()` por sí solo ya rechaza ANTES de validar elementos", () => {
     const { contador, elemento } = elementoContado();
     const esquema = z.object({ lista: z.array(elemento).max(3, MENSAJE) });
 
     const resultado = esquema.safeParse({ lista: ["a", "b", "c", "d"] });
 
+    // Con Zod 3 esto daba 4 validaciones y más de un error (medido). Si un cambio de versión lo revierte, falla aquí.
+    expect(contador.validaciones).toBe(0);
+    expect(resultado.success).toBe(false);
+    if (!resultado.success) expect(resultado.error.issues).toHaveLength(1);
+  });
+
+  it("CONTROL: sin tope, la misma entrada sí valida cada elemento (el contador mide de verdad)", () => {
+    const { contador, elemento } = elementoContado();
+    const esquema = z.object({ lista: z.array(elemento) });
+
+    const resultado = esquema.safeParse({ lista: ["a", "b", "c", "d"] });
+
     expect(contador.validaciones).toBe(4);
     expect(resultado.success).toBe(false);
-    if (!resultado.success) expect(resultado.error.issues.length).toBeGreaterThan(1);
+    if (!resultado.success) expect(resultado.error.issues).toHaveLength(4);
   });
 });
 
@@ -85,15 +98,20 @@ describe("dentro del límite se comporta como el esquema interno", () => {
   });
 
   it.each([
-    ["ausente", undefined, "Required"],
-    ["null", null, "Expected array, received null"],
-    ["texto", "abc", "Expected array, received string"],
-    ["objeto", {}, "Expected array, received object"],
-  ])("un valor que no es lista (%s) lo rechaza el esquema interno con su mensaje", (_nombre, valor, mensaje) => {
+    ["ausente", undefined, /expected array, received undefined/],
+    ["null", null, /expected array, received null/],
+    ["texto", "abc", /expected array, received string/],
+    ["objeto", {}, /expected array, received object/],
+  ])("un valor que no es lista (%s) lo rechaza el esquema interno con su error de tipo (no el del tope)", (_nombre, valor, mensaje) => {
     const esquema = z.object({ lista: listaAcotada(3, z.array(z.string()), MENSAJE) });
     const resultado = esquema.safeParse(valor === undefined ? {} : { lista: valor });
     expect(resultado.success).toBe(false);
-    if (!resultado.success) expect(resultado.error.flatten().fieldErrors).toEqual({ lista: [mensaje] });
+    if (!resultado.success) {
+      const mensajes = (resultado.error.flatten().fieldErrors as Record<string, string[]>).lista ?? [];
+      expect(mensajes).toHaveLength(1);
+      expect(mensajes[0]).toMatch(mensaje);
+      expect(mensajes[0]).not.toBe(MENSAJE);
+    }
   });
 });
 

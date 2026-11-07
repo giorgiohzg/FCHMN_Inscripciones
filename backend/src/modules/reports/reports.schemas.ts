@@ -1,12 +1,13 @@
 import { z } from "zod";
+import { uuidField } from "../../shared/uuid.schema";
 
 export const registrationsReportQuerySchema = z.object({
-  competitionId: z.string().uuid("Debe seleccionar una competencia"),
-  clubId: z.string().uuid().optional(),
-  competitionDateId: z.string().uuid().optional(),
-  sessionTypeId: z.string().uuid().optional(),
-  competitionEventId: z.string().uuid().optional(),
-  categoryId: z.string().uuid().optional(),
+  competitionId: uuidField("Debe seleccionar una competencia"),
+  clubId: uuidField().optional(),
+  competitionDateId: uuidField().optional(),
+  sessionTypeId: uuidField().optional(),
+  competitionEventId: uuidField().optional(),
+  categoryId: uuidField().optional(),
   gender: z.enum(["male", "female", "mixed"]).optional(),
 });
 export type RegistrationsReportQuery = z.infer<typeof registrationsReportQuerySchema>;

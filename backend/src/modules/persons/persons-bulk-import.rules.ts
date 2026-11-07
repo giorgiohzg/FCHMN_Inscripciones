@@ -248,7 +248,7 @@ export function mapRowToPersonInput(rawRow: unknown[], opciones: { conColumnasDe
 
   const parsed = personCreateSchema.safeParse(candidate);
   if (!parsed.success) {
-    return { ok: false, errors: parsed.error.errors.map((e) => `${e.path.join(".")}: ${e.message}`) };
+    return { ok: false, errors: parsed.error.issues.map((e) => `${e.path.join(".")}: ${e.message}`) };
   }
 
   return { ok: true, data: parsed.data, sigla, fechaEfectiva, errors: [] };

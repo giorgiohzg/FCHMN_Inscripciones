@@ -31,7 +31,7 @@ const UUID = "11111111-2222-3333-4444-555555555555";
 const RUT_VALIDO = "11111111-1";
 const RUT_DV_MALO = "11111111-2";
 
-function mensajes(r: { success: boolean; error?: { issues: { path: (string | number)[]; message: string }[] } }) {
+function mensajes(r: { success: boolean; error?: { issues: { path: PropertyKey[]; message: string }[] } }) {
   return r.success ? [] : (r.error?.issues ?? []).map((i) => `${i.path.join(".")}: ${i.message}`);
 }
 
