@@ -724,8 +724,8 @@ cuenta `system`.
   ciclo de vida completo en `tests/legal-representative.integration.test.ts`.
 - **A-03**: una credencial de acceso por club (mismo patrón que personas, `ownerType=club`).
 - Bloquear/inhabilitar/reactivar un club propaga el mismo estado a su cuenta de usuario.
-- **El estado del club se aplica a quien actúa por él** (auditoría AUD-04/AUD-11; publicado en el
-  repositorio y probado en local; pendiente de despliegue). La autorización efectiva se resuelve en un solo
+- **El estado del club se aplica a quien actúa por él** (auditoría AUD-04/AUD-11; **cerrada dentro de su
+  alcance**: API desplegada desde `d877686`, probada en local y en la CI). La autorización efectiva se resuelve en un solo
   lugar (`resolverAutorizacionEfectiva`, en `modules/auth/authorization.ts`), el mismo para el
   login, la renovación, el cambio de contraseña y cada solicitud:
   - La cuenta de un club bloqueado, inhabilitado o eliminado no inicia sesión, no renueva y no
@@ -739,6 +739,7 @@ cuenta `system`.
   - Crear credenciales de un club no activo se rechaza (400). Restablecerlas deja la cuenta
     `active` si el club está activo (como siempre) y con el estado del club si no lo está; en
     ambos casos `lockedUntil` nulo y `failedLoginAttempts` en 0.
+  - **Despliegue:** `fchmn-api` pasó de `64e2122` a `d877686` (despliegue [`dep-dbnu7hu417fc73ep19v0`](https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80/deploys/dep-dbnu7hu417fc73ep19v0), exitoso y Live, Auto-Deploy Off; CI del código 42437889969 en éxito). Web y mantenimiento no se desplegaron. En producción solo se observó disponibilidad (`/api/health` y `/api/ready` 200, `/api/auth/me` sin credenciales 401, todas con `Cache-Control: no-store`); la validación funcional fue local y en la CI, sin pruebas funcionales en producción.
   - Detalle y pruebas en `docs/seguridad/PLAN_SEGURIDAD.md` («AUD-A»).
 
 ## Endpoints del Módulo 4 — Asignación de Nadadores a Clubes

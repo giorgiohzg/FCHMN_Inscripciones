@@ -18,7 +18,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | CI de SEC-02 | Pánico intermitente del motor de Prisma en las pruebas unitarias (ejecución 42269659668) | **Diagnosticado; protección publicada en el repositorio y validada en local.** La causa del pánico **no está demostrada**. Ver «CI de SEC-02» |
 | **SEC-01** | Topes para las listas JSON (`personIds` de relevos y otras) | **Cerrada** dentro de su alcance: desplegada en `fchmn-api` desde `120e29d` (Live, Auto-Deploy Off) y validada en local y en la CI con datos sintéticos. Ver «SEC-01» |
 | **SEC-03** | Dependencias, en tres entregas (A backend compatible, B Vite/Vitest, C Zod) | **A cerrada** dentro de su alcance: desplegada solo en `fchmn-api` desde `dab3690` (Live, Auto-Deploy Off). **B publicada en el repositorio, validada en local y desplegada** (API en `64e2122`, web en `2de9dea`; ver «SEC-03, entrega B»). **C (Zod del backend 3 → 4.6.7) cerrada:** API en `64e2122` (Live, Auto-Deploy Off), mantenimiento y web en `2de9dea` (ver «SEC-03, entrega C»). **SEC-03 sigue abierta:** solo por el aviso de desarrollo de `minimatch`; su override acotado es una **solución temporal publicada y validada localmente** (la CI de su SHA se comprueba aparte; ver «SEC-03, override acotado de `minimatch`»). Ver «SEC-03, entrega A» |
-| **AUD-A** | Auditoría del 2026-11-07, AUD-04 y AUD-11: el estado del club se aplica a su cuenta, a su personal y a sus credenciales | **Publicado en el repositorio y probado en local** (pruebas de integración focalizadas sobre la base desechable, typecheck y lint); **pendiente de despliegue**; la CI de su SHA se comprueba aparte. Ver «AUD-A» |
+| **AUD-A** | Auditoría del 2026-11-07, AUD-04 y AUD-11: el estado del club se aplica a su cuenta, a su personal y a sus credenciales | **Cerrada dentro de su alcance:** probada en local (pruebas de integración focalizadas sobre la base desechable, typecheck y lint) y en la CI (ejecución 42437889969, éxito), y desplegada en `fchmn-api` desde `d877686` (Live, Auto-Deploy Off). Web y mantenimiento no se desplegaron. Ver «AUD-A» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -1048,7 +1048,7 @@ Todo con datos sintéticos, sobre el árbol ya reinstalado con `npm ci` y **sin 
 
 ## SEC-03, entrega B: Vite, Vitest y herramientas de ambos proyectos (publicada en el repositorio, validada en local y desplegada: API en `64e2122` y web en `2de9dea`)
 
-**Estado: publicada en el repositorio, validada en LOCAL y desplegada:** la API corre el commit `64e2122` (las herramientas de desarrollo del backend de B viajan en él, sin efecto en su código de producción) y la web corre `2de9dea`, con una compilación hecha con Vite 7; mantenimiento está en `2de9dea` (ver «SEC-03, entrega C»). *(Antecedente, al publicar B: sin desplegar, con producción en las versiones anteriores; la entrega C no estaba autorizada y no se tocó.)* No cambia código de producción, ni ninguna versión del árbol de producción de ninguno de los dos proyectos (Fastify, Zod del backend, Prisma, React, React Router…): la comparación de los
+**Estado: publicada en el repositorio, validada en LOCAL y desplegada:** la API corría el commit `64e2122` al cerrar esta entrega (hoy corre `d877686`; las herramientas de desarrollo del backend de B viajan en él, sin efecto en su código de producción) y la web corre `2de9dea`, con una compilación hecha con Vite 7; mantenimiento está en `2de9dea` (ver «SEC-03, entrega C»). *(Antecedente, al publicar B: sin desplegar, con producción en las versiones anteriores; la entrega C no estaba autorizada y no se tocó.)* No cambia código de producción, ni ninguna versión del árbol de producción de ninguno de los dos proyectos (Fastify, Zod del backend, Prisma, React, React Router…): la comparación de los
 bloqueos antes y después da **0 entradas de producción** cambiadas, añadidas o retiradas en el backend y en el frontend. Tampoco se cambió ninguna imagen, `Dockerfile` ni imagen base, y no se construyó
 ninguna imagen en esta entrega.
 
@@ -1139,7 +1139,7 @@ Todo con datos sintéticos, una vez cada comprobación, sin relajar ninguna expe
 
 ## SEC-03, entrega C: Zod del backend 3.25.76 → 4.6.7 (cerrada: API en `64e2122`; mantenimiento y web en `2de9dea`)
 
-**Estado: cerrada: validada en local y en la CI; la API corre `64e2122` y mantenimiento y web corren `2de9dea`.** Publicada en `main` y desplegada a mano en Render; las secciones siguientes conservan como historial el estado en que se implementó (validada localmente, sin publicar ni desplegar).
+**Estado: cerrada: validada en local y en la CI; al cerrarla la API corría `64e2122` (hoy corre `d877686`, ver «AUD-A») y mantenimiento y web corren `2de9dea`.** Publicada en `main` y desplegada a mano en Render; las secciones siguientes conservan como historial el estado en que se implementó (validada localmente, sin publicar ni desplegar).
 
 | Servicio | Despliegue | Commit |
 |---|---|---|
@@ -1214,7 +1214,7 @@ sin ejecuciones simultáneas: 54 archivos, 1.127 pruebas**. (Antes de C eran 65/
 
 ## SEC-03, override acotado de `minimatch` (publicado; validado localmente; CI del SHA por comprobar)
 
-**Estado: solución temporal publicada en `main` y validada localmente.** Su resultado en la CI se comprueba aparte y no se anticipa aquí. No hay despliegue ni se tocó Render o producción. Es una **solución temporal**: existe solo mientras los paquetes padres no resuelvan por sí mismos una versión corregida.
+**Estado: solución temporal publicada en `main` y validada localmente.** Su resultado en la CI se comprueba aparte y no se anticipa aquí. Llegó a la API en el despliegue de `d877686` (ver «AUD-A»); web y mantenimiento no la llevan en su imagen. Es una **solución temporal**: existe solo mientras los paquetes padres no resuelvan por sí mismos una versión corregida.
 
 **Qué cubre.** El aviso GHSA-g3hv-75wg-m249 (CVE-2026-118764, moderado, CWE-405) afecta a `minimatch` `>=7.0.0 <11.0.1` y solo se activa con patrones controlados por un atacante y `optimizationLevel` ≥ 2 (el valor por omisión es 1 y ninguno de los consumidores lo cambia). Quedaba como **único** aviso del repositorio, de **desarrollo**, en `eslint` 10.10.0, `@eslint/config-array` 0.23.5 y `@typescript-eslint/typescript-estree` 8.69.0, que piden `minimatch` `^10.2.x`.
 
@@ -1253,10 +1253,15 @@ Es la **reubicación aceptada** de esos tres paquetes: al subir la copia de la r
 - La equivalencia de lint se midió con los archivos y patrones de este repositorio; no prueba equivalencia general entre `minimatch` 10 y 11.
 - Quedan en el equipo las imágenes `fchmn-{backend,migrate}:mm-descubrimiento`; los nueve contenedores de las extracciones y comprobaciones se detuvieron y eliminaron por su ID (sin `-f` ni `-v`), y los seis contenedores del proyecto, las demás imágenes y los volúmenes no se tocaron.
 
-## AUD-A: estado del club y autorización (AUD-04 y AUD-11; publicado en el repositorio y probado en local; pendiente de despliegue)
+## AUD-A: estado del club y autorización (AUD-04 y AUD-11; cerrada dentro de su alcance: API desplegada desde `d877686`)
 
-**Estado: publicado en `main` y probado en LOCAL; pendiente de despliegue. Su resultado en la CI se comprueba aparte y no se anticipa aquí. No se tocó Render ni producción.**
-Producción sigue con el comportamiento anterior. No es «validada localmente» en el sentido de las fases
+**Estado: cerrada dentro de su alcance.** Probada en LOCAL y en la CI (ejecución 42437889969, éxito), publicada en `main` y desplegada a mano en `fchmn-api`.
+
+| Servicio | Despliegue | Commit |
+|---|---|---|
+| API (`fchmn-api`) | [`dep-dbnu7hu417fc73ep19v0`](https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80/deploys/dep-dbnu7hu417fc73ep19v0), «Deploy succeeded» y Live, Auto-Deploy Off | `64e2122` → `d877686` |
+
+Web y mantenimiento **no** se desplegaron. **Observado en producción, sin credenciales y por el proxy de la web:** `/api/health` 200, `/api/ready` 200 (base disponible) y `/api/auth/me` 401, todas con `Cache-Control: no-store`. **Es disponibilidad, no validación funcional:** la validación funcional fue local y en la CI, y **no** se hicieron pruebas funcionales en producción (bloqueo de clubes, restablecimiento de credenciales ni inicio de sesión de personal). El Deploy Hook de la API se regeneró antes de desplegar, tras aparecer en una salida de herramienta; no se reproduce ningún valor. El despliegue incluyó también el override de `minimatch` (`8bb1c14`), que estaba entre `64e2122` y `d877686`. No es «validada localmente» en el sentido de las fases
 anteriores: **no** se ejecutaron las suites completas, solo las pruebas pertinentes descritas abajo.
 
 **El defecto.** Bloquear, inhabilitar o eliminar un club apagaba solo SU cuenta. El personal —delegado,
