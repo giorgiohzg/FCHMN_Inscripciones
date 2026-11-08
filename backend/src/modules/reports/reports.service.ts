@@ -21,6 +21,7 @@ import {
 import type { RegistrationsReportQuery } from "./reports.schemas";
 import { resolveClubFilter, scopedPersonId, type ActorContext } from "../../shared/actorContext";
 import { NotFoundError, ValidationError } from "../../shared/errors";
+import { exigirCompetenciaVisible } from "../competitions/competitions.visibilidad";
 
 const INDIVIDUAL_HEADERS = [
   "Competencia",
@@ -79,6 +80,7 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
 
   const competition = await prisma.competition.findUnique({ where: { id: query.competitionId } });
   if (!competition) throw new NotFoundError("Competencia");
+  exigirCompetenciaVisible(competition, actor); // AUD-07
 
   /**
    * Hallazgo 17 — tope de tamaño del reporte.

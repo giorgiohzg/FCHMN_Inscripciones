@@ -19,6 +19,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **SEC-01** | Topes para las listas JSON (`personIds` de relevos y otras) | **Cerrada** dentro de su alcance: desplegada en `fchmn-api` desde `120e29d` (Live, Auto-Deploy Off) y validada en local y en la CI con datos sintéticos. Ver «SEC-01» |
 | **SEC-03** | Dependencias, en tres entregas (A backend compatible, B Vite/Vitest, C Zod) | **A cerrada** dentro de su alcance: desplegada solo en `fchmn-api` desde `dab3690` (Live, Auto-Deploy Off). **B publicada en el repositorio, validada en local y desplegada** (API en `64e2122`, web en `2de9dea`; ver «SEC-03, entrega B»). **C (Zod del backend 3 → 4.6.7) cerrada:** API en `64e2122` (Live, Auto-Deploy Off), mantenimiento y web en `2de9dea` (ver «SEC-03, entrega C»). **SEC-03 sigue abierta:** solo por el aviso de desarrollo de `minimatch`; su override acotado es una **solución temporal publicada y validada localmente** (la CI de su SHA se comprueba aparte; ver «SEC-03, override acotado de `minimatch`»). Ver «SEC-03, entrega A» |
 | **AUD-A** | Auditoría del 2026-11-07, AUD-04 y AUD-11: el estado del club se aplica a su cuenta, a su personal y a sus credenciales | **Cerrada dentro de su alcance:** probada en local (pruebas de integración focalizadas sobre la base desechable, typecheck y lint) y en la CI (ejecución 42437889969, éxito), y desplegada en `fchmn-api` desde `d877686` (Live, Auto-Deploy Off). Web y mantenimiento no se desplegaron. Ver «AUD-A» |
+| **AUD-C** | Auditoría del 2026-11-07, AUD-03, AUD-05, AUD-07, AUD-15 y AUD-02: registros sin consultas ni valores, sin datos ajenos en errores, competencias ocultas uniformes, club actual mínimo y conteo del ZIP previo | **Publicado en el repositorio y probado en local** (pruebas unitarias y de integración focalizadas sobre la base desechable, typecheck y lint); **pendiente de despliegue**; la CI de su SHA se comprueba aparte. AUD-03 **no** queda resuelta en todas las capas (Nginx y los registros del proveedor). Ver «AUD-C» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -1324,6 +1325,75 @@ activo dejaba su cuenta `active`, con lo que el club recuperaba el acceso.
 frontend actualiza roles y club desde los claims al renovar, así que puede mostrar menús de club hasta
 entonces (las solicitudes reciben 403). La capacidad por club que ve un nadador sigue pendiente de la
 decisión funcional AUD-06. No se ejecutaron las suites completas.
+
+## AUD-C: correcciones de baja severidad de la API (publicado en el repositorio y probado en local; pendiente de despliegue)
+
+**Estado: publicado en `main` y probado en LOCAL; pendiente de despliegue. Su resultado en la CI se comprueba aparte y no se anticipa aquí. No se tocó Render ni producción.** Producción
+sigue con el comportamiento anterior. Cinco correcciones de la auditoría del 2026-11-07 (AUD-03, AUD-05, AUD-07, AUD-15 y AUD-02).
+No cambian dependencias, imágenes, Nginx, la CI ni el esquema, y no hay migraciones.
+
+**AUD-03: registros de la API (Fastify).**
+- La ruta de cada petición se escribe **sin su cadena de consulta**: ahí viajaban las búsquedas por nombre, RUN o RUT
+  (`GET /persons?search=...`). La correlación se conserva: cada línea lleva su `reqId`, y el error se registra con el registro de la
+  petición (`req.log`), no con el global.
+- Los errores se registran con una **lista explícita de campos** (`errorSeguro`, en `backend/src/shared/registro.ts`): clase, `code`,
+  `statusCode`, clase y `code` de la causa, y marcos de la pila en los que no son de Prisma; en los de Prisma, además, versión del cliente,
+  modelo y nombres de columna de `meta.target`. **Nunca** el mensaje, el resto de `meta`, los argumentos de la consulta ni la pila de un
+  error de Prisma. El mensaje de Prisma ocupa varias líneas y lleva valores: no se intentó limpiarlo, no se escribe. Los marcos se eligen por su
+  forma, no por su posición.
+- Se encontró, con una prueba, que Fastify arma **por su cuenta** líneas que no pasan por los serializadores: el 404 escribía
+  `Route GET:/ruta?search=... not found` con la consulta completa, y el registro de error por omisión usa `error.message` como mensaje. Se
+  reemplazan con un `logController` propio (`ControladorDeRegistroSeguro`). El manejador de errores se movió a
+  `shared/manejadorDeErrores.ts` para probarlo tal cual. **El contrato de las respuestas HTTP no cambia.**
+- La hipótesis de que un error de Prisma pueda arrastrar valores personales en su mensaje **no se demostró ni se descartó**: no hacía falta,
+  porque ya no se escribe el mensaje.
+
+**AUD-05: datos de personas ajenas en errores.** Para quien no es administrador, la pertenencia al plantel activo del club se comprueba
+**antes** de cargar a la persona o de armar un error con su nombre. Una persona de otro club y una inexistente reciben el **mismo 403
+genérico**, sin nombre, RUN, edad, género, estado ni inscripciones. Cubre la inscripción individual y la creación y edición de relevos
+(`validateAndResolveRelayTeam`). Quien se inscribe a sí mismo ya quedaba limitado a su `personId`. El administrador y los integrantes propios
+conservan los mensajes detallados. **Cambio de contrato:** para un usuario de club, un integrante ajeno pasa de 400 con detalle a 403 genérico.
+
+**AUD-07: competencias en Borrador o Programada.** Un criterio único (`competitions.visibilidad.ts`) que usan los endpoints que cuelgan de la
+competencia: sus pruebas (`/events` y `/enabled-events`), `/capacity`, `available-events`, `club-eligibility-matrix`, `eligible-swimmers`, los reportes y la
+exportación a Team Manager. Solo el administrador las ve; para el resto, el mismo 404 que el detalle. Se usa el estado **efectivo**
+(`computeEffectiveStatus`, función pura): no se escribe nada, y `applyAutoStatus` se conserva donde estaba. Una competencia guardada como
+«programada» cuya inscripción ya abrió por fecha es visible. `visibleInRegistrationPanels` **no interviene**: sigue controlando solo los
+desplegables, y una competencia abierta pero oculta en los paneles sigue accesible. **Cambio de contrato:** para quien no es administrador, una
+competencia inexistente responde 404 también en `/events` y `/enabled-events` (antes, lista vacía); si no, la diferencia entre «vacía» y «404» sería un oráculo.
+
+**AUD-15: club actual.** `GET /swimmer-assignments/current-club/:personId` devuelve solo `{ club: { id, name } }` o `null`, no la membresía
+completa (quién la pidió y revisó, fechas, motivo de rechazo). Las reglas de acceso no cambian. `getCurrentClubForPerson` conserva la
+membresía completa para sus usos internos. El tipo del frontend (`ClubActual`, en `assignmentApi.ts`) se ajustó junto con la respuesta; los cinco
+consumidores (Personas, Reportes, Relevos y los asistentes de inscripción) solo usaban `club.id` y `club.name`.
+
+**AUD-02: ZIP.** `readSingleEntryFromZip` comprueba `getEntryCount()` —el número declarado, sin construir ninguna entrada— **antes** de
+`getEntries()`. Un ZIP pequeño de 513 entradas, o un índice que declara 60.000, se rechaza sin materializarlas. Se conservan los límites y la
+comprobación posterior. Además, un índice imposible de leer y una entrada dañada (CRC que no coincide) dejaron de escapar como excepciones
+crudas de la librería: son un `ValidationError`. Sin dependencias nuevas ni aislamiento nuevo.
+
+**Pruebas** (datos sintéticos; la integración, solo sobre la base desechable de `docker-compose.test.yml`).
+- Nuevas: `registro-seguro.test.ts` (14, sin base de datos: marcadores personales sintéticos en la consulta y en errores de Prisma simulados,
+  capturados en memoria, y correlación por `reqId`), `safeZip-orden.test.ts` (4, con `vi.mock` que cuenta las llamadas a `getEntries()`), ampliación de
+  `safeZip.test.ts` (5) y `aud-c-alcance.integration.test.ts` (33: ausencia de datos ajenos, visibilidad por rol y estado con los dos valores de la casilla
+  de paneles, consultar no escribe, respuesta mínima del club actual).
+- **Contraprueba** contra el código anterior: fallan 6 de las de ZIP y 14 de las de alcance; las de registro fallaron mientras faltaba el
+  `logController`.
+- Una expectativa existente cambió por el contrato de AUD-05: en `relay-condition.integration.test.ts`, un integrante de otro club ahora es
+  `ForbiddenError` y no `ValidationError`. No se modificó ninguna otra.
+- Además pasaron la suite unitaria completa del backend (69 archivos, 1.717 pruebas), 32 archivos de integración elegidos por los módulos y rutas
+  tocados (893 pruebas; la única falla fue la expectativa anterior, corregida y repetida solo ese archivo), la suite del frontend (45 archivos, 811
+  pruebas), `npm run typecheck` del backend y del frontend, y ESLint sin autocorrección de los archivos tocados (0 errores; avisos preexistentes de `no-explicit-any`).
+
+**Límites.**
+- Solo cubre el registro **de la aplicación**, así que **AUD-03 no queda resuelta en todas las capas**. El registro de acceso de Nginx no se
+  tocó y queda pendiente de AUD-B. Los registros del proveedor (borde y plataforma) **no fueron inspeccionados** y no se garantiza que AUD-B
+  los modifique: la cadena de consulta puede seguir en ellos.
+- Fastify avisa con la URL cruda cuando hay un fallo de programación (`Reply was already sent`); no hay punto de enganche y no ocurre en el uso normal.
+  El aviso `startup_failed` del arranque sigue escribiendo el mensaje del error de configuración.
+- La tabla de auditoría (AUD-09), la capacidad por rol (AUD-06), la fecha de nacimiento (AUD-10), el RUN de compañeros (AUD-14), la validación del CSV (AUD-08) y
+  las imágenes (AUD-01) siguen pendientes. Team Manager conserva el RUN y los reportes no lo incluyen, como antes.
+- No se observó la interfaz ni se compiló la web; el cambio del tipo del frontend se comprobó con el typecheck y sus pruebas.
 
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 

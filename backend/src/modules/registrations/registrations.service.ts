@@ -4,6 +4,7 @@ import { ValidationError, NotFoundError, ForbiddenError } from "../../shared/err
 import { assertClubAccess, resolveClubFilter, scopedPersonId, type ActorContext as SharedActorContext } from "../../shared/actorContext";
 import { computeAge, getDefaultAgeCutoffDate } from "../../shared/age.util";
 import { computeEffectiveStatus, isRegistrationOpen, evaluateRegistrationWindow } from "../competitions/competitions.rules";
+import { exigirCompetenciaVisible, competenciaVisiblePara } from "../competitions/competitions.visibilidad";
 import { evaluateCapacity, evaluateEventClubLimit } from "../competitions/competition-capacity.rules";
 import {
   readCapacityUsage,
@@ -129,6 +130,7 @@ export async function listAvailableIndividualEvents(competitionId: string, perso
 
   const competition = await prisma.competition.findUnique({ where: { id: competitionId } });
   if (!competition) throw new NotFoundError("Competencia");
+  exigirCompetenciaVisible(competition, actor); // AUD-07
 
   const person = await prisma.person.findFirst({ where: { id: personId, deletedAt: null } });
   if (!person) throw new NotFoundError("Nadador");
@@ -202,6 +204,7 @@ export async function listClubEligibilityMatrix(competitionId: string, clubId: s
 
   const competition = await prisma.competition.findUnique({ where: { id: competitionId } });
   if (!competition) throw new NotFoundError("Competencia");
+  exigirCompetenciaVisible(competition, actor); // AUD-07
 
   const ageCutoffDate = competition.ageCutoffDate ?? getDefaultAgeCutoffDate();
 
@@ -266,6 +269,8 @@ export async function listEligibleSwimmers(query: EligibleSwimmersQuery, actor: 
     include: { event: { include: { distance: true, stroke: true } }, enabledCategories: { include: { category: true } }, competition: true },
   });
   if (!competitionEvent) throw new NotFoundError("Prueba de competencia");
+  // AUD-07: la prueba de una competencia en Borrador o Programada no existe para quien no es administrador.
+  if (!competenciaVisiblePara(competitionEvent.competition, actor)) throw new NotFoundError("Prueba de competencia");
 
   /**
    * Este endpoint alimenta el paso "nadadores elegibles" del asistente y no
@@ -355,6 +360,15 @@ export async function createRegistration(input: CreateRegistrationInput, actor: 
     }
   } else {
     assertClubAccess(actor, input.clubId);
+    /**
+     * AUD-05 — la pertenencia ANTES de resolver a la persona. Un usuario de club podía enviar el
+     * identificador de un nadador de OTRO club y, según lo que fallara después, recibir de vuelta
+     * su edad, su estado, si ya estaba inscrito en esa prueba o cuántas pruebas llevaba. Se
+     * comprueba primero que esté en el plantel activo del club: si no, el mismo 403 genérico para
+     * una persona ajena que para una que no existe. El administrador conserva los mensajes
+     * detallados, y quien se inscribe a sí mismo ya quedó acotado a su propio `personId` arriba.
+     */
+    await assertPersonWithinScope(actor, input.personId);
   }
 
   const person = await prisma.person.findFirst({ where: { id: input.personId, deletedAt: null }, include: { roles: true } });

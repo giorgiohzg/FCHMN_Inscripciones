@@ -741,6 +741,13 @@ cuenta `system`.
     ambos casos `lockedUntil` nulo y `failedLoginAttempts` en 0.
   - **Despliegue:** `fchmn-api` pasó de `64e2122` a `d877686` (despliegue [`dep-dbnu7hu417fc73ep19v0`](https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80/deploys/dep-dbnu7hu417fc73ep19v0), exitoso y Live, Auto-Deploy Off; CI del código 42437889969 en éxito). Web y mantenimiento no se desplegaron. En producción solo se observó disponibilidad (`/api/health` y `/api/ready` 200, `/api/auth/me` sin credenciales 401, todas con `Cache-Control: no-store`); la validación funcional fue local y en la CI, sin pruebas funcionales en producción.
   - Detalle y pruebas en `docs/seguridad/PLAN_SEGURIDAD.md` («AUD-A»).
+- **Correcciones de baja severidad de la API** (auditoría AUD-03, AUD-05, AUD-07, AUD-15 y AUD-02; publicadas en el repositorio y probadas en local; pendientes de despliegue):
+  - **Registros:** la ruta de cada petición se escribe sin su cadena de consulta (ahí viajan las búsquedas por nombre o RUN) y los errores solo con una lista explícita de campos, sin mensaje ni valores; el `reqId` se conserva. Solo el registro de la aplicación: AUD-03 no queda resuelta en todas las capas. El de Nginx queda pendiente de AUD-B, y los registros del proveedor no fueron inspeccionados ni se garantiza que AUD-B los modifique.
+  - **Personas ajenas:** quien no es administrador debe demostrar primero la pertenencia al plantel activo de su club; una persona de otro club y una inexistente reciben el mismo 403 genérico, sin nombre ni RUN (inscripción individual y relevos, al crear y al editar).
+  - **Competencias en Borrador o Programada:** solo el administrador las ve también en sus pruebas, capacidad, elegibilidad, reportes y exportación a Team Manager, con estado efectivo y sin escribir; `visibleInRegistrationPanels` sigue controlando solo los desplegables.
+  - **`GET /swimmer-assignments/current-club/:personId`** devuelve únicamente `{ club: { id, name } }` o `null`.
+  - **ZIP:** el conteo de entradas se comprueba antes de materializarlas, y un ZIP dañado es un error controlado.
+  - Detalle, cambios de contrato y límites en `docs/seguridad/PLAN_SEGURIDAD.md` («AUD-C»).
 
 ## Endpoints del Módulo 4 — Asignación de Nadadores a Clubes
 

@@ -21,7 +21,7 @@ import * as registrationsService from "../src/modules/registrations/registration
 import * as relayService from "../src/modules/relay-registrations/relay-registrations.service";
 import * as catalogsCategories from "../src/modules/catalogs/categories.service";
 import * as catalogsEvents from "../src/modules/catalogs/events.service";
-import { ValidationError } from "../src/shared/errors";
+import { ValidationError, ForbiddenError } from "../src/shared/errors";
 
 type Admin = { userId: string; isAdmin: true; scope: { kind: "admin" }; canRegisterPostClose: boolean };
 type DeClub = { userId: string; isAdmin: false; scope: { kind: "club"; clubId: string }; canRegisterPostClose: boolean };
@@ -276,9 +276,10 @@ describe("condición DESACTIVADA", () => {
     await e.equipo(e.relevoA, ids(e, 0, 1, 2, 3));
     // Límite de 1 relevo por nadador y jornada: el mismo grupo en otra prueba se rechaza.
     await expect(e.equipo(e.relevoB, ids(e, 0, 1, 2, 3))).rejects.toThrow(/relevo/i);
-    // Un nadador que no es del club sigue sin poder integrarlo.
+    // Un nadador que no es del club sigue sin poder integrarlo. Desde AUD-05 el rechazo a quien no es administrador es
+    // el error GENÉRICO (403) por pertenencia, sin nombrar a la persona; antes era un ValidationError con su nombre y RUN.
     const ajeno = await createPerson({ run: "69999999", username: "ajeno_rel", firstName: "Ajeno", gender: "male", birthYear: 1990 });
-    await expect(e.equipo(e.relevoB, [e.nadadores[4]!.id, e.nadadores[5]!.id, e.nadadores[6]!.id, ajeno.id])).rejects.toBeInstanceOf(ValidationError);
+    await expect(e.equipo(e.relevoB, [e.nadadores[4]!.id, e.nadadores[5]!.id, e.nadadores[6]!.id, ajeno.id])).rejects.toBeInstanceOf(ForbiddenError);
     // Cierre total: sin permiso especial no se forma ningún equipo, con la condición apagada o no.
     await prisma.competition.update({ where: { id: e.competitionId }, data: { status: "closed", registrationsClosedReason: "manual", registrationsClosedAt: new Date() } });
     await expect(e.equipo(e.relevoB, ids(e, 4, 5, 6, 7))).rejects.toThrow(/cerradas/);

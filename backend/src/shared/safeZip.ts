@@ -116,7 +116,30 @@ export function readSingleEntryFromZip(
     throw new ValidationError("El archivo no es un .zip válido o está dañado.");
   }
 
-  const entries = zip.getEntries();
+  /**
+   * El conteo ANTES de materializar nada (auditoría AUD-02).
+   *
+   * `adm-zip` abre el archivo sin leer sus entradas: `getEntryCount()` devuelve el
+   * número DECLARADO en el directorio central, sin construir una `ZipEntry` por cada
+   * una. `getEntries()`, en cambio, las construye todas, y un archivo de 15 MB puede
+   * declarar unas 340.000: esa asignación ocurría antes de comparar con el máximo.
+   * Se rechaza primero por lo declarado; la comprobación sobre las entradas realmente
+   * leídas se conserva más abajo.
+   */
+  const declaradas = zip.getEntryCount();
+  if (declaradas > limits.maxEntries) {
+    throw new ValidationError(`El archivo comprimido declara ${declaradas} entradas y el máximo admitido es ${limits.maxEntries}.`);
+  }
+
+  // Un índice inválido (más entradas declaradas de las que caben, nombres duplicados…)
+  // hace que la librería LANCE al leer el directorio. Eso es un archivo dañado, no un
+  // fallo del servidor: se responde igual que con cualquier .zip ilegible.
+  let entries: AdmZip.IZipEntry[];
+  try {
+    entries = zip.getEntries();
+  } catch {
+    throw new ValidationError("El archivo no es un .zip válido o está dañado.");
+  }
   assertTimeBudget();
 
   if (entries.length > limits.maxEntries) {
@@ -161,7 +184,14 @@ export function readSingleEntryFromZip(
   }
 
   assertTimeBudget();
-  const data = wanted.getData();
+  // Una entrada dañada (CRC que no coincide, datos truncados) hace que la librería
+  // LANCE al descomprimir: es un archivo inválido, no un fallo del servidor.
+  let data: Buffer;
+  try {
+    data = wanted.getData();
+  } catch {
+    throw new ValidationError("El archivo comprimido está dañado: no se pudo descomprimir su contenido.");
+  }
 
   // El tamaño declarado en el índice puede mentir: se comprueba lo realmente
   // descomprimido.

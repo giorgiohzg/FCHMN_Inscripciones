@@ -1,4 +1,4 @@
-import Fastify, { type FastifyError } from "fastify";
+import Fastify from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
@@ -20,9 +20,10 @@ import { teamManagerExportRoutes } from "./modules/team-manager-export/team-mana
 import { auditRoutes } from "./modules/audit/audit.routes";
 import { dashboardRoutes } from "./modules/dashboard/dashboard.routes";
 import { meetImportRoutes } from "./modules/meet-import/meet-import.routes";
-import { resolveErrorResponse } from "./shared/httpErrorResponse";
+import { manejadorDeErrores } from "./shared/manejadorDeErrores";
 import { prisma } from "./shared/prisma.client";
 import { env, swaggerHabilitadoEn, urlPublicaApiDe, type Env } from "./shared/env";
+import { opcionesDeRegistro, ControladorDeRegistroSeguro } from "./shared/registro";
 
 /**
  * Métodos que la aplicación expone.
@@ -41,9 +42,16 @@ const METODOS_HTTP = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"];
  * las pruebas —por ejemplo, con una lista blanca de CORS— sin manipular
  * `process.env`. En producción siempre se usa el `env` del proceso.
  */
-export async function buildServer(config: Env = env) {
+export async function buildServer(config: Env = env, opciones: { flujoDeRegistro?: NodeJS.WritableStream } = {}) {
   const app = Fastify({
-    logger: true,
+    /**
+     * Registro con lista explícita de lo que se escribe (auditoría AUD-03): la ruta de cada
+     * petición SIN su cadena de consulta —ahí viajan las búsquedas por nombre o RUN— y los
+     * errores solo con campos seguros. Ver `shared/registro.ts`. `flujoDeRegistro` existe para
+     * que las pruebas capturen las líneas; en producción no se pasa.
+     */
+    logger: opcionesDeRegistro(opciones.flujoDeRegistro),
+    logController: new ControladorDeRegistroSeguro(),
     /**
      * `trustProxy: true` le decía a Fastify que confiara en la cadena
      * `X-Forwarded-For` COMPLETA, viniera de donde viniera: cualquier cliente
@@ -89,16 +97,7 @@ export async function buildServer(config: Env = env) {
    * message, details}`), así que el mismo tipo de error tenía dos formas
    * distintas según dónde se lanzara.
    */
-  app.setErrorHandler((err: FastifyError & { statusCode?: number }, _req, reply) => {
-    // Toda la decisión vive en `resolveErrorResponse` para que las pruebas
-    // puedan ejercitar la misma función que usa el servidor — incluida la
-    // traducción de errores de Prisma, que antes solo se aplicaba en los
-    // servicios que la invocaban a mano.
-    const { status, body, log } = resolveErrorResponse(err);
-    if (log === "error") app.log.error(err);
-    else if (log === "warn") app.log.warn(err);
-    reply.status(status).send(body);
-  });
+  app.setErrorHandler(manejadorDeErrores);
 
   await app.register(helmet);
 

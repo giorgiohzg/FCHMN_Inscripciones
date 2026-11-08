@@ -10,6 +10,7 @@ import AdmZip from "adm-zip";
 import { crc32 } from "node:zlib";
 import { readSingleEntryFromZip, isSafeEntryName, DEFAULT_ZIP_LIMITS } from "../src/shared/safeZip";
 import { ValidationError } from "../src/shared/errors";
+import { construirZip } from "./helpers/zipSintetico";
 
 function zipCon(entradas: { nombre: string; contenido: Buffer | string }[]): Buffer {
   const zip = new AdmZip();
@@ -152,6 +153,46 @@ describe("readSingleEntryFromZip", () => {
   it("RECHAZA un ZIP con demasiadas entradas", () => {
     const entradas = Array.from({ length: 20 }, (_, i) => ({ nombre: `f${i}.txt`, contenido: "x" }));
     expect(() => readSingleEntryFromZip(zipCon(entradas), { ...OPCIONES, limits: { maxEntries: 5 } })).toThrow(/entradas/i);
+  });
+
+  describe("el conteo de entradas se comprueba ANTES de materializarlas (AUD-02)", () => {
+    // Que el rechazo ocurra ANTES de getEntries() se comprueba en `safeZip-orden.test.ts`.
+    it("un ZIP pequeño de 513 entradas se rechaza por lo declarado", () => {
+      const entradas = Array.from({ length: 513 }, (_, i) => ({ nombre: `f${i}.txt`, contenido: "x" }));
+      const buffer = zipCon(entradas);
+      expect(buffer.length, "sigue siendo un archivo pequeño").toBeLessThan(100_000);
+
+      expect(() => readSingleEntryFromZip(buffer, OPCIONES)).toThrow(/declara 513 entradas/);
+    });
+
+    it("el límite exacto (512) todavía se lee", () => {
+      const entradas = Array.from({ length: 511 }, (_, i) => ({ nombre: `f${i}.txt`, contenido: "x" }));
+      entradas.push({ nombre: "p.ev3", contenido: "ok" });
+      expect(readSingleEntryFromZip(zipCon(entradas), OPCIONES).content).toBe("ok");
+    });
+
+    it("un índice que declara muchas más entradas de las que contiene se rechaza por lo declarado", () => {
+      const buffer = construirZip([{ nombre: "p.ev3", contenido: "x" }], { totalEntradas: 60_000 });
+      expect(() => readSingleEntryFromZip(buffer, OPCIONES)).toThrow(/declara 60000 entradas/);
+    });
+
+    it("un índice dentro del límite pero imposible de leer es un error CONTROLADO, no una excepción de la librería", () => {
+      // Declara 400 entradas (bajo el máximo) con un directorio que solo tiene una.
+      const buffer = construirZip([{ nombre: "p.ev3", contenido: "x" }], { totalEntradas: 400 });
+      let error: unknown;
+      try {
+        readSingleEntryFromZip(buffer, OPCIONES);
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(ValidationError);
+      expect((error as Error).message).toMatch(/no es un .zip válido o está dañado/);
+    });
+
+    it("conserva la comprobación posterior sobre las entradas realmente leídas", () => {
+      const entradas = Array.from({ length: 20 }, (_, i) => ({ nombre: `f${i}.txt`, contenido: "x" }));
+      expect(() => readSingleEntryFromZip(zipCon(entradas), { ...OPCIONES, limits: { maxEntries: 5 } })).toThrow(/entradas/i);
+    });
   });
 
   it("RECHAZA un .zip más grande que el máximo admitido", () => {

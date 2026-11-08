@@ -99,7 +99,7 @@ export async function swimmerAssignmentRoutes(app: FastifyInstance) {
    * consultar a cualquier persona, deliberadamente: lo necesita el flujo de
    * propuesta (A-05), donde busca a un nadador que todavía no es suyo y debe
    * ver si ya pertenece a otro club antes de proponerlo. Lo único que expone
-   * es el nombre del club, no datos personales.
+   * es el club (`{ club: { id, name } }` o `null`): ni la membresía ni quién la gestionó.
    */
   app.get("/swimmer-assignments/current-club/:personId", { preHandler: [requirePermission("swimmer-assignment:read")] }, async (req, reply) => {
     const { personId } = req.params as { personId: string };
@@ -107,7 +107,7 @@ export async function swimmerAssignmentRoutes(app: FastifyInstance) {
     if (actor.scope.kind === "swimmer" && actor.scope.personId !== personId) {
       throw new ForbiddenError("Solo puede consultar su propia información.");
     }
-    reply.send(await assignmentService.getCurrentClubForPerson(personId));
+    reply.send(await assignmentService.getCurrentClubSummary(personId));
   });
 
   /** Cambia de club a un nadador en un solo paso (finaliza el anterior si existía, y activa el nuevo). */

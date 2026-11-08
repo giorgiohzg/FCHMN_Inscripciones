@@ -4,6 +4,7 @@ import { ValidationError, NotFoundError } from "../../shared/errors";
 import { computeEffectiveStatus, recomputeStatusAfterEdit, evaluateCompetitionAction, evaluateReopenRegistrations, type CompetitionAction } from "./competitions.rules";
 import { shouldCloseRegistrations } from "./competition-capacity.rules";
 import { readCapacityUsage } from "./competition-capacity.service";
+import { exigirCompetenciaVisible } from "./competitions.visibilidad";
 import { contarEquiposDeRelevoIncumplidores } from "./relay-condition.service";
 import { scopedClubId, type ActorContext as SharedActorContext } from "../../shared/actorContext";
 import { type TxOption } from "../../shared/transaction";
@@ -443,9 +444,11 @@ export interface CompetitionCapacityView {
 export async function getCompetitionCapacity(id: string, actor: SharedActorContext): Promise<CompetitionCapacityView> {
   const competition = await prisma.competition.findUnique({
     where: { id },
-    select: { id: true, maxSwimmers: true, maxSwimmersPerClub: true },
+    select: { id: true, maxSwimmers: true, maxSwimmersPerClub: true, status: true, registrationStartAt: true, registrationEndAt: true },
   });
   if (!competition) throw new NotFoundError("Competencia");
+  // AUD-07: Borrador o Programada, solo el administrador (estado efectivo, sin escribir nada).
+  exigirCompetenciaVisible(competition, actor);
 
   const uso = await readCapacityUsage(prisma, id);
   const totalSwimmers = uso.swimmerIds.size;

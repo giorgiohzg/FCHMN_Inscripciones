@@ -12,6 +12,7 @@ import {
 import { requireAuth, requirePermission } from "../auth/rbac.middleware";
 import { ValidationError } from "../../shared/errors";
 import { buildActorContext } from "../../shared/actorContext";
+import { exigirCompetenciaVisiblePorId } from "../competitions/competitions.visibilidad";
 
 export async function registrationsRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireAuth);
@@ -19,6 +20,8 @@ export async function registrationsRoutes(app: FastifyInstance) {
   // Paso 3: pruebas habilitadas de la competencia.
   app.get("/competitions/:id/enabled-events", { preHandler: [requirePermission("registrations:read")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
+    // AUD-07: una competencia en Borrador o Programada es solo del administrador, también aquí.
+    await exigirCompetenciaVisiblePorId(id, { isAdmin: (req.authUser!.roles as string[]).includes("admin") });
     reply.send(await registrationsService.listEnabledCompetitionEvents(id));
   });
 

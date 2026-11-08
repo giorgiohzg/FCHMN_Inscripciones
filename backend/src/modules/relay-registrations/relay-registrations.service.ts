@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../../shared/prisma.client";
 import { audit, withAudit } from "../audit/audit.service";
-import { ValidationError, NotFoundError } from "../../shared/errors";
+import { ValidationError, NotFoundError, ForbiddenError } from "../../shared/errors";
 import { computeAge, getDefaultAgeCutoffDate } from "../../shared/age.util";
 import { computeEffectiveStatus, isRelayRegistrationOpen, evaluateRegistrationWindow } from "../competitions/competitions.rules";
 import { evaluarElegibilidadDeIntegrantes } from "./relay-membership.rules";
@@ -101,6 +101,26 @@ async function validateAndResolveRelayTeam(params: {
   if (!club) throw new NotFoundError("Club");
 
   assertClubAccess(actor, clubId);
+
+  /**
+   * AUD-05 — la pertenencia ANTES de tocar datos personales.
+   *
+   * Los integrantes se cargaban por identificador sin acotarlos al club, y el nombre visible
+   * (`nombre (RUN)`) terminaba dentro de los mensajes de error: un usuario de club que enviara el
+   * identificador de una persona de OTRO club recibía de vuelta su nombre y su RUN, su estado, la
+   * compatibilidad de género y cuántos relevos tenía. Quien no es administrador debe demostrar
+   * primero que TODOS los integrantes están en el plantel activo de su club; si no, un error
+   * genérico, igual para una persona ajena que para una que no existe, sin cargar ni nombrar a
+   * nadie. El administrador conserva los mensajes detallados. Cubre crear y editar: las dos pasan
+   * por aquí.
+   */
+  if (!actor.isAdmin) {
+    const distintos = [...new Set(personIds)];
+    const enElPlantel = await db.clubSwimmer.count({ where: { clubId, personId: { in: distintos }, status: "active" } });
+    if (enElPlantel !== distintos.length) {
+      throw new ForbiddenError("Uno o más integrantes no pertenecen al plantel activo de su club.");
+    }
+  }
 
   // Hallazgo 8: la prueba debe ser de relevo. Una llamada directa a la API
   // podía registrar un "equipo" de 4 en una prueba INDIVIDUAL.

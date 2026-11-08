@@ -2,6 +2,11 @@ import { api } from "../../shared/apiClient";
 
 export type AssignmentStatus = "pending" | "active" | "rejected" | "ended";
 
+/** Respuesta de `current-club`: únicamente el club al que pertenece hoy el nadador. */
+export interface ClubActual {
+  club: { id: string; name: string };
+}
+
 export interface ClubSwimmerAssignment {
   id: string;
   clubId: string;
@@ -98,9 +103,8 @@ export function useSwimmerAssignmentApi() {
     bulkAssign: (targetClubId: string, personIds: string[], fechaEfectiva?: string) =>
       api.post<BulkAssignSummary>(`/swimmer-assignments/bulk-assign`, { targetClubId, personIds, fechaEfectiva }),
 
-    /** Club actual del nadador (null si no tiene ninguno activo). */
-    getCurrentClub: (personId: string) =>
-      api.get<(ClubSwimmerAssignment & { club: { id: string; name: string } }) | null>(`/swimmer-assignments/current-club/${personId}`),
+    /** Club actual del nadador (null si no tiene ninguno activo). Solo el club: no la membresía. */
+    getCurrentClub: (personId: string) => api.get<ClubActual | null>(`/swimmer-assignments/current-club/${personId}`),
 
     /** Cambia de club en un solo paso (finaliza el anterior si existía). */
     reassign: (personId: string, newClubId: string, fechaEfectiva?: string) =>

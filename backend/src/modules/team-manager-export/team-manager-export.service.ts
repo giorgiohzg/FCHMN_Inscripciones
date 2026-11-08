@@ -9,6 +9,7 @@ import { textoExportable, type ExportRelay, type ExportSwimmer, type TeamManager
 import { computeAge } from "../../shared/age.util";
 import { fechasDeLaCompetencia } from "./competition-dates";
 import { assertClubAccess, type ActorContext } from "../../shared/actorContext";
+import { exigirCompetenciaVisible } from "../competitions/competitions.visibilidad";
 import { formatRunConGuion } from "../../shared/run.util";
 
 /**
@@ -97,6 +98,7 @@ export async function buildTeamManagerExport(
 
   const competition = await prisma.competition.findUnique({ where: { id: competitionId }, include: { pool: true, dates: { select: { date: true } } } });
   if (!competition) throw new NotFoundError("Competencia");
+  exigirCompetenciaVisible(competition, actor); // AUD-07
 
   /**
    * Hallazgo 17 — el curso de piscina ya no se adivina.

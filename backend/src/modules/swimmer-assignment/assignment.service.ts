@@ -124,6 +124,21 @@ export async function getCurrentClubForPerson(personId: string) {
 }
 
 /**
+ * Respuesta de `GET /swimmer-assignments/current-club/:personId` (auditoría AUD-15).
+ *
+ * Devolvía la fila de membresía completa —quién la solicitó y la revisó, fechas, motivo de
+ * rechazo— a cualquier usuario de club que consultara a cualquier persona, cuando el flujo de
+ * propuesta (A-05) solo necesita saber A QUÉ CLUB pertenece. Ahora entrega únicamente el club.
+ *
+ * `getCurrentClubForPerson` conserva la membresía completa para quienes la necesitan por dentro
+ * (cambio de club y fin de membresía).
+ */
+export async function getCurrentClubSummary(personId: string): Promise<{ club: { id: string; name: string } } | null> {
+  const actual = await getCurrentClubForPerson(personId);
+  return actual ? { club: { id: actual.club.id, name: actual.club.name } } : null;
+}
+
+/**
  * `restrictToClubId`: `undefined` = sin restricción (admin). Cualquier
  * otro valor SÍ restringe — incluido `null`, que significa "sin club
  * real detrás" (ej. rol delegado marcado pero no asignado a ningún
