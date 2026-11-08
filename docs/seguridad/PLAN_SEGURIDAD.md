@@ -20,6 +20,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **SEC-03** | Dependencias, en tres entregas (A backend compatible, B Vite/Vitest, C Zod) | **A cerrada** dentro de su alcance: desplegada solo en `fchmn-api` desde `dab3690` (Live, Auto-Deploy Off). **B publicada en el repositorio, validada en local y desplegada** (API en `64e2122`, web en `2de9dea`; ver «SEC-03, entrega B»). **C (Zod del backend 3 → 4.6.7) cerrada:** API en `64e2122` (Live, Auto-Deploy Off), mantenimiento y web en `2de9dea` (ver «SEC-03, entrega C»). **SEC-03 sigue abierta:** solo por el aviso de desarrollo de `minimatch`; su override acotado es una **solución temporal publicada y validada localmente** (la CI de su SHA se comprueba aparte; ver «SEC-03, override acotado de `minimatch`»). Ver «SEC-03, entrega A» |
 | **AUD-A** | Auditoría del 2026-11-07, AUD-04 y AUD-11: el estado del club se aplica a su cuenta, a su personal y a sus credenciales | **Cerrada dentro de su alcance:** probada en local (pruebas de integración focalizadas sobre la base desechable, typecheck y lint) y en la CI (ejecución 42437889969, éxito), y desplegada en `fchmn-api` desde `d877686` (Live, Auto-Deploy Off). Web y mantenimiento no se desplegaron. Ver «AUD-A» |
 | **AUD-C** | Auditoría del 2026-11-07, AUD-03, AUD-05, AUD-07, AUD-15 y AUD-02: registros sin consultas ni valores, sin datos ajenos en errores, competencias ocultas uniformes, club actual mínimo y conteo del ZIP previo | **Publicado en el repositorio y probado en local** (pruebas unitarias y de integración focalizadas sobre la base desechable, typecheck y lint); **pendiente de despliegue**; la CI de su SHA se comprueba aparte. AUD-03 **no** queda resuelta en todas las capas (Nginx y los registros del proveedor). Ver «AUD-C» |
+| **AUD-B** | Auditoría del 2026-11-07, AUD-01 y AUD-03 (Nginx): bases Node 22.23.4 y Nginx 1.30.6 y registro de acceso de Nginx sin consulta ni `Referer` | **Publicado en el repositorio y validado en local** (tres imágenes candidatas construidas, inventarios y avisos regenerados, escaneadas y ejecutadas sobre la base desechable); **pendiente de despliegue**. Quedan 24 avisos por versión como riesgo residual condicionado (no corregidos). Ver «AUD-B» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -987,12 +988,12 @@ solo para `eslint` (desarrollo), donde no tiene corrección posible hasta que `e
   avisos de npm sobre el bloqueo resultante y con `npm audit --omit=dev`: un único aviso, `zod`.
 - **Pendiente en desarrollo:** `vite`, `esbuild`, `vitest` y `tinypool` (entrega B) y `minimatch` 10.2.6 bajo `eslint` (sin corrección disponible).
 
-**Compatibilidad de npm.** El bloqueo se regeneró con **npm 11.17.0** (Node 24.19, local). Las imágenes usan Node 22.23.2 con **npm 10.9.8**, y
+**Compatibilidad de npm.** El bloqueo se regeneró con **npm 11.17.0** (Node 24.19, local). Las imágenes usaban entonces Node 22.23.2 con **npm 10.9.8** (hoy Node 22.23.4 con npm 10.9.9, AUD-B), y
 `npm ci` con esa versión instaló el bloqueo sin errores en las dos candidatas (`--omit=dev --omit=optional`). `allowScripts` lo reconoce npm 11.17.0
 (trae `npm approve-scripts`); **no se comprobó que npm 10.9.8 lo aplique**, así que en las imágenes no se afirma que rija: la construcción conserva sus propias guardas.
 Las imágenes se construyeron pasando la CA de la red (inspección TLS) como **secreto de construcción**, que no queda en ellas.
 
-**Para B (registrado, sin implementar):** `undici` 8.12.4 exige Node ≥ 22.19.0 (la base fijada es 22.23.2, que lo cumple).
+**Para B (registrado, sin implementar):** `undici` 8.12.4 exige Node ≥ 22.19.0 (la base entonces fijada era la 22.23.2, que lo cumple; hoy es la 22.23.4, AUD-B).
 
 ### Artefactos: calculado frente a extraído de imágenes
 - **Calculado del bloqueo:** las versiones y cadenas de las tablas anteriores y el resultado de los avisos.
@@ -1075,7 +1076,7 @@ Cambian además, en consecuencia, las transitivas de Vitest 4 (`chai` 6, `std-en
 - **Backend:** `engines` pasa de `>=20.11` a **`^22.13.0 || >=24`**. El árbol de **producción** ya exigía Node ≥ 22 (`cookie` 2.0.1 y, desde la entrega A, `content-disposition` 3.0.0), así que `>=20.11`
   no era cierto; en desarrollo, `eslint` pide `^20.19 || ^22.13 || >=24` y Vite 7, `^20.19 || >=22.12`.
 - **Frontend:** se añade `engines` **`^22.22.2 || ^24.15.0 || >=26.0.0`**. El límite lo pone `jsdom` 30.0.1; además `undici` 8.12.4 pide ≥ 22.19 y `whatwg-url` 17.1, `^22.14 || >=24`. No basta con declarar Node ≥ 22.19.
-- **Contraste:** el Node local es 24.19.0 (cumple ambos); la imagen base fijada por digest lleva **Node 22.23.2** (leído de los metadatos de la imagen local; cumple ambos); la CI usa `node-version: "22"`, que
+- **Contraste:** el Node local es 24.19.0 (cumple ambos); la imagen base fijada por digest llevaba entonces **Node 22.23.2** (leído de los metadatos de la imagen local; cumple ambos; hoy es la 22.23.4, AUD-B); la CI usa `node-version: "22"`, que
   resuelve al último 22.x al ejecutarse: **no está fijado y no verifiqué qué parche usa el ejecutor**. `engine-strict` no está activado, así que los `engines` documentan pero no bloquean una instalación.
   El README (requisitos) se corrigió en consecuencia.
 
@@ -1387,13 +1388,145 @@ crudas de la librería: son un `ValidationError`. Sin dependencias nuevas ni ais
 
 **Límites.**
 - Solo cubre el registro **de la aplicación**, así que **AUD-03 no queda resuelta en todas las capas**. El registro de acceso de Nginx no se
-  tocó y queda pendiente de AUD-B. Los registros del proveedor (borde y plataforma) **no fueron inspeccionados** y no se garantiza que AUD-B
+  tocó aquí; su corrección está en «AUD-B» (publicada y validada en local, pendiente de despliegue). Los registros del proveedor (borde y plataforma) **no fueron inspeccionados** y no se garantiza que AUD-B
   los modifique: la cadena de consulta puede seguir en ellos.
 - Fastify avisa con la URL cruda cuando hay un fallo de programación (`Reply was already sent`); no hay punto de enganche y no ocurre en el uso normal.
   El aviso `startup_failed` del arranque sigue escribiendo el mensaje del error de configuración.
 - La tabla de auditoría (AUD-09), la capacidad por rol (AUD-06), la fecha de nacimiento (AUD-10), el RUN de compañeros (AUD-14), la validación del CSV (AUD-08) y
   las imágenes (AUD-01) siguen pendientes. Team Manager conserva el RUN y los reportes no lo incluyen, como antes.
 - No se observó la interfaz ni se compiló la web; el cambio del tipo del frontend se comprobó con el typecheck y sus pruebas.
+
+## AUD-B: imágenes base y registro de acceso de Nginx (publicado y validado en local, pendiente de despliegue)
+
+**Estado: publicado en el repositorio y validado en LOCAL; pendiente de despliegue. No se tocó Render ni producción.** Producción
+sigue con las imágenes anteriores. Parte de AUD-01 (imágenes base) y de AUD-03 (capa de Nginx) de la auditoría del 2026-11-07. No migra a
+Node 24 ni cambia dependencias npm, código funcional ni la rama estable de Nginx.
+
+**Versiones** (consultadas hoy en fuentes oficiales y comprobadas descargando cada imagen por digest y leyendo su metadato).
+
+| Base | Antes | Ahora | Fuente |
+|---|---|---|---|
+| Node (API, mantenimiento y compilación de la web) | 22.23.2 · `c610fcdf…` · Alpine 3.24.1 | **22.23.4** · `22.23.4-alpine3.24` · `sha256:0e175475…8202` · Alpine 3.24.4 | nodejs.org (22.23.4, 2026-10-20, versión de seguridad; la última 22.x) · índice de la imagen oficial de Docker Hub |
+| Nginx (web) | 1.27.5 · `65645c7b…` · Alpine 3.21.3 | **1.30.6** · `1.30.6-alpine3.24` · `sha256:583b7f2f…c311` · Alpine 3.24.4 | nginx.org (1.30.6, la última estable) · índice de la imagen oficial de Docker Hub |
+
+Las etiquetas `22.23.4-alpine3.24` y `1.30.6-alpine3.24` resuelven a esos mismos digests. Se actualizaron `backend/Dockerfile` y
+`frontend/Dockerfile` (versión y digest juntos, con su comentario) y se regeneró `backend/Dockerfile.mantenimiento` con su generador. Los paquetes
+de Alpine de la API y de mantenimiento no están fijados: la etapa `base` ejecuta `apk add openssl` en cada construcción, así que su versión
+exacta depende del repositorio ese día.
+
+**Registro de acceso de Nginx.** La imagen oficial define a nivel `http` un `access_log` con el formato `main`, que escribe `$request`
+—con la cadena de consulta— y `$http_referer`; el servidor lo heredaba sin que la plantilla dijera nada. `default.conf.template` declara ahora un
+`log_format` JSON propio (`fchmn_acceso`, con `escape=json`) y un `access_log` a nivel servidor que reemplaza al heredado. Campos: hora, dirección,
+`X-Forwarded-For`, método, **ruta sin consulta**, protocolo, estado, bytes, tiempo y agente; **sin** `Referer`, `$request`, `$args` ni `$request_uri`
+completo. La ruta sale de un `map` sobre `$request_uri` y no de `$uri`, que cambia con el `rewrite` de `/api/` (perdería el prefijo) y con la
+redirección interna del SPA (siempre `/index.html`). El `map` usa una captura con nombre como valor y no la combina con otra variable en una
+expresión; además la versión ya es la corregida. Se conservan el proxy `/api`, la resolución DNS, la CSP, las cabeceras y la reescritura de cookies.
+
+**Inventarios y avisos** (procedimiento de dos pasadas de `scripts/construir-y-revalidar.md`).
+- **Pasada 1:** construcción de las tres imágenes candidatas (API, mantenimiento y web, con la guardia del árbol instalado del `Dockerfile`), extracción
+  con la sonda y regeneración de `sources.json` y de los avisos. Pasada 2: reconstrucción con los avisos definitivos.
+- **Paquetes Node:** idénticos en nombre, versión y rutas en API y mantenimiento (258 y 264). Sistema operativo: 19 → 20 paquetes (nuevo `libatomic`; cambian
+  `musl`, `zlib`, `openssl`, `libcrypto3`, `libssl3`, `apk-tools`, `libapk`, `ca-certificates-bundle` y `alpine-release`). Web: 68 → 71 paquetes (5 nuevos, 2 retirados
+  —`libgcrypto` y `libgpg-error`—, 61 con otra versión) y un componente nuevo de nginx.org, `nginx-module-acme`.
+- **La sonda no recogía el `COPYRIGHT` de `nginx-module-acme`** (11.357 bytes): se añadió a su lista de componentes sueltos (`scripts/inventario/extraer-de-imagen.cjs`).
+  La imagen web no tiene Node: se extrae con `tar` y la sonda se ejecuta en un contenedor Node con esos archivos montados; el método se validó contra la imagen
+  anterior y reprodujo el inventario vigente sin diferencias.
+- `generar-sources.mjs` tenía fija la rama de la web en `3.21-stable` (y una prueba también): ahora `3.24-stable`.
+- **Avisos de copyright por paquete fuente** (`notices/avisos-fuente.json`, 64 → 107 entradas; ninguna anterior se modificó ni se perdió, salvo el commit de
+  `libpsl` 0.21.5-r3, que en Alpine 3.24 es otro con los mismos avisos upstream, comprobados byte a byte): las pruebas exigen una entrada por paquete fuente y
+  versión. Se cubrieron 43 con el mismo método (APKBUILD en el commit exacto; el mismo archivo en la etiqueta nueva donde ya había aviso recuperado): **13 con aviso propio
+  recuperado** (aom, brotli, c-ares, geoip, libavif, openssl, gd, libjpeg-turbo, nghttp2, pcre2, tzdata, xz y zstd), **1 verificado sin aviso** (`alpine-base`) y **29 no verificables**
+  (se publican como tarball o no se inspeccionó su repositorio; no se afirma que carezcan de aviso). La cobertura del aviso de la web se conserva: 14 con aviso propio, 2
+  verificados sin aviso y 37 no verificables, igual que antes. En `pcre2` 10.49, `COPYING` es solo un puntero a `LICENCE.md` y `AUTHORS` pasó a `AUTHORS.md`; se recuperaron esos tres.
+- Resultado: solo cambian los inventarios, `sources.json`, `avisos-fuente.json`, un texto nuevo, los avisos generados y sus copias; **los textos de licencia se conservan íntegros**. Con la candidata
+  final: `generar-avisos`, `distribuir-avisos` y `generar-dockerfile-mantenimiento` con `--verificar` devuelven 0; el `THIRD-PARTY-NOTICES.txt` de cada imagen (y el `third-party-notices.txt` servido por la web)
+  tiene el mismo sha256 que el del repositorio; y una nueva extracción de las tres imágenes es **idéntica** a la de la pasada 1 (cero cambios). Los archivos de `/app/prisma` (44 y 42) están todos versionados. No se afirma identidad binaria entre imágenes.
+
+**Comprobaciones locales** (datos sintéticos; la base fue la desechable de `docker-compose.test.yml`).
+- **Versiones reales dentro de las imágenes:** Node 22.23.4 con OpenSSL 3.5.9 (API y mantenimiento), Alpine 3.24.4, Prisma 5.22.0 con el motor `linux-musl-openssl-3.0.x`, Nginx 1.30.6.
+- **API, Prisma y mantenimiento:** la API arranca sana como usuario `node`; la imagen de mantenimiento aplicó todas las migraciones sobre la base desechable y ejecutó los seeds de referencia y del administrador
+  sintético (solo ahí). Por la web: `/api/health` y `/api/ready` 200, `/api/auth/me` 401, todas con `Cache-Control: no-store`; el inicio de sesión devuelve las cookies con `Path=/api/auth` (reescrita), `HttpOnly`, `Secure` y `SameSite=Lax`.
+- **Nginx efectivo:** `nginx -T` conserva el `access_log ... main` de nivel `http` de la imagen, pero el del servidor lo reemplaza: con peticiones reales a rutas de la SPA, de la API y a un activo inexistente, **no apareció ninguna línea con el formato heredado**
+  y el **marcador sintético de búsqueda aparece 0 veces** en la salida estándar de la web y de la API (y 0 en la de errores con el upstream arriba). Las rutas del registro son las originales (`/api/persons`, `/competencias/abc`).
+  Cabeceras (CSP, HSTS, `X-Frame-Options`, `Referrer-Policy`, `X-Content-Type-Options`) y proxy iguales a los observados en producción.
+- Suite unitaria y pruebas estáticas pertinentes: `avisos-terceros`, `inventario-sonda`, `dockerfile-mantenimiento`, `dependencias-produccion` y `frontend-cabeceras` (164 pruebas). No se repitieron las pruebas de AUD-C ni las suites completas.
+
+**Escaneo** (el «antes» son las imágenes locales equivalentes: `fchmn-backend:sec03c-candidato` y `fchmn-frontend:fase3-mismo-origen`, no las de producción; Trivy 0.76.2, imagen oficial `aquasec/trivy` fijada por digest, solo vulnerabilidades; base de datos del 2026-11-08; el contenedor confió además en la CA de la red, que inspecciona TLS).
+
+| Imagen | Antes | Ahora | Origen de lo que queda |
+|---|---|---|---|
+| Web | 215 (3 críticas, 64 altas) sobre Alpine 3.21 / Nginx 1.27.5 | **1** (media) | `zlib` 1.3.2-r1 (CVE-2026-4738) |
+| API | 33 (1 crítica, 15 altas) | **24** (10 altas, 13 medias, 1 baja) | 23 del `npm` incluido en la imagen base de Node (`/usr/local/lib/node_modules/npm`) y `zlib`; **0 en las dependencias de la aplicación** |
+| Mantenimiento | — | **24** (igual que la API) | ídem |
+
+Lo que queda son avisos por versión: **no están corregidos** y se registran como riesgo residual condicionado (ver «Avisos residuales» más abajo). Los avisos de Nginx que motivaron la auditoría (`map`, `rewrite`, `alias`, HTTP/3, `ssi`, etc.) figuran como corregidos en versiones 1.30.x anteriores o iguales a la 1.30.6 según cada aviso de nginx.org; la 1.30.6 los incluye todos los publicados hoy.
+
+**Avisos residuales** (revisión del 2026-11-08 sobre los informes del escaneo anterior, sin reconstruir ni volver a escanear; las imágenes son las candidatas
+locales, no las de producción). Que Trivy marque una versión prueba presencia, no alcanzabilidad; ninguno de estos avisos se da por corregido.
+
+*Los 23 de `npm`.* Todos están en dependencias del `npm` 10.9.9 que trae la imagen oficial de Node (`/usr/local/lib/node_modules/npm/node_modules/…`), en la API y en
+mantenimiento (no en la web). Evidencia común: la imagen final de la API arranca con `node dist/server.js` y la de mantenimiento con `prisma migrate deploy` o en
+reposo; `npm`/`npx` solo aparecen en pasos `RUN` de etapas de construcción. La aplicación resuelve sus propias copias en `/app/node_modules` (por ejemplo
+`minimatch` 11.0.5) y no hay `NODE_PATH`. La evidencia por aviso sale del código publicado de npm 10.9.9 (registro npm). Clases:
+- **A — condición de uso no cumplida (8):** npm no invoca la función u opción afectada de la forma que exige el aviso.
+- **B — condición presente en el código de npm (15):** solo sería alcanzable ejecutando `npm` dentro de la imagen con una entrada hostil (patrón, `package.json`,
+  especificación de paquete, consulta o firma). Ninguna ruta de arranque de estas imágenes lo hace, pero **no está comprobado que nadie ejecute `npm` en producción**.
+
+| Paquete (versión) | Avisos (gravedad del escáner) | Impacto | Condición y evidencia | Clase |
+|---|---|---|---|---|
+| `@sigstore/core` 2.0.0 | CVE-2026-48758 / GHSA-jfc7-64v2-mr8c (media) | **Integridad de la verificación**: `payloadType` de un sobre DSSE puede cambiarse tras firmar sin invalidar la firma | `preAuthEncoding` usa codificación `ascii`; npm verifica firmas y atestaciones en `npm audit signatures` (`lib/utils/verify-signatures.js` y `pacote/lib/registry.js`) | B |
+| `sigstore` 3.1.0 | CVE-2026-48815 / GHSA-52v5-jr5w-gjxr (alta) | Integridad: se aceptan certificados sin las extensiones exigidas | Solo si el llamador pasa `certificateOIDs`; ningún módulo de npm fuera de sigstore lo usa | A |
+| `brace-expansion` 2.0.2 | CVE-2026-102276, -102278, -13149, -14257, -69152 (altas); -102277, -33750 (medias) | Denegación de servicio (pila, memoria o tiempo) | Llega a través de `minimatch` 9.0.9 desde `glob`; requiere un patrón hostil en `npm help`, en los `workspaces` de un `package.json` o similar | B (7) |
+| `minimatch` 9.0.9 | CVE-2026-118764 / GHSA-g3hv-75wg-m249 (media) | Denegación de servicio | Requiere `optimizationLevel >= 2`: **`glob` 10.5.0 lo fija** al crear sus patrones (`glob/dist/commonjs/glob.js`, línea 153, y `ignore.js`, línea 37; igual en `dist/esm`) y resuelve el `minimatch` 9.0.9 de la raíz (no hay copia anidada). Llamadores de `glob` en npm: `@npmcli/map-workspaces` (patrones de `workspaces`), `@npmcli/package-json`, `cacache` (rutas propias) y `npm help`/`help-search` (argumento del usuario) | B |
+| `glob` 10.5.0 | CVE-2026-118773 / GHSA-3g3m-2fjr-6pw4 (media) | Denegación de servicio | Solo afecta a quien acota el recorrido con `signal`; ninguno de los cinco módulos de npm que usan `glob` pasa `signal` | A |
+| `ip-address` 10.1.0 | CVE-2026-69192 (alta, SSRF); -101912, -101913 (medias, comparación de subredes y enlace local); -42338 (media, XSS) | Decisión de acceso o SSRF erróneas; HTML sin escapar | Requieren usar `Address4`/`Address6` para decidir políticas de red, `isInSubnet`, `isLinkLocal` o mostrar `group()`/`link()` como HTML; npm solo llega por `socks` (proxy SOCKS) y no usa esas funciones así | A (4) |
+| `ip-address` 10.1.0 | CVE-2026-101911, -111997 (medias) | Denegación de servicio | Análisis de una dirección IPv6 larga; llegaría con un proxy SOCKS configurado con un valor hostil | B (2) |
+| `pacote` 19.0.2 y 20.0.1 (copia de `@npmcli/metavuln-calculator`) | CVE-2026-9496 / GHSA-w4pp-8pjf-rmxw (alta, una fila por ruta) | Denegación de servicio | `addGitSha` con un `rawSpec` git manipulado; requiere instalar o resolver una dependencia git hostil | B (2) |
+| `picomatch` 4.0.3 | CVE-2026-33671 (alta, ReDoS); CVE-2026-33672 (media, integridad del patrón) | Denegación de servicio; coincidencias erróneas | Requieren un extglob o una clase POSIX controlados; llega por `tinyglobby` desde `node-gyp`, que solo usa patrones fijos (`build/*.sln`, `build/*.mk`) | A (2) |
+| `postcss-selector-parser` 7.1.1 | CVE-2026-104844 (media); CVE-2026-9358 (baja) | Denegación de servicio | Selector hostil en `npm query` (`@npmcli/query`) | B (2) |
+
+Recuento: 8 de clase A (`sigstore`, `glob`, cuatro de `ip-address` y dos de `picomatch`) y 15 de clase B (`@sigstore/core`, siete de `brace-expansion`, `minimatch`,
+dos de `ip-address`, dos de `pacote` y dos de `postcss-selector-parser`), más `zlib`. Corrección de versión: cada aviso tiene corrección publicada en su paquete, pero
+dependen del `npm` que trae la imagen de Node; no se actualizan por separado.
+
+*`zlib` 1.3.2-r1 (CVE-2026-4738, media; web, API y mantenimiento).* Clasificación **provisional: posible falso positivo**.
+- El registro del CNA (GovTech CSG) describe un desbordamiento en `frmts/zlib/contrib/infback9` (`inftree9.c`) de **GDAL** anterior a 3.11.0, corregido en
+  [OSGeo/gdal#12244](https://github.com/OSGeo/gdal/pull/12244); no nombra el paquete zlib. GDAL no figura en los inventarios de las imágenes.
+- `infback9` es un `contrib` sin soporte de zlib (`contrib/README.contrib`). En zlib 1.3.2, `Makefile.in` compila la biblioteca solo con `OBJZ`/`OBJG`
+  (`adler32` … `zutil`, `compress` … `gzwrite`) y nombra `contrib/infback9` únicamente en la limpieza; `configure` no lo menciona.
+- El APKBUILD de Alpine 3.24 para 1.3.2-r1 (commit `0afa2da0e8c8` de aports) construye con `./configure --prefix=/usr --shared --disable-crcvx` y `make`, y su
+  único parche toca `gzwrite.c`.
+- La copia de zlib de Node 22.23.4 (`deps/zlib`) no contiene `infback9` ni `inftree9`, y `zlib.gyp` no los compila.
+- Indicio complementario, no prueba suficiente por sí solo: en las tres imágenes locales `libz.so.1.3.2` es el mismo archivo y ni él ni ningún otro contiene
+  los nombres de `infback9`.
+- Por qué sigue siendo provisional: Alpine atribuye la corrección a `1.4-r0` (`secfixes` del APKBUILD y secdb de 3.24), y no se comprobó la procedencia del
+  paquete instalado (su commit de aports) ni el enlace de Nginx con `libz`.
+- **Recomendación:** actualizar a `zlib` 1.4-r0 (ya en `3.24-stable` desde el 2026-11-06) en un paso propio y autorizado. zlib 1.4 trae además otras correcciones de
+  memoria en la propia biblioteca, que justifican la actualización por sí mismas.
+
+*Comprobaciones pendientes* (no ejecutadas; cada una devuelve solo los datos indicados).
+- **Procedencia de `zlib`:** versión y commit de aports del paquete `zlib` instalado (solo esas dos líneas de la base de datos de `apk`) y lista de archivos del paquete.
+- **Enlace de Nginx:** solo las bibliotecas dinámicas requeridas por `/usr/sbin/nginx` (para saber si usa la `libz` del sistema).
+- **Configuración de npm:** solo si existen (sí/no) archivos `npmrc` en las rutas habituales de la imagen y si están definidos (sí/no) nombres concretos de
+  variables `npm_config_*` relevantes, sin leer su contenido ni volcar el entorno.
+- **Producción, por separado** (Render reconstruye las imágenes, así que no se espera igualdad binaria con las locales):
+  - *versión:* Node, Nginx y `zlib` que informe la imagen desplegada;
+  - *procedencia:* SHA del commit desplegado y digests de las bases fijados en los Dockerfile;
+  - *configuración:* que Docker Command, Pre-Deploy y la tarea de mantenimiento no invoquen `npm` ni `npx`;
+  - *evidencia efectiva:* comprobaciones posteriores al despliegue (salud, cabeceras y formato del registro de acceso con un marcador sintético).
+
+**Riesgos residuales.**
+- **Avisos de `npm` y `zlib`:** registrados arriba, **no corregidos**; la clase B depende de que no se ejecute `npm` en las imágenes de ejecución.
+- **Registro de errores de Nginx.** Cuando falla el upstream, Nginx escribe en su registro de errores la línea de petición y la URI del upstream **con su cadena de consulta** (observado con un marcador sintético, en la salida de errores). No se modificó:
+  filtrar ese registro por nivel ocultaría también los fallos del proxy. Queda como riesgo aparte.
+- **Registros del proveedor** (borde y plataforma): no fueron inspeccionados y no se promete corregirlos.
+- **El `npm` de la imagen base** arrastra sus propios avisos mientras exista en la imagen. Retirarlo de las etapas de ejecución eliminaría los 23, pero obliga a
+  cambiar el perfil local `mantenimiento` de `docker-compose.yml` (usa `npx`) y a regenerar inventarios, avisos y `Dockerfile.mantenimiento`; es una decisión pendiente, no aplicada.
+- `zlib` 1.4-r0 está disponible en Alpine 3.24 y no se aplicó en AUD-B; queda recomendado como paso propio (ver arriba).
+- La etapa `base` de la API no fija los paquetes de Alpine; dos construcciones en días distintos pueden diferir.
+
+**Límites.** Publicado en el repositorio, sin desplegar; AUD-V y las decisiones funcionales siguen pendientes. Los servicios que necesitarían despliegue son la web, la API y mantenimiento (el cron de enero ejecutaría la imagen nueva por primera vez).
+No se observó la interfaz en un navegador con estas imágenes. Quedan en el equipo las imágenes candidatas `fchmn-{backend,migrate,frontend}:audb-p1` y `:audb-p2` y las dos bases oficiales descargadas por digest.
 
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 

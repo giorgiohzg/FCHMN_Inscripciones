@@ -3,165 +3,174 @@
   "sistema": [
     {
       "nombre": "alpine-baselayout",
-      "version": "3.6.8-r1",
+      "version": "3.7.2-r1",
       "expresion": "GPL-2.0-only",
       "origen": "alpine-baselayout",
-      "url": "https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout",
-      "commit": "5f0cd7890349e7fe11128478ac506c709805224d",
-      "construido": "2025-01-04T07:04:48.000Z"
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/master/main/alpine-baselayout",
+      "commit": "60a7585bbab2fa0f762504eb617dbca90216e31f",
+      "construido": "2026-03-24T19:40:54.000Z"
     },
     {
       "nombre": "alpine-baselayout-data",
-      "version": "3.6.8-r1",
+      "version": "3.7.2-r1",
       "expresion": "GPL-2.0-only",
       "origen": "alpine-baselayout",
-      "url": "https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout",
-      "commit": "5f0cd7890349e7fe11128478ac506c709805224d",
-      "construido": "2025-01-04T07:04:48.000Z"
+      "url": "https://gitlab.alpinelinux.org/alpine/aports/-/tree/master/main/alpine-baselayout",
+      "commit": "60a7585bbab2fa0f762504eb617dbca90216e31f",
+      "construido": "2026-03-24T19:40:54.000Z"
     },
     {
       "nombre": "alpine-keys",
-      "version": "2.5-r0",
+      "version": "2.6-r0",
       "expresion": "MIT",
       "origen": "alpine-keys",
       "url": "https://alpinelinux.org",
-      "commit": "6d473fb38effb2389f567b29fb7eb27039b3a279",
-      "construido": "2024-08-14T12:30:20.000Z"
+      "commit": "b9f23becced4d7b3ccc0fa0f28530243ccd314a0",
+      "construido": "2025-09-18T17:13:52.000Z"
     },
     {
       "nombre": "alpine-release",
-      "version": "3.21.3-r0",
+      "version": "3.24.4-r0",
       "expresion": "MIT",
       "origen": "alpine-base",
       "url": "https://alpinelinux.org",
-      "commit": "899c70c801638ce9aea29a822aaa07a1488efa15",
-      "construido": "2025-02-13T23:03:07.000Z"
+      "commit": "105b835acd9971b9770fb61f5a1ddcc133c180dc",
+      "construido": "2026-11-05T09:17:02.000Z"
     },
     {
       "nombre": "aom-libs",
-      "version": "3.11.0-r0",
+      "version": "3.14.1-r0",
       "expresion": "BSD-2-Clause AND custom",
       "origen": "aom",
       "url": "https://aomedia.org/",
-      "commit": "566a03ffbe0922833d0cc76ee4f93a44df5dfb93",
-      "construido": "2024-11-17T21:23:34.000Z"
+      "commit": "ca6a710df98ad5e2b596cf06b44cd82a5ceefc4e",
+      "construido": "2026-05-24T21:23:54.000Z"
     },
     {
       "nombre": "apk-tools",
-      "version": "2.14.6-r3",
+      "version": "3.0.9-r0",
       "expresion": "GPL-2.0-only",
       "origen": "apk-tools",
       "url": "https://gitlab.alpinelinux.org/alpine/apk-tools",
-      "commit": "41847d6ccff08940b5bf1ba0d6005e95897039f9",
-      "construido": "2025-02-13T21:57:30.000Z"
+      "commit": "13685e8f2cf1c103cbba2fb9efcfcf19f4918df0",
+      "construido": "2026-11-04T08:03:01.000Z"
     },
     {
       "nombre": "brotli-libs",
-      "version": "1.1.0-r2",
+      "version": "1.2.1-r0",
       "expresion": "MIT",
       "origen": "brotli",
       "url": "https://github.com/google/brotli",
-      "commit": "bdeb5ac39445d803f7d97bb9b3cf9171d9a35f52",
-      "construido": "2024-04-12T09:43:36.000Z"
+      "commit": "8313352127992a9d82e2c2024494f6c38a4dffb4",
+      "construido": "2026-10-22T02:32:33.000Z"
     },
     {
       "nombre": "busybox",
-      "version": "1.37.0-r12",
+      "version": "1.37.0-r31",
       "expresion": "GPL-2.0-only",
       "origen": "busybox",
       "url": "https://busybox.net/",
-      "commit": "9c49608930ef6a9936750e9e39edec56b3db9cd5",
-      "construido": "2025-01-17T18:12:01.000Z"
+      "commit": "c3ef5d10e6ef6528852c51f0564963e2f8c1be19",
+      "construido": "2026-01-10T15:38:28.000Z"
     },
     {
       "nombre": "busybox-binsh",
-      "version": "1.37.0-r12",
+      "version": "1.37.0-r31",
       "expresion": "GPL-2.0-only",
       "origen": "busybox",
       "url": "https://busybox.net/",
-      "commit": "9c49608930ef6a9936750e9e39edec56b3db9cd5",
-      "construido": "2025-01-17T18:12:01.000Z"
+      "commit": "c3ef5d10e6ef6528852c51f0564963e2f8c1be19",
+      "construido": "2026-01-10T15:38:28.000Z"
     },
     {
       "nombre": "c-ares",
-      "version": "1.34.5-r0",
+      "version": "1.34.9-r0",
       "expresion": "MIT",
       "origen": "c-ares",
       "url": "https://c-ares.org/",
-      "commit": "e7fe61bc1a50c88db90d446688444acc8bf13dbf",
-      "construido": "2025-04-09T20:52:20.000Z"
+      "commit": "50f178d7a4c30ea44b54b7d4731ab58558c38b14",
+      "construido": "2026-10-21T11:55:14.000Z"
     },
     {
       "nombre": "ca-certificates",
-      "version": "20241121-r1",
+      "version": "20261020-r0",
       "expresion": "MPL-2.0 AND MIT",
       "origen": "ca-certificates",
       "url": "https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/",
-      "commit": "707ff77afebd8ef5bd60f3a5dd1b08f8c480f531",
-      "construido": "2025-01-08T09:56:39.000Z"
+      "commit": "e78f5987166c6ffbe23f6472e2e8f040298fe2da",
+      "construido": "2026-10-20T15:31:28.000Z"
     },
     {
       "nombre": "ca-certificates-bundle",
-      "version": "20241121-r1",
+      "version": "20261020-r0",
       "expresion": "MPL-2.0 AND MIT",
       "origen": "ca-certificates",
       "url": "https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/",
-      "commit": "707ff77afebd8ef5bd60f3a5dd1b08f8c480f531",
-      "construido": "2025-01-08T09:56:39.000Z"
+      "commit": "e78f5987166c6ffbe23f6472e2e8f040298fe2da",
+      "construido": "2026-10-20T15:31:28.000Z"
     },
     {
       "nombre": "curl",
-      "version": "8.12.1-r1",
+      "version": "8.23.0-r0",
       "expresion": "curl",
       "origen": "curl",
       "url": "https://curl.se/",
-      "commit": "f7044762c3757181b5b0f7689cbf305a07215887",
-      "construido": "2025-03-17T09:41:17.000Z"
+      "commit": "c65a7b3f6d6bc4b3c0a8a6fff759d8fd05a167ce",
+      "construido": "2026-10-25T15:48:10.000Z"
     },
     {
       "nombre": "fontconfig",
-      "version": "2.15.0-r1",
+      "version": "2.17.1-r1",
       "expresion": "MIT",
       "origen": "fontconfig",
       "url": "https://www.freedesktop.org/wiki/Software/fontconfig",
-      "commit": "bdeb5ac39445d803f7d97bb9b3cf9171d9a35f52",
-      "construido": "2024-04-12T09:43:36.000Z"
+      "commit": "07061cb5a28861b108b09adc09ebd4fd962e549f",
+      "construido": "2026-03-27T19:39:10.000Z"
     },
     {
       "nombre": "freetype",
-      "version": "2.13.3-r0",
+      "version": "2.14.3-r0",
       "expresion": "FTL OR GPL-2.0-or-later",
       "origen": "freetype",
       "url": "https://www.freetype.org/",
-      "commit": "9404f86086f8e5c970b156336e71c56828a1e587",
-      "construido": "2024-09-05T03:44:08.000Z"
+      "commit": "ad16b0afc1a315c4095a75ff72ebbe3cfa29b671",
+      "construido": "2026-04-29T14:07:13.000Z"
     },
     {
       "nombre": "geoip",
-      "version": "1.6.12-r5",
+      "version": "1.6.12-r6",
       "expresion": "LGPL-2.1-or-later",
       "origen": "geoip",
       "url": "http://www.maxmind.com/app/ip-location",
-      "commit": "fc95c59998285564fbcb0bfb2443898c62e10171",
-      "construido": "2024-03-12T15:33:42.000Z"
+      "commit": "6db81e6559d66572861f28962c24459c4a583da1",
+      "construido": "2025-02-10T09:04:37.000Z"
     },
     {
       "nombre": "gettext-envsubst",
-      "version": "0.22.5-r0",
+      "version": "1.0-r0",
       "expresion": "GPL-3.0-or-later AND LGPL-2.1-or-later AND MIT",
       "origen": "gettext",
       "url": "https://www.gnu.org/software/gettext/gettext.html",
-      "commit": "c49ded5d54b708768165f7a99589464cd5c5eeee",
-      "construido": "2024-03-27T17:11:29.000Z"
+      "commit": "a0b12dbf67fb047e79a1b76c6dfe6f2904d0d391",
+      "construido": "2026-04-18T21:49:18.000Z"
+    },
+    {
+      "nombre": "libapk",
+      "version": "3.0.9-r0",
+      "expresion": "GPL-2.0-only",
+      "origen": "apk-tools",
+      "url": "https://gitlab.alpinelinux.org/alpine/apk-tools",
+      "commit": "13685e8f2cf1c103cbba2fb9efcfcf19f4918df0",
+      "construido": "2026-11-04T08:03:01.000Z"
     },
     {
       "nombre": "libavif",
-      "version": "1.0.4-r0",
+      "version": "1.4.1-r0",
       "expresion": "BSD-2-Clause",
       "origen": "libavif",
       "url": "https://aomediacodec.github.io/av1-avif/",
-      "commit": "b957b6e51ead6a412cb11ecc63a77e3a70edbfd5",
-      "construido": "2024-02-08T18:32:25.000Z"
+      "commit": "7c091e42619c47958002c5de53dd7f02dd4c83ac",
+      "construido": "2026-04-10T08:10:08.000Z"
     },
     {
       "nombre": "libbsd",
@@ -183,138 +192,129 @@
     },
     {
       "nombre": "libcrypto3",
-      "version": "3.3.3-r0",
+      "version": "3.5.9-r0",
       "expresion": "Apache-2.0",
       "origen": "openssl",
       "url": "https://www.openssl.org/",
-      "commit": "ddbf4a43b534e1e2da4ccb72bdc4ffcd9b85ce03",
-      "construido": "2025-02-11T17:51:32.000Z"
+      "commit": "29b9ec24b1b5b39aeef51fa2a044210e2ec5258e",
+      "construido": "2026-09-30T07:09:33.000Z"
     },
     {
       "nombre": "libcurl",
-      "version": "8.12.1-r1",
+      "version": "8.23.0-r0",
       "expresion": "curl",
       "origen": "curl",
       "url": "https://curl.se/",
-      "commit": "f7044762c3757181b5b0f7689cbf305a07215887",
-      "construido": "2025-03-17T09:41:17.000Z"
+      "commit": "c65a7b3f6d6bc4b3c0a8a6fff759d8fd05a167ce",
+      "construido": "2026-10-25T15:48:10.000Z"
     },
     {
       "nombre": "libdav1d",
-      "version": "1.5.0-r0",
+      "version": "1.5.3-r0",
       "expresion": "BSD-2-Clause",
       "origen": "dav1d",
       "url": "https://code.videolan.org/videolan/dav1d",
-      "commit": "209790842fd2d60db34aed86d7e5f8b035f89b0e",
-      "construido": "2024-10-23T09:29:45.000Z"
+      "commit": "6a13170ddff8fdf27712aa7d0e5437aa2407ff56",
+      "construido": "2026-01-02T17:20:08.000Z"
     },
     {
       "nombre": "libedit",
-      "version": "20240808.3.1-r0",
+      "version": "20260508.3.1-r1",
       "expresion": "BSD-3-Clause",
       "origen": "libedit",
       "url": "https://www.thrysoee.dk/editline",
-      "commit": "ee9c3251f481e457cafb2a39a31fdf734c7c55d8",
-      "construido": "2024-08-22T08:09:44.000Z"
+      "commit": "7c805161e588c028cdee3f19f500849fb2c75d42",
+      "construido": "2026-05-15T07:56:49.000Z"
     },
     {
       "nombre": "libexpat",
-      "version": "2.7.0-r0",
+      "version": "2.10.0-r0",
       "expresion": "MIT",
       "origen": "expat",
       "url": "https://libexpat.github.io/",
-      "commit": "6b8bc07f26b221e11bb5cd6b34535d3985cac606",
-      "construido": "2025-03-16T19:59:08.000Z"
+      "commit": "af0fa42036cd6e626768c0d65fddaa1d1b30cf21",
+      "construido": "2026-11-02T13:12:51.000Z"
     },
     {
-      "nombre": "libgcrypt",
-      "version": "1.10.3-r1",
-      "expresion": "LGPL-2.1-or-later AND GPL-2.0-or-later",
-      "origen": "libgcrypt",
-      "url": "https://www.gnupg.org/",
-      "commit": "40176cc16c5dfa243d502fa9e1f7b9e68ebcad0b",
-      "construido": "2024-10-15T11:56:28.000Z"
+      "nombre": "libgcc",
+      "version": "15.2.0-r5",
+      "expresion": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "origen": "gcc",
+      "url": "https://gcc.gnu.org",
+      "commit": "423a8ad043d07f2c7546c8ec3e2b0384cda360ae",
+      "construido": "2026-05-29T19:59:26.000Z"
     },
     {
       "nombre": "libgd",
-      "version": "2.3.3-r9",
+      "version": "2.3.3-r10",
       "expresion": "GD",
       "origen": "gd",
       "url": "https://libgd.github.io/",
-      "commit": "21d29cabd99e7ff6534d2e99601cbd77abf30f8a",
-      "construido": "2024-05-22T08:13:48.000Z"
-    },
-    {
-      "nombre": "libgpg-error",
-      "version": "1.51-r0",
-      "expresion": "GPL-2.0-or-later AND LGPL-2.1-or-later",
-      "origen": "libgpg-error",
-      "url": "https://www.gnupg.org/",
-      "commit": "59a563eec99ff1e59c5cb42ecf7a482be3684a1c",
-      "construido": "2024-11-19T07:21:14.000Z"
+      "commit": "bf4ebac970366eda6cc26aa61c8dddae0d6916ee",
+      "construido": "2025-07-31T14:05:06.000Z"
     },
     {
       "nombre": "libice",
-      "version": "1.1.1-r6",
+      "version": "1.1.2-r0",
       "expresion": "X11",
       "origen": "libice",
       "url": "https://xorg.freedesktop.org/",
-      "commit": "614e9166706cec427fc3d907b8d981390a42e088",
-      "construido": "2024-04-11T21:39:10.000Z"
+      "commit": "d4941e833167c30aa1172e6d8420d084698254ab",
+      "construido": "2024-12-19T17:05:35.000Z"
     },
     {
       "nombre": "libidn2",
-      "version": "2.3.7-r0",
+      "version": "2.3.8-r0",
       "expresion": "GPL-2.0-or-later OR LGPL-3.0-or-later",
       "origen": "libidn2",
       "url": "https://www.gnu.org/software/libidn#libidn2",
-      "commit": "1cdcdd0eccbee1f60078417a7aaf83f92f6e6754",
-      "construido": "2024-01-28T21:37:39.000Z"
+      "commit": "8240e09aa2fdd8f9979b2016be082273965aff0c",
+      "construido": "2025-06-30T13:36:47.000Z"
     },
     {
       "nombre": "libintl",
-      "version": "0.22.5-r0",
+      "version": "1.0-r0",
       "expresion": "LGPL-2.1-or-later",
       "origen": "gettext",
       "url": "https://www.gnu.org/software/gettext/gettext.html",
-      "commit": "c49ded5d54b708768165f7a99589464cd5c5eeee",
-      "construido": "2024-03-27T17:11:29.000Z"
+      "commit": "a0b12dbf67fb047e79a1b76c6dfe6f2904d0d391",
+      "construido": "2026-04-18T21:49:18.000Z"
     },
     {
       "nombre": "libjpeg-turbo",
-      "version": "3.0.4-r0",
+      "version": "3.1.3-r0",
       "expresion": "BSD-3-Clause AND IJG AND Zlib",
       "origen": "libjpeg-turbo",
       "url": "https://libjpeg-turbo.org/",
-      "commit": "30b4b4d47dba66db916d78a58ea7a4639447a04f",
-      "construido": "2024-09-17T13:50:22.000Z"
+      "commit": "5fe6bebf850fc964a8525c81548397c39cb6f7cd",
+      "construido": "2025-12-11T22:06:35.000Z"
     },
     {
       "nombre": "libmd",
-      "version": "1.1.0-r0",
+      "version": "1.2.0-r0",
       "expresion": "BSD-3-Clause AND BSD-2-Clause AND ISC AND Beerware AND Public Domain",
       "origen": "libmd",
       "url": "https://www.hadrons.org/software/libmd/",
-      "commit": "73e716067b9edc32c4cc7818cb7d206e57fdde15",
-      "construido": "2023-06-14T03:26:12.000Z"
+      "commit": "87b78bc6890645c317d3167bdbb0187502d0cda9",
+      "construido": "2026-05-18T11:07:46.000Z"
     },
     {
       "nombre": "libncursesw",
-      "version": "6.5_p20241006-r3",
+      "version": "6.6_p20260516-r0",
       "expresion": "X11",
       "origen": "ncurses",
       "url": "https://invisible-island.net/ncurses/",
-      "commit": "2cf24c798675a7f7deb2603c350d4adc7b59c8bb",
-      "construido": "2024-11-11T16:33:53.000Z"
+      "commit": "2cee8a7328d061418336ad327b512d96bcd7bc5e",
+      "construido": "2026-05-24T07:36:39.000Z"
     },
     {
       "nombre": "libpng",
-      "version": "1.6.47-r0",
+      "version": "1.6.59-r0",
       "expresion": "Libpng",
       "origen": "libpng",
       "url": "http://www.libpng.org",
-      "commit": "b7f398fb35c0533ad2b0d3b693c09dcb08eb5974",
-      "construido": "2025-03-17T10:16:42.000Z"
+      "commit": "8f222b50cd6e31c83f7dd69ab7c00e7471e11d4b",
+      "construido": "2026-09-30T05:50:19.000Z"
     },
     {
       "nombre": "libpsl",
@@ -322,89 +322,98 @@
       "expresion": "MIT",
       "origen": "libpsl",
       "url": "https://rockdaboot.github.io/libpsl",
-      "commit": "398a5aee3025ec8a4d0d761e448dc86ac777fa09",
-      "construido": "2024-10-05T12:41:08.000Z"
+      "commit": "6bd45b53fb316dc01bda59f5feaf1e127eb64f22",
+      "construido": "2025-05-09T20:48:14.000Z"
     },
     {
       "nombre": "libsharpyuv",
-      "version": "1.4.0-r0",
+      "version": "1.6.0-r0",
       "expresion": "BSD-3-Clause",
       "origen": "libwebp",
       "url": "https://developers.google.com/speed/webp",
-      "commit": "9e9632efda29b66bba6f82b0010a94660831760e",
-      "construido": "2024-07-17T05:43:37.000Z"
+      "commit": "af8b48fabd19b69b00f5efe192f461896a38cf74",
+      "construido": "2025-07-10T19:04:59.000Z"
     },
     {
       "nombre": "libsm",
-      "version": "1.2.4-r4",
+      "version": "1.2.6-r0",
       "expresion": "MIT",
       "origen": "libsm",
       "url": "https://xorg.freedesktop.org/",
-      "commit": "614e9166706cec427fc3d907b8d981390a42e088",
-      "construido": "2024-04-11T21:39:10.000Z"
+      "commit": "4eaa957537767ad0344894ad0e609068b26bf85d",
+      "construido": "2025-06-28T11:20:50.000Z"
     },
     {
       "nombre": "libssl3",
-      "version": "3.3.3-r0",
+      "version": "3.5.9-r0",
       "expresion": "Apache-2.0",
       "origen": "openssl",
       "url": "https://www.openssl.org/",
-      "commit": "ddbf4a43b534e1e2da4ccb72bdc4ffcd9b85ce03",
-      "construido": "2025-02-11T17:51:32.000Z"
+      "commit": "29b9ec24b1b5b39aeef51fa2a044210e2ec5258e",
+      "construido": "2026-09-30T07:09:33.000Z"
+    },
+    {
+      "nombre": "libstdc++",
+      "version": "15.2.0-r5",
+      "expresion": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "origen": "gcc",
+      "url": "https://gcc.gnu.org",
+      "commit": "423a8ad043d07f2c7546c8ec3e2b0384cda360ae",
+      "construido": "2026-05-29T19:59:26.000Z"
     },
     {
       "nombre": "libunistring",
-      "version": "1.2-r0",
+      "version": "1.4.2-r0",
       "expresion": "GPL-2.0-or-later OR LGPL-3.0-or-later",
       "origen": "libunistring",
       "url": "https://www.gnu.org/software/libunistring/",
-      "commit": "c4c67852adc5bc15e278054876bc3c70c321948e",
-      "construido": "2024-02-29T09:08:45.000Z"
+      "commit": "30d9f19340385b2cd16eaf1cc6a9a8b30c4afe1c",
+      "construido": "2026-04-16T17:03:10.000Z"
     },
     {
       "nombre": "libuuid",
-      "version": "2.40.4-r1",
+      "version": "2.42.3-r1",
       "expresion": "BSD-3-Clause",
       "origen": "util-linux",
       "url": "https://git.kernel.org/cgit/utils/util-linux/util-linux.git",
-      "commit": "67123673d9594a0de26838c585ce77ac2e75e7de",
-      "construido": "2025-04-16T00:25:58.000Z"
+      "commit": "d98c55af59055e6ca60fbe36e171546918709965",
+      "construido": "2026-09-05T13:01:49.000Z"
     },
     {
       "nombre": "libwebp",
-      "version": "1.4.0-r0",
+      "version": "1.6.0-r0",
       "expresion": "BSD-3-Clause",
       "origen": "libwebp",
       "url": "https://developers.google.com/speed/webp",
-      "commit": "9e9632efda29b66bba6f82b0010a94660831760e",
-      "construido": "2024-07-17T05:43:37.000Z"
+      "commit": "af8b48fabd19b69b00f5efe192f461896a38cf74",
+      "construido": "2025-07-10T19:04:59.000Z"
     },
     {
       "nombre": "libx11",
-      "version": "1.8.10-r0",
+      "version": "1.8.14-r0",
       "expresion": "X11",
       "origen": "libx11",
       "url": "https://xorg.freedesktop.org/",
-      "commit": "35f49f7d1dd8609d25302034acf39e5a0fd68391",
-      "construido": "2024-07-30T14:01:08.000Z"
+      "commit": "e129d974905f6cf078e41390b58241a73519f572",
+      "construido": "2026-10-18T09:30:03.000Z"
     },
     {
       "nombre": "libxau",
-      "version": "1.0.11-r4",
+      "version": "1.0.12-r0",
       "expresion": "MIT",
       "origen": "libxau",
       "url": "https://xorg.freedesktop.org/",
-      "commit": "614e9166706cec427fc3d907b8d981390a42e088",
-      "construido": "2024-04-11T21:39:10.000Z"
+      "commit": "6bd45b53fb316dc01bda59f5feaf1e127eb64f22",
+      "construido": "2025-05-09T20:48:14.000Z"
     },
     {
       "nombre": "libxcb",
-      "version": "1.16.1-r0",
+      "version": "1.17.0-r2",
       "expresion": "MIT",
       "origen": "libxcb",
       "url": "https://xcb.freedesktop.org/",
-      "commit": "96c0dfa57f3437a68b4df24fdbbdcf49f1698248",
-      "construido": "2024-03-25T19:23:23.000Z"
+      "commit": "5e1b822309fb17cc2ebd46d6fbacb1763acbcdd1",
+      "construido": "2026-05-02T07:57:20.000Z"
     },
     {
       "nombre": "libxdmcp",
@@ -417,39 +426,39 @@
     },
     {
       "nombre": "libxext",
-      "version": "1.3.6-r2",
+      "version": "1.3.7-r0",
       "expresion": "MIT",
       "origen": "libxext",
       "url": "https://xorg.freedesktop.org/",
-      "commit": "614e9166706cec427fc3d907b8d981390a42e088",
-      "construido": "2024-04-11T21:39:10.000Z"
+      "commit": "4ec252fa3e6e8edf16d0d6da3fe6dd39e2263942",
+      "construido": "2026-01-31T09:13:02.000Z"
     },
     {
       "nombre": "libxml2",
-      "version": "2.13.4-r5",
+      "version": "2.13.9-r2",
       "expresion": "MIT",
       "origen": "libxml2",
       "url": "https://gitlab.gnome.org/GNOME/libxml2",
-      "commit": "c9b177afb6ad46a0857b45194c1b0ac7aba123ab",
-      "construido": "2025-03-10T22:47:48.000Z"
+      "commit": "f1bd5b6767a0e7fdda380c95138a1c938eb6e102",
+      "construido": "2026-05-28T09:40:38.000Z"
     },
     {
       "nombre": "libxpm",
-      "version": "3.5.17-r0",
+      "version": "3.5.20-r0",
       "expresion": "X11",
       "origen": "libxpm",
       "url": "https://xorg.freedesktop.org/",
-      "commit": "1be698a8f385af9d03e946f4ddee9c4c89d4feca",
-      "construido": "2023-10-05T08:28:42.000Z"
+      "commit": "f5d3a71d8949514ce4a8057ae2002180a6f42321",
+      "construido": "2026-10-18T09:30:03.000Z"
     },
     {
       "nombre": "libxslt",
-      "version": "1.1.42-r2",
+      "version": "1.1.43-r3",
       "expresion": "X11",
       "origen": "libxslt",
       "url": "http://xmlsoft.org/XSLT/",
-      "commit": "dab69828342ba8e073aeff49d41670f9091ddb62",
-      "construido": "2025-03-14T15:47:02.000Z"
+      "commit": "730f2f5bdc97be98b2beee33f55134c622e6189c",
+      "construido": "2025-07-23T14:47:56.000Z"
     },
     {
       "nombre": "libxt",
@@ -461,157 +470,175 @@
       "construido": "2024-11-26T14:42:10.000Z"
     },
     {
+      "nombre": "libyuv",
+      "version": "0.0.1928-r0",
+      "expresion": "BSD-3-Clause",
+      "origen": "libyuv",
+      "url": "https://chromium.googlesource.com/libyuv/libyuv/",
+      "commit": "6d055fa770a2fbbd807ee496c4dc8c69d00fbee4",
+      "construido": "2026-04-18T23:29:38.000Z"
+    },
+    {
       "nombre": "musl",
-      "version": "1.2.5-r9",
+      "version": "1.2.6-r3",
       "expresion": "MIT",
       "origen": "musl",
       "url": "https://musl.libc.org/",
-      "commit": "efd4d5df7be0ea48d98512671f676fc5ceb14899",
-      "construido": "2025-02-13T17:26:26.000Z"
+      "commit": "8f79d39391b46d6dbf1800fb68b8212a21d5ee2e",
+      "construido": "2026-10-21T15:50:16.000Z"
     },
     {
       "nombre": "musl-utils",
-      "version": "1.2.5-r9",
+      "version": "1.2.6-r3",
       "expresion": "MIT AND BSD-2-Clause AND GPL-2.0-or-later",
       "origen": "musl",
       "url": "https://musl.libc.org/",
-      "commit": "efd4d5df7be0ea48d98512671f676fc5ceb14899",
-      "construido": "2025-02-13T17:26:26.000Z"
+      "commit": "8f79d39391b46d6dbf1800fb68b8212a21d5ee2e",
+      "construido": "2026-10-21T15:50:16.000Z"
     },
     {
       "nombre": "ncurses-terminfo-base",
-      "version": "6.5_p20241006-r3",
+      "version": "6.6_p20260516-r0",
       "expresion": "X11",
       "origen": "ncurses",
       "url": "https://invisible-island.net/ncurses/",
-      "commit": "2cf24c798675a7f7deb2603c350d4adc7b59c8bb",
-      "construido": "2024-11-11T16:33:53.000Z"
+      "commit": "2cee8a7328d061418336ad327b512d96bcd7bc5e",
+      "construido": "2026-05-24T07:36:39.000Z"
     },
     {
       "nombre": "nghttp2-libs",
-      "version": "1.64.0-r0",
+      "version": "1.70.0-r0",
       "expresion": "MIT",
       "origen": "nghttp2",
       "url": "https://nghttp2.org",
-      "commit": "08e359a7bafd226d766d421eb66e27b6fc1144d2",
-      "construido": "2024-10-31T07:14:26.000Z"
+      "commit": "d5a34efc88bbe8d18737fda28125071c4aef8517",
+      "construido": "2026-10-01T12:22:29.000Z"
     },
     {
       "nombre": "nginx",
-      "version": "1.27.5-r1",
+      "version": "1.30.6-r1",
       "expresion": "2-clause BSD-like license",
       "origen": "nginx",
       "url": "https://nginx.org/",
       "commit": null,
-      "construido": "2025-04-16T12:55:34.000Z"
+      "construido": "2026-10-02T17:14:31.000Z"
+    },
+    {
+      "nombre": "nginx-module-acme",
+      "version": "1.30.6.0.4.1-r1",
+      "expresion": "2-clause BSD-like license",
+      "origen": "nginx-module-acme",
+      "url": "https://nginx.org/",
+      "commit": null,
+      "construido": "2026-10-02T17:15:24.000Z"
     },
     {
       "nombre": "nginx-module-geoip",
-      "version": "1.27.5-r1",
+      "version": "1.30.6-r1",
       "expresion": "2-clause BSD-like license",
       "origen": "nginx-module-geoip",
       "url": "https://nginx.org/",
       "commit": null,
-      "construido": "2025-04-16T12:56:23.000Z"
+      "construido": "2026-10-02T17:17:45.000Z"
     },
     {
       "nombre": "nginx-module-image-filter",
-      "version": "1.27.5-r1",
+      "version": "1.30.6-r1",
       "expresion": "2-clause BSD-like license",
       "origen": "nginx-module-image-filter",
       "url": "https://nginx.org/",
       "commit": null,
-      "construido": "2025-04-16T12:56:34.000Z"
+      "construido": "2026-10-02T17:17:57.000Z"
     },
     {
       "nombre": "nginx-module-njs",
-      "version": "1.27.5.0.8.10-r1",
+      "version": "1.30.6.1.0.2-r1",
       "expresion": "2-clause BSD-like license",
       "origen": "nginx-module-njs",
       "url": "https://nginx.org/",
       "commit": null,
-      "construido": "2025-04-16T12:56:45.000Z"
+      "construido": "2026-10-02T17:18:10.000Z"
     },
     {
       "nombre": "nginx-module-xslt",
-      "version": "1.27.5-r1",
+      "version": "1.30.6-r1",
       "expresion": "2-clause BSD-like license",
       "origen": "nginx-module-xslt",
       "url": "https://nginx.org/",
       "commit": null,
-      "construido": "2025-04-16T12:59:49.000Z"
+      "construido": "2026-10-02T17:21:30.000Z"
     },
     {
       "nombre": "pcre2",
-      "version": "10.43-r0",
+      "version": "10.49-r0",
       "expresion": "BSD-3-Clause",
       "origen": "pcre2",
       "url": "https://pcre.org/",
-      "commit": "0826e91f0c743946bdc6ffa51fe90479bf4a83da",
-      "construido": "2024-05-13T21:59:46.000Z"
+      "commit": "3d497cbb3217749c4fb85f90f3b6f7908b0c1f95",
+      "construido": "2026-10-01T10:55:35.000Z"
     },
     {
       "nombre": "scanelf",
-      "version": "1.3.8-r1",
+      "version": "1.3.9-r1",
       "expresion": "GPL-2.0-only",
       "origen": "pax-utils",
       "url": "https://wiki.gentoo.org/wiki/Hardened/PaX_Utilities",
-      "commit": "398a5aee3025ec8a4d0d761e448dc86ac777fa09",
-      "construido": "2024-10-05T12:41:08.000Z"
+      "commit": "c61801eeacb3ffcd9c2025b09e402153bb93fb39",
+      "construido": "2026-03-27T19:39:10.000Z"
     },
     {
       "nombre": "ssl_client",
-      "version": "1.37.0-r12",
+      "version": "1.37.0-r31",
       "expresion": "GPL-2.0-only",
       "origen": "busybox",
       "url": "https://busybox.net/",
-      "commit": "9c49608930ef6a9936750e9e39edec56b3db9cd5",
-      "construido": "2025-01-17T18:12:01.000Z"
+      "commit": "c3ef5d10e6ef6528852c51f0564963e2f8c1be19",
+      "construido": "2026-01-10T15:38:28.000Z"
     },
     {
       "nombre": "tiff",
-      "version": "4.7.0-r0",
+      "version": "4.7.2-r0",
       "expresion": "libtiff",
       "origen": "tiff",
       "url": "https://gitlab.com/libtiff/libtiff",
-      "commit": "cb62264d3973d8a6ffb6b9b97ddf44705183bd54",
-      "construido": "2024-10-16T05:08:39.000Z"
+      "commit": "bbcfbafeadf5dac4744d065ac69338c1b58fc0d1",
+      "construido": "2026-10-08T11:04:31.000Z"
     },
     {
       "nombre": "tzdata",
-      "version": "2025b-r0",
+      "version": "2026f-r0",
       "expresion": "Public-Domain",
       "origen": "tzdata",
       "url": "https://www.iana.org/time-zones",
-      "commit": "c4a545b4457088daf2edfe933fecbaa8eeb774a4",
-      "construido": "2025-03-25T00:59:08.000Z"
+      "commit": "63faba7f731ad47f4cd60d3ff34ff1aadd49c091",
+      "construido": "2026-11-04T13:13:23.000Z"
     },
     {
       "nombre": "xz-libs",
-      "version": "5.6.3-r1",
+      "version": "5.8.4-r0",
       "expresion": "GPL-2.0-or-later AND 0BSD AND Public-Domain AND LGPL-2.1-or-later",
       "origen": "xz",
       "url": "https://tukaani.org/xz/",
-      "commit": "0e019d9722d6d8e51ef4658074b2bc736f60b4dc",
-      "construido": "2025-04-04T21:46:30.000Z"
+      "commit": "0c088d609f9fe69eedd6b4c7f4b99cdad847c20a",
+      "construido": "2026-09-09T21:24:27.000Z"
     },
     {
       "nombre": "zlib",
-      "version": "1.3.1-r2",
+      "version": "1.3.2-r1",
       "expresion": "Zlib",
       "origen": "zlib",
       "url": "https://zlib.net/",
-      "commit": "4c2722e7ecc1c5e3ba882429044a101497121223",
-      "construido": "2024-09-18T11:26:19.000Z"
+      "commit": "0afa2da0e8c8051c6f8f64a7a388e5a259904245",
+      "construido": "2026-10-06T20:34:20.000Z"
     },
     {
       "nombre": "zstd-libs",
-      "version": "1.5.6-r2",
+      "version": "1.5.7-r2",
       "expresion": "BSD-3-Clause OR GPL-2.0-or-later",
       "origen": "zstd",
       "url": "https://facebook.github.io/zstd/",
-      "commit": "5c2ddf18f193dafdd25ae7391d96c7e30766eecd",
-      "construido": "2024-12-25T07:14:12.000Z"
+      "commit": "3c6e2ee2b16f403d53eab39c4426eb61f003c322",
+      "construido": "2025-07-28T12:06:44.000Z"
     }
   ],
   "node": [],
@@ -624,30 +651,37 @@
       "bytes": 1377
     },
     {
+      "componente": "nginx-module-acme",
+      "ruta": "/usr/share/licenses/nginx-module-acme/COPYRIGHT",
+      "nota": "paquete de nginx.org",
+      "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+      "bytes": 11357
+    },
+    {
       "componente": "nginx-module-geoip",
       "ruta": "/usr/share/licenses/nginx-module-geoip/COPYRIGHT",
-      "nota": "paquete de nginx.org, no de aports",
+      "nota": "paquete de nginx.org",
       "sha256": "4f72e2bccf0bcd839dd447ab6f359336f428caa1987a9afec2bc9ade5711658a",
       "bytes": 1377
     },
     {
       "componente": "nginx-module-image-filter",
       "ruta": "/usr/share/licenses/nginx-module-image-filter/COPYRIGHT",
-      "nota": "paquete de nginx.org, no de aports",
+      "nota": "paquete de nginx.org",
       "sha256": "4f72e2bccf0bcd839dd447ab6f359336f428caa1987a9afec2bc9ade5711658a",
       "bytes": 1377
     },
     {
       "componente": "nginx-module-njs",
       "ruta": "/usr/share/licenses/nginx-module-njs/COPYRIGHT",
-      "nota": "paquete de nginx.org, no de aports",
+      "nota": "paquete de nginx.org",
       "sha256": "bf0746e75035cc2b9c3346feb08fd7aa414c088719c00e76734c6d7fe9c0647d",
       "bytes": 1485
     },
     {
       "componente": "nginx-module-xslt",
       "ruta": "/usr/share/licenses/nginx-module-xslt/COPYRIGHT",
-      "nota": "paquete de nginx.org, no de aports",
+      "nota": "paquete de nginx.org",
       "sha256": "4f72e2bccf0bcd839dd447ab6f359336f428caa1987a9afec2bc9ade5711658a",
       "bytes": 1377
     }

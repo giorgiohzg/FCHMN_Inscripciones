@@ -208,7 +208,8 @@ describe("avisos de terceros: las obligaciones se declaran por licencia", () => 
       for (const b of c.binarios) registrados.add(`${c.ramaAports}|${b}|${c.versionDistribuida}`);
     }
     const RAMA: Record<string, string> = {
-      "frontend-image": "3.21-stable", backend: "3.24-stable", migrate: "3.24-stable",
+      // AUD-B: la web pasó de Alpine 3.21 (Nginx 1.27) a Alpine 3.24 (Nginx 1.30), la misma rama que la API y mantenimiento.
+      "frontend-image": "3.24-stable", backend: "3.24-stable", migrate: "3.24-stable",
     };
     for (const a of ["frontend-image", "backend", "migrate"]) {
       for (const p of inventario(a).sistema) {

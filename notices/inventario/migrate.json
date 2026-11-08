@@ -30,21 +30,21 @@
     },
     {
       "nombre": "alpine-release",
-      "version": "3.24.1-r0",
+      "version": "3.24.4-r0",
       "expresion": "MIT",
       "origen": "alpine-base",
       "url": "https://alpinelinux.org",
-      "commit": "0934530484bbcde7498e2c694c710a49616a450e",
-      "construido": "2026-06-13T15:17:55.000Z"
+      "commit": "105b835acd9971b9770fb61f5a1ddcc133c180dc",
+      "construido": "2026-11-05T09:17:02.000Z"
     },
     {
       "nombre": "apk-tools",
-      "version": "3.0.6-r0",
+      "version": "3.0.9-r0",
       "expresion": "GPL-2.0-only",
       "origen": "apk-tools",
       "url": "https://gitlab.alpinelinux.org/alpine/apk-tools",
-      "commit": "1403ea7a8ae3fb8e5a11207ddb1ff536eb8de912",
-      "construido": "2026-04-13T09:23:00.000Z"
+      "commit": "13685e8f2cf1c103cbba2fb9efcfcf19f4918df0",
+      "construido": "2026-11-04T08:03:01.000Z"
     },
     {
       "nombre": "busybox",
@@ -66,30 +66,39 @@
     },
     {
       "nombre": "ca-certificates-bundle",
-      "version": "20260611-r0",
+      "version": "20261020-r0",
       "expresion": "MPL-2.0 AND MIT",
       "origen": "ca-certificates",
       "url": "https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/",
-      "commit": "e41cbd2ae991adfe8df298ba8e8e777e90bd0e03",
-      "construido": "2026-06-13T14:47:22.000Z"
+      "commit": "e78f5987166c6ffbe23f6472e2e8f040298fe2da",
+      "construido": "2026-10-20T15:31:28.000Z"
     },
     {
       "nombre": "libapk",
-      "version": "3.0.6-r0",
+      "version": "3.0.9-r0",
       "expresion": "GPL-2.0-only",
       "origen": "apk-tools",
       "url": "https://gitlab.alpinelinux.org/alpine/apk-tools",
-      "commit": "1403ea7a8ae3fb8e5a11207ddb1ff536eb8de912",
-      "construido": "2026-04-13T09:23:00.000Z"
+      "commit": "13685e8f2cf1c103cbba2fb9efcfcf19f4918df0",
+      "construido": "2026-11-04T08:03:01.000Z"
+    },
+    {
+      "nombre": "libatomic",
+      "version": "15.2.0-r5",
+      "expresion": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "origen": "gcc",
+      "url": "https://gcc.gnu.org",
+      "commit": "423a8ad043d07f2c7546c8ec3e2b0384cda360ae",
+      "construido": "2026-05-29T19:59:26.000Z"
     },
     {
       "nombre": "libcrypto3",
-      "version": "3.5.8-r0",
+      "version": "3.5.9-r0",
       "expresion": "Apache-2.0",
       "origen": "openssl",
       "url": "https://www.openssl.org/",
-      "commit": "013edf8b29199933e8ea34dde460b5584b979042",
-      "construido": "2026-08-25T20:58:57.000Z"
+      "commit": "29b9ec24b1b5b39aeef51fa2a044210e2ec5258e",
+      "construido": "2026-09-30T07:09:33.000Z"
     },
     {
       "nombre": "libgcc",
@@ -102,12 +111,12 @@
     },
     {
       "nombre": "libssl3",
-      "version": "3.5.8-r0",
+      "version": "3.5.9-r0",
       "expresion": "Apache-2.0",
       "origen": "openssl",
       "url": "https://www.openssl.org/",
-      "commit": "013edf8b29199933e8ea34dde460b5584b979042",
-      "construido": "2026-08-25T20:58:57.000Z"
+      "commit": "29b9ec24b1b5b39aeef51fa2a044210e2ec5258e",
+      "construido": "2026-09-30T07:09:33.000Z"
     },
     {
       "nombre": "libstdc++",
@@ -120,30 +129,30 @@
     },
     {
       "nombre": "musl",
-      "version": "1.2.6-r2",
+      "version": "1.2.6-r3",
       "expresion": "MIT",
       "origen": "musl",
       "url": "https://musl.libc.org/",
-      "commit": "f5640d3a10f664c9119720c60515265d3d6f6d01",
-      "construido": "2026-04-11T09:33:27.000Z"
+      "commit": "8f79d39391b46d6dbf1800fb68b8212a21d5ee2e",
+      "construido": "2026-10-21T15:50:16.000Z"
     },
     {
       "nombre": "musl-utils",
-      "version": "1.2.6-r2",
+      "version": "1.2.6-r3",
       "expresion": "MIT AND BSD-2-Clause AND GPL-2.0-or-later",
       "origen": "musl",
       "url": "https://musl.libc.org/",
-      "commit": "f5640d3a10f664c9119720c60515265d3d6f6d01",
-      "construido": "2026-04-11T09:33:27.000Z"
+      "commit": "8f79d39391b46d6dbf1800fb68b8212a21d5ee2e",
+      "construido": "2026-10-21T15:50:16.000Z"
     },
     {
       "nombre": "openssl",
-      "version": "3.5.8-r0",
+      "version": "3.5.9-r0",
       "expresion": "Apache-2.0",
       "origen": "openssl",
       "url": "https://www.openssl.org/",
-      "commit": "013edf8b29199933e8ea34dde460b5584b979042",
-      "construido": "2026-08-25T20:58:57.000Z"
+      "commit": "29b9ec24b1b5b39aeef51fa2a044210e2ec5258e",
+      "construido": "2026-09-30T07:09:33.000Z"
     },
     {
       "nombre": "scanelf",
@@ -165,12 +174,12 @@
     },
     {
       "nombre": "zlib",
-      "version": "1.3.2-r0",
+      "version": "1.3.2-r1",
       "expresion": "Zlib",
       "origen": "zlib",
       "url": "https://zlib.net/",
-      "commit": "f248b33b5943c7dc69bf691031d7612ab2e8ed93",
-      "construido": "2026-03-05T10:00:20.000Z"
+      "commit": "0afa2da0e8c8051c6f8f64a7a388e5a259904245",
+      "construido": "2026-10-06T20:34:20.000Z"
     }
   ],
   "node": [

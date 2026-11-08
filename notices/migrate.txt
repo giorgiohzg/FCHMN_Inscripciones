@@ -10716,7 +10716,7 @@ commit 31ba1a50e5397e00a304dbadc76531740e89ee48.
   Zlib                           -> licencias/Zlib.txt
 
 ==============================================================================
-PAQUETES DEL SISTEMA OPERATIVO  (19 paquetes)
+PAQUETES DEL SISTEMA OPERATIVO  (20 paquetes)
 ==============================================================================
 
 Distribuidos como parte de la capa base de la imagen. Cada uno indica su
@@ -10730,40 +10730,43 @@ licencia, el paquete fuente del que sale y en que archivo del directorio
                                        texto: GPL-2.0-only: licencias/GPL-2.0-only.txt
   alpine-keys             2.6-r0       MIT
                                        texto: MIT: licencias/MIT.txt
-  alpine-release          3.24.1-r0    MIT
+  alpine-release          3.24.4-r0    MIT
                                        paquete fuente: alpine-base
                                        texto: MIT: licencias/MIT.txt
-  apk-tools               3.0.6-r0     GPL-2.0-only
+  apk-tools               3.0.9-r0     GPL-2.0-only
                                        texto: GPL-2.0-only: licencias/GPL-2.0-only.txt
   busybox                 1.37.0-r31   GPL-2.0-only
                                        texto: GPL-2.0-only: licencias/GPL-2.0-only.txt
   busybox-binsh           1.37.0-r31   GPL-2.0-only
                                        paquete fuente: busybox
                                        texto: GPL-2.0-only: licencias/GPL-2.0-only.txt
-  ca-certificates-bundle  20260611-r0  MPL-2.0 AND MIT
+  ca-certificates-bundle  20261020-r0  MPL-2.0 AND MIT
                                        paquete fuente: ca-certificates
                                        texto: MPL-2.0: licencias/MPL-2.0.txt  |  MIT: licencias/MIT.txt
-  libapk                  3.0.6-r0     GPL-2.0-only
+  libapk                  3.0.9-r0     GPL-2.0-only
                                        paquete fuente: apk-tools
                                        texto: GPL-2.0-only: licencias/GPL-2.0-only.txt
-  libcrypto3              3.5.8-r0     Apache-2.0
+  libatomic               15.2.0-r5    GPL-2.0-or-later AND LGPL-2.1-or-later
+                                       paquete fuente: gcc
+                                       texto: GPL-2.0-or-later: licencias/GPL-2.0-or-later.txt  |  LGPL-2.1-or-later: licencias/LGPL-2.1-or-later.txt
+  libcrypto3              3.5.9-r0     Apache-2.0
                                        paquete fuente: openssl
                                        texto: Apache-2.0: licencias/Apache-2.0.txt
   libgcc                  15.2.0-r5    GPL-2.0-or-later AND LGPL-2.1-or-later
                                        paquete fuente: gcc
                                        texto: GPL-2.0-or-later: licencias/GPL-2.0-or-later.txt  |  LGPL-2.1-or-later: licencias/LGPL-2.1-or-later.txt
-  libssl3                 3.5.8-r0     Apache-2.0
+  libssl3                 3.5.9-r0     Apache-2.0
                                        paquete fuente: openssl
                                        texto: Apache-2.0: licencias/Apache-2.0.txt
   libstdc++               15.2.0-r5    GPL-2.0-or-later AND LGPL-2.1-or-later
                                        paquete fuente: gcc
                                        texto: GPL-2.0-or-later: licencias/GPL-2.0-or-later.txt  |  LGPL-2.1-or-later: licencias/LGPL-2.1-or-later.txt
-  musl                    1.2.6-r2     MIT
+  musl                    1.2.6-r3     MIT
                                        texto: MIT: licencias/MIT.txt
-  musl-utils              1.2.6-r2     MIT AND BSD-2-Clause AND GPL-2.0-or-later
+  musl-utils              1.2.6-r3     MIT AND BSD-2-Clause AND GPL-2.0-or-later
                                        paquete fuente: musl
                                        texto: MIT: licencias/MIT.txt  |  BSD-2-Clause: licencias/BSD-2-Clause.txt  |  GPL-2.0-or-later: licencias/GPL-2.0-or-later.txt
-  openssl                 3.5.8-r0     Apache-2.0
+  openssl                 3.5.9-r0     Apache-2.0
                                        texto: Apache-2.0: licencias/Apache-2.0.txt
   scanelf                 1.3.9-r1     GPL-2.0-only
                                        paquete fuente: pax-utils
@@ -10771,11 +10774,11 @@ licencia, el paquete fuente del que sale y en que archivo del directorio
   ssl_client              1.37.0-r31   GPL-2.0-only
                                        paquete fuente: busybox
                                        texto: GPL-2.0-only: licencias/GPL-2.0-only.txt
-  zlib                    1.3.2-r0     Zlib
+  zlib                    1.3.2-r1     Zlib
                                        texto: Zlib: licencias/Zlib.txt
 
 ------------------------------------------------------------------------------
-COMPONENTES CON COPYLEFT  (12 binarios)
+COMPONENTES CON COPYLEFT  (13 binarios)
 ------------------------------------------------------------------------------
 
 Estos componentes obligan a poner a disposicion del destinatario la
@@ -10797,12 +10800,12 @@ Enlace LGPL: enlace dinamico contra bibliotecas compartidas del sistema. El dest
       APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/60a7585bbab2fa0f762504eb617dbca90216e31f/main/alpine-baselayout/APKBUILD
       espejo oficial  : https://github.com/alpinelinux/aports/tree/60a7585bbab2fa0f762504eb617dbca90216e31f/main/alpine-baselayout
 
-  apk-tools 3.0.6-r0  [GPL-2.0-only]
+  apk-tools 3.0.9-r0  [GPL-2.0-only]
       proyecto        : https://gitlab.alpinelinux.org/alpine/apk-tools
-      construido el   : 2026-04-13T09:23:00.000Z
-      commit aports   : 1403ea7a8ae3fb8e5a11207ddb1ff536eb8de912
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/1403ea7a8ae3fb8e5a11207ddb1ff536eb8de912/main/apk-tools/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/1403ea7a8ae3fb8e5a11207ddb1ff536eb8de912/main/apk-tools
+      construido el   : 2026-11-04T08:03:01.000Z
+      commit aports   : 13685e8f2cf1c103cbba2fb9efcfcf19f4918df0
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/13685e8f2cf1c103cbba2fb9efcfcf19f4918df0/main/apk-tools/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/13685e8f2cf1c103cbba2fb9efcfcf19f4918df0/main/apk-tools
 
   busybox 1.37.0-r31  [GPL-2.0-only]
       proyecto        : https://busybox.net/
@@ -10811,12 +10814,12 @@ Enlace LGPL: enlace dinamico contra bibliotecas compartidas del sistema. El dest
       APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/c3ef5d10e6ef6528852c51f0564963e2f8c1be19/main/busybox/APKBUILD
       espejo oficial  : https://github.com/alpinelinux/aports/tree/c3ef5d10e6ef6528852c51f0564963e2f8c1be19/main/busybox
 
-  ca-certificates 20260611-r0  [MPL-2.0 AND MIT]
+  ca-certificates 20261020-r0  [MPL-2.0 AND MIT]
       proyecto        : https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/
-      construido el   : 2026-06-13T14:47:22.000Z
-      commit aports   : e41cbd2ae991adfe8df298ba8e8e777e90bd0e03
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/e41cbd2ae991adfe8df298ba8e8e777e90bd0e03/main/ca-certificates/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/e41cbd2ae991adfe8df298ba8e8e777e90bd0e03/main/ca-certificates
+      construido el   : 2026-10-20T15:31:28.000Z
+      commit aports   : e78f5987166c6ffbe23f6472e2e8f040298fe2da
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/e78f5987166c6ffbe23f6472e2e8f040298fe2da/main/ca-certificates/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/e78f5987166c6ffbe23f6472e2e8f040298fe2da/main/ca-certificates
 
   gcc 15.2.0-r5  [GPL-2.0-or-later AND LGPL-2.1-or-later]
       proyecto        : https://gcc.gnu.org
@@ -10825,12 +10828,12 @@ Enlace LGPL: enlace dinamico contra bibliotecas compartidas del sistema. El dest
       APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/423a8ad043d07f2c7546c8ec3e2b0384cda360ae/main/gcc/APKBUILD
       espejo oficial  : https://github.com/alpinelinux/aports/tree/423a8ad043d07f2c7546c8ec3e2b0384cda360ae/main/gcc
 
-  musl 1.2.6-r2  [MIT AND BSD-2-Clause AND GPL-2.0-or-later]
+  musl 1.2.6-r3  [MIT AND BSD-2-Clause AND GPL-2.0-or-later]
       proyecto        : https://musl.libc.org/
-      construido el   : 2026-04-11T09:33:27.000Z
-      commit aports   : f5640d3a10f664c9119720c60515265d3d6f6d01
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/f5640d3a10f664c9119720c60515265d3d6f6d01/main/musl/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/f5640d3a10f664c9119720c60515265d3d6f6d01/main/musl
+      construido el   : 2026-10-21T15:50:16.000Z
+      commit aports   : 8f79d39391b46d6dbf1800fb68b8212a21d5ee2e
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/8f79d39391b46d6dbf1800fb68b8212a21d5ee2e/main/musl/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/8f79d39391b46d6dbf1800fb68b8212a21d5ee2e/main/musl
 
   pax-utils 1.3.9-r1  [GPL-2.0-only]
       proyecto        : https://wiki.gentoo.org/wiki/Hardened/PaX_Utilities
@@ -10855,14 +10858,14 @@ exacta se publica solo como tarball y comprobarlo exigiria descargar un
 binario. No se afirma ausencia sin haber mirado.
 
 ------------------------------------------------------------------------------
-openssl 3.5.8-r0
+openssl 3.5.9-r0
 Licencia: Apache-2.0
 Binarios: libcrypto3, libssl3, openssl
-Commit de aports: 013edf8b29199933e8ea34dde460b5584b979042
+Commit de aports: 29b9ec24b1b5b39aeef51fa2a044210e2ec5258e
 ------------------------------------------------------------------------------
 
---- LICENSE.txt --- upstream github openssl/openssl@openssl-3.5.8
---- https://raw.githubusercontent.com/openssl/openssl/openssl-3.5.8/LICENSE.txt
+--- LICENSE.txt --- upstream github openssl/openssl@openssl-3.5.9
+--- https://raw.githubusercontent.com/openssl/openssl/openssl-3.5.9/LICENSE.txt
 
 
                                  Apache License
@@ -11046,8 +11049,8 @@ Commit de aports: 013edf8b29199933e8ea34dde460b5584b979042
 VERIFICADOS Y SIN AVISO PROPIO
 ------------------------------------------------------------------------------
 
-  alpine-base 3.24.1-r0: paquete propio de Alpine: se inspecciono su directorio en aports en el commit exacto y no contiene archivo de aviso
-      inspeccionado: https://raw.githubusercontent.com/alpinelinux/aports/0934530484bbcde7498e2c694c710a49616a450e/main/alpine-base/
+  alpine-base 3.24.4-r0: paquete propio de Alpine: se inspecciono su directorio en aports en el commit exacto y no contiene archivo de aviso
+      inspeccionado: https://raw.githubusercontent.com/alpinelinux/aports/105b835acd9971b9770fb61f5a1ddcc133c180dc/main/alpine-base/
   alpine-keys 2.6-r0: paquete propio de Alpine: se inspecciono su directorio en aports en el commit exacto y no contiene archivo de aviso
       inspeccionado: https://raw.githubusercontent.com/alpinelinux/aports/b9f23becced4d7b3ccc0fa0f28530243ccd314a0/main/alpine-keys/
 
@@ -11057,19 +11060,19 @@ NO VERIFICABLES DENTRO DEL ALCANCE AUTORIZADO
 
   alpine-baselayout 3.7.2-r1
       fuente: https://salsa.debian.org/md/netbase/-/raw/v6.4/etc/protocols
-  apk-tools 3.0.6-r0
-      fuente: https://gitlab.alpinelinux.org/alpine/apk-tools/-/archive/v3.0.6/apk-tools-v3.0.6.tar.gz
+  apk-tools 3.0.9-r0
+      fuente: https://gitlab.alpinelinux.org/alpine/apk-tools/-/archive/v3.0.9/apk-tools-v3.0.9.tar.gz
   busybox 1.37.0-r31
       fuente: https://busybox.net/downloads/busybox-1.37.0.tar.bz2
-  ca-certificates 20260611-r0
-      fuente: https://gitlab.alpinelinux.org/alpine/ca-certificates/-/archive/20260611/ca-certificates-20260611.tar.bz2
+  ca-certificates 20261020-r0
+      fuente: https://gitlab.alpinelinux.org/alpine/ca-certificates/-/archive/20261020/ca-certificates-20261020.tar.bz2
   gcc 15.2.0-r5
       fuente: https://gcc.gnu.org/pub/gcc/releases/gcc-15.2.0%%_git*}/gcc-15.2.0%%_git*}.tar.xz
-  musl 1.2.6-r2
+  musl 1.2.6-r3
       fuente: https://musl.libc.org/releases/musl-1.2.6.tar.gz
   pax-utils 1.3.9-r1
       fuente: https://dev.gentoo.org/~sam/distfiles/app-misc/pax-utils/pax-utils-1.3.9.tar.xz
-  zlib 1.3.2-r0
+  zlib 1.3.2-r1
       fuente: https://zlib.net/fossils/zlib-1.3.2.tar.gz
 
 ==============================================================================

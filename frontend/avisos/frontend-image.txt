@@ -59,177 +59,186 @@ commit 31ba1a50e5397e00a304dbadc76531740e89ee48.
   libtiff                        -> licencias/libtiff.txt
 
 ==============================================================================
-PAQUETES DEL SISTEMA OPERATIVO  (68 paquetes)
+PAQUETES DEL SISTEMA OPERATIVO  (71 paquetes)
 ==============================================================================
 
 Distribuidos como parte de la capa base de la imagen. Cada uno indica su
 licencia, el paquete fuente del que sale y en que archivo del directorio
 `licencias/` esta su texto completo.
 
-  alpine-baselayout          3.6.8-r1          GPL-2.0-only
+  alpine-baselayout          3.7.2-r1          GPL-2.0-only
                                                texto: GPL-2.0-only: licencias/GPL-2.0-only.txt
-  alpine-baselayout-data     3.6.8-r1          GPL-2.0-only
+  alpine-baselayout-data     3.7.2-r1          GPL-2.0-only
                                                paquete fuente: alpine-baselayout
                                                texto: GPL-2.0-only: licencias/GPL-2.0-only.txt
-  alpine-keys                2.5-r0            MIT
+  alpine-keys                2.6-r0            MIT
                                                texto: MIT: licencias/MIT.txt
-  alpine-release             3.21.3-r0         MIT
+  alpine-release             3.24.4-r0         MIT
                                                paquete fuente: alpine-base
                                                texto: MIT: licencias/MIT.txt
-  aom-libs                   3.11.0-r0         BSD-2-Clause AND custom
+  aom-libs                   3.14.1-r0         BSD-2-Clause AND custom
                                                paquete fuente: aom
                                                texto: BSD-2-Clause: licencias/BSD-2-Clause.txt  |  custom: licencias/LicenseRef-AOM-Patent-1.0.txt
-  apk-tools                  2.14.6-r3         GPL-2.0-only
+  apk-tools                  3.0.9-r0          GPL-2.0-only
                                                texto: GPL-2.0-only: licencias/GPL-2.0-only.txt
-  brotli-libs                1.1.0-r2          MIT
+  brotli-libs                1.2.1-r0          MIT
                                                paquete fuente: brotli
                                                texto: MIT: licencias/MIT.txt
-  busybox                    1.37.0-r12        GPL-2.0-only
+  busybox                    1.37.0-r31        GPL-2.0-only
                                                texto: GPL-2.0-only: licencias/GPL-2.0-only.txt
-  busybox-binsh              1.37.0-r12        GPL-2.0-only
+  busybox-binsh              1.37.0-r31        GPL-2.0-only
                                                paquete fuente: busybox
                                                texto: GPL-2.0-only: licencias/GPL-2.0-only.txt
-  c-ares                     1.34.5-r0         MIT
+  c-ares                     1.34.9-r0         MIT
                                                texto: MIT: licencias/MIT.txt
-  ca-certificates            20241121-r1       MPL-2.0 AND MIT
+  ca-certificates            20261020-r0       MPL-2.0 AND MIT
                                                texto: MPL-2.0: licencias/MPL-2.0.txt  |  MIT: licencias/MIT.txt
-  ca-certificates-bundle     20241121-r1       MPL-2.0 AND MIT
+  ca-certificates-bundle     20261020-r0       MPL-2.0 AND MIT
                                                paquete fuente: ca-certificates
                                                texto: MPL-2.0: licencias/MPL-2.0.txt  |  MIT: licencias/MIT.txt
-  curl                       8.12.1-r1         curl
+  curl                       8.23.0-r0         curl
                                                texto: curl: licencias/curl.txt
-  fontconfig                 2.15.0-r1         MIT
+  fontconfig                 2.17.1-r1         MIT
                                                texto: MIT: licencias/MIT.txt
-  freetype                   2.13.3-r0         FTL OR GPL-2.0-or-later
+  freetype                   2.14.3-r0         FTL OR GPL-2.0-or-later
                                                texto: FTL: licencias/FTL.txt  |  GPL-2.0-or-later: licencias/GPL-2.0-or-later.txt
-  geoip                      1.6.12-r5         LGPL-2.1-or-later
+  geoip                      1.6.12-r6         LGPL-2.1-or-later
                                                texto: LGPL-2.1-or-later: licencias/LGPL-2.1-or-later.txt
-  gettext-envsubst           0.22.5-r0         GPL-3.0-or-later AND LGPL-2.1-or-later AND MIT
+  gettext-envsubst           1.0-r0            GPL-3.0-or-later AND LGPL-2.1-or-later AND MIT
                                                paquete fuente: gettext
                                                texto: GPL-3.0-or-later: licencias/GPL-3.0-or-later.txt  |  LGPL-2.1-or-later: licencias/LGPL-2.1-or-later.txt  |  MIT: licencias/MIT.txt
-  libavif                    1.0.4-r0          BSD-2-Clause
+  libapk                     3.0.9-r0          GPL-2.0-only
+                                               paquete fuente: apk-tools
+                                               texto: GPL-2.0-only: licencias/GPL-2.0-only.txt
+  libavif                    1.4.1-r0          BSD-2-Clause
                                                texto: BSD-2-Clause: licencias/BSD-2-Clause.txt
   libbsd                     0.12.2-r0         BSD-3-Clause
                                                texto: BSD-3-Clause: licencias/BSD-3-Clause.txt
   libbz2                     1.0.8-r6          bzip2-1.0.6
                                                paquete fuente: bzip2
                                                texto: bzip2-1.0.6: licencias/bzip2-1.0.6.txt
-  libcrypto3                 3.3.3-r0          Apache-2.0
+  libcrypto3                 3.5.9-r0          Apache-2.0
                                                paquete fuente: openssl
                                                texto: Apache-2.0: licencias/Apache-2.0.txt
-  libcurl                    8.12.1-r1         curl
+  libcurl                    8.23.0-r0         curl
                                                paquete fuente: curl
                                                texto: curl: licencias/curl.txt
-  libdav1d                   1.5.0-r0          BSD-2-Clause
+  libdav1d                   1.5.3-r0          BSD-2-Clause
                                                paquete fuente: dav1d
                                                texto: BSD-2-Clause: licencias/BSD-2-Clause.txt
-  libedit                    20240808.3.1-r0   BSD-3-Clause
+  libedit                    20260508.3.1-r1   BSD-3-Clause
                                                texto: BSD-3-Clause: licencias/BSD-3-Clause.txt
-  libexpat                   2.7.0-r0          MIT
+  libexpat                   2.10.0-r0         MIT
                                                paquete fuente: expat
                                                texto: MIT: licencias/MIT.txt
-  libgcrypt                  1.10.3-r1         LGPL-2.1-or-later AND GPL-2.0-or-later
-                                               texto: LGPL-2.1-or-later: licencias/LGPL-2.1-or-later.txt  |  GPL-2.0-or-later: licencias/GPL-2.0-or-later.txt
-  libgd                      2.3.3-r9          GD
+  libgcc                     15.2.0-r5         GPL-2.0-or-later AND LGPL-2.1-or-later
+                                               paquete fuente: gcc
+                                               texto: GPL-2.0-or-later: licencias/GPL-2.0-or-later.txt  |  LGPL-2.1-or-later: licencias/LGPL-2.1-or-later.txt
+  libgd                      2.3.3-r10         GD
                                                paquete fuente: gd
                                                texto: GD: licencias/GD.txt
-  libgpg-error               1.51-r0           GPL-2.0-or-later AND LGPL-2.1-or-later
-                                               texto: GPL-2.0-or-later: licencias/GPL-2.0-or-later.txt  |  LGPL-2.1-or-later: licencias/LGPL-2.1-or-later.txt
-  libice                     1.1.1-r6          X11
+  libice                     1.1.2-r0          X11
                                                texto: X11: licencias/X11.txt
-  libidn2                    2.3.7-r0          GPL-2.0-or-later OR LGPL-3.0-or-later
+  libidn2                    2.3.8-r0          GPL-2.0-or-later OR LGPL-3.0-or-later
                                                texto: GPL-2.0-or-later: licencias/GPL-2.0-or-later.txt  |  LGPL-3.0-or-later: licencias/LGPL-3.0-or-later.txt
-  libintl                    0.22.5-r0         LGPL-2.1-or-later
+  libintl                    1.0-r0            LGPL-2.1-or-later
                                                paquete fuente: gettext
                                                texto: LGPL-2.1-or-later: licencias/LGPL-2.1-or-later.txt
-  libjpeg-turbo              3.0.4-r0          BSD-3-Clause AND IJG AND Zlib
+  libjpeg-turbo              3.1.3-r0          BSD-3-Clause AND IJG AND Zlib
                                                texto: BSD-3-Clause: licencias/BSD-3-Clause.txt  |  IJG: licencias/IJG.txt  |  Zlib: licencias/Zlib.txt
-  libmd                      1.1.0-r0          BSD-3-Clause AND BSD-2-Clause AND ISC AND Beerware AND Public Domain
+  libmd                      1.2.0-r0          BSD-3-Clause AND BSD-2-Clause AND ISC AND Beerware AND Public Domain
                                                texto: BSD-3-Clause: licencias/BSD-3-Clause.txt  |  BSD-2-Clause: licencias/BSD-2-Clause.txt  |  ISC: licencias/ISC.txt  |  Beerware: licencias/Beerware.txt  |  Public Domain: sin-texto-que-reproducir
-  libncursesw                6.5_p20241006-r3  X11
+  libncursesw                6.6_p20260516-r0  X11
                                                paquete fuente: ncurses
                                                texto: X11: licencias/X11.txt
-  libpng                     1.6.47-r0         Libpng
+  libpng                     1.6.59-r0         Libpng
                                                texto: Libpng: licencias/Libpng.txt
   libpsl                     0.21.5-r3         MIT
                                                texto: MIT: licencias/MIT.txt
-  libsharpyuv                1.4.0-r0          BSD-3-Clause
+  libsharpyuv                1.6.0-r0          BSD-3-Clause
                                                paquete fuente: libwebp
                                                texto: BSD-3-Clause: licencias/BSD-3-Clause.txt
-  libsm                      1.2.4-r4          MIT
+  libsm                      1.2.6-r0          MIT
                                                texto: MIT: licencias/MIT.txt
-  libssl3                    3.3.3-r0          Apache-2.0
+  libssl3                    3.5.9-r0          Apache-2.0
                                                paquete fuente: openssl
                                                texto: Apache-2.0: licencias/Apache-2.0.txt
-  libunistring               1.2-r0            GPL-2.0-or-later OR LGPL-3.0-or-later
+  libstdc++                  15.2.0-r5         GPL-2.0-or-later AND LGPL-2.1-or-later
+                                               paquete fuente: gcc
+                                               texto: GPL-2.0-or-later: licencias/GPL-2.0-or-later.txt  |  LGPL-2.1-or-later: licencias/LGPL-2.1-or-later.txt
+  libunistring               1.4.2-r0          GPL-2.0-or-later OR LGPL-3.0-or-later
                                                texto: GPL-2.0-or-later: licencias/GPL-2.0-or-later.txt  |  LGPL-3.0-or-later: licencias/LGPL-3.0-or-later.txt
-  libuuid                    2.40.4-r1         BSD-3-Clause
+  libuuid                    2.42.3-r1         BSD-3-Clause
                                                paquete fuente: util-linux
                                                texto: BSD-3-Clause: licencias/BSD-3-Clause.txt
-  libwebp                    1.4.0-r0          BSD-3-Clause
+  libwebp                    1.6.0-r0          BSD-3-Clause
                                                texto: BSD-3-Clause: licencias/BSD-3-Clause.txt
-  libx11                     1.8.10-r0         X11
+  libx11                     1.8.14-r0         X11
                                                texto: X11: licencias/X11.txt
-  libxau                     1.0.11-r4         MIT
+  libxau                     1.0.12-r0         MIT
                                                texto: MIT: licencias/MIT.txt
-  libxcb                     1.16.1-r0         MIT
+  libxcb                     1.17.0-r2         MIT
                                                texto: MIT: licencias/MIT.txt
   libxdmcp                   1.1.5-r1          MIT
                                                texto: MIT: licencias/MIT.txt
-  libxext                    1.3.6-r2          MIT
+  libxext                    1.3.7-r0          MIT
                                                texto: MIT: licencias/MIT.txt
-  libxml2                    2.13.4-r5         MIT
+  libxml2                    2.13.9-r2         MIT
                                                texto: MIT: licencias/MIT.txt
-  libxpm                     3.5.17-r0         X11
+  libxpm                     3.5.20-r0         X11
                                                texto: X11: licencias/X11.txt
-  libxslt                    1.1.42-r2         X11
+  libxslt                    1.1.43-r3         X11
                                                texto: X11: licencias/X11.txt
   libxt                      1.3.1-r0          MIT
                                                texto: MIT: licencias/MIT.txt
-  musl                       1.2.5-r9          MIT
+  libyuv                     0.0.1928-r0       BSD-3-Clause
+                                               texto: BSD-3-Clause: licencias/BSD-3-Clause.txt
+  musl                       1.2.6-r3          MIT
                                                texto: MIT: licencias/MIT.txt
-  musl-utils                 1.2.5-r9          MIT AND BSD-2-Clause AND GPL-2.0-or-later
+  musl-utils                 1.2.6-r3          MIT AND BSD-2-Clause AND GPL-2.0-or-later
                                                paquete fuente: musl
                                                texto: MIT: licencias/MIT.txt  |  BSD-2-Clause: licencias/BSD-2-Clause.txt  |  GPL-2.0-or-later: licencias/GPL-2.0-or-later.txt
-  ncurses-terminfo-base      6.5_p20241006-r3  X11
+  ncurses-terminfo-base      6.6_p20260516-r0  X11
                                                paquete fuente: ncurses
                                                texto: X11: licencias/X11.txt
-  nghttp2-libs               1.64.0-r0         MIT
+  nghttp2-libs               1.70.0-r0         MIT
                                                paquete fuente: nghttp2
                                                texto: MIT: licencias/MIT.txt
-  nginx                      1.27.5-r1         2-clause BSD-like license
+  nginx                      1.30.6-r1         2-clause BSD-like license
                                                texto: 2-clause BSD-like license: texto-propio-del-componente
-  nginx-module-geoip         1.27.5-r1         2-clause BSD-like license
+  nginx-module-acme          1.30.6.0.4.1-r1   2-clause BSD-like license
                                                texto: 2-clause BSD-like license: texto-propio-del-componente
-  nginx-module-image-filter  1.27.5-r1         2-clause BSD-like license
+  nginx-module-geoip         1.30.6-r1         2-clause BSD-like license
                                                texto: 2-clause BSD-like license: texto-propio-del-componente
-  nginx-module-njs           1.27.5.0.8.10-r1  2-clause BSD-like license
+  nginx-module-image-filter  1.30.6-r1         2-clause BSD-like license
                                                texto: 2-clause BSD-like license: texto-propio-del-componente
-  nginx-module-xslt          1.27.5-r1         2-clause BSD-like license
+  nginx-module-njs           1.30.6.1.0.2-r1   2-clause BSD-like license
                                                texto: 2-clause BSD-like license: texto-propio-del-componente
-  pcre2                      10.43-r0          BSD-3-Clause
+  nginx-module-xslt          1.30.6-r1         2-clause BSD-like license
+                                               texto: 2-clause BSD-like license: texto-propio-del-componente
+  pcre2                      10.49-r0          BSD-3-Clause
                                                texto: BSD-3-Clause: licencias/BSD-3-Clause.txt
-  scanelf                    1.3.8-r1          GPL-2.0-only
+  scanelf                    1.3.9-r1          GPL-2.0-only
                                                paquete fuente: pax-utils
                                                texto: GPL-2.0-only: licencias/GPL-2.0-only.txt
-  ssl_client                 1.37.0-r12        GPL-2.0-only
+  ssl_client                 1.37.0-r31        GPL-2.0-only
                                                paquete fuente: busybox
                                                texto: GPL-2.0-only: licencias/GPL-2.0-only.txt
-  tiff                       4.7.0-r0          libtiff
+  tiff                       4.7.2-r0          libtiff
                                                texto: libtiff: licencias/libtiff.txt
-  tzdata                     2025b-r0          Public-Domain
+  tzdata                     2026f-r0          Public-Domain
                                                texto: Public-Domain: sin-texto-que-reproducir
-  xz-libs                    5.6.3-r1          GPL-2.0-or-later AND 0BSD AND Public-Domain AND LGPL-2.1-or-later
+  xz-libs                    5.8.4-r0          GPL-2.0-or-later AND 0BSD AND Public-Domain AND LGPL-2.1-or-later
                                                paquete fuente: xz
                                                texto: GPL-2.0-or-later: licencias/GPL-2.0-or-later.txt  |  0BSD: licencias/0BSD.txt  |  Public-Domain: sin-texto-que-reproducir  |  LGPL-2.1-or-later: licencias/LGPL-2.1-or-later.txt
-  zlib                       1.3.1-r2          Zlib
+  zlib                       1.3.2-r1          Zlib
                                                texto: Zlib: licencias/Zlib.txt
-  zstd-libs                  1.5.6-r2          BSD-3-Clause OR GPL-2.0-or-later
+  zstd-libs                  1.5.7-r2          BSD-3-Clause OR GPL-2.0-or-later
                                                paquete fuente: zstd
                                                texto: BSD-3-Clause: licencias/BSD-3-Clause.txt  |  GPL-2.0-or-later: licencias/GPL-2.0-or-later.txt
 
 ------------------------------------------------------------------------------
-COMPONENTES CON COPYLEFT  (20 binarios)
+COMPONENTES CON COPYLEFT  (21 binarios)
 ------------------------------------------------------------------------------
 
 Estos componentes obligan a poner a disposicion del destinatario la
@@ -244,110 +253,103 @@ Mecanismo previsto: Cada version publicada de las imagenes se acompanara de un a
 
 Enlace LGPL: enlace dinamico contra bibliotecas compartidas del sistema. El destinatario puede sustituir la biblioteca reemplazando el objeto compartido dentro de la imagen. Esta condicion es la que hace admisible el enlace y se declara en el aviso.
 
-  alpine-baselayout 3.6.8-r1  [GPL-2.0-only]
-      proyecto        : https://git.alpinelinux.org/cgit/aports/tree/main/alpine-baselayout
-      construido el   : 2025-01-04T07:04:48.000Z
-      commit aports   : 5f0cd7890349e7fe11128478ac506c709805224d
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/5f0cd7890349e7fe11128478ac506c709805224d/main/alpine-baselayout/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/5f0cd7890349e7fe11128478ac506c709805224d/main/alpine-baselayout
+  alpine-baselayout 3.7.2-r1  [GPL-2.0-only]
+      proyecto        : https://gitlab.alpinelinux.org/alpine/aports/-/tree/master/main/alpine-baselayout
+      construido el   : 2026-03-24T19:40:54.000Z
+      commit aports   : 60a7585bbab2fa0f762504eb617dbca90216e31f
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/60a7585bbab2fa0f762504eb617dbca90216e31f/main/alpine-baselayout/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/60a7585bbab2fa0f762504eb617dbca90216e31f/main/alpine-baselayout
 
-  apk-tools 2.14.6-r3  [GPL-2.0-only]
+  apk-tools 3.0.9-r0  [GPL-2.0-only]
       proyecto        : https://gitlab.alpinelinux.org/alpine/apk-tools
-      construido el   : 2025-02-13T21:57:30.000Z
-      commit aports   : 41847d6ccff08940b5bf1ba0d6005e95897039f9
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/41847d6ccff08940b5bf1ba0d6005e95897039f9/main/apk-tools/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/41847d6ccff08940b5bf1ba0d6005e95897039f9/main/apk-tools
+      construido el   : 2026-11-04T08:03:01.000Z
+      commit aports   : 13685e8f2cf1c103cbba2fb9efcfcf19f4918df0
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/13685e8f2cf1c103cbba2fb9efcfcf19f4918df0/main/apk-tools/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/13685e8f2cf1c103cbba2fb9efcfcf19f4918df0/main/apk-tools
 
-  busybox 1.37.0-r12  [GPL-2.0-only]
+  busybox 1.37.0-r31  [GPL-2.0-only]
       proyecto        : https://busybox.net/
-      construido el   : 2025-01-17T18:12:01.000Z
-      commit aports   : 9c49608930ef6a9936750e9e39edec56b3db9cd5
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/9c49608930ef6a9936750e9e39edec56b3db9cd5/main/busybox/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/9c49608930ef6a9936750e9e39edec56b3db9cd5/main/busybox
+      construido el   : 2026-01-10T15:38:28.000Z
+      commit aports   : c3ef5d10e6ef6528852c51f0564963e2f8c1be19
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/c3ef5d10e6ef6528852c51f0564963e2f8c1be19/main/busybox/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/c3ef5d10e6ef6528852c51f0564963e2f8c1be19/main/busybox
 
-  ca-certificates 20241121-r1  [MPL-2.0 AND MIT]
+  ca-certificates 20261020-r0  [MPL-2.0 AND MIT]
       proyecto        : https://www.mozilla.org/en-US/about/governance/policies/security-group/certs/
-      construido el   : 2025-01-08T09:56:39.000Z
-      commit aports   : 707ff77afebd8ef5bd60f3a5dd1b08f8c480f531
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/707ff77afebd8ef5bd60f3a5dd1b08f8c480f531/main/ca-certificates/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/707ff77afebd8ef5bd60f3a5dd1b08f8c480f531/main/ca-certificates
+      construido el   : 2026-10-20T15:31:28.000Z
+      commit aports   : e78f5987166c6ffbe23f6472e2e8f040298fe2da
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/e78f5987166c6ffbe23f6472e2e8f040298fe2da/main/ca-certificates/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/e78f5987166c6ffbe23f6472e2e8f040298fe2da/main/ca-certificates
 
-  freetype 2.13.3-r0  [FTL OR GPL-2.0-or-later]
+  freetype 2.14.3-r0  [FTL OR GPL-2.0-or-later]
       proyecto        : https://www.freetype.org/
-      construido el   : 2024-09-05T03:44:08.000Z
-      commit aports   : 9404f86086f8e5c970b156336e71c56828a1e587
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/9404f86086f8e5c970b156336e71c56828a1e587/main/freetype/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/9404f86086f8e5c970b156336e71c56828a1e587/main/freetype
+      construido el   : 2026-04-29T14:07:13.000Z
+      commit aports   : ad16b0afc1a315c4095a75ff72ebbe3cfa29b671
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/ad16b0afc1a315c4095a75ff72ebbe3cfa29b671/main/freetype/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/ad16b0afc1a315c4095a75ff72ebbe3cfa29b671/main/freetype
 
-  geoip 1.6.12-r5  [LGPL-2.1-or-later]
+  geoip 1.6.12-r6  [LGPL-2.1-or-later]
       proyecto        : http://www.maxmind.com/app/ip-location
-      construido el   : 2024-03-12T15:33:42.000Z
-      commit aports   : fc95c59998285564fbcb0bfb2443898c62e10171
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/fc95c59998285564fbcb0bfb2443898c62e10171/main/geoip/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/fc95c59998285564fbcb0bfb2443898c62e10171/main/geoip
+      construido el   : 2025-02-10T09:04:37.000Z
+      commit aports   : 6db81e6559d66572861f28962c24459c4a583da1
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/6db81e6559d66572861f28962c24459c4a583da1/main/geoip/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/6db81e6559d66572861f28962c24459c4a583da1/main/geoip
 
-  gettext 0.22.5-r0  [GPL-3.0-or-later AND LGPL-2.1-or-later AND MIT]
+  gettext 1.0-r0  [GPL-3.0-or-later AND LGPL-2.1-or-later AND MIT]
       proyecto        : https://www.gnu.org/software/gettext/gettext.html
-      construido el   : 2024-03-27T17:11:29.000Z
-      commit aports   : c49ded5d54b708768165f7a99589464cd5c5eeee
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/c49ded5d54b708768165f7a99589464cd5c5eeee/main/gettext/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/c49ded5d54b708768165f7a99589464cd5c5eeee/main/gettext
+      construido el   : 2026-04-18T21:49:18.000Z
+      commit aports   : a0b12dbf67fb047e79a1b76c6dfe6f2904d0d391
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/a0b12dbf67fb047e79a1b76c6dfe6f2904d0d391/main/gettext/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/a0b12dbf67fb047e79a1b76c6dfe6f2904d0d391/main/gettext
 
-  libgcrypt 1.10.3-r1  [LGPL-2.1-or-later AND GPL-2.0-or-later]
-      proyecto        : https://www.gnupg.org/
-      construido el   : 2024-10-15T11:56:28.000Z
-      commit aports   : 40176cc16c5dfa243d502fa9e1f7b9e68ebcad0b
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/40176cc16c5dfa243d502fa9e1f7b9e68ebcad0b/main/libgcrypt/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/40176cc16c5dfa243d502fa9e1f7b9e68ebcad0b/main/libgcrypt
+  gcc 15.2.0-r5  [GPL-2.0-or-later AND LGPL-2.1-or-later]
+      proyecto        : https://gcc.gnu.org
+      construido el   : 2026-05-29T19:59:26.000Z
+      commit aports   : 423a8ad043d07f2c7546c8ec3e2b0384cda360ae
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/423a8ad043d07f2c7546c8ec3e2b0384cda360ae/main/gcc/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/423a8ad043d07f2c7546c8ec3e2b0384cda360ae/main/gcc
 
-  libgpg-error 1.51-r0  [GPL-2.0-or-later AND LGPL-2.1-or-later]
-      proyecto        : https://www.gnupg.org/
-      construido el   : 2024-11-19T07:21:14.000Z
-      commit aports   : 59a563eec99ff1e59c5cb42ecf7a482be3684a1c
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/59a563eec99ff1e59c5cb42ecf7a482be3684a1c/main/libgpg-error/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/59a563eec99ff1e59c5cb42ecf7a482be3684a1c/main/libgpg-error
-
-  libidn2 2.3.7-r0  [GPL-2.0-or-later OR LGPL-3.0-or-later]
+  libidn2 2.3.8-r0  [GPL-2.0-or-later OR LGPL-3.0-or-later]
       proyecto        : https://www.gnu.org/software/libidn#libidn2
-      construido el   : 2024-01-28T21:37:39.000Z
-      commit aports   : 1cdcdd0eccbee1f60078417a7aaf83f92f6e6754
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/1cdcdd0eccbee1f60078417a7aaf83f92f6e6754/main/libidn2/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/1cdcdd0eccbee1f60078417a7aaf83f92f6e6754/main/libidn2
+      construido el   : 2025-06-30T13:36:47.000Z
+      commit aports   : 8240e09aa2fdd8f9979b2016be082273965aff0c
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/8240e09aa2fdd8f9979b2016be082273965aff0c/main/libidn2/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/8240e09aa2fdd8f9979b2016be082273965aff0c/main/libidn2
 
-  libunistring 1.2-r0  [GPL-2.0-or-later OR LGPL-3.0-or-later]
+  libunistring 1.4.2-r0  [GPL-2.0-or-later OR LGPL-3.0-or-later]
       proyecto        : https://www.gnu.org/software/libunistring/
-      construido el   : 2024-02-29T09:08:45.000Z
-      commit aports   : c4c67852adc5bc15e278054876bc3c70c321948e
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/c4c67852adc5bc15e278054876bc3c70c321948e/main/libunistring/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/c4c67852adc5bc15e278054876bc3c70c321948e/main/libunistring
+      construido el   : 2026-04-16T17:03:10.000Z
+      commit aports   : 30d9f19340385b2cd16eaf1cc6a9a8b30c4afe1c
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/30d9f19340385b2cd16eaf1cc6a9a8b30c4afe1c/main/libunistring/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/30d9f19340385b2cd16eaf1cc6a9a8b30c4afe1c/main/libunistring
 
-  musl 1.2.5-r9  [MIT AND BSD-2-Clause AND GPL-2.0-or-later]
+  musl 1.2.6-r3  [MIT AND BSD-2-Clause AND GPL-2.0-or-later]
       proyecto        : https://musl.libc.org/
-      construido el   : 2025-02-13T17:26:26.000Z
-      commit aports   : efd4d5df7be0ea48d98512671f676fc5ceb14899
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/efd4d5df7be0ea48d98512671f676fc5ceb14899/main/musl/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/efd4d5df7be0ea48d98512671f676fc5ceb14899/main/musl
+      construido el   : 2026-10-21T15:50:16.000Z
+      commit aports   : 8f79d39391b46d6dbf1800fb68b8212a21d5ee2e
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/8f79d39391b46d6dbf1800fb68b8212a21d5ee2e/main/musl/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/8f79d39391b46d6dbf1800fb68b8212a21d5ee2e/main/musl
 
-  pax-utils 1.3.8-r1  [GPL-2.0-only]
+  pax-utils 1.3.9-r1  [GPL-2.0-only]
       proyecto        : https://wiki.gentoo.org/wiki/Hardened/PaX_Utilities
-      construido el   : 2024-10-05T12:41:08.000Z
-      commit aports   : 398a5aee3025ec8a4d0d761e448dc86ac777fa09
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/398a5aee3025ec8a4d0d761e448dc86ac777fa09/main/pax-utils/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/398a5aee3025ec8a4d0d761e448dc86ac777fa09/main/pax-utils
+      construido el   : 2026-03-27T19:39:10.000Z
+      commit aports   : c61801eeacb3ffcd9c2025b09e402153bb93fb39
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/c61801eeacb3ffcd9c2025b09e402153bb93fb39/main/pax-utils/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/c61801eeacb3ffcd9c2025b09e402153bb93fb39/main/pax-utils
 
-  xz 5.6.3-r1  [GPL-2.0-or-later AND 0BSD AND Public-Domain AND LGPL-2.1-or-later]
+  xz 5.8.4-r0  [GPL-2.0-or-later AND 0BSD AND Public-Domain AND LGPL-2.1-or-later]
       proyecto        : https://tukaani.org/xz/
-      construido el   : 2025-04-04T21:46:30.000Z
-      commit aports   : 0e019d9722d6d8e51ef4658074b2bc736f60b4dc
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/0e019d9722d6d8e51ef4658074b2bc736f60b4dc/main/xz/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/0e019d9722d6d8e51ef4658074b2bc736f60b4dc/main/xz
+      construido el   : 2026-09-09T21:24:27.000Z
+      commit aports   : 0c088d609f9fe69eedd6b4c7f4b99cdad847c20a
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/0c088d609f9fe69eedd6b4c7f4b99cdad847c20a/main/xz/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/0c088d609f9fe69eedd6b4c7f4b99cdad847c20a/main/xz
 
-  zstd 1.5.6-r2  [BSD-3-Clause OR GPL-2.0-or-later]
+  zstd 1.5.7-r2  [BSD-3-Clause OR GPL-2.0-or-later]
       proyecto        : https://facebook.github.io/zstd/
-      construido el   : 2024-12-25T07:14:12.000Z
-      commit aports   : 5c2ddf18f193dafdd25ae7391d96c7e30766eecd
-      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/5c2ddf18f193dafdd25ae7391d96c7e30766eecd/main/zstd/APKBUILD
-      espejo oficial  : https://github.com/alpinelinux/aports/tree/5c2ddf18f193dafdd25ae7391d96c7e30766eecd/main/zstd
+      construido el   : 2025-07-28T12:06:44.000Z
+      commit aports   : 3c6e2ee2b16f403d53eab39c4426eb61f003c322
+      APKBUILD        : https://gitlab.alpinelinux.org/alpine/aports/-/blob/3c6e2ee2b16f403d53eab39c4426eb61f003c322/main/zstd/APKBUILD
+      espejo oficial  : https://github.com/alpinelinux/aports/tree/3c6e2ee2b16f403d53eab39c4426eb61f003c322/main/zstd
 
 ==============================================================================
 AVISOS DE COPYRIGHT DE LOS PAQUETES DEL SISTEMA
@@ -365,14 +367,14 @@ exacta se publica solo como tarball y comprobarlo exigiria descargar un
 binario. No se afirma ausencia sin haber mirado.
 
 ------------------------------------------------------------------------------
-aom 3.11.0-r0
+aom 3.14.1-r0
 Licencia: BSD-2-Clause AND custom
 Binarios: aom-libs
-Commit de aports: 566a03ffbe0922833d0cc76ee4f93a44df5dfb93
+Commit de aports: ca6a710df98ad5e2b596cf06b44cd82a5ceefc4e
 ------------------------------------------------------------------------------
 
---- LICENSE --- repositorio oficial aomedia/aom@v3.11.0
---- https://aomedia.googlesource.com/aom/+/refs/tags/v3.11.0/LICENSE?format=TEXT
+--- LICENSE --- repositorio oficial aomedia/aom@v3.14.1
+--- https://aomedia.googlesource.com/aom/+/refs/tags/v3.14.1/LICENSE?format=TEXT
 
 Copyright (c) 2016, Alliance for Open Media. All rights reserved.
 
@@ -401,8 +403,8 @@ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
 ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 
---- PATENTS --- repositorio oficial aomedia/aom@v3.11.0
---- https://aomedia.googlesource.com/aom/+/refs/tags/v3.11.0/PATENTS?format=TEXT
+--- PATENTS --- repositorio oficial aomedia/aom@v3.14.1
+--- https://aomedia.googlesource.com/aom/+/refs/tags/v3.14.1/PATENTS?format=TEXT
 
 Alliance for Open Media Patent License 1.0
 
@@ -512,8 +514,8 @@ Alliance for Open Media Patent License 1.0
       the Alliance for Open Media as a Final Deliverable for which this
       License was issued.
 
---- AUTHORS --- repositorio oficial aomedia/aom@v3.11.0
---- https://aomedia.googlesource.com/aom/+/refs/tags/v3.11.0/AUTHORS?format=TEXT
+--- AUTHORS --- repositorio oficial aomedia/aom@v3.14.1
+--- https://aomedia.googlesource.com/aom/+/refs/tags/v3.14.1/AUTHORS?format=TEXT
 
 # This file is automatically generated from the git commit history
 # by tools/gen_authors.sh.
@@ -528,6 +530,8 @@ Akshata Jadhav <akshata.jadhav@ittiam.com>
 Alexander Bokov <alexanderbokov@google.com>
 Alexander Voronov <avoronov@graphics.cs.msu.ru>
 Aℓex Converse <aconverse@google.com>
+Alex Davicenko <alex.davicenko@arm.com>
+Alex Faxa <alexanderfaxa@google.com>
 Alexis Ballier <aballier@gentoo.org>
 Alex Peterson <petersonab@google.com>
 Alok Ahuja <waveletcoeff@gmail.com>
@@ -543,13 +547,19 @@ Aniket Dhok <aniket.dhok@ittiam.com>
 Aniket Wanare <Aniket.wanare@ittiam.com>
 Ankur Saxena <ankurs@nvidia.com>
 Anupam Pandey <anupam.pandey@ittiam.com>
+Anusuya <anusuya.k@ittiam.com>
 Apurve Kumar Pandey <apurve.pandey@ittiam.com>
+Aras Pranckevicius <aras@nesnausk.org>
 Arild Fuldseth <arilfuld@cisco.com>
 Aron Rosenberg <arosenberg@logitech.com>
 Arpad Panyik <Arpad.Panyik@arm.com>
 Arun Singh Negi <arun.negi@ittiam.com>
+Athulya Raj Raji Mohini <AthulyaRaj.RajiMohini@arm.com>
 Attila Nagy <attilanagy@google.com>
 Balaji Anandapadmanaban <balaji.anandapadmanaban@arm.com>
+Bernhard M. Wiedemann <bwiedemann@suse.de>
+Bhaskarabhatla V S K S Yaswanth Sastry <yaswanth.sastry@ittiam.com>
+bmarques1995 <testebash@outlook.com>
 Bohan Li <bohanli@google.com>
 Brennan Shacklett <bshacklett@mozilla.com>
 Brion Vibber <bvibber@wikimedia.org>
@@ -573,6 +583,7 @@ Daniele Castagna <dcastagna@chromium.org>
 Daniel Kang <ddkang@google.com>
 Daniel Max Valenzuela <daniel.vt@samsung.com>
 Danil Chapovalov <danilchap@google.com>
+Darryl Pogue <darryl@dpogue.ca>
 David Major <dmajor@mozilla.com>
 David Michael Barr <b@rr-dav.id.au>
 David Turner <david.turner@argondesign.com>
@@ -591,6 +602,7 @@ Ehsan Akhgari <ehsan.akhgari@gmail.com>
 Elliott Karpilovsky <elliottk@google.com>
 Emil Keyder <emilkeyder@google.com>
 Erik Niemeyer <erik.a.niemeyer@intel.com>
+Erik Språng <sprang@google.com>
 Fabio Pedretti <fabio.ped@libero.it>
 Fangwen Fu <fangwen.fu@intel.com>
 Fergus Simpson <afergs@google.com>
@@ -642,7 +654,10 @@ Jean-Yves Avenard <jyavenard@mozilla.com>
 Jeff Faust <jfaust@google.com>
 Jeff Muizelaar <jmuizelaar@mozilla.com>
 Jeff Petkau <jpet@chromium.org>
+Jeremy Dorfman <jdorfman@google.com>
 Jerome Jiang <jianj@google.com>
+jerry <jerytsai@andestech.com>
+Jerry Tsai <jerytsai@andestech.com>
 Jia Jia <jia.jia@linaro.org>
 Jian Zhou <zhoujian@fb.com>
 Jim Bankoski <jimbankoski@google.com>
@@ -655,12 +670,15 @@ Johnny Klonaris <google@jawknee.com>
 John Stark <jhnstrk@gmail.com>
 Jonathan Matthews <jonathan.matthews@argondesign.com>
 Jonathan Wright <jonathan.wright@arm.com>
+Jordan Brown <rop@google.com>
 Joshua Bleecher Snyder <josh@treelinelabs.com>
 Joshua Litt <joshualitt@google.com>
 Josh Verdejo <joverdejo@google.com>
 Julia Robson <juliamrobson@gmail.com>
+Julio Barba <juliobbv@gmail.com>
 Justin Clift <justin@salasaga.org>
 Justin Lebar <justin.lebar@gmail.com>
+Kalamatee <kalamatee@gmail.com>
 Katsuhisa Yuasa <berupon@gmail.com>
 Kavi Ramamurthy <kavii@google.com>
 KO Myung-Hun <komh@chollian.net>
@@ -668,6 +686,7 @@ Konstantinos Margaritis <konma@vectorcamp.gr>
 Krishna Malladi <kmalladi@google.com>
 Kwanghoon Son <kwangson@yahoo.com>
 Kyle Siefring <siekyleb@amazon.com>
+Kyle Swanson <kswanson@netflix.com>
 Larisa Markeeva <lmarkeeva@google.com>
 Lauren Partin <lpartin@google.com>
 Lawrence Velázquez <larryv@macports.org>
@@ -679,6 +698,7 @@ liang zhao <leolzhao@tencent.com>
 Linfeng Zhang <linfengz@google.com>
 Link.Meng <monthev@gmail.com>
 Lin Zheng <linzhen@google.com>
+Li Zhang <li.zhang2@arm.com>
 Logan Goldberg <logangw@google.com>
 Lokeshwar Reddy B <lokeshwar.reddy@ittiam.com>
 Lou Quillio <louquillio@google.com>
@@ -686,6 +706,7 @@ Luca Barbato <lu_zero@gentoo.org>
 Luca Versari <veluca@google.com>
 Luc Trudeau <luc@trud.ca>
 Madhu Peringassery Krishnan <mpkrishnan@tencent.com>
+Mahesh Madhav <mahesh@amperecomputing.com>
 Makoto Kato <makoto.kt@gmail.com>
 Mans Rullgard <mans@mansr.com>
 Marco Paniconi <marpan@google.com>
@@ -737,12 +758,15 @@ Peter de Rivaz <peter.derivaz@gmail.com>
 Peter Kasting <pkasting@chromium.org>
 Philip Jägenstedt <philipj@opera.com>
 Philippe Antoine <p.antoine@catenacyber.fr>
+Philipp Hancke <phancke@meta.com>
+Pradeep Kumar <pradeep.kumar@intel.corp-partner.google.com>
 Priit Laes <plaes@plaes.org>
 Qiu Jianlin <jianlin.qiu@intel.com>
 Rachel Barker <rachelbarker@google.com>
 Rafael Ávila de Espíndola <rafael.espindola@gmail.com>
 Rafaël Carré <funman@videolan.org>
 Ralph Giles <giles@xiph.org>
+Ram Mohan M <ram.mohan@ittiam.com>
 Ranjit Kumar Tulabandu <ranjit.tulabandu@ittiam.com>
 Ravi Chaudhary <ravi.chaudhary@ittiam.com>
 Remya Prakasan <remya.prakasan@ittiam.com>
@@ -751,6 +775,7 @@ Rob Bradford <rob@linux.intel.com>
 Robert-André Mauchin <zebob.m@gmail.com>
 Robert Chin <robertchin@google.com>
 Roger Zhou <youzhou@microsoft.com>
+Rohan Baid <rohan.baid@ittiam.com>
 Rohit Athavale <rathaval@xilinx.com>
 Ronald S. Bultje <rsbultje@gmail.com>
 Rostislav Pehlivanov <rpehlivanov@mozilla.com>
@@ -792,6 +817,7 @@ Suman Sunkara <sunkaras@google.com>
 Susanna D'Souza <susannad@google.com>
 Taekhyun Kim <takim@nvidia.com>
 Takanori MATSUURA <t.matsuu@gmail.com>
+Takuto Ikuta <tikuta@google.com>
 Tamar Levy <tamar.levy@intel.com>
 Tao Bai <michaelbai@chromium.org>
 Tarek AMARA <amatarek@justin.tv>
@@ -807,6 +833,7 @@ Todd Nguyen <toddnguyen@google.com>
 Tom Anderson <thomasanderson@google.com>
 Tom Finegan <tomfinegan@google.com>
 Tristan Matthews <tmatth@videolan.org>
+ttwu <ttwu@andestech.com>
 Umang Saini <umang.saini@ittiam.com>
 Urvang Joshi <urvang@google.com>
 Venkat Sanampudi <sanampudi.venkatarao@ittiam.com>
@@ -836,19 +863,20 @@ Yue Chen <yuec@google.com>
 Yunqing Wang <yunqingwang@google.com>
 Yury Gitman <yuryg@google.com>
 Yushin Cho <ycho@mozilla.com>
+Zhaoliang Ma <zhaoliang.ma@intel.com>
 Zhijie Yang <zhijie.yang@broadcom.com>
 Zhipin Deng <zhipin.deng@intel.com>
 Zoe Liu <zoeliu@gmail.com>
 
 ------------------------------------------------------------------------------
-brotli 1.1.0-r2
+brotli 1.2.1-r0
 Licencia: MIT
 Binarios: brotli-libs
-Commit de aports: bdeb5ac39445d803f7d97bb9b3cf9171d9a35f52
+Commit de aports: 8313352127992a9d82e2c2024494f6c38a4dffb4
 ------------------------------------------------------------------------------
 
---- LICENSE --- upstream github google/brotli@v1.1.0
---- https://raw.githubusercontent.com/google/brotli/v1.1.0/LICENSE
+--- LICENSE --- upstream github google/brotli@v1.2.1
+--- https://raw.githubusercontent.com/google/brotli/v1.2.1/LICENSE
 
 Copyright (c) 2009, 2010, 2013-2016 by the Brotli Authors.
 
@@ -871,14 +899,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ------------------------------------------------------------------------------
-c-ares 1.34.5-r0
+c-ares 1.34.9-r0
 Licencia: MIT
 Binarios: c-ares
-Commit de aports: e7fe61bc1a50c88db90d446688444acc8bf13dbf
+Commit de aports: 50f178d7a4c30ea44b54b7d4731ab58558c38b14
 ------------------------------------------------------------------------------
 
---- LICENSE.md --- upstream github c-ares/c-ares@v1.34.5
---- https://raw.githubusercontent.com/c-ares/c-ares/v1.34.5/LICENSE.md
+--- LICENSE.md --- upstream github c-ares/c-ares@v1.34.9
+--- https://raw.githubusercontent.com/c-ares/c-ares/v1.34.9/LICENSE.md
 
 MIT License
 
@@ -905,8 +933,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
---- AUTHORS --- upstream github c-ares/c-ares@v1.34.5
---- https://raw.githubusercontent.com/c-ares/c-ares/v1.34.5/AUTHORS
+--- AUTHORS --- upstream github c-ares/c-ares@v1.34.9
+--- https://raw.githubusercontent.com/c-ares/c-ares/v1.34.9/AUTHORS
 
 c-ares is based on ares, and these are the people that have worked on it since
 the fork was made:
@@ -994,10 +1022,10 @@ nordsturm
 saghul
 
 ------------------------------------------------------------------------------
-gd 2.3.3-r9
+gd 2.3.3-r10
 Licencia: GD
 Binarios: libgd
-Commit de aports: 21d29cabd99e7ff6534d2e99601cbd77abf30f8a
+Commit de aports: bf4ebac970366eda6cc26aa61c8dddae0d6916ee
 ------------------------------------------------------------------------------
 
 --- COPYING --- upstream github libgd/libgd@gd-2.3.3
@@ -1078,10 +1106,10 @@ authors wish to thank David Koblas, David Rowley, and Hutchison
 Avenue Software Corporation for their prior contributions.
 
 ------------------------------------------------------------------------------
-geoip 1.6.12-r5
+geoip 1.6.12-r6
 Licencia: LGPL-2.1-or-later
 Binarios: geoip
-Commit de aports: fc95c59998285564fbcb0bfb2443898c62e10171
+Commit de aports: 6db81e6559d66572861f28962c24459c4a583da1
 ------------------------------------------------------------------------------
 
 --- LICENSE --- upstream github maxmind/geoip-api-c@v1.6.12
@@ -1628,14 +1656,14 @@ That's all there is to it!
 T.J. Mather <geoipapi@maxmind.com>
 
 ------------------------------------------------------------------------------
-libavif 1.0.4-r0
+libavif 1.4.1-r0
 Licencia: BSD-2-Clause
 Binarios: libavif
-Commit de aports: b957b6e51ead6a412cb11ecc63a77e3a70edbfd5
+Commit de aports: 7c091e42619c47958002c5de53dd7f02dd4c83ac
 ------------------------------------------------------------------------------
 
---- LICENSE --- upstream github AOMediaCodec/libavif@v1.0.4
---- https://raw.githubusercontent.com/AOMediaCodec/libavif/v1.0.4/LICENSE
+--- LICENSE --- upstream github AOMediaCodec/libavif@v1.4.1
+--- https://raw.githubusercontent.com/AOMediaCodec/libavif/v1.4.1/LICENSE
 
 Copyright 2019 Joe Drago. All rights reserved.
 
@@ -1690,7 +1718,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ------------------------------------------------------------------------------
 
-Files: apps/shared/iccjpeg.*
+Files: third_party/iccjpeg/*
 
 In plain English:
 
@@ -1992,14 +2020,48 @@ Files: android_jni/gradlew*
    limitations under the License.
 
 ------------------------------------------------------------------------------
-libjpeg-turbo 3.0.4-r0
+
+Files: third_party/libyuv/*
+
+Copyright 2011 The LibYuv Project Authors. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+  * Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+
+  * Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in
+    the documentation and/or other materials provided with the
+    distribution.
+
+  * Neither the name of Google nor the names of its contributors may
+    be used to endorse or promote products derived from this software
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+------------------------------------------------------------------------------
+libjpeg-turbo 3.1.3-r0
 Licencia: BSD-3-Clause AND IJG AND Zlib
 Binarios: libjpeg-turbo
-Commit de aports: 30b4b4d47dba66db916d78a58ea7a4639447a04f
+Commit de aports: 5fe6bebf850fc964a8525c81548397c39cb6f7cd
 ------------------------------------------------------------------------------
 
---- LICENSE.md --- upstream github libjpeg-turbo/libjpeg-turbo@3.0.4
---- https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/3.0.4/LICENSE.md
+--- LICENSE.md --- upstream github libjpeg-turbo/libjpeg-turbo@3.1.3
+--- https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/3.1.3/LICENSE.md
 
 libjpeg-turbo Licenses
 ======================
@@ -2097,7 +2159,7 @@ intended solely for clarification.
 The Modified (3-clause) BSD License
 ===================================
 
-Copyright (C)2009-2023 D. R. Commander.  All Rights Reserved.<br>
+Copyright (C)2009-2025 D. R. Commander.  All Rights Reserved.<br>
 Copyright (C)2015 Viktor Szathmáry.  All Rights Reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -2141,7 +2203,7 @@ that were granted to the IJG for code derived from their software.
 libpsl 0.21.5-r3
 Licencia: MIT
 Binarios: libpsl
-Commit de aports: 398a5aee3025ec8a4d0d761e448dc86ac777fa09
+Commit de aports: 6bd45b53fb316dc01bda59f5feaf1e127eb64f22
 ------------------------------------------------------------------------------
 
 --- LICENSE --- upstream github rockdaboot/libpsl@0.21.5
@@ -2219,19 +2281,19 @@ Xavier Claessens (Add Meson build system)
 Ignacio Casal Quinteiro (Improve Meson build)
 
 ------------------------------------------------------------------------------
-nghttp2 1.64.0-r0
+nghttp2 1.70.0-r0
 Licencia: MIT
 Binarios: nghttp2-libs
-Commit de aports: 08e359a7bafd226d766d421eb66e27b6fc1144d2
+Commit de aports: d5a34efc88bbe8d18737fda28125071c4aef8517
 ------------------------------------------------------------------------------
 
---- LICENSE --- upstream github nghttp2/nghttp2@v1.64.0
---- https://raw.githubusercontent.com/nghttp2/nghttp2/v1.64.0/LICENSE
+--- LICENSE --- upstream github nghttp2/nghttp2@v1.70.0
+--- https://raw.githubusercontent.com/nghttp2/nghttp2/v1.70.0/LICENSE
 
 See COPYING
 
---- COPYING --- upstream github nghttp2/nghttp2@v1.64.0
---- https://raw.githubusercontent.com/nghttp2/nghttp2/v1.64.0/COPYING
+--- COPYING --- upstream github nghttp2/nghttp2@v1.70.0
+--- https://raw.githubusercontent.com/nghttp2/nghttp2/v1.70.0/COPYING
 
 The MIT License
 
@@ -2257,8 +2319,8 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
---- AUTHORS --- upstream github nghttp2/nghttp2@v1.64.0
---- https://raw.githubusercontent.com/nghttp2/nghttp2/v1.64.0/AUTHORS
+--- AUTHORS --- upstream github nghttp2/nghttp2@v1.70.0
+--- https://raw.githubusercontent.com/nghttp2/nghttp2/v1.70.0/AUTHORS
 
 nghttp2 project was started as a fork of spdylay project [1].  Both
 projects were started by Tatsuhiro Tsujikawa, who is still the main
@@ -2279,6 +2341,7 @@ github issues [2].
 Adam Gołębiowski
 Alek Storm
 Alex Nalivko
+Alexander Gerasimov
 Alexandr Vlasov
 Alexandros Konstantinakis-Karmis
 Alexis La Goutte
@@ -2290,6 +2353,7 @@ Andreas Pohl
 Andrew Penkrat
 Andy Davies
 Angus Gratton
+Ankur Tyagi
 Anna Henningsen
 Ant Bryan
 Anthony Alayo
@@ -2301,6 +2365,7 @@ Bernhard Walle
 Brendan Heinonen
 Brian Card
 Brian Suh
+Chris Barrick
 Daniel Bevenius
 Daniel Evers
 Daniel Stenberg
@@ -2309,6 +2374,7 @@ David Beitey
 David Korczynski
 David Weekly
 Deel
+Deep Chordia
 Dimitris Apostolou
 Dmitri Tikhonov
 Dmitriy Vetutnev
@@ -2325,6 +2391,7 @@ George Liu
 Gitai
 Google Inc.
 Hajime Fujita
+Huangbin Zhan
 Jacky Tian
 Jacky_Yin
 Jacob Champion
@@ -2341,6 +2408,8 @@ Jonas Kvinge
 Josh Braegger
 José F. Calcerrada
 Kamil Dudka
+Karl Mehltretter
+Karthik Dasari
 Kazuho Oku
 Kenny (kang-yen) Peng
 Kenny Peng
@@ -2350,6 +2419,7 @@ LazyHamster
 Leo Neat
 Lorenz Nickel
 Lucas Pardue
+Lukas Märdian
 MATSUMOTO Ryosuke
 Marc Bachmann
 Marcelo Trylesinski
@@ -2365,6 +2435,7 @@ Nora Shoemaker
 Paweł Wegner
 Pedro Santos
 Peeyush Aggarwal
+Peng-Yu Chen
 Peter Wu
 Piotr Sikora
 PufferOverflow
@@ -2380,6 +2451,7 @@ Ryan Carsten Schmidt
 Ryo Ota
 Scott Mitchell
 Sebastiaan Deckers
+Sergei Trofimovich
 Sergey Fedorov
 Shelley Vohr
 Simon Frankenberger
@@ -2403,18 +2475,22 @@ Vernon Tang
 Viacheslav Biriukov
 Viktor Szakats
 Viktor Szépe
+Ville Vesilehto
 Wenfeng Liu
 William A Rowe Jr
 Xiaoguang Sun
+Zachary Turner
 Zhuoyun Wei
 acesso
 ayanamist
+bmarques1995
 bxshi
 clemahieu
 dalf
 dawg
 es
 fangdingjun
+feicong
 hrxi
 jwchoi
 kumagi
@@ -2428,14 +2504,14 @@ snnn
 yuuki-kodama
 
 ------------------------------------------------------------------------------
-openssl 3.3.3-r0
+openssl 3.5.9-r0
 Licencia: Apache-2.0
-Binarios: libcrypto3, libssl3
-Commit de aports: ddbf4a43b534e1e2da4ccb72bdc4ffcd9b85ce03
+Binarios: libcrypto3, libssl3, openssl
+Commit de aports: 29b9ec24b1b5b39aeef51fa2a044210e2ec5258e
 ------------------------------------------------------------------------------
 
---- LICENSE.txt --- upstream github openssl/openssl@openssl-3.3.3
---- https://raw.githubusercontent.com/openssl/openssl/openssl-3.3.3/LICENSE.txt
+--- LICENSE.txt --- upstream github openssl/openssl@openssl-3.5.9
+--- https://raw.githubusercontent.com/openssl/openssl/openssl-3.5.9/LICENSE.txt
 
 
                                  Apache License
@@ -2616,14 +2692,14 @@ Commit de aports: ddbf4a43b534e1e2da4ccb72bdc4ffcd9b85ce03
    END OF TERMS AND CONDITIONS
 
 ------------------------------------------------------------------------------
-pcre2 10.43-r0
+pcre2 10.49-r0
 Licencia: BSD-3-Clause
 Binarios: pcre2
-Commit de aports: 0826e91f0c743946bdc6ffa51fe90479bf4a83da
+Commit de aports: 3d497cbb3217749c4fb85f90f3b6f7908b0c1f95
 ------------------------------------------------------------------------------
 
---- COPYING --- upstream github PhilipHazel/pcre2@pcre2-10.43
---- https://raw.githubusercontent.com/PhilipHazel/pcre2/pcre2-10.43/COPYING
+--- COPYING --- upstream github PCRE2Project/pcre2@pcre2-10.49
+--- https://raw.githubusercontent.com/PCRE2Project/pcre2/pcre2-10.49/COPYING
 
 PCRE2 LICENCE
 
@@ -2631,55 +2707,348 @@ Please see the file LICENCE in the PCRE2 distribution for licensing details.
 
 End
 
---- AUTHORS --- upstream github PhilipHazel/pcre2@pcre2-10.43
---- https://raw.githubusercontent.com/PhilipHazel/pcre2/pcre2-10.43/AUTHORS
+--- LICENCE.md --- upstream github PCRE2Project/pcre2@pcre2-10.49
+--- https://raw.githubusercontent.com/PCRE2Project/pcre2/pcre2-10.49/LICENCE.md
 
-THE MAIN PCRE2 LIBRARY CODE
----------------------------
+PCRE2 Licence
+=============
 
-Written by:       Philip Hazel
-Email local part: Philip.Hazel
-Email domain:     gmail.com
+| SPDX-License-Identifier: | BSD-3-Clause WITH PCRE2-exception |
+|---------|-------|
 
-Retired from University of Cambridge Computing Service,
-Cambridge, England.
+PCRE2 is a library of functions to support regular expressions whose syntax
+and semantics are as close as possible to those of the Perl 5 language.
 
-Copyright (c) 1997-2024 University of Cambridge
-All rights reserved
+Releases 10.00 and above of PCRE2 are distributed under the terms of the "BSD"
+licence, as specified below, with one exemption for certain binary
+redistributions. The documentation for PCRE2, supplied in the "doc" directory,
+is distributed under the same terms as the software itself. The data in the
+testdata directory is not copyrighted and is in the public domain.
 
-
-PCRE2 JUST-IN-TIME COMPILATION SUPPORT
---------------------------------------
-
-Written by:       Zoltan Herczeg
-Email local part: hzmester
-Emain domain:     freemail.hu
-
-Copyright(c) 2010-2024 Zoltan Herczeg
-All rights reserved.
+The basic library functions are written in C and are freestanding. Also
+included in the distribution is a just-in-time compiler that can be used to
+optimize pattern matching. This is an optional feature that can be omitted when
+the library is built. The just-in-time compiler is separately licensed under the
+"2-clause BSD" licence.
 
 
-STACK-LESS JUST-IN-TIME COMPILER
---------------------------------
+COPYRIGHT
+---------
 
-Written by:       Zoltan Herczeg
-Email local part: hzmester
-Emain domain:     freemail.hu
+### The basic library functions
 
-Copyright(c) 2009-2024 Zoltan Herczeg
-All rights reserved.
+    Written by:       Philip Hazel
+    Email local part: Philip.Hazel
+    Email domain:     gmail.com
 
-####
+    Retired from University of Cambridge Computing Service,
+    Cambridge, England.
+
+    Copyright (c) 1997-2007 University of Cambridge
+    Copyright (c) 2007-2024 Philip Hazel
+    All rights reserved.
+
+### PCRE2 Just-In-Time compilation support
+
+    Written by:       Zoltan Herczeg
+    Email local part: hzmester
+    Email domain:     freemail.hu
+
+    Copyright (c) 2010-2024 Zoltan Herczeg
+    All rights reserved.
+
+### Stack-less Just-In-Time compiler
+
+    Written by:       Zoltan Herczeg
+    Email local part: hzmester
+    Email domain:     freemail.hu
+
+    Copyright (c) 2009-2024 Zoltan Herczeg
+    All rights reserved.
+
+The code in the `deps/sljit` directory has its own LICENSE file.
+
+### All other contributions
+
+Many other contributors have participated in the authorship of PCRE2. As PCRE2
+has never required a Contributor Licensing Agreement, or other copyright
+assignment agreement, all contributions have copyright retained by each
+original contributor or their employer.
+
+
+THE "BSD" LICENCE
+-----------------
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notices,
+  this list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright
+  notices, this list of conditions and the following disclaimer in the
+  documentation and/or other materials provided with the distribution.
+
+* Neither the name of the University of Cambridge nor the names of any
+  contributors may be used to endorse or promote products derived from this
+  software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+
+EXEMPTION FOR BINARY LIBRARY-LIKE PACKAGES
+------------------------------------------
+
+The second condition in the BSD licence (covering binary redistributions) does
+not apply all the way down a chain of software. If binary package A includes
+PCRE2, it must respect the condition, but if package B is software that
+includes package A, the condition is not imposed on package B unless it uses
+PCRE2 independently.
+
+--- AUTHORS.md --- upstream github PCRE2Project/pcre2@pcre2-10.49
+--- https://raw.githubusercontent.com/PCRE2Project/pcre2/pcre2-10.49/AUTHORS.md
+
+PCRE2 Authorship and Contributors
+=================================
+
+Copyright
+---------
+
+Please see the file [LICENCE](./LICENCE.md) in the PCRE2 distribution for
+copyright details.
+
+
+Maintainers
+-----------
+
+The PCRE and PCRE2 libraries were authored and maintained by Philip Hazel.
+
+Since 2024, the contributors with administrator access to the project are now
+Nicholas Wilson and Zoltán Herczeg. See the file [SECURITY](./SECURITY.md) for
+GPG keys.
+
+Both administrators are volunteers acting in a personal capacity.
+
+<table>
+<thead>
+<tr>
+  <th>Name</th>
+  <th>Role</th>
+<tr>
+</thead>
+<tbody>
+<tr>
+  <td>
+
+  Nicholas Wilson<br/>
+  `nicholas@nicholaswilson.me.uk`<br/>
+  Currently of Microsoft Research Cambridge, UK
+
+  </td>
+  <td>
+
+  * General project administration & maintenance
+  * Release management
+  * Code maintenance
+
+  </td>
+</tr>
+<tr>
+  <td>
+
+  Zoltán Herczeg<br/>
+  `hzmester@freemail.hu`<br/>
+  Currently of the University of Szeged, Hungary
+
+  </td>
+  <td>
+
+  * Code maintenance
+  * Ownership of `sljit` and PCRE2's JIT
+
+  </td>
+</tr>
+</tbody>
+</table>
+
+
+Contributors
+------------
+
+Many others have participated and contributed to PCRE2 over its history.
+
+The maintainers are grateful for all contributions and participation over the
+years. We apologise for any names we have forgotten.
+
+We are especially grateful to Philip Hazel, creator of PCRE and PCRE2, and
+maintainer from 1997 to 2024.
+
+All names listed alphabetically.
+
+### Contributors to PCRE2
+
+This list includes names up until the PCRE2 10.48 release. New names will be
+added from the Git history on each release.
+
+    Ilia Alshanetsky
+    Bernard Assan
+    Scott Bell
+    Carlo Marcelo Arenas Belón
+    Edward Betts
+    Jan-Willem Blokland
+    Ross Burton
+    Dmitry Cherniachenko
+    Alexey Chupahin
+    Jessica Clarke
+    Alejandro Colomar
+    Jeremie Courreges-Anglas
+    Addison Crump
+    Weixie Cui
+    Alex Dowad
+    Daniel Engberg
+    Marco Feuerstein
+    Daniel Richard G
+    Isaac Oscar Gariano
+    David Gaussmann
+    Andrey Gorbachev
+    Nikolay Govorov
+    Jordan Griege
+    Rudi Heitbaum
+    Jason Hood
+    Bumsu Hyeon
+    Roy Ivy
+    Nobuhiro Iwamatsu
+    Martin Joerg
+    Guillem Jover
+    Ralf Junker
+    Anton Karpov
+    Ayesh Karunaratne
+    Michael Kaufmann
+    Srijan Keshri
+    Yunho Kim
+    Joshua Kinard
+    David Korczynski
+    Uwe Korn
+    Jonas Kvinge
+    Kristian Larsson
+    Lin Runze
+    Kai Lu
+    Behzod Mansurov
+    Brian McKenna
+    B. Scott Michel
+    Greg Minshall
+    Nathan Moinvaziri
+    Alexandre Moyer
+    Mike Munday
+    Marc Mutz
+    Kartik Naik
+    NaN
+    Fabio Pagani
+    Christian Persch
+    Alex Reinking
+    Joshua Rogers
+    Tristan Ross
+    William A Rowe Jr
+    Rocco Ruscitti
+    David Seifert
+    Yaakov Selkowitz
+    Rich Siegel
+    Karl Skomski
+    Maciej Sroczyński
+    Wolfgang Stöggl
+    Thomas Tempelmann
+    Greg Thain
+    Lucas Trzesniewski
+    Theodore Tsirpanis
+    Matt Turner
+    Aaron M. Ucko
+    Matthew Vernon
+    Rémi Verschelde
+    Thomas Voss
+    Ezekiel Warren
+    Carl Weaver
+    Chris Wilson
+    Amin Yahyaabadi
+    Joe Zhang
+
+### Contributors to PCRE1
+
+These people contributed either by sending patches or reporting serious issues.
+
+    Irfan Adilovic
+    Alexander Barkov
+    Daniel Bergström
+    David Burgess
+    Ross Burton
+    David Byron
+    Fred Cox
+    Christian Ehrlicher
+    Tom Fortmann
+    Lionel Fourquaux
+    Mike Frysinger
+    Daniel Richard G
+    Dair Gran
+    "Graycode" (Red Hat Product Security)
+    Viktor Griph
+    Wen Guanxing
+    Robin Houston
+    Martin Jerabek
+    Peter Kankowski
+    Stephen Kelly
+    Yunho Kim
+    Joshua Kinard
+    Carsten Klein
+    Evgeny Kotkov
+    Ronald Landheer-Cieslak
+    Alan Lehotsky
+    Dmitry V. Levin
+    Nuno Lopes
+    Kai Lu
+    Giuseppe Maxia
+    Dan Mooney
+    Marc Mutz
+    Markus Oberhumer
+    Sheri Pierce
+    Petr Pisar
+    Ari Pollak
+    Bob Rossi
+    Ruiger Rill
+    Michael Shigorin
+    Rich Siegel
+    Craig Silverstein (C++ wrapper)
+    Karl Skomski
+    Paul Sokolovsky
+    Stan Switzer
+    Ian Taylor
+    Mark Tetrode
+    Jeff Trawick
+    Steven Van Ingelgem
+    Lawrence Velazquez
+    Jiong Wang
+    Stefan Weber
+    Chris Wilson
+
+Thanks go to Jeffrey Friedl for testing and debugging assistance.
 
 ------------------------------------------------------------------------------
-tzdata 2025b-r0
+tzdata 2026f-r0
 Licencia: Public-Domain
 Binarios: tzdata
-Commit de aports: c4a545b4457088daf2edfe933fecbaa8eeb774a4
+Commit de aports: 63faba7f731ad47f4cd60d3ff34ff1aadd49c091
 ------------------------------------------------------------------------------
 
---- LICENSE --- repositorio oficial eggert/tz@2025b
---- https://raw.githubusercontent.com/eggert/tz/2025b/LICENSE
+--- LICENSE --- repositorio oficial eggert/tz@2026f
+--- https://raw.githubusercontent.com/eggert/tz/2026f/LICENSE
 
 Unless specified below, all files in the tz code and data (including
 this LICENSE file) are in the public domain.
@@ -2688,14 +3057,14 @@ If the files date.c, newstrftime.3, and strftime.c are present, they
 contain material derived from BSD and use the BSD 3-clause license.
 
 ------------------------------------------------------------------------------
-xz 5.6.3-r1
+xz 5.8.4-r0
 Licencia: GPL-2.0-or-later AND 0BSD AND Public-Domain AND LGPL-2.1-or-later
 Binarios: xz-libs
-Commit de aports: 0e019d9722d6d8e51ef4658074b2bc736f60b4dc
+Commit de aports: 0c088d609f9fe69eedd6b4c7f4b99cdad847c20a
 ------------------------------------------------------------------------------
 
---- COPYING --- upstream github tukaani-project/xz@v5.6.3
---- https://raw.githubusercontent.com/tukaani-project/xz/v5.6.3/COPYING
+--- COPYING --- upstream github tukaani-project/xz@v5.8.4
+--- https://raw.githubusercontent.com/tukaani-project/xz/v5.8.4/COPYING
 
 
 XZ Utils Licensing
@@ -2739,6 +3108,12 @@ XZ Utils Licensing
         free software licenses. These aren't built or installed as
         part of XZ Utils.
 
+    The following command may be helpful in finding per-file license
+    information. It works on xz.git and on a clean file tree extracted
+    from a release tarball.
+
+        sh build-aux/license-check.sh -v
+
     For the files under the BSD Zero Clause License (0BSD), if
     a copyright notice is needed, the following is sufficient:
 
@@ -2758,30 +3133,11 @@ XZ Utils Licensing
       - COPYING.GPLv2: GNU General Public License version 2
       - COPYING.GPLv3: GNU General Public License version 3
 
-    A note about old XZ Utils releases:
-
-        XZ Utils releases 5.4.6 and older and 5.5.1alpha have a
-        significant amount of code put into the public domain and
-        that obviously remains so. The switch from public domain to
-        0BSD for newer releases was made in Febrary 2024 because
-        public domain has (real or perceived) legal ambiguities in
-        some jurisdictions.
-
-        There is very little *practical* difference between public
-        domain and 0BSD. The main difference likely is that one
-        shouldn't claim that 0BSD-licensed code is in the public
-        domain; 0BSD-licensed code is copyrighted but available under
-        an extremely permissive license. Neither 0BSD nor public domain
-        require retaining or reproducing author, copyright holder, or
-        license notices when distributing the software. (Compare to,
-        for example, BSD 2-Clause "Simplified" License which does have
-        such requirements.)
-
     If you have questions, don't hesitate to ask for more information.
     The contact information is in the README file.
 
---- AUTHORS --- upstream github tukaani-project/xz@v5.6.3
---- https://raw.githubusercontent.com/tukaani-project/xz/v5.6.3/AUTHORS
+--- AUTHORS --- upstream github tukaani-project/xz@v5.8.4
+--- https://raw.githubusercontent.com/tukaani-project/xz/v5.8.4/AUTHORS
 
 
 Authors of XZ Utils
@@ -2809,7 +3165,7 @@ Authors of XZ Utils
     by Michał Górny.
 
     Architecture-specific CRC optimizations were contributed by
-    Ilya Kurdyukov, Hans Jansen, and Chenxi Mao.
+    Ilya Kurdyukov, Chenxi Mao, and Xi Ruoyao.
 
     Other authors:
       - Jonathan Nieder
@@ -2842,14 +3198,14 @@ Authors of XZ Utils
         GNU Libtool, GNU Gettext, Autoconf Archive, and related files.
 
 ------------------------------------------------------------------------------
-zstd 1.5.6-r2
+zstd 1.5.7-r2
 Licencia: BSD-3-Clause OR GPL-2.0-or-later
 Binarios: zstd-libs
-Commit de aports: 5c2ddf18f193dafdd25ae7391d96c7e30766eecd
+Commit de aports: 3c6e2ee2b16f403d53eab39c4426eb61f003c322
 ------------------------------------------------------------------------------
 
---- LICENSE --- upstream github facebook/zstd@v1.5.6
---- https://raw.githubusercontent.com/facebook/zstd/v1.5.6/LICENSE
+--- LICENSE --- upstream github facebook/zstd@v1.5.7
+--- https://raw.githubusercontent.com/facebook/zstd/v1.5.7/LICENSE
 
 BSD License
 
@@ -2882,8 +3238,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
---- COPYING --- upstream github facebook/zstd@v1.5.6
---- https://raw.githubusercontent.com/facebook/zstd/v1.5.6/COPYING
+--- COPYING --- upstream github facebook/zstd@v1.5.7
+--- https://raw.githubusercontent.com/facebook/zstd/v1.5.7/COPYING
 
                     GNU GENERAL PUBLIC LICENSE
                        Version 2, June 1991
@@ -3229,92 +3585,92 @@ Public License instead of this License.
 VERIFICADOS Y SIN AVISO PROPIO
 ------------------------------------------------------------------------------
 
-  alpine-base 3.21.3-r0: paquete propio de Alpine: se inspecciono su directorio en aports en el commit exacto y no contiene archivo de aviso
-      inspeccionado: https://raw.githubusercontent.com/alpinelinux/aports/899c70c801638ce9aea29a822aaa07a1488efa15/main/alpine-base/
-  alpine-keys 2.5-r0: paquete propio de Alpine: se inspecciono su directorio en aports en el commit exacto y no contiene archivo de aviso
-      inspeccionado: https://raw.githubusercontent.com/alpinelinux/aports/6d473fb38effb2389f567b29fb7eb27039b3a279/main/alpine-keys/
+  alpine-base 3.24.4-r0: paquete propio de Alpine: se inspecciono su directorio en aports en el commit exacto y no contiene archivo de aviso
+      inspeccionado: https://raw.githubusercontent.com/alpinelinux/aports/105b835acd9971b9770fb61f5a1ddcc133c180dc/main/alpine-base/
+  alpine-keys 2.6-r0: paquete propio de Alpine: se inspecciono su directorio en aports en el commit exacto y no contiene archivo de aviso
+      inspeccionado: https://raw.githubusercontent.com/alpinelinux/aports/b9f23becced4d7b3ccc0fa0f28530243ccd314a0/main/alpine-keys/
 
 ------------------------------------------------------------------------------
 NO VERIFICABLES DENTRO DEL ALCANCE AUTORIZADO
 ------------------------------------------------------------------------------
 
-  alpine-baselayout 3.6.8-r1
+  alpine-baselayout 3.7.2-r1
       fuente: https://salsa.debian.org/md/netbase/-/raw/v6.4/etc/protocols
-  apk-tools 2.14.6-r3
-      fuente: https://gitlab.alpinelinux.org/alpine/apk-tools/-/archive/v2.14.6/apk-tools-v2.14.6.tar.gz
-  busybox 1.37.0-r12
+  apk-tools 3.0.9-r0
+      fuente: https://gitlab.alpinelinux.org/alpine/apk-tools/-/archive/v3.0.9/apk-tools-v3.0.9.tar.gz
+  busybox 1.37.0-r31
       fuente: https://busybox.net/downloads/busybox-1.37.0.tar.bz2
   bzip2 1.0.8-r6
       fuente: https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
-  ca-certificates 20241121-r1
-      fuente: https://gitlab.alpinelinux.org/alpine/ca-certificates/-/archive/20241121/ca-certificates-20241121.tar.bz2
-  curl 8.12.1-r1
-      fuente: https://curl.se/download/curl-8.12.1.tar.xz
-  dav1d 1.5.0-r0
-      fuente: https://code.videolan.org/videolan/dav1d/-/archive/1.5.0/dav1d-1.5.0.tar.bz2
-  expat 2.7.0-r0
-      fuente: https://downloads.sourceforge.net/project/expat/expat/2.7.0/expat-2.7.0.tar.bz2
-  fontconfig 2.15.0-r1
-      fuente: https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.15.0.tar.gz
-  freetype 2.13.3-r0
-      fuente: https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz
-  gettext 0.22.5-r0
-      fuente: https://ftp.gnu.org/gnu/gettext/gettext-0.22.5.tar.xz
+  ca-certificates 20261020-r0
+      fuente: https://gitlab.alpinelinux.org/alpine/ca-certificates/-/archive/20261020/ca-certificates-20261020.tar.bz2
+  curl 8.23.0-r0
+      fuente: https://curl.se/download/curl-8.23.0.tar.xz
+  dav1d 1.5.3-r0
+      fuente: https://code.videolan.org/videolan/dav1d/-/archive/1.5.3/dav1d-1.5.3.tar.gz
+  expat 2.10.0-r0
+      fuente: https://github.com/libexpat/libexpat/releases/download/$_tagver/expat-$pkgver.tar.xz
+  fontconfig 2.17.1-r1
+      fuente: https://gitlab.freedesktop.org/api/v4/projects/890/packages/generic/fontconfig/2.17.1/fontconfig-2.17.1.tar.xz
+  freetype 2.14.3-r0
+      fuente: https://download.savannah.gnu.org/releases/freetype/freetype-2.14.3.tar.xz
+  gcc 15.2.0-r5
+      fuente: https://gcc.gnu.org/pub/gcc/releases/gcc-15.2.0%%_git*}/gcc-15.2.0%%_git*}.tar.xz
+  gettext 1.0-r0
+      fuente: https://ftp.gnu.org/gnu/gettext/gettext-1.0.tar.xz
   libbsd 0.12.2-r0
       fuente: https://libbsd.freedesktop.org/releases/libbsd-0.12.2.tar.xz
-  libedit 20240808.3.1-r0
-      fuente: https://www.thrysoee.dk/editline/libedit-20240808.3.1/./-}.tar.gz
-  libgcrypt 1.10.3-r1
-      fuente: https://www.gnupg.org/ftp/gcrypt/libgcrypt/libgcrypt-1.10.3.tar.bz2
-  libgpg-error 1.51-r0
-      fuente: https://gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-1.51.tar.bz2
-  libice 1.1.1-r6
-      fuente: https://www.x.org/releases/individual/lib/libICE-1.1.1.tar.xz
-  libidn2 2.3.7-r0
-      fuente: https://ftp.gnu.org/gnu/libidn/libidn2-2.3.7.tar.gz
-  libmd 1.1.0-r0
-      fuente: https://archive.hadrons.org/software/libmd/libmd-1.1.0.tar.xz
-  libpng 1.6.47-r0
-      fuente: https://downloads.sourceforge.net/libpng/libpng-1.6.47.tar.gz
-  libsm 1.2.4-r4
-      fuente: https://www.x.org/releases/individual/lib/libSM-1.2.4.tar.xz
-  libunistring 1.2-r0
-      fuente: https://ftp.gnu.org/gnu/libunistring/libunistring-1.2.tar.xz
-  libwebp 1.4.0-r0
-      fuente: https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.4.0.tar.gz
-  libx11 1.8.10-r0
-      fuente: https://www.x.org/releases/individual/lib/libX11-1.8.10.tar.xz
-  libxau 1.0.11-r4
-      fuente: https://www.x.org/releases/individual/lib/libXau-1.0.11.tar.xz
-  libxcb 1.16.1-r0
-      fuente: https://xorg.freedesktop.org/archive/individual/lib/libxcb-1.16.1.tar.xz
+  libedit 20260508.3.1-r1
+      fuente: https://www.thrysoee.dk/editline/libedit-$_ver.tar.gz
+  libice 1.1.2-r0
+      fuente: https://www.x.org/releases/individual/lib/libICE-1.1.2.tar.xz
+  libidn2 2.3.8-r0
+      fuente: https://ftp.gnu.org/gnu/libidn/libidn2-2.3.8.tar.gz
+  libmd 1.2.0-r0
+      fuente: https://archive.hadrons.org/software/libmd/libmd-1.2.0.tar.xz
+  libpng 1.6.59-r0
+      fuente: https://github.com/pnggroup/libpng/archive/refs/tags/v1.6.59.tar.gz
+  libsm 1.2.6-r0
+      fuente: https://www.x.org/releases/individual/lib/libSM-1.2.6.tar.xz
+  libunistring 1.4.2-r0
+      fuente: https://ftp.gnu.org/gnu/libunistring/libunistring-1.4.2.tar.xz
+  libwebp 1.6.0-r0
+      fuente: https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.6.0.tar.gz
+  libx11 1.8.14-r0
+      fuente: https://www.x.org/releases/individual/lib/libX11-1.8.14.tar.xz
+  libxau 1.0.12-r0
+      fuente: https://www.x.org/releases/individual/lib/libXau-1.0.12.tar.xz
+  libxcb 1.17.0-r2
+      fuente: https://xorg.freedesktop.org/archive/individual/lib/libxcb-1.17.0.tar.xz
   libxdmcp 1.1.5-r1
       fuente: https://www.x.org/releases/individual/lib/libXdmcp-1.1.5.tar.xz
-  libxext 1.3.6-r2
-      fuente: https://www.x.org/releases/individual/lib/libXext-1.3.6.tar.xz
-  libxml2 2.13.4-r5
-      fuente: https://download.gnome.org/sources/libxml2/2.13.4%.*}/libxml2-2.13.4.tar.xz
-  libxpm 3.5.17-r0
-      fuente: https://www.x.org/releases/individual/lib/libXpm-3.5.17.tar.xz
-  libxslt 1.1.42-r2
-      fuente: https://download.gnome.org/sources/libxslt/1.1.42%.*}/libxslt-1.1.42.tar.xz
+  libxext 1.3.7-r0
+      fuente: https://www.x.org/releases/individual/lib/libXext-1.3.7.tar.xz
+  libxml2 2.13.9-r2
+      fuente: https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.9.tar.xz
+  libxpm 3.5.20-r0
+      fuente: https://www.x.org/releases/individual/lib/libXpm-3.5.20.tar.xz
+  libxslt 1.1.43-r3
+      fuente: https://download.gnome.org/sources/libxslt/1.1/libxslt-1.1.43.tar.xz
   libxt 1.3.1-r0
       fuente: https://www.x.org/releases/individual/lib/libXt-1.3.1.tar.xz
-  musl 1.2.5-r9
-      fuente: https://musl.libc.org/releases/musl-1.2.5.tar.gz
-  ncurses 6.5_p20241006-r3
-      fuente: https://invisible-mirror.net/archives/ncurses/current/ncurses-6.5_p20241006/_p/-}.tgz
-  pax-utils 1.3.8-r1
-      fuente: https://dev.gentoo.org/~sam/distfiles/app-misc/pax-utils/pax-utils-1.3.8.tar.xz
-  tiff 4.7.0-r0
-      fuente: https://download.osgeo.org/libtiff/tiff-4.7.0.tar.gz
-  util-linux 2.40.4-r1
-      fuente: https://www.kernel.org/pub/linux/utils/util-linux/v$_v/util-linux-2.40.4.tar.xz
-  zlib 1.3.1-r2
-      fuente: https://zlib.net/fossils/zlib-1.3.1.tar.gz
+  libyuv 0.0.1928-r0
+      fuente: $pkgname-$pkgver.tar.gz::https://chromium.googlesource.com/libyuv/libyuv/+archive/$_commit.tar.gz
+  musl 1.2.6-r3
+      fuente: https://musl.libc.org/releases/musl-1.2.6.tar.gz
+  ncurses 6.6_p20260516-r0
+      fuente: https://invisible-mirror.net/archives/ncurses/current/ncurses-6.6_p20260516.tgz
+  pax-utils 1.3.9-r1
+      fuente: https://dev.gentoo.org/~sam/distfiles/app-misc/pax-utils/pax-utils-1.3.9.tar.xz
+  tiff 4.7.2-r0
+      fuente: https://download.osgeo.org/libtiff/tiff-4.7.2.tar.gz
+  util-linux 2.42.3-r1
+      fuente: https://www.kernel.org/pub/linux/utils/util-linux/v$_v/util-linux-$pkgver.tar.xz
+  zlib 1.3.2-r1
+      fuente: https://zlib.net/fossils/zlib-1.3.2.tar.gz
 
 ==============================================================================
-COMPONENTES DE LAS IMAGENES BASE  (5)
+COMPONENTES DE LAS IMAGENES BASE  (6)
 ==============================================================================
 
 ------------------------------------------------------------------------------
@@ -3351,9 +3707,217 @@ paquete de nginx.org, no de aports
  */
 
 ------------------------------------------------------------------------------
+nginx-module-acme
+Ubicacion en la imagen: /usr/share/licenses/nginx-module-acme/COPYRIGHT
+paquete de nginx.org
+------------------------------------------------------------------------------
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "{}"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright {yyyy} {name of copyright owner}
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+------------------------------------------------------------------------------
 nginx-module-geoip
 Ubicacion en la imagen: /usr/share/licenses/nginx-module-geoip/COPYRIGHT
-paquete de nginx.org, no de aports
+paquete de nginx.org
 ------------------------------------------------------------------------------
 
 /* 
@@ -3386,7 +3950,7 @@ paquete de nginx.org, no de aports
 ------------------------------------------------------------------------------
 nginx-module-image-filter
 Ubicacion en la imagen: /usr/share/licenses/nginx-module-image-filter/COPYRIGHT
-paquete de nginx.org, no de aports
+paquete de nginx.org
 ------------------------------------------------------------------------------
 
 /* 
@@ -3419,7 +3983,7 @@ paquete de nginx.org, no de aports
 ------------------------------------------------------------------------------
 nginx-module-njs
 Ubicacion en la imagen: /usr/share/licenses/nginx-module-njs/COPYRIGHT
-paquete de nginx.org, no de aports
+paquete de nginx.org
 ------------------------------------------------------------------------------
 
 /*
@@ -3454,7 +4018,7 @@ paquete de nginx.org, no de aports
 ------------------------------------------------------------------------------
 nginx-module-xslt
 Ubicacion en la imagen: /usr/share/licenses/nginx-module-xslt/COPYRIGHT
-paquete de nginx.org, no de aports
+paquete de nginx.org
 ------------------------------------------------------------------------------
 
 /* 

@@ -21,7 +21,8 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIR = path.join(RAIZ, "notices");
 
 const ARTEFACTOS = [
-  { nombre: "frontend-image", rama: "3.21-stable" },
+  // AUD-B: la web pasa de Alpine 3.21 (Nginx 1.27) a Alpine 3.24 (Nginx 1.30), la misma rama que la API y mantenimiento.
+  { nombre: "frontend-image", rama: "3.24-stable" },
   { nombre: "backend", rama: "3.24-stable" },
   { nombre: "migrate", rama: "3.24-stable" },
 ];

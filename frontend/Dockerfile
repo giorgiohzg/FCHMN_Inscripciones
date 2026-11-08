@@ -15,8 +15,8 @@
 # apuntar a otro backend exige RECONSTRUIR la imagen.
 # =============================================================================
 
-ARG NODE_VERSION=22-alpine
-ARG NGINX_VERSION=1.27-alpine
+ARG NODE_VERSION=22.23.4-alpine3.24
+ARG NGINX_VERSION=1.30.6-alpine3.24
 
 # BASES FIJADAS POR DIGEST.
 #
@@ -26,14 +26,20 @@ ARG NGINX_VERSION=1.27-alpine
 # veces puede dar dos imágenes distintas, y entonces el inventario de avisos
 # deja de describir lo que se distribuye.
 #
-# NODE_DIGEST conserva el digest ya verificado, para que la capa de Node siga
-# siendo exactamente la auditada. NGINX_DIGEST fija el índice publicado el
-# 2026-09-20; NO está probado que sea el de la imagen anterior, porque esa
-# imagen no registra su base. Al reconstruir cambiarán versiones de paquetes
+# Al reconstruir sobre un digest distinto cambian las versiones de los paquetes
 # del sistema, y por eso el inventario debe volver a extraerse y verificarse
 # contra la nueva candidata.
-ARG NODE_DIGEST=sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32
-ARG NGINX_DIGEST=sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+#
+# AUD-B (2026-11-08): Node pasa de 22.23.2 (`c610fcdf…`) a 22.23.4 (version de
+# seguridad de la rama 22 LTS, nodejs.org, 2026-10-20) y Nginx de 1.27.5
+# (`65645c7b…`, rama que el fabricante ya no evalua) a 1.30.6, la ultima
+# ESTABLE (nginx.org), sobre Alpine 3.24.4. No se migra a Node 24 ni a la
+# rama mainline de Nginx. Etiqueta y digest son los del INDICE multiplataforma
+# de las imagenes oficiales de Docker Hub, verificados descargando cada imagen
+# por digest y leyendo `NODE_VERSION` y `NGINX_VERSION`; al subir una version
+# hay que actualizar ETIQUETA Y DIGEST juntos.
+ARG NODE_DIGEST=sha256:0e1754758c2df4cfa3e68d59e2e1b7374bb7fd9ea6328eaaacf15cc934af8202
+ARG NGINX_DIGEST=sha256:583b7f2fce1cdb8da5ad5c39ebd3c33b98b87d493190e548bdee1fa8c619c311
 
 # --- Compilación -------------------------------------------------------------
 FROM node:${NODE_VERSION}@${NODE_DIGEST} AS build

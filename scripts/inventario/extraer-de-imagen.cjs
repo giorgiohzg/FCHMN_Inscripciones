@@ -229,6 +229,8 @@ function leerSueltos() {
         { componente: "nginx-module-geoip", ruta: "/usr/share/licenses/nginx-module-geoip/COPYRIGHT", nota: "paquete de nginx.org" },
         { componente: "nginx-module-xslt", ruta: "/usr/share/licenses/nginx-module-xslt/COPYRIGHT", nota: "paquete de nginx.org" },
         { componente: "nginx-module-image-filter", ruta: "/usr/share/licenses/nginx-module-image-filter/COPYRIGHT", nota: "paquete de nginx.org" },
+        // Nuevo con Nginx 1.30 (AUD-B): la imagen oficial incorpora el modulo ACME de nginx.org, que trae su propio texto.
+        { componente: "nginx-module-acme", ruta: "/usr/share/licenses/nginx-module-acme/COPYRIGHT", nota: "paquete de nginx.org" },
     ];
     const out = [];
     for (const c of candidatos) {

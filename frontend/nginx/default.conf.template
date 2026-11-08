@@ -39,6 +39,46 @@ map $http_x_forwarded_proto $esquema_original {
     "~^(http|https)$"  $http_x_forwarded_proto;
 }
 
+# REGISTRO DE ACCESO SIN CADENA DE CONSULTA NI `Referer` (auditoría AUD-03).
+#
+# La imagen oficial de Nginx declara en su `nginx.conf`, a nivel `http`, un
+# `access_log` con el formato `main`, que escribe `"$request"` —método, URI CON su
+# cadena de consulta y protocolo— y `$http_referer`. Los listados reciben ahí la
+# búsqueda (`/api/persons?search=...`) y por eso un nombre, un RUN o un RUT quedaban
+# escritos en la salida estándar del contenedor. El servidor lo HEREDABA sin que
+# este archivo dijera nada.
+#
+# Este formato lo reemplaza: ruta sin consulta, y sin `$request`, `$args`,
+# `$query_string`, `$request_uri` ni `$http_referer`. `escape=json` escapa cada
+# valor, de modo que una ruta con comillas o saltos de línea no rompe la línea ni
+# permite inyectar campos. Sigue habiendo método, ruta, estado, bytes, tiempo y
+# direcciones, que es lo que hace falta para operar.
+#
+# POR QUÉ UN `map` Y NO `$uri`. `$uri` cambia durante el procesamiento: tras el
+# `rewrite ... break` de `/api/` vale la ruta SIN el prefijo, y tras la redirección
+# interna del `try_files` del SPA vale `/index.html`. Los dos registrarían una ruta
+# que no es la que pidió el cliente. `$request_uri` es la original, pero con la
+# consulta, así que se recorta: el patrón toma todo lo anterior al primer `?`. Se usa
+# una captura con nombre como VALOR del `map` y no se combina con ninguna otra
+# variable en una expresión, que es lo que exigen los avisos de Nginx sobre `map` con
+# expresiones regulares (y esta imagen ya está en una versión corregida).
+map $request_uri $ruta_original {
+    default          "-";
+    "~^(?<ruta_sin_consulta>[^?]*)"  $ruta_sin_consulta;
+}
+
+log_format fchmn_acceso escape=json
+    '{"hora":"$time_iso8601",'
+    '"direccion":"$remote_addr",'
+    '"reenviada":"$http_x_forwarded_for",'
+    '"metodo":"$request_method",'
+    '"ruta":"$ruta_original",'
+    '"protocolo":"$server_protocol",'
+    '"estado":$status,'
+    '"bytes":$body_bytes_sent,'
+    '"tiempo":$request_time,'
+    '"agente":"$http_user_agent"}';
+
 server {
     listen ${PORT};
     server_name _;
@@ -47,6 +87,12 @@ server {
 
     # No anunciar la versión de Nginx.
     server_tokens off;
+
+    # Registro de acceso del servidor. Una directiva `access_log` en ESTE nivel
+    # reemplaza a la del nivel `http` de la imagen (formato `main`, con la consulta
+    # y el `Referer`): no se hereda ninguna otra. Mismo destino que la imagen, que
+    # enlaza `/var/log/nginx/access.log` a la salida estándar. Ver `log_format` arriba.
+    access_log /var/log/nginx/access.log fchmn_acceso;
 
     # CABECERAS DE SEGURIDAD (Fase 3). Se incluyen en `/`, `/assets/` y
     # `= /index.html` (más abajo) y NO en `/api/`, que ya recibe las suyas de la
