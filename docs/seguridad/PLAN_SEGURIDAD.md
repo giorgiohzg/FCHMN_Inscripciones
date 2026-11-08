@@ -18,6 +18,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | CI de SEC-02 | Pánico intermitente del motor de Prisma en las pruebas unitarias (ejecución 42269659668) | **Diagnosticado; protección publicada en el repositorio y validada en local.** La causa del pánico **no está demostrada**. Ver «CI de SEC-02» |
 | **SEC-01** | Topes para las listas JSON (`personIds` de relevos y otras) | **Cerrada** dentro de su alcance: desplegada en `fchmn-api` desde `120e29d` (Live, Auto-Deploy Off) y validada en local y en la CI con datos sintéticos. Ver «SEC-01» |
 | **SEC-03** | Dependencias, en tres entregas (A backend compatible, B Vite/Vitest, C Zod) | **A cerrada** dentro de su alcance: desplegada solo en `fchmn-api` desde `dab3690` (Live, Auto-Deploy Off). **B publicada en el repositorio, validada en local y desplegada** (API en `64e2122`, web en `2de9dea`; ver «SEC-03, entrega B»). **C (Zod del backend 3 → 4.6.7) cerrada:** API en `64e2122` (Live, Auto-Deploy Off), mantenimiento y web en `2de9dea` (ver «SEC-03, entrega C»). **SEC-03 sigue abierta:** solo por el aviso de desarrollo de `minimatch`; su override acotado es una **solución temporal publicada y validada localmente** (la CI de su SHA se comprueba aparte; ver «SEC-03, override acotado de `minimatch`»). Ver «SEC-03, entrega A» |
+| **AUD-A** | Auditoría del 2026-11-07, AUD-04 y AUD-11: el estado del club se aplica a su cuenta, a su personal y a sus credenciales | **Publicado en el repositorio y probado en local** (pruebas de integración focalizadas sobre la base desechable, typecheck y lint); **pendiente de despliegue**; la CI de su SHA se comprueba aparte. Ver «AUD-A» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -1251,6 +1252,73 @@ Es la **reubicación aceptada** de esos tres paquetes: al subir la copia de la r
 - El override fija una versión exacta (`11.0.5`): una futura versión de `glob` que pida un rango distinto volvería a mover copias, y los inventarios lo reflejarían.
 - La equivalencia de lint se midió con los archivos y patrones de este repositorio; no prueba equivalencia general entre `minimatch` 10 y 11.
 - Quedan en el equipo las imágenes `fchmn-{backend,migrate}:mm-descubrimiento`; los nueve contenedores de las extracciones y comprobaciones se detuvieron y eliminaron por su ID (sin `-f` ni `-v`), y los seis contenedores del proyecto, las demás imágenes y los volúmenes no se tocaron.
+
+## AUD-A: estado del club y autorización (AUD-04 y AUD-11; publicado en el repositorio y probado en local; pendiente de despliegue)
+
+**Estado: publicado en `main` y probado en LOCAL; pendiente de despliegue. Su resultado en la CI se comprueba aparte y no se anticipa aquí. No se tocó Render ni producción.**
+Producción sigue con el comportamiento anterior. No es «validada localmente» en el sentido de las fases
+anteriores: **no** se ejecutaron las suites completas, solo las pruebas pertinentes descritas abajo.
+
+**El defecto.** Bloquear, inhabilitar o eliminar un club apagaba solo SU cuenta. El personal —delegado,
+entrenador, representante legal— entra con su cuenta de persona, y su club salía de `club_staff` sin
+mirar el estado del club: seguía operando por él (cancelar o editar inscripciones y relevos, terminar
+membresías, reportes, exportación Team Manager). Y crear o restablecer las credenciales de un club no
+activo dejaba su cuenta `active`, con lo que el club recuperaba el acceso.
+
+**Qué cambia.**
+- **Una sola resolución de autorización efectiva** (`resolverAutorizacionEfectiva`, en
+  `backend/src/modules/auth/authorization.ts`), usada por el login, la renovación, el cambio de
+  contraseña (`auth.service.ts`) y cada solicitud (`loadAuthorizationState`). Antes había dos copias.
+  La respuesta de autenticación, los claims del token y `/auth/me` coinciden.
+- **Personal de un club no activo o eliminado:** sin club y sin los roles de personal; los permisos se
+  recalculan con los roles que quedan. Solo quitar el club no bastaba: los permisos de club seguían
+  cargados sobre un alcance personal que no los acota.
+
+  | Actor | Club activo | Club bloqueado, inhabilitado o eliminado |
+  |---|---|---|
+  | Administrador | Sin cambios | Sin cambios; sus sesiones no se tocan |
+  | Cuenta del club | Sin cambios | No inicia sesión, no renueva y no opera (401), aunque su fila figure activa |
+  | Personal sin rol de nadador | Sin cambios | Conserva su sesión: `/auth/me`, cambio de contraseña, renovación y cierre. Sin roles ni permisos efectivos: lo demás responde 403 |
+  | Personal que también es nadador | Sin cambios | Roles `[swimmer]` y exactamente los permisos de nadador: lo suyo responde 200 sin datos ajenos; lo del club, 403 |
+
+  La reducción es de autorización EFECTIVA: `user_roles` y `club_staff` no cambian. Al reactivar el
+  club, la siguiente solicitud —con el token anterior— recupera roles y club. No se añadió ninguna
+  revocación de sesiones del personal ni de administradores; las de la cuenta del club siguen como
+  antes. Se conserva la regla de un solo club por persona.
+- **Cuenta del club:** se exige su club activo y no eliminado en el login (con el mismo criterio que la
+  persona dueña: la incoherencia recibe el genérico; el estado administrativo habitual, su motivo), en
+  la renovación, en el cambio de contraseña y en cada solicitud.
+- **Credenciales** (`backend/src/modules/clubs/clubs.service.ts`). Crear las de un club no activo se
+  rechaza (400); eliminado, 404 como antes. Restablecer decide con el estado del club releído en la
+  misma transacción:
+
+  | Club | Cuenta antes | `status` | `lockedUntil` | `failedLoginAttempts` |
+  |---|---|---|---|---|
+  | activo | activa, bloqueo temporal, bloqueo administrativo o inhabilitada | `active` (como siempre) | `null` | 0 |
+  | bloqueado o inhabilitado | cualquiera | el del club | `null` | 0 |
+  | eliminado | — | 404, como antes | | |
+
+  Con el club activo se conserva el restablecimiento administrativo de siempre; un bloqueo temporal
+  nunca pasa a administrativo dentro de un club activo. En todos los casos siguen la contraseña
+  temporal, `mustChangePassword` y el fin de las sesiones de esa cuenta.
+
+**Pruebas** (datos sintéticos, solo sobre la base desechable de `docker-compose.test.yml`).
+- Nueva `backend/tests/club-inactivo-alcance.integration.test.ts` (34 casos): la matriz de arriba con el
+  club bloqueado, inhabilitado, eliminado y reactivado; login, renovación y solicitudes con un token
+  obtenido antes del cambio; cambio de contraseña; listados personales en 200 sin datos ajenos y
+  operaciones del club en 403; roles persistidos intactos; ausencia de revocaciones nuevas; la cuenta
+  incoherente (activa con el club bloqueado); y la matriz completa de crear y restablecer credenciales.
+- Contraprueba: contra el código anterior fallan 20 de los 34 casos (los de club no activo, reactivación,
+  cuenta incoherente y credenciales de clubes no activos); los 14 restantes describen comportamiento que
+  no cambia.
+- Además pasaron, sin cambiar expectativas, 18 archivos de integración de autenticación, sesiones,
+  clubes, alcance y auditoría (en total 19 archivos y 487 pruebas), `npm run typecheck` completo del
+  backend y ESLint sin autocorrección de los archivos tocados (0 errores; avisos `no-explicit-any`).
+
+**Límites.** No se observó la interfaz: el backend aplica el cambio en la siguiente solicitud, pero el
+frontend actualiza roles y club desde los claims al renovar, así que puede mostrar menús de club hasta
+entonces (las solicitudes reciben 403). La capacidad por club que ve un nadador sigue pendiente de la
+decisión funcional AUD-06. No se ejecutaron las suites completas.
 
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 

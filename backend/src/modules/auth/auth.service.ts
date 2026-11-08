@@ -3,7 +3,7 @@ import { prisma } from "../../shared/prisma.client";
 import { env } from "../../shared/env";
 import { audit } from "../audit/audit.service";
 import { signAccessToken, verifyAccessToken, type SessionOwnerType } from "./jwt.util";
-import { loadRolesAndPermissions, resolvePersonClubId } from "./authorization";
+import { resolverAutorizacionEfectiva, type AutorizacionEfectiva } from "./authorization";
 import { hashPassword, verifyPassword, verificacionFicticia, generateOpaqueToken, hashOpaqueToken } from "./password.util";
 import {
   OPCIONES_TX_SESION,
@@ -163,9 +163,37 @@ async function personaUtilizable(tx: Tx, personId: string | null): Promise<boole
   return persona !== null && persona.status === "active" && persona.deletedAt === null;
 }
 
-// `loadRolesAndPermissions` y `resolvePersonClubId` viven ahora en
-// `./authorization`, compartidos con `rbac.middleware`: el login, el refresco
-// y cada solicitud autenticada resuelven la autorización exactamente igual.
+/** Lo que el login necesita saber del club dueño de una cuenta de club. */
+type ClubDeCuenta = { status: "active" | "locked" | "disabled"; deletedAt: Date | null };
+
+/**
+ * Cómo está el club dueño respecto de su cuenta (AUD-04/11). Mismas tres
+ * situaciones y mismo criterio que `situacionDePersona`:
+ *
+ *  - `utilizable`: la cuenta no es de un club, o su club está activo y no eliminado.
+ *  - `administrativa`: el club está bloqueado o inhabilitado y su cuenta tiene el MISMO
+ *    estado con bloqueo indefinido. Es lo que deja `setStatus` en `clubs.service`; el
+ *    login da el motivo tras comprobar la contraseña vigente.
+ *  - `incoherente`: club eliminado o inexistente, o estados que no se corresponden —una
+ *    cuenta activa de un club bloqueado, como la dejaba el restablecimiento anterior—.
+ *    Siempre el genérico, con cualquier contraseña, y sin tocar la cuenta.
+ */
+function situacionDeClub(
+  clubId: string | null,
+  club: ClubDeCuenta | null,
+  cuenta: Pick<UsuarioBloqueado, "status" | "lockedUntil">
+): SituacionDePersona {
+  if (!clubId) return "utilizable";
+  if (!club || club.deletedAt !== null) return "incoherente";
+  if (club.status === "active") return "utilizable";
+  return cuenta.status === club.status && cuenta.lockedUntil === null ? "administrativa" : "incoherente";
+}
+
+/** El club dueño, releído dentro de la transacción en una sentencia aparte, como la persona. */
+async function clubDeCuenta(tx: Tx, clubId: string | null): Promise<ClubDeCuenta | null> {
+  if (!clubId) return null;
+  return tx.club.findUnique({ where: { id: clubId }, select: { status: true, deletedAt: true } });
+}
 
 interface SessionUser {
   id: string;
@@ -176,62 +204,30 @@ interface SessionUser {
 }
 
 /**
- * Club al que queda acotada la sesión, resuelto de forma EXHAUSTIVA sobre el
- * tipo de dueño. Las tres ramas eran antes dos, y la del administrador
- * (`system`) se colaba por la de `person`: terminaba llamando a
- * `resolvePersonClubId(null)`, que devuelve `null` porque no hay persona, no
- * porque se hubiera decidido que un administrador no tiene club.
- */
-async function resolveEffectiveClubId(user: SessionUser, esAdministrador: boolean): Promise<string | null> {
-  /**
-   * Un administrador no pasa por la resolución de club, igual que en
-   * `loadAuthorizationState`. No es una optimización: `resolvePersonClubId`
-   * LANZA si la persona figura como personal de más de un club, y eso dejaría
-   * a un administrador en esa situación sin poder ni iniciar sesión, pese a
-   * que su alcance no depende de ningún club.
-   */
-  if (esAdministrador) return null;
-
-  switch (user.ownerType) {
-    case "club":
-      return user.clubId;
-    case "system":
-      return null;
-    case "person":
-      return resolvePersonClubId(user.personId);
-  }
-}
-
-interface AutorizacionDeSesion {
-  roles: string[];
-  permissions: string[];
-  effectiveClubId: string | null;
-}
-
-/**
  * Roles, permisos y club con los que se firmará el token.
+ *
+ * Es `resolverAutorizacionEfectiva`, la MISMA que aplica `requireAuth` en cada
+ * solicitud: el token, la respuesta y la autorización por solicitud no pueden
+ * discrepar (AUD-04).
  *
  * Se resuelve SIEMPRE fuera de la transacción y antes de escribir: puede lanzar
  * (una persona con vínculos en más de un club), y lanzar después de consumir un
  * refresh token deja al navegador con una cookie ya rotada, que el siguiente
  * intento leería como un reuso.
  */
-async function resolverAutorizacion(user: SessionUser): Promise<AutorizacionDeSesion> {
-  const { roles, permissions } = await loadRolesAndPermissions(user.id);
-  return { roles, permissions, effectiveClubId: await resolveEffectiveClubId(user, roles.includes("admin")) };
-}
+const resolverAutorizacion = (user: SessionUser): Promise<AutorizacionEfectiva> => resolverAutorizacionEfectiva(user);
 
 /**
  * Firma el access token de una sesión. Es una operación pura en memoria: no
  * puede fallar por estado externo, así que queda fuera de la transacción.
  */
-function firmarAccessToken(user: SessionUser, sid: string, autorizacion: AutorizacionDeSesion): string {
+function firmarAccessToken(user: SessionUser, sid: string, autorizacion: AutorizacionEfectiva): string {
   return signAccessToken({
     sub: user.id,
     sid,
     ownerType: user.ownerType,
     personId: user.personId,
-    clubId: autorizacion.effectiveClubId,
+    clubId: autorizacion.clubId,
     roles: autorizacion.roles,
     permissions: autorizacion.permissions,
   });
@@ -247,7 +243,7 @@ export async function login(input: LoginInput, ctx: RequestContext) {
    */
   const user = await prisma.user.findFirst({
     where: { username: input.username, deletedAt: null },
-    include: { person: { select: { status: true, deletedAt: true } } },
+    include: { person: { select: { status: true, deletedAt: true } }, club: { select: { status: true, deletedAt: true } } },
   });
 
   // Mensaje genérico: no revelar si el usuario existe o no (evita user enumeration).
@@ -307,6 +303,14 @@ export async function login(input: LoginInput, ctx: RequestContext) {
     throw genericError();
   }
 
+  // Lo mismo para la cuenta de un club cuyo club no está activo (AUD-04/11): la cuenta
+  // activa de un club bloqueado es una incoherencia y recibe el genérico con cualquier
+  // contraseña; el estado administrativo habitual sigue el flujo y da su motivo abajo.
+  if (situacionDeClub(user.clubId, user.club, user) === "incoherente") {
+    await verificacionFicticia(input.password);
+    throw genericError();
+  }
+
   // Bloqueo temporal vigente: genérico SIEMPRE, sin mirar la contraseña real. Verificarla
   // aquí haría que acertar o no cambiara la respuesta de una cuenta bloqueada.
   if (bloqueoTemporalVigente(user, new Date())) {
@@ -354,6 +358,7 @@ export async function login(input: LoginInput, ctx: RequestContext) {
       ? await tx.person.findUnique({ where: { id: cuenta.personId }, select: { status: true, deletedAt: true } })
       : null;
     if (situacionDePersona(cuenta.personId, persona, cuenta) === "incoherente") throw genericError();
+    if (situacionDeClub(user.clubId, await clubDeCuenta(tx, user.clubId), cuenta) === "incoherente") throw genericError();
 
     const rechazo = rechazoDeLogin(cuenta, ahora);
     if (rechazo) throw rechazo;
@@ -386,7 +391,7 @@ export async function login(input: LoginInput, ctx: RequestContext) {
       username: user.username,
       ownerType: user.ownerType,
       personId: user.personId,
-      clubId: autorizacion.effectiveClubId,
+      clubId: autorizacion.clubId,
       roles: autorizacion.roles,
     },
   };
@@ -431,7 +436,7 @@ export async function refresh(refreshTokenPlain: string, ctx: RequestContext) {
     where: { tokenHash },
     include: {
       session: { select: { revokedAt: true, absoluteExpiresAt: true } },
-      user: { include: { person: { select: { status: true, deletedAt: true } } } },
+      user: { include: { person: { select: { status: true, deletedAt: true } }, club: { select: { status: true, deletedAt: true } } } },
     },
   });
 
@@ -451,7 +456,8 @@ export async function refresh(refreshTokenPlain: string, ctx: RequestContext) {
     stored.session.absoluteExpiresAt > ahoraOrientacion &&
     user.status === "active" &&
     user.deletedAt === null &&
-    (user.person === null || (user.person.status === "active" && user.person.deletedAt === null));
+    (user.person === null || (user.person.status === "active" && user.person.deletedAt === null)) &&
+    (user.clubId === null || (user.club !== null && user.club.status === "active" && user.club.deletedAt === null));
   const autorizacion = puedeRotar ? await resolverAutorizacion(user) : null;
 
   const desenlace = await prisma.$transaction(async (tx): Promise<DesenlaceDeRefresco> => {
@@ -486,8 +492,14 @@ export async function refresh(refreshTokenPlain: string, ctx: RequestContext) {
     if (token.revokedAt) return { tipo: "rechazado", mensaje: "Sesión inválida. Vuelva a iniciar sesión." };
     if (token.expiresAt < ahora) return { tipo: "rechazado", mensaje: "Sesión expirada" };
 
-    // 3. La cuenta. El bloqueo temporal sigue rechazando aquí, igual que antes.
-    if (cuenta.status !== "active" || cuenta.deletedAt !== null || !(await personaUtilizable(tx, cuenta.personId))) {
+    // 3. La cuenta. El bloqueo temporal sigue rechazando aquí, igual que antes. La de un
+    // club, además, solo rota si su club está activo y no eliminado (AUD-04/11).
+    if (
+      cuenta.status !== "active" ||
+      cuenta.deletedAt !== null ||
+      !(await personaUtilizable(tx, cuenta.personId)) ||
+      situacionDeClub(user.clubId, await clubDeCuenta(tx, user.clubId), cuenta) !== "utilizable"
+    ) {
       return { tipo: "rechazado", mensaje: "Cuenta no disponible" };
     }
 
@@ -538,7 +550,7 @@ export async function refresh(refreshTokenPlain: string, ctx: RequestContext) {
       username: user.username,
       ownerType: user.ownerType,
       personId: user.personId,
-      clubId: autorizacion.effectiveClubId,
+      clubId: autorizacion.clubId,
       roles: autorizacion.roles,
     },
   };
@@ -635,7 +647,12 @@ export async function changePassword(userId: string, input: ChangePasswordInput,
     if (!cuenta || cuenta.passwordHash !== user.passwordHash) {
       throw new ConflictError("La contraseña cambió mientras se procesaba la solicitud. Vuelva a intentarlo.");
     }
-    if (cuenta.status !== "active" || cuenta.deletedAt !== null || !(await personaUtilizable(tx, cuenta.personId))) {
+    if (
+      cuenta.status !== "active" ||
+      cuenta.deletedAt !== null ||
+      !(await personaUtilizable(tx, cuenta.personId)) ||
+      situacionDeClub(user.clubId, await clubDeCuenta(tx, user.clubId), cuenta) !== "utilizable"
+    ) {
       throw new UnauthorizedError("Cuenta no disponible");
     }
 
@@ -673,7 +690,7 @@ export async function changePassword(userId: string, input: ChangePasswordInput,
       username: user.username,
       ownerType: user.ownerType,
       personId: user.personId,
-      clubId: autorizacion.effectiveClubId,
+      clubId: autorizacion.clubId,
       roles: autorizacion.roles,
     },
   };

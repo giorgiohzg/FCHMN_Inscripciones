@@ -724,6 +724,22 @@ cuenta `system`.
   ciclo de vida completo en `tests/legal-representative.integration.test.ts`.
 - **A-03**: una credencial de acceso por club (mismo patrón que personas, `ownerType=club`).
 - Bloquear/inhabilitar/reactivar un club propaga el mismo estado a su cuenta de usuario.
+- **El estado del club se aplica a quien actúa por él** (auditoría AUD-04/AUD-11; publicado en el
+  repositorio y probado en local; pendiente de despliegue). La autorización efectiva se resuelve en un solo
+  lugar (`resolverAutorizacionEfectiva`, en `modules/auth/authorization.ts`), el mismo para el
+  login, la renovación, el cambio de contraseña y cada solicitud:
+  - La cuenta de un club bloqueado, inhabilitado o eliminado no inicia sesión, no renueva y no
+    opera, aunque su fila de usuario figure activa.
+  - El personal (delegado, entrenador, representante legal) de un club no activo **conserva su
+    sesión y su acceso personal**, pero queda sin club y sin los roles de personal: sin otro rol
+    no tiene permisos; si además es nadador, opera exactamente como nadador. Es una reducción de
+    la autorización efectiva —`user_roles` y `club_staff` no cambian— y al reactivar el club la
+    siguiente solicitud recupera todo, sin volver a iniciar sesión. No se revoca ninguna sesión
+    del personal ni de administradores; el administrador no cambia.
+  - Crear credenciales de un club no activo se rechaza (400). Restablecerlas deja la cuenta
+    `active` si el club está activo (como siempre) y con el estado del club si no lo está; en
+    ambos casos `lockedUntil` nulo y `failedLoginAttempts` en 0.
+  - Detalle y pruebas en `docs/seguridad/PLAN_SEGURIDAD.md` («AUD-A»).
 
 ## Endpoints del Módulo 4 — Asignación de Nadadores a Clubes
 

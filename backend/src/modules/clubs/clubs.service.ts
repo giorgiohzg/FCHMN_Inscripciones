@@ -493,6 +493,11 @@ export async function createClubCredentials(clubId: string, actor: ActorContext,
           const club = await tx.club.findFirst({ where: { id: clubId, deletedAt: null }, include: { user: { select: { id: true } } } });
           if (!club) throw new NotFoundError("Club");
           if (club.user) throw new ValidationError("El club ya tiene credenciales de acceso");
+          // AUD-11: la cuenta nacía `active` aunque el club estuviera bloqueado o
+          // inhabilitado, y con ella el club volvía a operar. Se pide reactivarlo antes.
+          if (club.status !== "active") {
+            throw new ValidationError("El club no está activo: reactívelo antes de crear sus credenciales de acceso.");
+          }
 
           const username = opciones.username ?? club.username;
           if (!username) throw new ValidationError(MENSAJE_FALTA_USERNAME, { field: "username" });
@@ -548,12 +553,32 @@ export async function resetClubCredentials(clubId: string, actor: ActorContext) 
   const tempPassword = generateOpaqueToken().token.slice(0, 12);
   const passwordHash = await hashPassword(tempPassword);
 
-  // Ver la nota equivalente en `persons.service.resetCredentials`.
+  /**
+   * Estado resultante de la cuenta (AUD-11). Se decide con el estado del club
+   * releído en la misma transacción:
+   *
+   *   | Club                    | Cuenta antes                          | status       | lockedUntil | failedLoginAttempts |
+   *   |-------------------------|---------------------------------------|--------------|-------------|---------------------|
+   *   | `active`                | cualquiera (activa, bloqueo temporal, | `active`     | `null`      | 0                   |
+   *   |                         |   bloqueo administrativo, inhabilitada)|              |             |                     |
+   *   | `locked` / `disabled`   | cualquiera                            | el del club  | `null`      | 0                   |
+   *   | eliminado               | — (404: `getClubById` lo excluye)      |              |             |                     |
+   *
+   * Con el club activo se conserva lo de siempre: el restablecimiento
+   * administrativo desbloquea, igual que en personas. Con el club no activo la
+   * cuenta toma el estado administrativo del club —el que deja `setStatus`—, en
+   * vez de quedar activa y devolverle al club su acceso. Un bloqueo temporal
+   * nunca pasa a administrativo dentro de un club activo.
+   *
+   * En todos los casos: contraseña temporal nueva, `mustChangePassword` y fin de
+   * las sesiones de ESA cuenta, como antes.
+   */
   await withAudit(
     async (tx) => {
+      const { status: estadoDelClub } = await tx.club.findUniqueOrThrow({ where: { id: clubId }, select: { status: true } });
       await tx.user.update({
         where: { id: club.user!.id },
-        data: { passwordHash, mustChangePassword: true, failedLoginAttempts: 0, status: "active", lockedUntil: null },
+        data: { passwordHash, mustChangePassword: true, failedLoginAttempts: 0, status: estadoDelClub, lockedUntil: null },
       });
       await terminarSesionesDelUsuario(tx, club.user!.id, "admin_revocation");
     },
