@@ -24,7 +24,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **Errores de Nginx** | AUD-03 (capa Nginx): errores de petición sin el mensaje original, con la consulta y el `Referer` | **Publicado y desplegado en la web, dentro de su alcance; AUD-03 no queda cerrada en todas las capas.** Ver «Errores de Nginx» |
 | **zlib del sistema** | Aviso residual de AUD-B: `zlib` 1.3.2-r1 → 1.4-r0 en API, migraciones y web | **Desplegada en la API y la web y construida en mantenimiento; versión efectiva en producción sin verificar.** Ver «zlib del sistema» |
 | **Campos del upstream** | Observabilidad de la incidencia 504: cuatro campos del upstream en `fchmn_acceso` | **Publicada y desplegada en la web.** Ver «Campos del upstream en el registro de acceso» |
-| **npm fuera de ejecución** | Aviso residual de AUD-B: npm/npx retirados de las imágenes finales de API, migraciones y mantenimiento | **Publicada en el repositorio y validada localmente; pendiente de despliegue.** Ver «npm fuera de las imágenes de ejecución» |
+| **npm fuera de ejecución** | Aviso residual de AUD-B: npm/npx retirados de las imágenes finales de API, migraciones y mantenimiento | **Retirada publicada y desplegada en la API y construida en mantenimiento.** Ver «npm fuera de las imágenes de ejecución» |
 | **AUD-V** | Fórmulas en el CSV de inscritos (Excel 16.0, es-CL, separador `;`) | **Completada: publicada, desplegada (API y web en `d105823`) y probada en local y en CI.** Ver «AUD-V» |
 | **Descancelar** | Botón `cancelada → borrador`, solo administración | **Completado: publicado, desplegado (API y web en `d105823`) y probado en local y en CI.** Ver «Descancelar» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
@@ -1525,7 +1525,7 @@ dependen del `npm` que trae la imagen de Node; no se actualizan por separado.
   filtrar ese registro por nivel ocultaría también los fallos del proxy. Queda como riesgo aparte.
 - **Registros del proveedor** (borde y plataforma): no fueron inspeccionados y no se promete corregirlos.
 - **El `npm` de la imagen base** arrastra sus propios avisos mientras exista en la imagen. Retirarlo de las etapas de ejecución eliminaría los 23, pero obliga a
-  cambiar el perfil local `mantenimiento` de `docker-compose.yml` (usa `npx`) y a regenerar inventarios, avisos y `Dockerfile.mantenimiento`; es una decisión pendiente, no aplicada. *Posterior:* publicada en el repositorio y validada localmente; pendiente de despliegue (ver «npm fuera de las imágenes de ejecución»).
+  cambiar el perfil local `mantenimiento` de `docker-compose.yml` (usa `npx`) y a regenerar inventarios, avisos y `Dockerfile.mantenimiento`; es una decisión pendiente, no aplicada. *Posterior:* retirada publicada y desplegada en la API y construida en mantenimiento, dentro de su alcance (ver «npm fuera de las imágenes de ejecución»).
 - `zlib` 1.4-r0 está disponible en Alpine 3.24 y no se aplicó en AUD-B; queda recomendado como paso propio (ver arriba). *Posterior:* desplegada en la API y la web y construida en mantenimiento; versión efectiva del paquete en producción sin verificar (ver «zlib del sistema»).
 - La etapa `base` de la API no fija los paquetes de Alpine; dos construcciones en días distintos pueden diferir.
 
@@ -1730,7 +1730,7 @@ Los 23 que quedan son los del `npm` de la imagen base de Node (mismos paquetes y
 - **Registro, dos líneas de `/api/health`** a las 20:09:16 y 20:09:17 UTC del 2026-11-09: `estado` numérico (200) y los cuatro campos del upstream como cadenas. La atribución a las peticiones normales hechas en ese momento es por **coincidencia temporal**, no una identificación demostrada.
 - **Límites:** en producción solo se comprobó una petición normal al upstream; los fallos y reintentos se validaron localmente. Los campos ayudan a interpretar fases e intentos, pero **no garantizan diagnosticar todos los incidentes**, no identifican el destino ni demuestran un DNS obsoleto. **La causa del 504 sigue indeterminada.** Los 23 avisos de `npm` y los demás residuales siguen pendientes.
  No cambia el comportamiento ante la indisponibilidad ni identifica la causa.
-## npm fuera de las imágenes de ejecución (publicada en el repositorio y validada localmente; pendiente de despliegue)
+## npm fuera de las imágenes de ejecución (retirada publicada y desplegada en la API y construida en mantenimiento, dentro de su alcance)
 
 **Motivo.** Aviso residual de AUD-B: el escáner marcaba 23 avisos en el `npm` 10.9.9 que trae la imagen base de Node, presente en la API, en migraciones y en mantenimiento aunque ninguna de ellas lo ejecuta.
 
@@ -1758,11 +1758,24 @@ Los 23 que quedan son los del `npm` de la imagen base de Node (mismos paquetes y
 Los 23 avisos **desaparecen del sistema de archivos final** porque se retiró el componente: **no se actualizó ningún paquete** y no se declaran corregidos. Sus **bytes permanecen en las capas inferiores**: las cuatro capas de la base de Node siguen en la candidata, que pesa unos 25 kB más que el control por la capa del `rm`. No aparecieron avisos nuevos.
 
 **Límites.**
-- **Publicada en el repositorio; pendiente de despliegue:** producción sigue con npm hasta entonces.
+- **Desplegada** (ver el cierre más abajo); no se verificó por shell la ausencia de npm/npx en producción.
 - **Capas inferiores:** npm no se ejecuta ni aparece en el sistema de archivos combinado, pero viaja en la imagen; un escáner que lea capa por capa puede seguir encontrándolo.
 - **Yarn y Corepack sin retirar:** Corepack podría descargar un gestor de paquetes si alguien lo invocara.
 - **Usos externos desconocidos:** no se comprobó si Render invoca npm/npx en algún comando (por ejemplo, el cron de mantenimiento o comandos manuales); hay que comprobarlo antes de desplegar.
 - La copia de zlib incorporada en Node sigue sin actualizar y la causa del 504 sigue indeterminada; los demás residuales no cambian.
+**Cierre (despliegue en Render).** SHA `dbdbda278b2193064a506e6955d1f59c66f83788`; CI del código `42701844815`, éxito. Render informó «Deploy succeeded» y Live, con Auto-Deploy desactivado en ambos; la web no se redesplegó:
+- **API** `c6580d3` → `dbdbda2`: [despliegue](https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80/deploys/dep-dbp41plbedkc73fk4n4g).
+- **Mantenimiento** `c6580d3` → `dbdbda2`: [construcción](https://dashboard.render.com/cron/crn-dbh500bl550s73c5n2o0/deploys/dep-dbp44l88v5cc73d4i1u0), **sin ejecutar el cron**: Runs 26 antes y después, y se conservan `Dockerfile.mantenimiento`, la programación `0 6 1 1 *`, el Docker Command vacío y Auto-Deploy Off.
+
+**Muestreo durante el despliegue de la API** (30 `GET /api/health` por la web, sin credenciales ni parámetros; secuenciales, unos 10 s entre petición y petición, timeout de 12 s): **30 respuestas 200, sin errores de transporte**, del 2026-11-09 21:53:28.9 a 21:58:31.8 UTC. La primera instancia nueva se observó en la muestra 12 (uptime 68 s, 21:55:24 UTC) y se observaron unos 188 s después de ella; se cumplieron las condiciones temporales de estabilidad fijadas. **Hubo huecos de unos 10 s entre muestras, y en el de la muestra 11 a la 12 cambió la instancia sin observarse: no se afirma disponibilidad continua ni ausencia absoluta de fallos.** Las 30 líneas de registro de `/api/health` de la ventana traen `estado` numérico `200` y los cuatro campos del upstream como cadenas, sin intentos fallidos ni listas de intentos. **El 504 no se repitió en las muestras; la causa del 504 anterior sigue indeterminada** (los campos no identifican el destino).
+
+**Evidencia, por separado.**
+- *Local:* ausencia de npm y npx en el sistema de archivos final y escaneo 23 → 0.
+- *Render:* el commit y el estado de las operaciones.
+- *HTTP y registros acotados:* disponibilidad y campos observados durante este despliegue; `/api/ready` 200 con base disponible, `/api/auth/me` 401 y `no-store` conservado.
+- *Producción:* **no se verificó mediante shell la ausencia de npm/npx** en las imágenes desplegadas.
+
+**Se conserva abierto:** los bytes de npm en las capas inferiores; Yarn y Corepack presentes; posibles usos manuales externos de npm/npx, no inspeccionados; la copia de zlib incorporada en Node y los demás residuales. **No se actualizaron las dependencias internas de npm: se retiró el componente del sistema de archivos final.**
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 
 **SEC-01 (listas JSON).** Medido en memoria con Zod 3.25.76 durante la revisión: `.max()` **no** corta el
