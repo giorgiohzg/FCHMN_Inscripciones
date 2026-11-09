@@ -1586,6 +1586,14 @@ Cron: **no se ejecutó**. Tenía 26 ejecuciones antes y 26 después, ninguna en 
 - **Validación funcional:** la local y la CI. CSV probado en Excel 16.0, es-CL, sin generalizar a otros entornos.
 - **Residuales y pendientes (sin cambios):** avisos de imágenes (npm, zlib), registro de errores de Nginx, registros del proveedor y decisiones funcionales. Los despliegues anteriores (`b02eff2` y previos) se conservan como antecedentes.
 
+**Cierre: visibilidad de competencias y «Cancelar edición» (despliegue solo de la web).** Visibilidad de competencias y «Cancelar edición» (web desplegada desde `5d0692fc14cd2bce639e2b4a6ea29c61e656d6f9`, antes `d105823`): Inscripción, Relevos y Reportes excluyen las competencias ocultas para quienes no son administradores; la administración las conserva. «Cancelar edición» está junto a «Guardar cambios».
+
+- **Despliegue:** [`dep-dbork8rl550s73amk080`](https://dashboard.render.com/web/srv-dbh48scs728c73arlf8g/deploys/dep-dbork8rl550s73amk080). Render informó «Deploy succeeded» y Live; Auto-Deploy, Off. La API y el mantenimiento no se desplegaron.
+- **CI del código:** `42613933928`, éxito.
+- **HTTP observado:** `/login` y `/api/ready` con 200, `/api/auth/me` sin credenciales con 401; `no-store` y CSP conservados. Acredita disponibilidad y cabeceras, no el funcionamiento de la interfaz.
+- **Validación funcional:** local con pruebas simuladas y CI; sin comprobación funcional autenticada en producción.
+- **Sin cambios:** los riesgos residuales y las decisiones pendientes siguen abiertos.
+
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 
 **SEC-01 (listas JSON).** Medido en memoria con Zod 3.25.76 durante la revisión: `.max()` **no** corta el
