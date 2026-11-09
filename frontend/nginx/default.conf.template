@@ -84,6 +84,18 @@ map $status $estado_json {
     "~^(?=[0-9]{3}$)0+$"            0;
 }
 
+# CAMPOS DEL UPSTREAM (observabilidad de fallos del proxy a la API).
+#
+# `upstream_status`, `upstream_connect_time`, `upstream_header_time` y `upstream_response_time` son las
+# variables homónimas de Nginx y se escriben SIEMPRE como CADENAS JSON (entre comillas, con `escape=json`):
+# quedan VACÍAS cuando no hay upstream (la SPA, los activos o un fallo de resolución antes de intentar), valen `-`
+# en un intento sin medición (por ejemplo, la conexión rechazada), pueden llevar ceros iniciales y, con varios
+# intentos, listas de valores separados por comas y dos puntos; como números romperían el JSON.
+#
+# Qué NO son: `upstream_status` no siempre es una respuesta recibida (Nginx también asigna un estado a un
+# intento fallido, por ejemplo 502 o 504), y `upstream_response_time` no prueba una respuesta completa. Los
+# tiempos se miden en segundos con resolución de milisegundos. NO se registra `$upstream_addr`: el destino
+# sigue siendo desconocido, y estos campos no demuestran por sí solos que se usara una dirección antigua.
 log_format fchmn_acceso escape=json
     '{"hora":"$time_iso8601",'
     '"direccion":"$remote_addr",'
@@ -94,6 +106,10 @@ log_format fchmn_acceso escape=json
     '"estado":$estado_json,'
     '"bytes":$body_bytes_sent,'
     '"tiempo":$request_time,'
+    '"upstream_status":"$upstream_status",'
+    '"upstream_connect_time":"$upstream_connect_time",'
+    '"upstream_header_time":"$upstream_header_time",'
+    '"upstream_response_time":"$upstream_response_time",'
     '"agente":"$http_user_agent"}';
 
 server {

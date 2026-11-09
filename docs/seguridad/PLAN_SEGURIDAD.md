@@ -23,6 +23,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **AUD-B** | Auditoría del 2026-11-07, AUD-01 y AUD-03 (Nginx): bases Node 22.23.4 y Nginx 1.30.6 y registro de acceso de Nginx sin consulta ni `Referer` | **Publicado en el repositorio y validado en local** (tres imágenes candidatas construidas, inventarios y avisos regenerados, escaneadas y ejecutadas sobre la base desechable); publicada en `b02eff2` y **desplegada** (`fchmn-api` y `fchmn-web`, Live; `fchmn-mantenimiento`, construida sin ejecutar el cron). **Completada dentro de su alcance**, sin declarar resueltos todos sus riesgos: quedan 24 avisos por versión (de las candidatas locales) como riesgo residual condicionado, no corregidos. Ver «AUD-B» y «Despliegue conjunto de AUD-B y AUD-C» |
 | **Errores de Nginx** | AUD-03 (capa Nginx): errores de petición sin el mensaje original, con la consulta y el `Referer` | **Publicado y desplegado en la web, dentro de su alcance; AUD-03 no queda cerrada en todas las capas.** Ver «Errores de Nginx» |
 | **zlib del sistema** | Aviso residual de AUD-B: `zlib` 1.3.2-r1 → 1.4-r0 en API, migraciones y web | **Desplegada en la API y la web y construida en mantenimiento; versión efectiva en producción sin verificar.** Ver «zlib del sistema» |
+| **Campos del upstream** | Observabilidad de la incidencia 504: cuatro campos del upstream en `fchmn_acceso` | **Publicada en el repositorio y validada localmente; pendiente de despliegue.** Ver «Campos del upstream en el registro de acceso» |
 | **AUD-V** | Fórmulas en el CSV de inscritos (Excel 16.0, es-CL, separador `;`) | **Completada: publicada, desplegada (API y web en `d105823`) y probada en local y en CI.** Ver «AUD-V» |
 | **Descancelar** | Botón `cancelada → borrador`, solo administración | **Completado: publicado, desplegado (API y web en `d105823`) y probado en local y en CI.** Ver «Descancelar» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
@@ -1685,6 +1686,43 @@ Los 23 que quedan son los del `npm` de la imagen base de Node (mismos paquetes y
 - La **copia de zlib incorporada en Node** (`1.3.1-e00f703`) no se actualizó, y los **23 avisos de `npm` siguen abiertos**. No se declara resuelta la familia de riesgos de zlib.
 
 **Incidencia pendiente de diagnóstico: 504 transitorio tras el despliegue de la API.** Cuando Render marcó la API como Live, las primeras lecturas por la web siguieron mostrando la instancia anterior (uptime de unas 14,9 h); poco después, `/api/health`, `/api/ready` y `/api/auth/me` respondieron 504 durante algunos minutos, y luego se recuperaron con una instancia nueva (uptime de pocos minutos). Es una **coincidencia temporal con el despliegue**: la causa no está determinada (no se afirma que la conmutación de instancia la produjera) y no se inspeccionaron registros. No se investigó ni se reprodujo. **Queda pendiente de diagnóstico antes de futuros despliegues de la API.**
+## Campos del upstream en el registro de acceso (publicada en el repositorio y validada localmente; pendiente de despliegue)
+
+**Motivo.** La incidencia 504 tras el despliegue de la API a `c6580d3` no dejó en el registro de la web la fase del fallo: el registro de acceso no guarda datos del upstream y el receptor njs de errores clasifica «upstream timed out» sin su fase (a propósito, AUD-03). Esta mejora añade solo observabilidad; **no cambia** DNS, timeouts, cierre de la API, descubrimiento de servicios ni configuración de Render, y **no promete resolver la indisponibilidad**.
+
+**Diagnóstico histórico, corregido.**
+- **Siete** respuestas 504 de la web (`/api/health` ×5, `/api/ready` ×1 y `/api/auth/me` ×1), de unos 10,0 s cada una, con final entre 17:41:54 y 17:42:46 UTC del 2026-11-09 e inicio estimado entre ≈17:41:44 y ≈17:42:36 (resolución de un segundo). El receptor njs registró siete mensajes de clase `timeout` en los mismos segundos; la correspondencia uno a uno es compatible, no demostrada.
+- **Timeout de conexión: inferencia**, apoyada en la coincidencia con `proxy_connect_timeout 10s` y en que la búsqueda de registros de la API no devolvió peticiones entre 17:41:28 y 17:43:02. No es un dato registrado: la fase no se conservó. Un error explícito de resolución habría dado la clase `dns` y no apareció, pero una respuesta DNS válida y obsoleta no daría ningún error de resolución, así que no queda descartada.
+- **Destino desconocido:** no hay dirección de upstream registrada para las peticiones fallidas; que antes llegaran a la instancia antigua no demuestra a dónde se intentó conectar después.
+- **Causa raíz: indeterminada.** Hipótesis abiertas: respuesta DNS obsoleta, comportamiento del resolutor de Nginx, retraso de la red de la plataforma, una conexión aceptada por un intermediario, o líneas de la API que la búsqueda no devolvió («la búsqueda no devolvió peticiones» no prueba su ausencia).
+- **Huecos sin observaciones:** entre 17:41:28.9 (última respuesta correcta de la instancia antigua) y ≈17:41:44, entre ≈17:41:54 y ≈17:41:58, y entre 17:42:46 y 17:43:02.3 (primera respuesta correcta de la nueva). No se declara una caída continua.
+
+**Cambio.** `frontend/nginx/default.conf.template`: cuatro campos nuevos en `fchmn_acceso`, después de `tiempo` y antes de `agente`, con las variables homónimas de Nginx y **siempre entre comillas** (cadenas JSON escapadas con `escape=json`): `upstream_status`, `upstream_connect_time`, `upstream_header_time` y `upstream_response_time`. Se conservan los demás campos y tipos, `estado` numérico normalizado (`estado_json`), la protección syslog/njs de errores y la exclusión de consultas, `Referer`, cookies, tokens y `$upstream_addr`. Sin dependencias ni procesos nuevos.
+
+**Valores observados** (Nginx 1.30.6 real en la imagen candidata, upstreams sintéticos en red interna; tiempos en segundos con resolución de milisegundos):
+
+| Caso | `estado` | `upstream_status` | `upstream_connect_time` | `upstream_header_time` | `upstream_response_time` |
+|---|---|---|---|---|---|
+| SPA, activo inexistente (sin upstream) | 200 / 404 | `""` (vacío) | `""` | `""` | `""` |
+| Upstream disponible | 200 | `"200"` | `"0.000"` | `"0.001"` | `"0.001"` |
+| Conexión rechazada | 502 | `"502"` | `"-"` | `"-"` | `"0.000"` |
+| DNS fallido | 502 | `""` | `""` | `""` | `""` |
+| Timeout de lectura (3 s, solo en el montaje de prueba) | 504 | `"504"` | `"0.001"` | `"-"` | `"3.004"` |
+| 504 emitido de inmediato por el upstream | 504 | `"504"` | `"0.000"` | `"0.001"` | `"0.001"` |
+| 502 emitido de inmediato por el upstream | 502 | `"502"` | `"0.008"` | `"0.010"` | `"0.010"` |
+| Respuesta sin línea de estado (HTTP/0.9) | 9 | `"200"` | `"0.000"` | `"0.001"` | `"0.001"` |
+| Dos destinos en el nombre: uno rechaza y otro responde (reintento) | 200 | `"502, 200"` | `"-, 0.000"` | `"-, 0.000"` | `"0.001, 0.000"` |
+
+**Qué permiten inferir, y sus límites.**
+- **Un 504 de conexión de Nginx y uno de lectura se distinguen por `upstream_header_time`:** `"-"` (no llegaron cabeceras) en el timeout de lectura observado. Un 504 emitido por el upstream trae tiempos de conexión y cabeceras reales y `upstream_response_time` pequeño. En un timeout de **conexión** no se pudo observar el valor: no hay un mecanismo local controlado sin privilegios ni reglas de red; se espera `upstream_connect_time` `"-"`, pero **no está comprobado**.
+- **`upstream_status` no siempre es una respuesta recibida:** con la conexión rechazada vale `"502"` aunque ningún upstream respondió, y con un timeout de lectura vale `"504"` asignado por Nginx. Con DNS fallido queda vacío (no hubo intento). Por eso hay que leerlo junto con los tiempos.
+- **`upstream_response_time` no prueba una respuesta completa:** con la conexión rechazada vale `"0.000"` y en el timeout de lectura mide el tiempo hasta el agotamiento.
+- **Listas de intentos:** con varios destinos aparecen valores separados por coma y espacio (`"502, 200"`); por eso son cadenas. El orden y el número de intentos dependen de cuántas direcciones devuelva la resolución.
+- **No identifican una dirección:** estos campos muestran la fase, los tiempos y los intentos, **no el destino**; no demuestran por sí solos que se usara una dirección DNS antigua.
+
+**Validación local.** `nginx -t` correcto con la plantilla montada y el entrypoint real; las 32 líneas de acceso de las ejecuciones con la plantilla candidata son JSON válido, el marcador sintético de consulta y de `Referer` aparece 0 veces en stdout y stderr, y el receptor njs sigue emitiendo solo líneas permitidas (clases `conexion_rechazada`, `dns`, `timeout` y `respuesta_invalida`). El control con la plantilla anterior no tiene los cuatro campos. `backend/tests/frontend-registro-estado.test.ts` (39 casos) fija el orden y los tipos de todos los campos, que los cuatro sean cadenas entre comillas y que no aparezcan `$upstream_addr` ni otras variables nuevas; con uno de los campos como número desnudo fallan 35 casos. Se usó una copia temporal con timeout de lectura corto solo en el montaje; la plantilla versionada conserva 120 s. `npm run typecheck` del backend y ESLint del archivo de prueba, sin errores.
+
+**Límites.** Publicada en el repositorio; pendiente de despliegue. No se observó un timeout de conexión (no se reprodujo localmente). No cambia el comportamiento ante la indisponibilidad ni identifica la causa.
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 
 **SEC-01 (listas JSON).** Medido en memoria con Zod 3.25.76 durante la revisión: `.max()` **no** corta el

@@ -61,6 +61,7 @@ function lineaDeRegistro(status: string): string {
     estado_json: estadoJson(status),
     time_iso8601: "2026-01-01T00:00:00+00:00", remote_addr: "127.0.0.1", http_x_forwarded_for: "", request_method: "GET",
     ruta_original: "/x", server_protocol: "HTTP/1.1", body_bytes_sent: "25", request_time: "0.001", http_user_agent: "a",
+    upstream_status: "-", upstream_connect_time: "-", upstream_header_time: "-", upstream_response_time: "-",
   };
   return texto.replace(/\$([a-z_0-9]+)/g, (_t, nombre: string) => {
     if (!(nombre in valores)) throw new Error(`variable inesperada en el formato: $${nombre}`);
@@ -102,9 +103,34 @@ describe("normalización del estado", () => {
 
   it("el formato conserva el resto de campos y sus tipos", () => {
     const o = JSON.parse(lineaDeRegistro("200")) as Record<string, unknown>;
-    expect(Object.keys(o)).toEqual(["hora", "direccion", "reenviada", "metodo", "ruta", "protocolo", "estado", "bytes", "tiempo", "agente"]);
-    for (const k of ["hora", "direccion", "reenviada", "metodo", "ruta", "protocolo", "agente"]) expect(typeof o[k], k).toBe("string");
+    expect(Object.keys(o)).toEqual([
+      "hora", "direccion", "reenviada", "metodo", "ruta", "protocolo", "estado", "bytes", "tiempo",
+      "upstream_status", "upstream_connect_time", "upstream_header_time", "upstream_response_time", "agente",
+    ]);
+    // Los cuatro campos del upstream son CADENAS (pueden valer "-", llevar ceros iniciales o listas de intentos).
+    for (const k of ["hora", "direccion", "reenviada", "metodo", "ruta", "protocolo", "agente", "upstream_status", "upstream_connect_time", "upstream_header_time", "upstream_response_time"]) expect(typeof o[k], k).toBe("string");
     for (const k of ["estado", "bytes", "tiempo"]) expect(typeof o[k], k).toBe("number");
+  });
+
+  it("los campos del upstream son cadenas JSON escapadas: valores ausentes, ceros iniciales y listas de intentos", () => {
+    const formato = /log_format fchmn_acceso escape=json\n([\s\S]*?);\n/.exec(PLANTILLA)![1]!;
+    for (const v of ["upstream_status", "upstream_connect_time", "upstream_header_time", "upstream_response_time"]) {
+      // Entre comillas en el formato: nunca como número desnudo.
+      expect(formato, v).toContain(`"${v}":"$${v}",`);
+    }
+    // Con escape=json, Nginx escapa el valor: una lista de intentos o un valor raro no rompe la línea.
+    for (const valor of ["-", "009", "502, 200", "502 : 200", "0.000, 10.001", "-, 0.002", 'a"b\\c']) {
+      const escapado = valor.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      const o = JSON.parse(`{"x":"${escapado}"}`) as { x: string };
+      expect(o.x).toBe(valor);
+    }
+  });
+
+  it("no registra la dirección del upstream ni otros campos nuevos", () => {
+    const formato = /log_format fchmn_acceso escape=json\n([\s\S]*?);\n/.exec(PLANTILLA)![1]!;
+    expect(formato).not.toMatch(/\$upstream_addr|\$upstream_bytes|\$proxy_host|\$upstream_cache/);
+    const delUpstream = [...formato.matchAll(/\$([a-z_0-9]+)/g)].map((m) => m[1]!).filter((n) => n.startsWith("upstream"));
+    expect(delUpstream).toEqual(["upstream_status", "upstream_connect_time", "upstream_header_time", "upstream_response_time"]);
   });
 
   it("sigue sin consulta, `$request`, `$args` ni `Referer`, y el estado sale del `map` y no de `$status` directo", () => {
