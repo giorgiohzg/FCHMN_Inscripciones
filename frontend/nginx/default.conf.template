@@ -67,6 +67,23 @@ map $request_uri $ruta_original {
     "~^(?<ruta_sin_consulta>[^?]*)"  $ruta_sin_consulta;
 }
 
+# ESTADO COMO NÚMERO JSON VÁLIDO.
+#
+# `$status` es el código que Nginx envió, como texto de tres cifras. Con una respuesta HTTP/0.9 del
+# upstream (sin línea de estado) vale `009`, y con una petición que Nginx no llegó a procesar, `000`:
+# escritos tal cual como número, `"estado":009` no es JSON válido (los ceros iniciales no se admiten) y
+# la línea completa deja de poder leerse. Este `map` normaliza solo la representación en el REGISTRO:
+# `009` → `9`, `000` → `0`; los códigos normales (200, 401, 404, 499, 502, 504…) salen igual, y cualquier
+# valor que no sea exactamente de tres cifras sale como `null`, JSON válido y explícito. No cambia el estado que
+# recibe el cliente ni el proxy: solo lo que se escribe aquí. El campo sigue siendo un número.
+#
+# Misma forma que `$ruta_original`: una captura con nombre como VALOR, sin combinarla con otra variable.
+map $status $estado_json {
+    default                         null;
+    "~^(?=[0-9]{3}$)0*(?<estado_sin_ceros>[1-9][0-9]*)$"  $estado_sin_ceros;
+    "~^(?=[0-9]{3}$)0+$"            0;
+}
+
 log_format fchmn_acceso escape=json
     '{"hora":"$time_iso8601",'
     '"direccion":"$remote_addr",'
@@ -74,7 +91,7 @@ log_format fchmn_acceso escape=json
     '"metodo":"$request_method",'
     '"ruta":"$ruta_original",'
     '"protocolo":"$server_protocol",'
-    '"estado":$status,'
+    '"estado":$estado_json,'
     '"bytes":$body_bytes_sent,'
     '"tiempo":$request_time,'
     '"agente":"$http_user_agent"}';
