@@ -1367,7 +1367,7 @@ Estas rutas son del administrador, que no necesita proponerse nada a sí mismo:
 
 ## Inventario completo de endpoints
 
-**117 endpoints**, agrupados por el módulo que los declara. Esta lista no está
+**118 endpoints**, agrupados por el módulo que los declara. Esta lista no está
 escrita a mano: `backend/tests/documentacion.test.ts` la compara con las rutas que
 el código declara y **falla si alguna sobra o falta**. Además comprueba que
 ninguna ruta fuera de las públicas se quede sin guardia, y que el permiso exacto
