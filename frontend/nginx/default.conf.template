@@ -94,6 +94,20 @@ server {
     # enlaza `/var/log/nginx/access.log` a la salida estándar. Ver `log_format` arriba.
     access_log /var/log/nginx/access.log fchmn_acceso;
 
+    # REGISTRO DE ERRORES DE PETICIÓN, SIN EL MENSAJE ORIGINAL (AUD-03, capa Nginx).
+    #
+    # Nginx añade a cada error de una petición la línea de petición, la URI del upstream y el
+    # `Referer`, con su cadena de consulta; algunos mensajes copian además `uri?args` en su texto. No
+    # hay directiva para quitarlos. Por eso los errores de este servidor (y de sus `location`, que lo
+    # heredan) NO van a stderr: van por syslog al receptor de `nginx.conf` (127.0.0.1:5140, UDP, dentro
+    # del contenedor), que escribe en stderr solo nivel, clase y errno de una lista cerrada. Mismo nivel
+    # que la imagen (`notice`).
+    #
+    # Se pierde el texto del error (fase, detalle de la cabecera inválida, dirección del upstream); la
+    # línea de acceso de la petición conserva estado y ruta. UDP puede perder mensajes. El registro
+    # GENERAL (arranque, señales, workers) sigue yendo a stderr por la directiva de `nginx.conf`.
+    error_log syslog:server=127.0.0.1:5140,nohostname,tag=fchmn notice;
+
     # CABECERAS DE SEGURIDAD (Fase 3). Se incluyen en `/`, `/assets/` y
     # `= /index.html` (más abajo) y NO en `/api/`, que ya recibe las suyas de la
     # API: ver `snippets/cabeceras-seguridad.conf.template`, que explica por qué

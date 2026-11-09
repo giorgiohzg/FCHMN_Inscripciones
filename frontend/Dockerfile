@@ -117,6 +117,15 @@ ENV API_INTERNA=backend:3000
 
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
 
+# CONFIGURACIÓN PRINCIPAL Y RECEPTOR DE ERRORES DE PETICIÓN (AUD-03, capa Nginx).
+#
+# `nginx.conf` es el de la imagen oficial sin cambios, más la carga del módulo njs de `stream` (ya
+# instalado en esta imagen, `nginx-module-njs`) y un servidor UDP solo en 127.0.0.1 que recibe por
+# syslog los errores de petición y escribe en stderr únicamente campos de una lista cerrada (ver
+# `nginx/njs/registro-errores.js`). Sin paquetes ni procesos nuevos y sin puertos publicados.
+COPY nginx/nginx.conf /etc/nginx/nginx.conf
+COPY nginx/njs/registro-errores.js /etc/nginx/njs/registro-errores.js
+
 # CABECERAS DE SEGURIDAD DEL FRONTEND (Fase 3) y su `connect-src`.
 #
 # CSP_CONNECT_SRC lista los orígenes a los que el navegador puede llamar con
