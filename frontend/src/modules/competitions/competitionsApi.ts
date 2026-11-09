@@ -109,9 +109,9 @@ export interface Competition {
   registrationsClosedReason: "manual" | "capacity" | "schedule" | null;
   registrationsClosedAt: string | null;
   /**
-   * `false` = oculta SOLO de los selectores del Panel de Inscripción y del Panel de
-   * Relevos. No afecta permisos, reglas de inscripción, acceso directo, Reportes ni
-   * los asistentes.
+   * `false` = oculta de los selectores de Inscripción, Relevos y Reportes para quienes
+   * no son administradores (administración sigue viéndola). No afecta permisos, reglas
+   * de inscripción, acceso directo ni los asistentes.
    */
   visibleInRegistrationPanels: boolean;
   /**
@@ -177,8 +177,9 @@ export function useCompetitionsApi() {
         search?: string;
         status?: CompetitionStatus;
         /**
-         * Filtro EXPLÍCITO: `true` = solo las visibles en los paneles de inscripción y
-         * relevos (lo envían esos dos paneles). Omitido = sin filtro, como siempre.
+         * Filtro EXPLÍCITO: `true` = solo las visibles (lo envían Inscripción, Relevos y
+         * Reportes a quienes no son administradores). Omitido = sin filtro; administración
+         * lo omite. No enviar `false`: traería solo las ocultas.
          */
         visibleInRegistrationPanels?: boolean;
         page?: number;

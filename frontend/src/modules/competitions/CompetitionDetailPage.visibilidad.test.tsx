@@ -50,7 +50,7 @@ vi.mock("../catalogs/catalogsApi", () => ({
 }));
 vi.mock("../pools/poolsApi", () => ({ usePoolsApi: () => ({ list: vi.fn().mockResolvedValue([]) }) }));
 
-const ETIQUETA = "Ocultar esta competencia del panel de inscripción y del panel de relevos";
+const ETIQUETA = "Ocultar esta competencia del panel de inscripción, del panel de relevos y de Reportes";
 
 function competencia(visible: boolean | undefined) {
   return {
@@ -124,7 +124,7 @@ describe("edición de la visibilidad", () => {
     expect(update.mock.calls[0]![1]).toMatchObject({ visibleInRegistrationPanels: false });
 
     await waitFor(() => expect(screen.queryByRole("button", { name: /Guardar/i })).toBeNull());
-    await waitFor(() => expect(screen.getByText(/oculta de esos dos selectores/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/oculta de esos selectores/i)).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: /^Editar$/i }));
     const reabierta = await screen.findByRole("checkbox", { name: ETIQUETA });
     expect(reabierta).toBeChecked();
@@ -139,8 +139,8 @@ describe("edición de la visibilidad", () => {
   it("el resumen de solo lectura dice Sí / No y, si está oculta, aclara que sigue accesible", async () => {
     montar();
     await waitFor(() => expect(screen.getByText("Copa Visibilidad")).toBeTruthy());
-    expect(screen.getByText(/Visible en el panel de inscripción y en el panel de relevos/i).textContent).toMatch(/Sí/);
-    expect(screen.queryByText(/oculta de esos dos selectores/i)).toBeNull();
+    expect(screen.getByText(/Visible en los selectores de Inscripción, Relevos y Reportes/i).textContent).toMatch(/Sí/);
+    expect(screen.queryByText(/oculta de esos selectores/i)).toBeNull();
   });
 
   it("una competencia sin el campo (respuesta antigua) se trata como visible, no como oculta", async () => {
@@ -196,7 +196,7 @@ describe("guardar sin tocar las fechas no las mueve", () => {
     expect(guardada.registrationEndAt).toBe(FIN);
 
     // Recargar y reabrir: la casilla está marcada; se desmarca y se guarda otra vez.
-    await waitFor(() => expect(screen.getByText(/oculta de esos dos selectores/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/oculta de esos selectores/i)).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: /^Editar$/i }));
     const reabierta = await screen.findByRole("checkbox", { name: ETIQUETA });
     expect(reabierta).toBeChecked();

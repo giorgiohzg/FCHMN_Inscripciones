@@ -202,11 +202,12 @@ export function CompetitionsListPage() {
               checked={form.ocultar}
               onChange={(e) => setForm({ ...form, ocultar: e.target.checked })}
             />
-            Ocultar esta competencia del panel de inscripción y del panel de relevos
+            Ocultar esta competencia del panel de inscripción, del panel de relevos y de Reportes
           </label>
           <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "0.2rem" }}>
-            Solo quita la competencia de los selectores de esos dos paneles. <strong>No es una medida de protección</strong>: no cambia permisos, reglas de
-            inscripción ni el acceso directo, y la competencia sigue apareciendo en Competencias, en Reportes y en los asistentes de inscripción.
+            Solo quita la competencia de los selectores de Inscripción, Relevos y Reportes para quienes no son administradores; la administración la sigue viendo en esos tres
+            selectores. <strong>No es una medida de protección</strong>: no cambia permisos, reglas de inscripción ni el acceso directo, y la competencia sigue apareciendo en
+            Competencias y en los asistentes de inscripción.
           </p>
           <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: 400 }}>
             <input

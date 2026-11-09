@@ -1,14 +1,13 @@
 /**
- * Cambio 6 — QUIÉN envía el filtro de visibilidad y quién no.
+ * QUIÉN envía el filtro de visibilidad y quién no.
  *
- * Ocultar una competencia la quita únicamente de los desplegables del Panel de
- * Inscripción y del Panel de Relevos, y para TODOS los roles (el administrador
- * incluido: es configuración, no permiso). Reportes y los dos asistentes conservan
- * su listado de siempre, así que NO envían el filtro (P8).
+ * Ocultar una competencia la quita de los desplegables de Inscripción, Relevos y Reportes para
+ * quienes NO son administradores. Administración (también si combina otros roles) los ve completos:
+ * omite el parámetro, porque enviar `false` traería solo las ocultas. Los dos asistentes conservan
+ * su listado de siempre y no envían el filtro.
  *
- * Se renderizan las cinco pantallas con servidores de mentira y se mira qué
- * parámetros llegan a `competitionsApi.list`. Que el servidor aplique el filtro
- * (sin tocar los demás) lo prueban las pruebas de integración del backend.
+ * Se renderizan las pantallas con servidores de mentira y se mira qué parámetros llegan a
+ * `competitionsApi.list`. Que el servidor aplique el filtro lo prueban las pruebas de integración del backend.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, waitFor } from "@testing-library/react";
@@ -87,14 +86,23 @@ beforeEach(() => {
   sesion = { ownerType: "system", clubId: null, personId: null, roles: ["admin"] };
 });
 
-describe("los DOS paneles piden solo las competencias visibles", () => {
-  const sesiones: [string, Sesion][] = [
-    ["administrador", { ownerType: "system", clubId: null, personId: null, roles: ["admin"] }],
+describe("los tres selectores piden solo las visibles, salvo para administración", () => {
+  const noAdmin: [string, Sesion][] = [
     ["personal de club", { ownerType: "club", clubId: "club-1", personId: null, roles: ["club"] }],
+    ["delegado (delegate)", { ownerType: "person", clubId: "club-1", personId: "p-1", roles: ["delegate"] }],
+    ["entrenador (coach)", { ownerType: "person", clubId: "club-1", personId: "p-3", roles: ["coach"] }],
+    ["representante legal (legal_representative)", { ownerType: "person", clubId: "club-1", personId: "p-4", roles: ["legal_representative"] }],
+    ["nadador", { ownerType: "person", clubId: null, personId: "p-2", roles: ["swimmer"] }],
   ];
+  const admin: [string, Sesion][] = [
+    ["administrador", { ownerType: "system", clubId: null, personId: null, roles: ["admin"] }],
+    ["administrador con otro rol", { ownerType: "system", clubId: null, personId: null, roles: ["club", "admin"] }],
+    ["administrador con otro rol y club", { ownerType: "club", clubId: "club-1", personId: null, roles: ["delegate", "admin"] }],
+  ];
+  const selectores = ["Panel de Inscripción", "Panel de Relevos", "Reportes"] as const;
 
-  for (const [rol, s] of sesiones) {
-    for (const nombre of ["Panel de Inscripción", "Panel de Relevos"] as const) {
+  for (const nombre of selectores) {
+    for (const [rol, s] of noAdmin) {
       it(`${nombre} — ${rol}: TODAS las páginas llevan visibleInRegistrationPanels: true`, async () => {
         sesion = s;
         const llamadas = await parametrosQueEnvia(PANTALLAS[nombre]);
@@ -102,11 +110,19 @@ describe("los DOS paneles piden solo las competencias visibles", () => {
         for (const parametros of llamadas) expect(parametros.visibleInRegistrationPanels).toBe(true);
       });
     }
+    for (const [rol, s] of admin) {
+      it(`${nombre} — ${rol}: omite el parámetro (nunca envía false)`, async () => {
+        sesion = s;
+        const llamadas = await parametrosQueEnvia(PANTALLAS[nombre]);
+        expect(llamadas.length).toBeGreaterThan(0);
+        for (const parametros of llamadas) expect(parametros).not.toHaveProperty("visibleInRegistrationPanels");
+      });
+    }
   }
 });
 
-describe("Reportes y los asistentes conservan su listado: NO envían el filtro", () => {
-  for (const nombre of ["Reportes", "Asistente de inscripción", "Asistente de relevos"] as const) {
+describe("los asistentes conservan su listado: NO envían el filtro", () => {
+  for (const nombre of ["Asistente de inscripción", "Asistente de relevos"] as const) {
     it(`${nombre}: ningún parámetro de visibilidad`, async () => {
       const llamadas = await parametrosQueEnvia(PANTALLAS[nombre]);
       for (const parametros of llamadas) expect(parametros).not.toHaveProperty("visibleInRegistrationPanels");

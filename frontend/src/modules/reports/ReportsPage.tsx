@@ -19,6 +19,8 @@ export function ReportsPage() {
   // club de la misma forma que en Inscripciones/Inscripciones de Relevo:
   // texto fijo, tomado de su propia membresía de nadador (no de `user.clubId`,
   // que para ellos siempre es null).
+  // Administración ve también las competencias ocultas (prevalece si combina otros roles).
+  const veCompetenciasOcultas = hasRole("admin");
   const isPureSwimmer = user?.ownerType === "person" && !hasRole("admin") && !user?.clubId;
   // Una cuenta de club, o un delegado/entrenador: el reporte se carga
   // filtrado directo a su propio club — el filtro se muestra como texto
@@ -38,15 +40,28 @@ export function ReportsPage() {
   const [exporting, setExporting] = useState<string | null>(null);
 
   useEffect(() => {
-    /**
-     * Selector de competencias: sin recorrer las páginas llegaban solo las 20
-     * primeras (el `pageSize` por omisión del backend), así que una competencia
-     * antigua simplemente no se podía elegir para el informe.
-     */
-    traerTodasLasPaginas((page, pageSize) => competitionsApi.list({ page, pageSize }))
-      .then(setCompetitions)
-      .catch((err) => setError(err instanceof Error ? err.message : "No se pudieron cargar las competencias"));
+    // Selector de competencias. Las que la administración ocultó
+    // (visibleInRegistrationPanels = false) solo se quitan del desplegable de quienes no son
+    // administradores; no cambia ningún acceso ni regla. Para administración se OMITE el
+    // parámetro (enviar false traería solo las ocultas). Depende del valor booleano, no de
+    // una función, para recargar una sola vez si la sesión cambia de rol.
+    let vigente = true;
+    traerTodasLasPaginas((page, pageSize) =>
+      competitionsApi.list({ ...(veCompetenciasOcultas ? {} : { visibleInRegistrationPanels: true }), page, pageSize })
+    )
+      .then((todas) => {
+        if (vigente) setCompetitions(todas);
+      })
+      .catch((err) => {
+        if (vigente) setError(err instanceof Error ? err.message : "No se pudieron cargar las competencias");
+      });
+    return () => {
+      vigente = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [veCompetenciasOcultas]);
 
+  useEffect(() => {
     if (isPureSwimmer) {
       if (user?.personId) {
         assignmentApi

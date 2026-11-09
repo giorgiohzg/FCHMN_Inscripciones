@@ -113,7 +113,7 @@ describe("el formulario de alta", () => {
     montar();
     await screen.findByText("Copa Visible");
     fireEvent.click(screen.getByRole("button", { name: "+ Nueva competencia" }));
-    return screen.getByRole("checkbox", { name: "Ocultar esta competencia del panel de inscripción y del panel de relevos" });
+    return screen.getByRole("checkbox", { name: "Ocultar esta competencia del panel de inscripción, del panel de relevos y de Reportes" });
   }
   const completar = () => {
     const [nombre] = screen.getAllByRole("textbox");

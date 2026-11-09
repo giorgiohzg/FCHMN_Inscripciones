@@ -1361,7 +1361,7 @@ competencia: sus pruebas (`/events` y `/enabled-events`), `/capacity`, `availabl
 exportación a Team Manager. Solo el administrador las ve; para el resto, el mismo 404 que el detalle. Se usa el estado **efectivo**
 (`computeEffectiveStatus`, función pura): no se escribe nada, y `applyAutoStatus` se conserva donde estaba. Una competencia guardada como
 «programada» cuya inscripción ya abrió por fecha es visible. `visibleInRegistrationPanels` **no interviene**: sigue controlando solo los
-desplegables, y una competencia abierta pero oculta en los paneles sigue accesible. **Cambio de contrato:** para quien no es administrador, una
+desplegables de Inscripción, Relevos y Reportes (para quienes no son administradores), y una competencia abierta pero oculta en los paneles sigue accesible. **Cambio de contrato:** para quien no es administrador, una
 competencia inexistente responde 404 también en `/events` y `/enabled-events` (antes, lista vacía); si no, la diferencia entre «vacía» y «404» sería un oráculo.
 
 **AUD-15: club actual.** `GET /swimmer-assignments/current-club/:personId` devuelve solo `{ club: { id, name } }` o `null`, no la membresía

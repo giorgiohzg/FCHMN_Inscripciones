@@ -45,6 +45,8 @@ export function RegistrationWorkspacePage() {
   // pero acotado a sí mismo: el club se muestra solo informativo (no se
   // puede elegir otro), y el plantel/las pruebas ya vienen filtrados a su
   // propia información desde el servidor.
+  // Administración ve también las competencias ocultas (prevalece si combina otros roles).
+  const veCompetenciasOcultas = hasRole("admin");
   const isPureSwimmer = user?.ownerType === "person" && !hasRole("admin") && !user?.clubId;
 
   // Una cuenta de club, o un delegado/entrenador: solo pueden operar sobre
@@ -298,14 +300,28 @@ export function RegistrationWorkspacePage() {
   const deshacerPorVista = useRef<Map<string, AccionDeshacer>>(new Map());
 
   useEffect(() => {
-    // Se muestran TODAS las competencias (no solo las abiertas) — permite
-    // revisar o corregir inscripciones de competencias ya cerradas — salvo las
-    // que la administración ocultó de este selector (para todos los roles; solo
-    // quita la opción del desplegable, no cambia ningún acceso ni regla).
-    traerTodasLasPaginas((page, pageSize) => competitionsApi.list({ visibleInRegistrationPanels: true, page, pageSize }))
-      .then(setCompetitions)
-      .catch((err) => setErrorGlobal(err instanceof Error ? err.message : "No se pudieron cargar las competencias"));
+    // Selector de competencias. Las que la administración ocultó
+    // (visibleInRegistrationPanels = false) solo se quitan del desplegable de quienes no son
+    // administradores; no cambia ningún acceso ni regla. Para administración se OMITE el
+    // parámetro (enviar false traería solo las ocultas). Depende del valor booleano, no de
+    // una función, para recargar una sola vez si la sesión cambia de rol.
+    let vigente = true;
+    traerTodasLasPaginas((page, pageSize) =>
+      competitionsApi.list({ ...(veCompetenciasOcultas ? {} : { visibleInRegistrationPanels: true }), page, pageSize })
+    )
+      .then((todas) => {
+        if (vigente) setCompetitions(todas);
+      })
+      .catch((err) => {
+        if (vigente) setErrorGlobal(err instanceof Error ? err.message : "No se pudieron cargar las competencias");
+      });
+    return () => {
+      vigente = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [veCompetenciasOcultas]);
 
+  useEffect(() => {
     if (isPureSwimmer) {
       if (user?.personId) {
         assignmentApi

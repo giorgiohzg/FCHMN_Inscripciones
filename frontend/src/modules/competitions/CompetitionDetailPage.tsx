@@ -305,7 +305,9 @@ export function CompetitionDetailPage() {
               Descancelar
             </button>
           )}
-          <button className="btn-secondary" onClick={() => setEditing((v) => !v)}>{editing ? "Cancelar edición" : "Editar"}</button>
+          {!editing && (
+            <button className="btn-secondary" onClick={() => setEditing(true)}>Editar</button>
+          )}
           <button className="btn-danger" onClick={handleDeleteCompetition}>Eliminar</button>
         </div>
       </div>
@@ -342,14 +344,14 @@ export function CompetitionDetailPage() {
             )}
           </p>
           <p style={{ color: "var(--brand-gray-600)", fontSize: "0.9rem" }}>
-            Visible en el panel de inscripción y en el panel de relevos:{" "}
+            Visible en los selectores de Inscripción, Relevos y Reportes:{" "}
             {competition.visibleInRegistrationPanels === false ? (
               <strong>No</strong>
             ) : (
               "Sí"
             )}
             {competition.visibleInRegistrationPanels === false && (
-              <> (oculta de esos dos selectores; sigue accesible desde Competencias, Reportes y los asistentes)</>
+              <> (oculta de esos selectores para quienes no son administradores; la administración la sigue viendo, y sigue accesible desde Competencias y los asistentes)</>
             )}
           </p>
 
@@ -485,13 +487,17 @@ export function CompetitionDetailPage() {
               checked={editForm.ocultar}
               onChange={(e) => setEditForm({ ...editForm, ocultar: e.target.checked })}
             />
-            Ocultar esta competencia del panel de inscripción y del panel de relevos
+            Ocultar esta competencia del panel de inscripción, del panel de relevos y de Reportes
           </label>
           <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "0.2rem" }}>
-            Solo quita la competencia de los selectores de esos dos paneles. <strong>No es una medida de protección</strong>: no cambia permisos, reglas de
-            inscripción ni el acceso directo, y la competencia sigue apareciendo en Competencias, en Reportes y en los asistentes de inscripción.
+            Solo quita la competencia de los selectores de Inscripción, Relevos y Reportes para quienes no son administradores; la administración la sigue viendo en esos tres
+            selectores. <strong>No es una medida de protección</strong>: no cambia permisos, reglas de inscripción ni el acceso directo, y la competencia sigue apareciendo en
+            Competencias y en los asistentes de inscripción.
           </p>
-          <button className="btn-primary" style={{ marginTop: "0.75rem" }} onClick={handleSaveDetails}>Guardar cambios</button>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.75rem" }}>
+            <button className="btn-primary" onClick={handleSaveDetails}>Guardar cambios</button>
+            <button className="btn-secondary" onClick={() => setEditing(false)}>Cancelar edición</button>
+          </div>
         </div>
       )}
 
