@@ -9,10 +9,10 @@
     "no-verificable": "la fuente exacta se publica solo como tarball, o su URL usa variables que no se resolvieron; comprobarlo exigiria descargar un binario, fuera del alcance autorizado. NO se afirma ausencia."
   },
   "resumen": {
-    "paquetesFuente": 107,
+    "paquetesFuente": 108,
     "conAvisoPropio": 28,
     "verificadoAusente": 5,
-    "noVerificable": 74,
+    "noVerificable": 75,
     "archivosDeAviso": 51
   },
   "paquetes": [
@@ -2620,6 +2620,29 @@
         "https://raw.githubusercontent.com/alpinelinux/aports/0afa2da0e8c8051c6f8f64a7a388e5a259904245/main/zlib/"
       ],
       "fuenteTarball": "https://zlib.net/fossils/zlib-1.3.2.tar.gz"
+    },
+    {
+      "paqueteFuente": "zlib",
+      "version": "1.4-r0",
+      "commitAports": "bdf501c870a92a05c097857401f69c48c4810384",
+      "expresionAlpine": "Zlib",
+      "licenseApkbuild": "Zlib",
+      "urlProyecto": "https://zlib.net/",
+      "artefactos": [
+        "backend",
+        "frontend-image",
+        "migrate"
+      ],
+      "binarios": [
+        "zlib"
+      ],
+      "estado": "no-verificable",
+      "nota": "version incorporada al actualizar solo el zlib del sistema (minimo explicito zlib>=1.4-r0): no se comprobo el aviso propio de esta version; la fuente exacta se publica como tarball. No se afirma que no exista aviso",
+      "avisos": [],
+      "lugaresInspeccionados": [
+        "https://raw.githubusercontent.com/alpinelinux/aports/bdf501c870a92a05c097857401f69c48c4810384/main/zlib/"
+      ],
+      "fuenteTarball": "https://zlib.net/fossils/zlib-1.4.tar.gz"
     },
     {
       "paqueteFuente": "zstd",

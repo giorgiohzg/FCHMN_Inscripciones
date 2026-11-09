@@ -231,7 +231,7 @@ licencia, el paquete fuente del que sale y en que archivo del directorio
   xz-libs                    5.8.4-r0          GPL-2.0-or-later AND 0BSD AND Public-Domain AND LGPL-2.1-or-later
                                                paquete fuente: xz
                                                texto: GPL-2.0-or-later: licencias/GPL-2.0-or-later.txt  |  0BSD: licencias/0BSD.txt  |  Public-Domain: sin-texto-que-reproducir  |  LGPL-2.1-or-later: licencias/LGPL-2.1-or-later.txt
-  zlib                       1.3.2-r1          Zlib
+  zlib                       1.4-r0            Zlib
                                                texto: Zlib: licencias/Zlib.txt
   zstd-libs                  1.5.7-r2          BSD-3-Clause OR GPL-2.0-or-later
                                                paquete fuente: zstd
@@ -3666,8 +3666,8 @@ NO VERIFICABLES DENTRO DEL ALCANCE AUTORIZADO
       fuente: https://download.osgeo.org/libtiff/tiff-4.7.2.tar.gz
   util-linux 2.42.3-r1
       fuente: https://www.kernel.org/pub/linux/utils/util-linux/v$_v/util-linux-$pkgver.tar.xz
-  zlib 1.3.2-r1
-      fuente: https://zlib.net/fossils/zlib-1.3.2.tar.gz
+  zlib 1.4-r0
+      fuente: https://zlib.net/fossils/zlib-1.4.tar.gz
 
 ==============================================================================
 COMPONENTES DE LAS IMAGENES BASE  (6)

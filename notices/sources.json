@@ -23,7 +23,7 @@
       "archivoDeFuentesCorrespondienteCreado": false
     },
     "motivos": [
-      "74 paquetes fuente cuyos avisos de copyright NO pudieron verificarse: su fuente exacta se publica solo como tarball. No se afirma que carezcan de aviso; se afirma que no se comprobo.",
+      "75 paquetes fuente cuyos avisos de copyright NO pudieron verificarse: su fuente exacta se publica solo como tarball. No se afirma que carezcan de aviso; se afirma que no se comprobo.",
       "las candidatas finales no se han construido ni verificado",
       "no existe archivo de fuentes correspondiente para una eventual entrega externa"
     ],
@@ -76,10 +76,10 @@
   ],
   "avisosDeCopyright": {
     "manifiesto": "notices/avisos-fuente.json",
-    "paquetesFuente": 107,
+    "paquetesFuente": 108,
     "conAvisoPropio": 28,
     "verificadoAusente": 5,
-    "noVerificable": 74
+    "noVerificable": 75
   },
   "totalComponentes": 15,
   "componentesSinResolver": 0,

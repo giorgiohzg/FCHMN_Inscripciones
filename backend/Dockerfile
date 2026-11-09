@@ -74,8 +74,20 @@ ARG NODE_DIGEST=sha256:0e1754758c2df4cfa3e68d59e2e1b7374bb7fd9ea6328eaaacf15cc93
 # certificado auténtico de Let's Encrypt. Darle el paquete a `apk` sería peor
 # que inútil, porque `/etc/apk/ca.pem` SUSTITUYE el almacén de autoridades en
 # lugar de ampliarlo y dejaría de confiar en el CDN.
+#
+# ZLIB DEL SISTEMA, CON UN MÍNIMO EXPLÍCITO.
+#
+# La base fijada trae `zlib` 1.3.2-r1. Alpine 3.24 publica `zlib` 1.4-r0 (aports
+# `3.24-stable`, `secfixes`: CVE-2026-4738), y la etiqueta oficial de la base no
+# se ha reconstruido con ella. `'zlib>=1.4-r0'` actualiza SOLO ese paquete (no es
+# un `apk upgrade` general) e impide instalar la versión antigua. Es un mínimo, no
+# una versión exacta: Alpine solo sirve la última revisión de cada rama, y la que
+# se obtuvo de verdad queda en el inventario extraído de la imagen.
+#
+# Solo cambia la biblioteca del SISTEMA. Node incorpora su propia copia de zlib
+# (`process.versions.zlib`), que esto no toca.
 FROM node:${NODE_VERSION}@${NODE_DIGEST} AS base
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl 'zlib>=1.4-r0'
 
 # --- Dependencias completas + compilación ------------------------------------
 FROM base AS build

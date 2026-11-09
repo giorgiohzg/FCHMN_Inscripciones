@@ -88,6 +88,14 @@ RUN npm run build
 # --- Servido estático --------------------------------------------------------
 FROM nginx:${NGINX_VERSION}@${NGINX_DIGEST} AS runtime
 
+# ZLIB DEL SISTEMA, CON UN MÍNIMO EXPLÍCITO (como en la base de la API).
+#
+# La base fijada trae `zlib` 1.3.2-r1; Alpine 3.24 publica 1.4-r0 (`secfixes`:
+# CVE-2026-4738). Se actualiza SOLO ese paquete, sin `apk upgrade` general, y el
+# mínimo impide la versión antigua. La versión obtenida queda en el inventario
+# extraído de la imagen; Alpine solo sirve la última revisión de la rama.
+RUN apk add --no-cache 'zlib>=1.4-r0'
+
 # La plantilla se procesa con `envsubst` al arrancar (mecanismo propio de la
 # imagen oficial de Nginx: todo lo que esté en /etc/nginx/templates/*.template).
 # `NGINX_ENVSUBST_FILTER` restringe la sustitución a las DOS variables que la
