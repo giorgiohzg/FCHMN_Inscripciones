@@ -250,6 +250,12 @@ export function useCompetitionsApi() {
     reopenRegistrations: (id: string) =>
       api.post<Competition>(`/competitions/${id}/reopenRegistrations`),
 
+    /**
+     * Descancelar: `cancelada → borrador`, siempre. Acción explícita y solo para administración
+     * (la API lo comprueba; ocultar el botón no es la protección).
+     */
+    uncancel: (id: string) => api.post<Competition>(`/competitions/${id}/uncancel`),
+
     addDate: (id: string, date: string) =>
       api.post<CompetitionDate>(`/competitions/${id}/dates`, { date }),
     removeDate: (dateId: string) =>

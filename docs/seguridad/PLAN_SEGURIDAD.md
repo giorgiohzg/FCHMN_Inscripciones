@@ -21,6 +21,8 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **AUD-A** | Auditoría del 2026-11-07, AUD-04 y AUD-11: el estado del club se aplica a su cuenta, a su personal y a sus credenciales | **Cerrada dentro de su alcance:** probada en local (pruebas de integración focalizadas sobre la base desechable, typecheck y lint) y en la CI (ejecución 42437889969, éxito), y desplegada en `fchmn-api` desde `d877686` (Live, Auto-Deploy Off). Web y mantenimiento no se desplegaron. Ver «AUD-A» |
 | **AUD-C** | Auditoría del 2026-11-07, AUD-03, AUD-05, AUD-07, AUD-15 y AUD-02: registros sin consultas ni valores, sin datos ajenos en errores, competencias ocultas uniformes, club actual mínimo y conteo del ZIP previo | **Completada dentro de su alcance:** probada en local (pruebas unitarias y de integración focalizadas sobre la base desechable, typecheck y lint), publicada en `57ce8e5` y **desplegada en `fchmn-api` desde `b02eff2`** (`d877686` → `b02eff2`, Live, Auto-Deploy Off; CI 42529120274 en éxito). AUD-03 **no** queda resuelta en todas las capas (registro de errores de Nginx y registros del proveedor); sin pruebas funcionales en producción. Ver «AUD-C» |
 | **AUD-B** | Auditoría del 2026-11-07, AUD-01 y AUD-03 (Nginx): bases Node 22.23.4 y Nginx 1.30.6 y registro de acceso de Nginx sin consulta ni `Referer` | **Publicado en el repositorio y validado en local** (tres imágenes candidatas construidas, inventarios y avisos regenerados, escaneadas y ejecutadas sobre la base desechable); publicada en `b02eff2` y **desplegada** (`fchmn-api` y `fchmn-web`, Live; `fchmn-mantenimiento`, construida sin ejecutar el cron). **Completada dentro de su alcance**, sin declarar resueltos todos sus riesgos: quedan 24 avisos por versión (de las candidatas locales) como riesgo residual condicionado, no corregidos. Ver «AUD-B» y «Despliegue conjunto de AUD-B y AUD-C» |
+| **AUD-V** | Fórmulas en el CSV de inscritos (Excel 16.0, es-CL, separador `;`) | **Publicada en el repositorio y probada en local; pendiente de despliegue.** Ver «AUD-V» |
+| **Descancelar** | Botón `cancelada → borrador`, solo administración | **Publicado en el repositorio y probado en local; pendiente de despliegue.** Ver «Descancelar» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -1523,7 +1525,7 @@ dependen del `npm` que trae la imagen de Node; no se actualizan por separado.
 - `zlib` 1.4-r0 está disponible en Alpine 3.24 y no se aplicó en AUD-B; queda recomendado como paso propio (ver arriba).
 - La etapa `base` de la API no fija los paquetes de Alpine; dos construcciones en días distintos pueden diferir.
 
-**Límites.** AUD-V y las decisiones funcionales siguen pendientes. El cron de enero ejecutará la imagen nueva por primera vez.
+**Límites.** Las decisiones funcionales siguen pendientes (AUD-V se trata aparte). El cron de enero ejecutará la imagen nueva por primera vez.
 No se observó la interfaz en un navegador con estas imágenes. Quedan en el equipo las imágenes candidatas `fchmn-{backend,migrate,frontend}:audb-p1` y `:audb-p2` y las dos bases oficiales descargadas por digest.
 
 ## Despliegue conjunto de AUD-B y AUD-C (2026-11-08)
@@ -1553,6 +1555,29 @@ Cron: **no se ejecutó**. Tenía 26 ejecuciones antes y 26 después, ninguna en 
 - Los 24 avisos son de las candidatas locales escaneadas, no un escaneo de producción: 23 del `npm` de la imagen base (8 NA-A y 15 NA-B, condicionados a no ejecutar `npm` ni `npx` con entradas no confiables en las imágenes de ejecución, algo no comprobado en Render) y `zlib` como posible falso positivo **provisional**.
 - El registro de errores de Nginx puede escribir la consulta cuando falla el upstream (pendiente).
 - Registros del proveedor no inspeccionados; sin pruebas funcionales en producción.
+
+
+## AUD-V: fórmulas en el CSV de inscritos (publicada y probada en local; pendiente de despliegue)
+
+**Qué se reprodujo** (validación previa, solo lectura): con Excel 16.0 en es-CL, cuyo separador de lista es `;`, abrir por doble clic el CSV completo que entrega `GET /reports/registrations/export?format=csv` evaluaba 13 fórmulas aritméticas inocuas. Condición: un valor de texto libre (club, nombre o apellido) con la forma `texto;=fórmula;texto`. Un valor así no se entrecomillaba (el RFC 4180 solo rige para la coma) y `neutralizeSpreadsheetFormula` solo miraba el principio del valor. La aplicación acepta esos valores: ninguna validación rechaza `;` ni `=`. No se generaliza a otras versiones, configuraciones ni programas.
+
+**Corrección** (`reports.rules.ts`, solo CSV): `neutralizeCsvCellBoundaries` antepone una comilla simple al disparador (`= + - @`) que sigue al inicio del valor o a un posible límite de celda (`;`, `|`, tabulador, salto de línea), saltando espacios, tabuladores y comillas que la planilla podría quitar. `escapeCsvValue` la aplica tras la neutralización existente. No cambia el separador, el entrecomillado, las columnas, el orden, los filtros ni los permisos, ni los nombres almacenados; `neutralizeSpreadsheetFormula`, compartida con XLSX y la carga masiva, no se modificó (una prueba lo fija).
+
+**Validación local** (datos sintéticos, base desechable): pruebas unitarias (valores hostiles, idempotencia, valores legítimos intactos y estructura del CSV; con la mitigación desactivada, 17 fallan) y una prueba de integración del flujo real. Exportación completa con los escenarios de AUD-V más variantes (comilla tras el separador, espacios, barra vertical, tabulador, salto de línea y comilla inicial) abierta en Excel 16.0 es-CL: por doble clic, 0 fórmulas, 0 errores y 0 celdas numéricas fuera de las fechas; con importación explícita por coma, `;` y tabulador, 0 fórmulas. Los valores legítimos (`Ana-María`, `O'Higgins; Gómez`, `Pérez, Soto`) se conservan. La importación por coma muestra la comilla simple literal en las celdas neutralizadas (ya ocurría con los valores que empiezan por `=`).
+
+**Límites.** Solo Excel 16.0 con configuración es-CL; no se probaron otras versiones, programas ni separadores del sistema. Solo aritmética inocua (sin hipervínculos, DDE, macros ni referencias externas). La exportación XLSX no se modificó ni se volvió a probar en Excel. El BOM, los acentos y otros defectos cosméticos del CSV siguen sin corregirse. Team Manager conserva el RUN; los reportes no lo incluyen.
+
+## Descancelar: `cancelada → borrador` (publicado y probado en local; pendiente de despliegue)
+
+**Definición aprobada:** `Cancelada → Borrador`, siempre; no recupera el estado anterior ni elige otro destino.
+
+**API.** `POST /competitions/:id/uncancel`, acción explícita aparte del bucle de transiciones y de `PUT /competitions/:id` (que no acepta `status`). Exige `competitions:write` **y** el rol `admin`, comprobados en el servidor; un perfil con el permiso pero sin el rol recibe 403. Rechaza (400) cualquier estado distinto de `cancelled` y devuelve 404 si no existe. La escritura está condicionada a que la fila siga cancelada y va en la misma transacción que la auditoría `COMPETITION_UNCANCEL` (autor, competencia, estado anterior y nuevo): con solicitudes repetidas o concurrentes, solo una cambia el estado y audita. Solo cambia el estado, los campos auxiliares de cierre (quedan nulos) y `updatedBy`; pruebas, fechas, jornadas, configuración, inscripciones y relevos no se tocan. Las lecturas posteriores devuelven Borrador: programar o abrir es otra acción, con las reglas existentes.
+
+**Interfaz.** En la página de la competencia, el botón «Descancelar» solo aparece para administración y con la competencia cancelada, y pide confirmación: volverá a Borrador, conservará sus datos y no abrirá inscripciones. Si se cancela el diálogo no se llama a la API; un error de la API se muestra.
+
+**Validación local:** prueba de integración (20 casos, base desechable): administrador, otros perfiles (club, nadador y un gestor con el permiso pero sin el rol), los siete estados rechazados, repetición, ocho solicitudes concurrentes, conservación de datos con huella completa, auditoría, reversión si falla la auditoría, ausencia de caminos alternativos y que tras descancelar se puede programar. Con el rol o la escritura condicionada retirados, fallan las pruebas correspondientes. Frontend: 13 casos (visibilidad, confirmación, cancelar el diálogo, error). Typecheck completo de backend y frontend sin errores; ESLint sin autocorrección de lo tocado, sin errores (avisos preexistentes en código no modificado).
+
+**Límites.** No se observó la interfaz en un navegador; el diálogo es `window.confirm`, como el resto de la página. Publicado en el repositorio, sin desplegar; el resultado de su CI se comprueba aparte.
 
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 

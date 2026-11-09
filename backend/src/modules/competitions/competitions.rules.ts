@@ -418,3 +418,18 @@ export function evaluateCompetitionAction(current: CompetitionStatus, action: Co
       return { allowed: true, nextStatus: "finished" };
   }
 }
+
+/**
+ * «Descancelar»: la única transición que SALE de `cancelled`, y siempre hacia `draft`.
+ *
+ * Es una acción explícita y con nombre, aparte de `evaluateCompetitionAction`: no es una
+ * transición más del ciclo de vida, solo la reparación de una cancelación y no recupera el
+ * estado anterior ni elige otro destino. Programar o abrir son acciones posteriores que
+ * siguen las reglas de siempre.
+ */
+export function evaluateUncancel(current: CompetitionStatus): TransitionResult {
+  if (current !== "cancelled") {
+    return { allowed: false, reason: `Solo se puede descancelar una competencia cancelada (actual: '${current}')` };
+  }
+  return { allowed: true, nextStatus: "draft" };
+}

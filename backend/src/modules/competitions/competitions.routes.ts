@@ -16,7 +16,7 @@ import {
   updateCompetitionEventSchema,
   reorderCompetitionEventsSchema,
 } from "./competitions.schemas";
-import { requireAuth, requirePermission } from "../auth/rbac.middleware";
+import { requireAuth, requirePermission, requireRole } from "../auth/rbac.middleware";
 import { ValidationError } from "../../shared/errors";
 import type { CompetitionAction } from "./competitions.rules";
 import { exigirCompetenciaVisiblePorId } from "./competitions.visibilidad";
@@ -101,6 +101,21 @@ export async function competitionsRoutes(app: FastifyInstance) {
       reply.send(await competitionsService.transitionCompetition(id, action, { userId: req.authUser!.sub, ipAddress: req.ip }));
     });
   }
+
+  /**
+   * Descancelar (`cancelada → borrador`). Acción explícita y SOLO para el rol administrativo, comprobado
+   * aquí además del permiso: ocultar el botón en la interfaz no es una protección. No pasa por el bucle de
+   * transiciones de arriba (que solo exige `competitions:write`) ni por `PUT /competitions/:id`, que no
+   * acepta `status`.
+   */
+  app.post(
+    "/competitions/:id/uncancel",
+    { preHandler: [requirePermission("competitions:write"), requireRole("admin")] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      reply.send(await competitionsService.uncancelCompetition(id, { userId: req.authUser!.sub, ipAddress: req.ip }));
+    }
+  );
 
   // ---------- Fechas ----------
   /**

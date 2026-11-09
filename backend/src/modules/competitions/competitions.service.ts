@@ -1,7 +1,7 @@
 import { prisma } from "../../shared/prisma.client";
 import { audit, withAudit } from "../audit/audit.service";
 import { ValidationError, NotFoundError } from "../../shared/errors";
-import { computeEffectiveStatus, recomputeStatusAfterEdit, evaluateCompetitionAction, evaluateReopenRegistrations, type CompetitionAction } from "./competitions.rules";
+import { computeEffectiveStatus, recomputeStatusAfterEdit, evaluateCompetitionAction, evaluateReopenRegistrations, evaluateUncancel, type CompetitionAction } from "./competitions.rules";
 import { shouldCloseRegistrations } from "./competition-capacity.rules";
 import { readCapacityUsage } from "./competition-capacity.service";
 import { exigirCompetenciaVisible } from "./competitions.visibilidad";
@@ -519,6 +519,49 @@ export async function transitionCompetition(id: string, action: CompetitionActio
       after: competition,
     })
   );
+}
+
+/**
+ * Descancelar: `cancelada → borrador`, siempre.
+ *
+ * Acción explícita; la ruta exige además el rol administrativo. No toca nada más que el estado y los
+ * campos auxiliares de cierre: pruebas, fechas, configuración, inscripciones y relevos quedan como estaban,
+ * y no abre inscripciones (programar o abrir es otra acción, con las reglas de siempre).
+ *
+ * Es idempotente frente a repetición y concurrencia: la transición se hace con una escritura condicionada
+ * a que la fila siga en `cancelled`, dentro de la misma transacción que la auditoría. Si dos solicitudes
+ * llegan a la vez, solo una cambia la fila y audita; la otra recibe el rechazo de «no está cancelada».
+ */
+export async function uncancelCompetition(id: string, actor: ActorContext) {
+  return prisma.$transaction(async (tx) => {
+    const before = await tx.competition.findUnique({ where: { id } });
+    if (!before) throw new NotFoundError("Competencia");
+
+    const result = evaluateUncancel(before.status);
+    if (!result.allowed) throw new ValidationError(result.reason!);
+
+    // Compare-and-set: solo cambia si sigue cancelada. Fuera de «cerrada» no hay causa de cierre que guardar.
+    const cambiadas = await tx.competition.updateMany({
+      where: { id, status: "cancelled" },
+      data: { status: result.nextStatus!, registrationsClosedReason: null, registrationsClosedAt: null, updatedBy: actor.userId },
+    });
+    if (cambiadas.count !== 1) throw new ValidationError("Solo se puede descancelar una competencia cancelada (otra solicitud ya cambió su estado)");
+
+    const after = await tx.competition.findUniqueOrThrow({ where: { id } });
+    await audit(
+      {
+        userId: actor.userId,
+        action: "COMPETITION_UNCANCEL",
+        entityType: "Competition",
+        entityId: id,
+        ipAddress: actor.ipAddress,
+        before,
+        after,
+      },
+      { tx }
+    );
+    return after;
+  });
 }
 
 /**

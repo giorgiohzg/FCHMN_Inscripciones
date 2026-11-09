@@ -750,6 +750,11 @@ cuenta `system`.
   - Detalle, cambios de contrato y límites en `docs/seguridad/PLAN_SEGURIDAD.md` («AUD-C»).
 - **Imágenes base y registro de acceso de Nginx** (auditoría AUD-01 y AUD-03; completadas dentro de su alcance: validadas en local, publicadas y desplegadas desde `b02eff2` en `fchmn-api` y `fchmn-web` (Live) y construidas en `fchmn-mantenimiento`, cuyo cron no se ejecutó; CI 42529120274 en éxito): las bases pasan a **Node 22.23.4** (versión de seguridad de la rama 22 LTS) y a **Nginx 1.30.6** (última estable), con etiqueta y digest explícitos, sobre Alpine 3.24.4; no se migra a Node 24. `frontend/nginx/default.conf.template` declara un formato de registro de acceso JSON propio, **sin cadena de consulta ni `Referer`**, que reemplaza al `access_log` heredado de la imagen oficial (comprobado con la configuración efectiva y con un marcador sintético de búsqueda). Inventarios, fuentes y avisos de las tres imágenes regenerados con el procedimiento documentado (textos de licencia íntegros; verificadores en 0). Escaneo con Trivy: la web pasa de 215 a 1 aviso por versión; en la API y mantenimiento quedan 24, 23 del `npm` incluido en la imagen base y ninguno en las dependencias de la aplicación. **Riesgo residual:** esos avisos no están corregidos; se registran como riesgo condicionado (8 sin la condición de uso en el código de npm, 15 que exigirían ejecutar `npm` en la imagen con una entrada hostil, y `zlib` como posible falso positivo provisional, con 1.4-r0 recomendada como paso propio); el registro de errores de Nginx escribe la consulta cuando falla el upstream, y los registros del proveedor no fueron inspeccionados. Los 24 avisos son de las candidatas locales escaneadas, no de un escaneo de producción, cuyas versiones y paquetes efectivos no se inspeccionaron; en producción se comprobó disponibilidad, cabeceras, el aviso público y, de forma acotada, el registro de acceso de la web, sin pruebas funcionales. Detalle en `docs/seguridad/PLAN_SEGURIDAD.md` («AUD-B» y «Despliegue conjunto de AUD-B y AUD-C»).
 
+- **AUD-V y «Descancelar»** (publicados en el repositorio y probados en local; **pendientes de despliegue**):
+  - **Fórmulas en el CSV de inscritos:** con Excel 16.0 en es-CL (separador `;`), abrir por doble clic el CSV evaluaba valores como `Club;=1+1;Z`. La exportación CSV neutraliza ahora también cada trozo que una planilla podría tomar como inicio de celda (tras `;`, `|`, tabulador o salto de línea, saltando espacios y comillas). Cambia solo `escapeCsvValue`; la neutralización compartida con XLSX no se toca. Sin cambios de separador, columnas ni estructura. Los casos ensayados ya no producen fórmulas en Excel (doble clic e importación con coma, `;` y tabulador); el BOM y los acentos siguen sin corregirse.
+  - **«Descancelar»:** `POST /competitions/:id/uncancel`, solo con el rol `admin` (comprobado en la API además del permiso), lleva una competencia `cancelada` a `borrador`, siempre. Conserva sus datos, no abre inscripciones y audita `COMPETITION_UNCANCEL` en la misma transacción; rechaza otros estados y las repeticiones o solicitudes concurrentes. La página de la competencia muestra el botón solo a administración y con la competencia cancelada, con confirmación.
+  - Detalle y límites en `docs/seguridad/PLAN_SEGURIDAD.md` («AUD-V» y «Descancelar»).
+
 ## Endpoints del Módulo 4 — Asignación de Nadadores a Clubes
 
 | Método | Ruta | Descripción | Permiso |
@@ -1477,6 +1482,7 @@ fuera de producción o con `ENABLE_SWAGGER=true`.
 | POST | `/competitions/:id/reopenRegistrations` |
 | POST | `/competitions/:id/schedule` |
 | POST | `/competitions/:id/start` |
+| POST | `/competitions/:id/uncancel` |
 
 ### `dashboard`
 

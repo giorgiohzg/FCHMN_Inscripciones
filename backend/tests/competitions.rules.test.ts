@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeEffectiveStatus, evaluateCompetitionAction, isRegistrationOpen, recomputeStatusAfterEdit } from "../src/modules/competitions/competitions.rules";
+import { computeEffectiveStatus, evaluateCompetitionAction, evaluateUncancel, isRegistrationOpen, recomputeStatusAfterEdit } from "../src/modules/competitions/competitions.rules";
 
 const START = new Date("2026-06-01T00:00:00Z");
 const END = new Date("2026-06-30T23:59:59Z");
@@ -136,5 +136,25 @@ describe("competitions.rules — recomputeStatusAfterEdit (al editar fechas expl
     const now = new Date("2026-06-15T00:00:00Z");
     expect(recomputeStatusAfterEdit("in_progress", START, END, now)).toBe("in_progress");
     expect(recomputeStatusAfterEdit("finished", START, END, now)).toBe("finished");
+  });
+});
+
+describe("competitions.rules — evaluateUncancel (Descancelar)", () => {
+  it("cancelada → borrador, siempre", () => {
+    expect(evaluateUncancel("cancelled")).toEqual({ allowed: true, nextStatus: "draft" });
+  });
+
+  it("rechaza cualquier otro estado y no propone destino", () => {
+    for (const estado of ["draft", "scheduled", "open", "individual_closed", "closed", "in_progress", "finished"] as const) {
+      const r = evaluateUncancel(estado);
+      expect(r.allowed, estado).toBe(false);
+      expect(r.nextStatus).toBeUndefined();
+      expect(r.reason).toContain(estado);
+    }
+  });
+
+  it("no es una acción del bucle genérico: «cancel» sigue sin poder salir de cancelada", () => {
+    expect(evaluateCompetitionAction("cancelled", "cancel").allowed).toBe(false);
+    expect(evaluateCompetitionAction("cancelled", "schedule").allowed).toBe(false);
   });
 });

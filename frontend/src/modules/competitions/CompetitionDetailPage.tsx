@@ -17,6 +17,7 @@ import { formatCalendarDate } from "../../shared/calendarDate";
 import { sortBySessionTypeName } from "../../shared/sessionOrder";
 import { CircledNumber } from "../../shared/CircledNumber";
 import { usePoolsApi, type Pool } from "../pools/poolsApi";
+import { useAuth } from "../auth/AuthContext";
 
 const COURSE_LENGTH_LABELS: Record<"short_25m" | "long_50m", string> = { short_25m: "25 metros", long_50m: "50 metros" };
 
@@ -37,6 +38,7 @@ export function CompetitionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const api = useCompetitionsApi();
+  const { hasRole } = useAuth();
   const catalogsApi = useCatalogsApi();
   const poolsApi = usePoolsApi();
   const [pools, setPools] = useState<Pool[]>([]);
@@ -147,6 +149,27 @@ export function CompetitionDetailPage() {
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudieron reabrir las inscripciones");
+    }
+  }
+
+  /**
+   * Descancelar. Vuelve a BORRADOR y nada más: conserva pruebas, fechas, configuración, inscripciones y
+   * relevos, y no abre inscripciones (programar o abrir son acciones aparte). Pide confirmación explícita.
+   */
+  async function handleUncancel() {
+    if (
+      !window.confirm(
+        "¿Descancelar esta competencia?\n\nVolverá al estado Borrador y conservará todos sus datos (pruebas, fechas, configuración, inscripciones y relevos). No abrirá las inscripciones: para eso tendrá que programarla o abrirla después."
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    try {
+      await api.uncancel(id!);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo descancelar la competencia");
     }
   }
 
@@ -271,6 +294,15 @@ export function CompetitionDetailPage() {
           {competition?.status === "closed" && (
             <button className="btn-secondary" onClick={handleReopen}>
               Reabrir inscripciones
+            </button>
+          )}
+          {/*
+            Solo para administración y solo con la competencia cancelada. La API vuelve a comprobar el rol:
+            esto solo evita ofrecer un botón que sería rechazado.
+          */}
+          {competition?.status === "cancelled" && hasRole("admin") && (
+            <button className="btn-secondary" onClick={handleUncancel}>
+              Descancelar
             </button>
           )}
           <button className="btn-secondary" onClick={() => setEditing((v) => !v)}>{editing ? "Cancelar edición" : "Editar"}</button>

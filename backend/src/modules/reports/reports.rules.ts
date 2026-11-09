@@ -135,9 +135,34 @@ export function neutralizeSpreadsheetFormula(value: string): string {
   return FORMULA_TRIGGERS.some((trigger) => value.startsWith(trigger)) ? `'${value}` : value;
 }
 
+/**
+ * Límites de celda y disparadores DENTRO de un valor de CSV (AUD-V).
+ *
+ * `neutralizeSpreadsheetFormula` solo mira el PRINCIPIO del valor, y eso solo
+ * protege cuando la planilla separa por coma. Con otro separador de lista (en
+ * es-CL, Excel usa `;`) el valor `Club;=1+1;Z` se parte en tres celdas y la
+ * del medio se evalúa como fórmula, porque el entrecomillado RFC 4180 solo
+ * rige para la coma. Se observó con Excel 16.0 por doble clic.
+ *
+ * Por eso se neutraliza también cada trozo que una planilla podría tomar como
+ * INICIO de celda: el comienzo del valor y lo que sigue a un posible separador
+ * (`;`, `|`, tabulador) o a un salto de línea, saltando espacios, tabuladores y
+ * comillas que la planilla podría quitar al leer la celda. Se antepone una comilla
+ * simple al disparador (`= + - @`), igual que al principio del valor; el texto
+ * almacenado no cambia y la estructura del CSV tampoco.
+ *
+ * Es propio del CSV: XLSX escribe cada valor como una celda de texto y no tiene
+ * separadores, así que no usa esta función.
+ */
+const INICIO_DE_CELDA_CON_DISPARADOR = /(^|[;|\t\r\n])([ \t"]*)(?=[=+\-@])/g;
+
+export function neutralizeCsvCellBoundaries(value: string): string {
+  return value.replace(INICIO_DE_CELDA_CON_DISPARADOR, "$1$2'");
+}
+
 /** Escapa un valor para una celda CSV (RFC 4180: comillas dobles si contiene coma, comilla o salto de línea). */
 export function escapeCsvValue(value: string): string {
-  const safe = neutralizeSpreadsheetFormula(value);
+  const safe = neutralizeCsvCellBoundaries(neutralizeSpreadsheetFormula(value));
   if (/[",\n\r]/.test(safe)) {
     return `"${safe.replace(/"/g, '""')}"`;
   }
