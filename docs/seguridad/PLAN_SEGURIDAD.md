@@ -21,8 +21,8 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **AUD-A** | Auditoría del 2026-11-07, AUD-04 y AUD-11: el estado del club se aplica a su cuenta, a su personal y a sus credenciales | **Cerrada dentro de su alcance:** probada en local (pruebas de integración focalizadas sobre la base desechable, typecheck y lint) y en la CI (ejecución 42437889969, éxito), y desplegada en `fchmn-api` desde `d877686` (Live, Auto-Deploy Off). Web y mantenimiento no se desplegaron. Ver «AUD-A» |
 | **AUD-C** | Auditoría del 2026-11-07, AUD-03, AUD-05, AUD-07, AUD-15 y AUD-02: registros sin consultas ni valores, sin datos ajenos en errores, competencias ocultas uniformes, club actual mínimo y conteo del ZIP previo | **Completada dentro de su alcance:** probada en local (pruebas unitarias y de integración focalizadas sobre la base desechable, typecheck y lint), publicada en `57ce8e5` y **desplegada en `fchmn-api` desde `b02eff2`** (`d877686` → `b02eff2`, Live, Auto-Deploy Off; CI 42529120274 en éxito). AUD-03 **no** queda resuelta en todas las capas (registro de errores de Nginx y registros del proveedor); sin pruebas funcionales en producción. Ver «AUD-C» |
 | **AUD-B** | Auditoría del 2026-11-07, AUD-01 y AUD-03 (Nginx): bases Node 22.23.4 y Nginx 1.30.6 y registro de acceso de Nginx sin consulta ni `Referer` | **Publicado en el repositorio y validado en local** (tres imágenes candidatas construidas, inventarios y avisos regenerados, escaneadas y ejecutadas sobre la base desechable); publicada en `b02eff2` y **desplegada** (`fchmn-api` y `fchmn-web`, Live; `fchmn-mantenimiento`, construida sin ejecutar el cron). **Completada dentro de su alcance**, sin declarar resueltos todos sus riesgos: quedan 24 avisos por versión (de las candidatas locales) como riesgo residual condicionado, no corregidos. Ver «AUD-B» y «Despliegue conjunto de AUD-B y AUD-C» |
-| **AUD-V** | Fórmulas en el CSV de inscritos (Excel 16.0, es-CL, separador `;`) | **Publicada en el repositorio y probada en local; pendiente de despliegue.** Ver «AUD-V» |
-| **Descancelar** | Botón `cancelada → borrador`, solo administración | **Publicado en el repositorio y probado en local; pendiente de despliegue.** Ver «Descancelar» |
+| **AUD-V** | Fórmulas en el CSV de inscritos (Excel 16.0, es-CL, separador `;`) | **Completada: publicada, desplegada (API y web en `d105823`) y probada en local y en CI.** Ver «AUD-V» |
+| **Descancelar** | Botón `cancelada → borrador`, solo administración | **Completado: publicado, desplegado (API y web en `d105823`) y probado en local y en CI.** Ver «Descancelar» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -1525,7 +1525,7 @@ dependen del `npm` que trae la imagen de Node; no se actualizan por separado.
 - `zlib` 1.4-r0 está disponible en Alpine 3.24 y no se aplicó en AUD-B; queda recomendado como paso propio (ver arriba).
 - La etapa `base` de la API no fija los paquetes de Alpine; dos construcciones en días distintos pueden diferir.
 
-**Límites.** Las decisiones funcionales siguen pendientes (AUD-V se trata aparte). El cron de enero ejecutará la imagen nueva por primera vez.
+**Límites.** Las decisiones funcionales siguen pendientes (AUD-V y Descancelar quedaron cerradas aparte). El cron de enero ejecutará la imagen nueva por primera vez.
 No se observó la interfaz en un navegador con estas imágenes. Quedan en el equipo las imágenes candidatas `fchmn-{backend,migrate,frontend}:audb-p1` y `:audb-p2` y las dos bases oficiales descargadas por digest.
 
 ## Despliegue conjunto de AUD-B y AUD-C (2026-11-08)
@@ -1557,7 +1557,7 @@ Cron: **no se ejecutó**. Tenía 26 ejecuciones antes y 26 después, ninguna en 
 - Registros del proveedor no inspeccionados; sin pruebas funcionales en producción.
 
 
-## AUD-V: fórmulas en el CSV de inscritos (publicada y probada en local; pendiente de despliegue)
+## AUD-V: fórmulas en el CSV de inscritos (completada: desplegada y probada en local y en CI)
 
 **Qué se reprodujo** (validación previa, solo lectura): con Excel 16.0 en es-CL, cuyo separador de lista es `;`, abrir por doble clic el CSV completo que entrega `GET /reports/registrations/export?format=csv` evaluaba 13 fórmulas aritméticas inocuas. Condición: un valor de texto libre (club, nombre o apellido) con la forma `texto;=fórmula;texto`. Un valor así no se entrecomillaba (el RFC 4180 solo rige para la coma) y `neutralizeSpreadsheetFormula` solo miraba el principio del valor. La aplicación acepta esos valores: ninguna validación rechaza `;` ni `=`. No se generaliza a otras versiones, configuraciones ni programas.
 
@@ -1567,7 +1567,7 @@ Cron: **no se ejecutó**. Tenía 26 ejecuciones antes y 26 después, ninguna en 
 
 **Límites.** Solo Excel 16.0 con configuración es-CL; no se probaron otras versiones, programas ni separadores del sistema. Solo aritmética inocua (sin hipervínculos, DDE, macros ni referencias externas). La exportación XLSX no se modificó ni se volvió a probar en Excel. El BOM, los acentos y otros defectos cosméticos del CSV siguen sin corregirse. Team Manager conserva el RUN; los reportes no lo incluyen.
 
-## Descancelar: `cancelada → borrador` (publicado y probado en local; pendiente de despliegue)
+## Descancelar: `cancelada → borrador` (completado: desplegado y probado en local y en CI)
 
 **Definición aprobada:** `Cancelada → Borrador`, siempre; no recupera el estado anterior ni elige otro destino.
 
@@ -1577,7 +1577,14 @@ Cron: **no se ejecutó**. Tenía 26 ejecuciones antes y 26 después, ninguna en 
 
 **Validación local:** prueba de integración (20 casos, base desechable): administrador, otros perfiles (club, nadador y un gestor con el permiso pero sin el rol), los siete estados rechazados, repetición, ocho solicitudes concurrentes, conservación de datos con huella completa, auditoría, reversión si falla la auditoría, ausencia de caminos alternativos y que tras descancelar se puede programar. Con el rol o la escritura condicionada retirados, fallan las pruebas correspondientes. Frontend: 13 casos (visibilidad, confirmación, cancelar el diálogo, error). Typecheck completo de backend y frontend sin errores; ESLint sin autocorrección de lo tocado, sin errores (avisos preexistentes en código no modificado).
 
-**Límites.** No se observó la interfaz en un navegador; el diálogo es `window.confirm`, como el resto de la página. Publicado en el repositorio, sin desplegar; el resultado de su CI se comprueba aparte.
+**Límites.** No se observó la interfaz en un navegador; el diálogo es `window.confirm`, como el resto de la página. La interfaz se probó con pruebas simuladas; no hubo comprobación funcional autenticada en producción.
+
+**Cierre de AUD-V y Descancelar (despliegue).** Código publicado en `f697d6e`; corrección documental y SHA desplegado `d1058232bc761770088627d05c6ec393158cc005` (`d105823`); CI `42551118288`, éxito. Despliegue manual y único de `fchmn-api` y `fchmn-web`, de `b02eff2` a `d105823`, ambos Live, con Auto-Deploy desactivado. El mantenimiento permanece en `b02eff2`: no se construyó ni se ejecutó.
+
+- **Observado en Render** ([`fchmn-api`](https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80), [`fchmn-web`](https://dashboard.render.com/web/srv-dbh48scs728c73arlf8g)): commit y estado Live de API y web, un despliegue por servicio, Auto-Deploy desactivado.
+- **Comprobado por HTTP:** disponibilidad (`/api/health` 200, `/api/ready` 200 con base de datos correcta, `/api/auth/me` 401 sin sesión) y cabeceras de la web (CSP, HSTS, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`). No acredita el funcionamiento del botón ni de la exportación.
+- **Validación funcional:** la local y la CI. CSV probado en Excel 16.0, es-CL, sin generalizar a otros entornos.
+- **Residuales y pendientes (sin cambios):** avisos de imágenes (npm, zlib), registro de errores de Nginx, registros del proveedor y decisiones funcionales. Los despliegues anteriores (`b02eff2` y previos) se conservan como antecedentes.
 
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 
