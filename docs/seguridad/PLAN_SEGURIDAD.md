@@ -19,8 +19,8 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **SEC-01** | Topes para las listas JSON (`personIds` de relevos y otras) | **Cerrada** dentro de su alcance: desplegada en `fchmn-api` desde `120e29d` (Live, Auto-Deploy Off) y validada en local y en la CI con datos sintéticos. Ver «SEC-01» |
 | **SEC-03** | Dependencias, en tres entregas (A backend compatible, B Vite/Vitest, C Zod) | **A cerrada** dentro de su alcance: desplegada solo en `fchmn-api` desde `dab3690` (Live, Auto-Deploy Off). **B publicada en el repositorio, validada en local y desplegada** (API en `64e2122`, web en `2de9dea`; ver «SEC-03, entrega B»). **C (Zod del backend 3 → 4.6.7) cerrada:** API en `64e2122` (Live, Auto-Deploy Off), mantenimiento y web en `2de9dea` (ver «SEC-03, entrega C»). **SEC-03 sigue abierta:** solo por el aviso de desarrollo de `minimatch`; su override acotado es una **solución temporal publicada y validada localmente** (la CI de su SHA se comprueba aparte; ver «SEC-03, override acotado de `minimatch`»). Ver «SEC-03, entrega A» |
 | **AUD-A** | Auditoría del 2026-11-07, AUD-04 y AUD-11: el estado del club se aplica a su cuenta, a su personal y a sus credenciales | **Cerrada dentro de su alcance:** probada en local (pruebas de integración focalizadas sobre la base desechable, typecheck y lint) y en la CI (ejecución 42437889969, éxito), y desplegada en `fchmn-api` desde `d877686` (Live, Auto-Deploy Off). Web y mantenimiento no se desplegaron. Ver «AUD-A» |
-| **AUD-C** | Auditoría del 2026-11-07, AUD-03, AUD-05, AUD-07, AUD-15 y AUD-02: registros sin consultas ni valores, sin datos ajenos en errores, competencias ocultas uniformes, club actual mínimo y conteo del ZIP previo | **Publicado en el repositorio y probado en local** (pruebas unitarias y de integración focalizadas sobre la base desechable, typecheck y lint); **pendiente de despliegue**; la CI de su SHA se comprueba aparte. AUD-03 **no** queda resuelta en todas las capas (Nginx y los registros del proveedor). Ver «AUD-C» |
-| **AUD-B** | Auditoría del 2026-11-07, AUD-01 y AUD-03 (Nginx): bases Node 22.23.4 y Nginx 1.30.6 y registro de acceso de Nginx sin consulta ni `Referer` | **Publicado en el repositorio y validado en local** (tres imágenes candidatas construidas, inventarios y avisos regenerados, escaneadas y ejecutadas sobre la base desechable); **pendiente de despliegue**. Quedan 24 avisos por versión como riesgo residual condicionado (no corregidos). Ver «AUD-B» |
+| **AUD-C** | Auditoría del 2026-11-07, AUD-03, AUD-05, AUD-07, AUD-15 y AUD-02: registros sin consultas ni valores, sin datos ajenos en errores, competencias ocultas uniformes, club actual mínimo y conteo del ZIP previo | **Completada dentro de su alcance:** probada en local (pruebas unitarias y de integración focalizadas sobre la base desechable, typecheck y lint), publicada en `57ce8e5` y **desplegada en `fchmn-api` desde `b02eff2`** (`d877686` → `b02eff2`, Live, Auto-Deploy Off; CI 42529120274 en éxito). AUD-03 **no** queda resuelta en todas las capas (registro de errores de Nginx y registros del proveedor); sin pruebas funcionales en producción. Ver «AUD-C» |
+| **AUD-B** | Auditoría del 2026-11-07, AUD-01 y AUD-03 (Nginx): bases Node 22.23.4 y Nginx 1.30.6 y registro de acceso de Nginx sin consulta ni `Referer` | **Publicado en el repositorio y validado en local** (tres imágenes candidatas construidas, inventarios y avisos regenerados, escaneadas y ejecutadas sobre la base desechable); publicada en `b02eff2` y **desplegada** (`fchmn-api` y `fchmn-web`, Live; `fchmn-mantenimiento`, construida sin ejecutar el cron). **Completada dentro de su alcance**, sin declarar resueltos todos sus riesgos: quedan 24 avisos por versión (de las candidatas locales) como riesgo residual condicionado, no corregidos. Ver «AUD-B» y «Despliegue conjunto de AUD-B y AUD-C» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -1327,10 +1327,9 @@ frontend actualiza roles y club desde los claims al renovar, así que puede most
 entonces (las solicitudes reciben 403). La capacidad por club que ve un nadador sigue pendiente de la
 decisión funcional AUD-06. No se ejecutaron las suites completas.
 
-## AUD-C: correcciones de baja severidad de la API (publicado en el repositorio y probado en local; pendiente de despliegue)
+## AUD-C: correcciones de baja severidad de la API (completada: publicada, probada en local y desplegada en la API)
 
-**Estado: publicado en `main` y probado en LOCAL; pendiente de despliegue. Su resultado en la CI se comprueba aparte y no se anticipa aquí. No se tocó Render ni producción.** Producción
-sigue con el comportamiento anterior. Cinco correcciones de la auditoría del 2026-11-07 (AUD-03, AUD-05, AUD-07, AUD-15 y AUD-02).
+**Estado: publicado en `57ce8e5`, probado en LOCAL y desplegado en `fchmn-api` desde `b02eff2`** (ver «Despliegue conjunto de AUD-B y AUD-C»). Lo que sigue describe la implementación y su validación local, anteriores al despliegue; en producción solo se observó disponibilidad, cabeceras y el registro de acceso de la web, **sin pruebas funcionales**. Cinco correcciones de la auditoría del 2026-11-07 (AUD-03, AUD-05, AUD-07, AUD-15 y AUD-02).
 No cambian dependencias, imágenes, Nginx, la CI ni el esquema, y no hay migraciones.
 
 **AUD-03: registros de la API (Fastify).**
@@ -1388,7 +1387,7 @@ crudas de la librería: son un `ValidationError`. Sin dependencias nuevas ni ais
 
 **Límites.**
 - Solo cubre el registro **de la aplicación**, así que **AUD-03 no queda resuelta en todas las capas**. El registro de acceso de Nginx no se
-  tocó aquí; su corrección está en «AUD-B» (publicada y validada en local, pendiente de despliegue). Los registros del proveedor (borde y plataforma) **no fueron inspeccionados** y no se garantiza que AUD-B
+  tocó aquí; su corrección está en «AUD-B» (desplegada en la web; el registro de errores de Nginx sigue pendiente). Los registros del proveedor (borde y plataforma) **no fueron inspeccionados** y no se garantiza que AUD-B
   los modifique: la cadena de consulta puede seguir en ellos.
 - Fastify avisa con la URL cruda cuando hay un fallo de programación (`Reply was already sent`); no hay punto de enganche y no ocurre en el uso normal.
   El aviso `startup_failed` del arranque sigue escribiendo el mensaje del error de configuración.
@@ -1396,10 +1395,9 @@ crudas de la librería: son un `ValidationError`. Sin dependencias nuevas ni ais
   las imágenes (AUD-01) siguen pendientes. Team Manager conserva el RUN y los reportes no lo incluyen, como antes.
 - No se observó la interfaz ni se compiló la web; el cambio del tipo del frontend se comprobó con el typecheck y sus pruebas.
 
-## AUD-B: imágenes base y registro de acceso de Nginx (publicado y validado en local, pendiente de despliegue)
+## AUD-B: imágenes base y registro de acceso de Nginx (completada dentro de su alcance: publicada, validada en local y desplegada)
 
-**Estado: publicado en el repositorio y validado en LOCAL; pendiente de despliegue. No se tocó Render ni producción.** Producción
-sigue con las imágenes anteriores. Parte de AUD-01 (imágenes base) y de AUD-03 (capa de Nginx) de la auditoría del 2026-11-07. No migra a
+**Estado: publicado en `b02eff2`, validado en LOCAL y desplegado en los tres servicios** (ver «Despliegue conjunto de AUD-B y AUD-C»). Lo que sigue describe la implementación y su validación local, anteriores al despliegue; los avisos y escaneos son de las **candidatas locales**, no de producción. Parte de AUD-01 (imágenes base) y de AUD-03 (capa de Nginx) de la auditoría del 2026-11-07. No migra a
 Node 24 ni cambia dependencias npm, código funcional ni la rama estable de Nginx.
 
 **Versiones** (consultadas hoy en fuentes oficiales y comprobadas descargando cada imagen por digest y leyendo su metadato).
@@ -1525,8 +1523,36 @@ dependen del `npm` que trae la imagen de Node; no se actualizan por separado.
 - `zlib` 1.4-r0 está disponible en Alpine 3.24 y no se aplicó en AUD-B; queda recomendado como paso propio (ver arriba).
 - La etapa `base` de la API no fija los paquetes de Alpine; dos construcciones en días distintos pueden diferir.
 
-**Límites.** Publicado en el repositorio, sin desplegar; AUD-V y las decisiones funcionales siguen pendientes. Los servicios que necesitarían despliegue son la web, la API y mantenimiento (el cron de enero ejecutaría la imagen nueva por primera vez).
+**Límites.** AUD-V y las decisiones funcionales siguen pendientes. El cron de enero ejecutará la imagen nueva por primera vez.
 No se observó la interfaz en un navegador con estas imágenes. Quedan en el equipo las imágenes candidatas `fchmn-{backend,migrate,frontend}:audb-p1` y `:audb-p2` y las dos bases oficiales descargadas por digest.
+
+## Despliegue conjunto de AUD-B y AUD-C (2026-11-08)
+
+Desde el commit exacto `b02eff2f019409423b173c443bd663f025c9d2bf`, a mano y con Auto-Deploy Off en los tres servicios (leído en el control exacto de cada uno).
+CI del código `b02eff2`: [ejecución 42529120274](https://github.com/giorgiohzg/FCHMN_Inscripciones/actions/runs/42529120274), éxito, intento 1.
+
+**Observado en Render (estados y commits)**
+
+| Servicio | Antes → después | Despliegue | Resultado |
+|---|---|---|---|
+| `fchmn-api` | `d877686` → `b02eff2` | [`dep-dbohd0hsrm7s73c01l3g`](https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80/deploys/dep-dbohd0hsrm7s73c01l3g) | Live; «Deploy a specific commit» |
+| `fchmn-web` | `2de9dea` → `b02eff2` | [lista de despliegues](https://dashboard.render.com/web/srv-dbh48scs728c73arlf8g) | Live; «Deploy a specific commit» |
+| `fchmn-mantenimiento` (cron) | `2de9dea` → `b02eff2` | [lista de despliegues](https://dashboard.render.com/cron/crn-dbh500bl550s73c5n2o0/deploys) | Construcción correcta («Manual Build»; el remoto real de `main` era el objetivo) |
+
+Cron: **no se ejecutó**. Tenía 26 ejecuciones antes y 26 después, ninguna en curso; se conservan la programación (`0 6 1 1 *`), el Docker Command vacío y el comando de reposo del Dockerfile (`echo`). Docker Command y Pre-Deploy vacíos en API y web. No hay migraciones.
+
+**Comprobado por HTTP** (sin credenciales, por `fchmn-web`): `/api/health` 200, `/api/ready` 200 con base disponible y `/api/auth/me` 401, las tres con `Cache-Control: no-store` (repetidas tras la web); `/login` 200 con CSP, HSTS, `nosniff`, `X-Frame-Options: DENY` y `Referrer-Policy: no-referrer`; recursos estáticos 200; `third-party-notices.txt` 200 e idéntico byte a byte a `notices/frontend-web.txt`.
+
+**Registro de acceso de Nginx (acotado):** con una petición sintética de bajo impacto, la vista de registros de la web mostró una línea JSON con la ruta sin consulta y **0 apariciones** del marcador. Solo cubre las líneas cargadas en el panel.
+
+**Validación local (no es producción):** pruebas de AUD-C, suites del backend y frontend, imágenes candidatas construidas y ejecutadas sobre la base desechable, Nginx efectivo y escaneo Trivy de las candidatas.
+
+**No inspeccionado:** versiones y paquetes efectivos de producción (Nginx, Node, `zlib` y demás dentro de las imágenes que Render reconstruyó; no se exige identidad binaria con las locales), registros del proveedor y shell o jobs de Render.
+
+**Riesgos que permanecen (no corregidos):**
+- Los 24 avisos son de las candidatas locales escaneadas, no un escaneo de producción: 23 del `npm` de la imagen base (8 NA-A y 15 NA-B, condicionados a no ejecutar `npm` ni `npx` con entradas no confiables en las imágenes de ejecución, algo no comprobado en Render) y `zlib` como posible falso positivo **provisional**.
+- El registro de errores de Nginx puede escribir la consulta cuando falla el upstream (pendiente).
+- Registros del proveedor no inspeccionados; sin pruebas funcionales en producción.
 
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 
