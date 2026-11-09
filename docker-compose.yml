@@ -22,11 +22,11 @@
 #   INSTALACIÓN NUEVA
 #     docker compose up -d postgres
 #     docker compose --profile mantenimiento run --rm migrate
-#     docker compose --profile mantenimiento run --rm migrate npm run seed:admin
+#     docker compose --profile mantenimiento run --rm migrate node dist-seed/prisma/seed-admin.js
 #     docker compose up -d
 #
 #   ACTUALIZACIÓN
-#     docker compose --profile mantenimiento run --rm migrate npx prisma migrate deploy
+#     docker compose --profile mantenimiento run --rm migrate prisma migrate deploy --schema=/app/prisma/schema.prisma
 #     docker compose up -d --no-deps --force-recreate backend
 #
 #   ARRANQUE COTIDIANO
@@ -96,7 +96,12 @@ services:
   # Contenedor EFÍMERO: aplica migraciones y siembra datos de referencia
   # (permisos, roles, parámetros y catálogos — todo idempotente). Termina y no
   # se reinicia. Es también el contenedor desde el que se ejecuta, a mano, la
-  # creación del administrador inicial: `npm run seed:admin`.
+  # creación del administrador inicial: `node dist-seed/prisma/seed-admin.js`.
+  #
+  # La imagen `migrate` NO trae npm ni npx (ni `package.json`): los comandos son
+  # directos, el CLI de Prisma aislado y los seeds ya compilados. Antes este
+  # servicio usaba `npx prisma ... && npx prisma db seed`, que en esta imagen
+  # podía intentar descargar Prisma y no tenía seed configurado.
   migrate:
     build:
       context: ./backend
@@ -113,7 +118,7 @@ services:
     # forma explícita.
     #   docker compose --profile mantenimiento run --rm migrate
     profiles: ["mantenimiento"]
-    command: sh -c "npx prisma migrate deploy && npx prisma db seed"
+    command: sh -c "prisma migrate deploy --schema=/app/prisma/schema.prisma && node dist-seed/prisma/seed.js"
 
   backend:
     restart: unless-stopped

@@ -200,6 +200,27 @@ COPY docker/migrate-cli/package.json docker/migrate-cli/package-lock.json ./
 RUN --mount=type=secret,id=npm_ca \
     sh -c 'if [ -f /run/secrets/npm_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/npm_ca; fi; npm ci --omit=dev --no-audit --no-fund'
 
+# --- Base de EJECUCION: la de arriba, sin npm ni npx -------------------------
+#
+# Las etapas que construyen (`build`, `deps`, `cli-migrate`) siguen usando
+# `base`, con npm. Las imagenes que se ejecutan (`runtime` y `migrate`, y el
+# alias `mantenimiento` de Dockerfile.mantenimiento) no lo necesitan: arrancan
+# con `node dist/server.js`, `prisma migrate deploy` o `node dist-seed/...`.
+# Retirarlo quita del sistema de archivos FINAL la instalacion global de npm y
+# sus dependencias, que el escaner marcaba, y evita que alguien ejecute
+# `npm` o `npx` (que descargaria paquetes) dentro de un contenedor.
+#
+# Rutas comprobadas en la imagen base fijada (node 22.23.4-alpine3.24): la
+# instalacion global `/usr/local/lib/node_modules/npm` y los enlaces
+# `/usr/local/bin/npm` y `/usr/local/bin/npx`. Node, Yarn y Corepack (con sus
+# shims internos, que no estan en el PATH) se conservan.
+#
+# LIMITE: un `rm` en una capa nueva solo OCULTA esos archivos; sus bytes siguen
+# en las capas inferiores de la imagen distribuida. No se ejecutan, pero viajan,
+# y por eso la licencia de Node (que los enumera) se sigue incluyendo.
+FROM base AS ejecucion
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
 # --- Herramientas de despliegue (migraciones y seed) -------------------------
 #
 # Contiene las dependencias de PRODUCCION, el CLI de Prisma aislado en
@@ -217,7 +238,7 @@ RUN --mount=type=secret,id=npm_ca \
 # `chown`, y no se crea ningun directorio escribible bajo /app ni
 # /opt/prisma-cli. Si Prisma necesitara cache temporal, debe usar una
 # ubicacion propia del usuario o /tmp, nunca el artefacto distribuido.
-FROM base AS migrate
+FROM ejecucion AS migrate
 WORKDIR /app
 
 # AVISOS DE TERCEROS, desde el mismo `backend/avisos/` en contexto.
@@ -274,7 +295,7 @@ CMD ["prisma", "migrate", "deploy", "--schema=/app/prisma/schema.prisma"]
 #
 # El orden no afecta a `docker compose`, que elige con `target:`, ni al
 # procedimiento de construccion y revalidacion, que usa `--target`.
-FROM base AS runtime
+FROM ejecucion AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
