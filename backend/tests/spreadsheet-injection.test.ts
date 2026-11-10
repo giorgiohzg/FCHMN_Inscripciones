@@ -171,7 +171,7 @@ describe("rowsToCsv / escapeCsvValue con separador de lista distinto de la coma 
       competencia: "Copa", equipoClub: "Club;+1+1;Z", prueba: "50m Libre", categoria: "Relevo", genero: "Mixto", fecha: "09-11-2026", jornada: "Mañana",
       integrante1: "A;=1+1;x", integrante2: "B", integrante3: "C", integrante4: "D",
     };
-    const lineas = buildCsv([individual as never], [relevo as never]).split("\r\n");
+    const lineas = buildCsv([individual as never], [relevo as never], "administracion").split("\r\n");
     expect(lineas[0]).toBe("INDIVIDUALES");
     expect(lineas[3]).toBe("");
     expect(lineas[4]).toBe("RELEVOS");

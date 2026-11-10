@@ -28,6 +28,8 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **npm fuera de ejecución** | Aviso residual de AUD-B: npm/npx retirados de las imágenes finales de API, migraciones y mantenimiento | **Retirada publicada y desplegada en la API y construida en mantenimiento.** Ver «npm fuera de las imágenes de ejecución» |
 | **AUD-V** | Fórmulas en el CSV de inscritos (Excel 16.0, es-CL, separador `;`) | **Completada: publicada, desplegada (API y web en `d105823`) y probada en local y en CI.** Ver «AUD-V» |
 | **Descancelar** | Botón `cancelada → borrador`, solo administración | **Completado: publicado, desplegado (API y web en `d105823`) y probado en local y en CI.** Ver «Descancelar» |
+| **AUD-10 y AUD-14** | Fecha de nacimiento en reportes (solo administración; edad para los demás) y RUN de los compañeros de relevo (fuera para el nadador) | **Publicadas en el repositorio y validadas localmente; pendientes de despliegue.** Ver «Privacidad de reportes y relevos» |
+| **AUD-06 y AUD-09** | Capacidad `byClub` visible al nadador; copias completas en la auditoría | **Se conservan por decisión expresa del usuario; no son mitigaciones.** Retención de la auditoría pendiente. Ver «Privacidad de reportes y relevos» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -1332,7 +1334,7 @@ activo dejaba su cuenta `active`, con lo que el club recuperaba el acceso.
 **Límites.** No se observó la interfaz: el backend aplica el cambio en la siguiente solicitud, pero el
 frontend actualiza roles y club desde los claims al renovar, así que puede mostrar menús de club hasta
 entonces (las solicitudes reciben 403). La capacidad por club que ve un nadador sigue pendiente de la
-decisión funcional AUD-06. No se ejecutaron las suites completas.
+decisión funcional AUD-06. *Posterior:* decidida; se conserva (ver «Privacidad de reportes y relevos»). No se ejecutaron las suites completas.
 
 ## AUD-C: correcciones de baja severidad de la API (completada: publicada, probada en local y desplegada en la API)
 
@@ -1399,7 +1401,7 @@ crudas de la librería: son un `ValidationError`. Sin dependencias nuevas ni ais
 - Fastify avisa con la URL cruda cuando hay un fallo de programación (`Reply was already sent`); no hay punto de enganche y no ocurre en el uso normal.
   El aviso `startup_failed` del arranque sigue escribiendo el mensaje del error de configuración.
 - La tabla de auditoría (AUD-09), la capacidad por rol (AUD-06), la fecha de nacimiento (AUD-10), el RUN de compañeros (AUD-14), la validación del CSV (AUD-08) y
-  las imágenes (AUD-01) siguen pendientes. Team Manager conserva el RUN y los reportes no lo incluyen, como antes.
+  las imágenes (AUD-01) siguen pendientes. Team Manager conserva el RUN y los reportes no lo incluyen, como antes. *Posterior:* AUD-06 y AUD-09 se conservan por decisión del usuario, y AUD-10 y AUD-14 están publicadas en el repositorio y validadas localmente, pendientes de despliegue (ver «Privacidad de reportes y relevos»).
 - No se observó la interfaz ni se compiló la web; el cambio del tipo del frontend se comprobó con el typecheck y sus pruebas.
 
 ## AUD-B: imágenes base y registro de acceso de Nginx (completada dentro de su alcance: publicada, validada en local y desplegada)
@@ -1814,6 +1816,38 @@ Los 23 avisos **desaparecen del sistema de archivos final** porque se retiró el
 **Opcional y separado:** ejecutar la importación de Meet Events en el mismo proceso aislado que la carga XLSX reduciría las consecuencias de los casos indeterminados, sin corregirlos. No es una tarea aprobada ni un requisito para cerrar esta evaluación.
 
 **Límites.** Evaluación de solo lectura: no se ejecutaron pruebas, no se generaron entradas de corrupción de memoria y no se auditó todo el código C++ de Node. La versión exacta de zlib en las imágenes de producción no se verificó; los resultados de `process.versions.zlib` y de las bibliotecas enlazadas son de imágenes locales. Los demás residuales (los de las imágenes y la causa del 504) no cambian.
+## Privacidad de reportes y relevos: AUD-06, AUD-09, AUD-10 y AUD-14 (AUD-10 y AUD-14 publicadas en el repositorio y validadas localmente; pendientes de despliegue)
+
+Cuatro hallazgos de privacidad de la auditoría del 2026-11-07. Dos se conservan por decisión funcional y dos se implementaron. No cambian el esquema, las dependencias, la configuración de Render ni datos reales.
+
+**Decisiones del usuario (sin cambios de código; no son mitigaciones).**
+- **AUD-06, capacidad por club:** el nadador sigue recibiendo los totales y el desglose `byClub` de todos los clubes. Se conserva **por decisión expresa del usuario**: no se recortó `byClub` ni cambiaron la capacidad, las estadísticas ni los permisos.
+- **AUD-09, copias en la auditoría:** la auditoría conserva las copias completas actuales en `before`/`after`. No cambiaron esos campos, el acceso (`audit:read`, solo `admin`), la IP ni la retención, y **los registros existentes siguen íntegros**. Se conserva íntegra la redacción de contraseñas, tokens y otros secretos (`audit.service.ts`). **La política de retención queda pendiente**: no hay purgas ni plazos definidos.
+
+**AUD-10: fecha de nacimiento en el reporte de inscritos (contrato por rol).**
+- **Administración** (alcance `admin`, también quien además tiene otro rol): sin cambios. `individualRows[].fechaNacimiento` (dd-mm-aaaa) en JSON, «Fecha de nacimiento» en CSV y XLSX, con la estructura de siempre.
+- **Demás roles** (cuenta del club, delegado, entrenador, representante legal, nadador y personal del club que además es nadador): `individualRows[].edad` (número) **en la misma posición**, sin `fechaNacimiento`; la fecha no va en ninguna otra propiedad de la respuesta. En CSV y XLSX, «Edad» reemplaza a «Fecha de nacimiento»; «Categoría», el orden y las demás columnas (12) no cambian.
+- **Edad:** `computeAge(fecha de nacimiento, ageCutoffDate de la competencia o, si falta, getDefaultAgeCutoffDate())`, el mismo cálculo y la misma fecha de corte que `groupedByClub`, **no la fecha actual**.
+- **En el backend:** la vista sale del alcance efectivo (`vistaDeReporteParaActor`, `reports.service.ts`), y la ruta de exportación usa el mismo actor con que se armaron las filas. Una fila que no corresponde a la vista del archivo se rechaza, en vez de dejar la fecha bajo «Edad».
+- **Sin cambios:** el PDF (ya no tenía la fecha; no se añadieron columnas), la vista agrupada, los filtros, el orden, los totales, el tope de filas, la auditoría `REPORT_EXPORTED`, la neutralización de fórmulas de CSV y XLSX, Team Manager (CL2 y HY3, con su formato) y la ausencia de RUN en todos los reportes, para cualquier rol. La fecha sigue almacenada en Personas y se usa internamente para la edad y la categoría.
+- **Frontend:** `IndividualReportRow` (`reportsApi.ts`) es una unión por rol; la pantalla de reportes no muestra esas filas y la vista agrupada no cambia.
+
+**AUD-14: RUN de los compañeros de relevo.**
+- **`GET /relay-registrations`** (y, por coherencia, las respuestas de crear y editar equipos): administración y alcance de club reciben `members[].person.run` de los integrantes de su alcance, como antes. Un **nadador sin funciones de club** recibe su propio RUN; en sus compañeros **la propiedad `run` no existe** (no va vacía ni oculta). Id, `personId`, orden, nombre y demás datos no cambian.
+- **Cómo:** `presentarRelevoParaActor` (`relay-registrations.service.ts`) decide con `scopedPersonId` del alcance efectivo, con la precedencia de siempre (administración, club, nadador), y arma **copias**: el objeto original, el que se audita, no se modifica. Ningún parámetro del cliente interviene.
+- **Sin cambios:** qué relevos, personas y clubes ve cada actor, la paginación, los totales, el plantel y sus selectores. Los nadadores siguen sin poder crear, editar ni cancelar equipos (403), así que en la práctica las respuestas de escritura no cambian. La auditoría de crear y editar conserva el objeto completo (AUD-09).
+- **Frontend:** `run?: string` en `relayRegistrationsApi.ts`; la interfaz no muestra el RUN de los integrantes.
+
+**Validación local** (datos sintéticos; integración solo contra la base desechable de `docker-compose.test.yml`).
+- *Integración, flujo HTTP real con login* (`tests/privacidad-reportes-relevos.integration.test.ts`, 12 pruebas): administración, administración + nadador, cuenta del club, delegado + nadador, entrenador, representante legal y nadador. JSON con edad correcta y sin la fecha en ninguna forma; CSV y XLSX con encabezados, columnas y valores alineados; generación del PDF; fallback de la fecha de corte; y filas, orden, filtros, totales y vista agrupada iguales a los de la administración filtrando por el club. En relevos: RUN por rol, paginación, totales y un `clubId` ajeno (403 para el club; sin ampliar nada para el nadador). Neutralización de fórmulas y ausencia de RUN en todos los formatos.
+- *Unitarias* (`tests/privacidad-reportes-relevos.test.ts`, 10 pruebas): fila por vista, edad a la fecha de corte, encabezados de CSV y XLSX con y sin filas, rechazo de filas de otra vista, y RUN por alcance sin modificar el objeto original.
+- *Pruebas existentes ajustadas al contrato nuevo:* `import-export-services.integration.test.ts` (las llamadas de administración pasan la vista y las claves esperadas son por rol), `reports.rules.test.ts` y `spreadsheet-injection.test.ts`.
+- *Resultados:* 7 archivos de integración de reportes y relevos (269 pruebas, entre ellas la exportación de Team Manager), 8 unitarios de reportes, relevos y neutralización (172) y 5 del frontend de reportes y relevos (62), en verde. `npm run typecheck` completo del backend y del frontend sin errores; ESLint de lo tocado sin errores (4 avisos `no-explicit-any` previos).
+
+**Límites.**
+- **Publicado en el repositorio; pendiente de despliegue** (producción no está actualizada). No se observó la interfaz en un navegador ni se ejecutaron las suites completas.
+- Del PDF solo se comprobó que se sigue generando; su código no cambió.
+- Fuera de este alcance (no se declaran resueltos): otros endpoints que entregan RUN o fecha de nacimiento a quien corresponde (plantel, selectores, personas), la capacidad de AUD-06, las copias de AUD-09 y su retención, y los demás hallazgos.
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 
 **SEC-01 (listas JSON).** Medido en memoria con Zod 3.25.76 durante la revisión: `.max()` **no** corta el

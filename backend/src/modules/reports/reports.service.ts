@@ -14,6 +14,7 @@ import {
   lineaDePrueba,
   type PersonaOrdenable,
   type IndividualReportRow,
+  type VistaDeReporte,
   type RelayReportRow,
   type SwimmerEventEntry,
   type ClubGroup,
@@ -37,6 +38,21 @@ const INDIVIDUAL_HEADERS = [
   "Jornada",
   "Tipo de prueba",
 ];
+
+/**
+ * AUD-10: los roles que no son administración reciben «Edad» en el lugar de «Fecha de
+ * nacimiento»; el orden y las demás columnas, incluida «Categoría», no cambian.
+ */
+const INDIVIDUAL_HEADERS_CON_EDAD = INDIVIDUAL_HEADERS.map((h) => (h === "Fecha de nacimiento" ? "Edad" : h));
+
+/**
+ * Vista del reporte según el ALCANCE EFECTIVO del actor (`buildActorContext`), nunca según
+ * parámetros del cliente: solo el alcance de administración recibe la fecha de nacimiento
+ * completa. Quien es administrador y además tiene otro rol resuelve a `admin`.
+ */
+export function vistaDeReporteParaActor(actor: ActorContext): VistaDeReporte {
+  return actor.scope.kind === "admin" ? "administracion" : "general";
+}
 
 const RELAY_HEADERS = [
   "Competencia",
@@ -285,6 +301,13 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
     .sort((x, y) => compararFilasDeRelevo(x.orden, y.orden))
     .map((x) => x.r);
 
+  // Fecha de corte de la edad: la MISMA de la vista agrupada (más abajo), con el mismo fallback.
+  const ageCutoffDate = competition.ageCutoffDate ?? getDefaultAgeCutoffDate();
+  const presentacion =
+    vistaDeReporteParaActor(actor) === "administracion"
+      ? ({ vista: "administracion" } as const)
+      : ({ vista: "general", fechaDeCorte: ageCutoffDate } as const);
+
   const individualRows: IndividualReportRow[] = individualesOrdenadas.map((r) =>
     mapIndividualRegistrationToRow({
       competitionName: competition.name,
@@ -298,7 +321,7 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
       sessionDate: r.competitionEvent.competitionSession.competitionDate.date,
       sessionTypeName: r.competitionEvent.competitionSession.sessionType.name,
       testTypeName: r.competitionEvent.event.testType.name,
-    })
+    }, presentacion)
   );
 
   const relayRows: RelayReportRow[] = relevosOrdenados.map((r) =>
@@ -363,7 +386,6 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
         }))
     ),
   ];
-  const ageCutoffDate = competition.ageCutoffDate ?? getDefaultAgeCutoffDate();
   // Cantidad de EQUIPOS de relevo distintos por club — no se puede derivar
   // sumando `relevos` por nadador (cada equipo aporta 4 integrantes).
   const relayTeamCountByClub = new Map<string, number>();
@@ -377,12 +399,23 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
 
 const GENDER_LABELS_ES: Record<"male" | "female" | "mixed", string> = { male: "Varones", female: "Damas", mixed: "Mixto" };
 
-function individualRowToArray(r: IndividualReportRow): string[] {
+/**
+ * La celda de nacimiento depende de la vista. Si una fila no corresponde a la vista pedida
+ * (por ejemplo, una fila con fecha en un archivo con «Edad»), se rechaza en vez de dejar la
+ * fecha bajo otro encabezado o la columna desalineada.
+ */
+function celdaDeNacimiento(r: IndividualReportRow, vista: VistaDeReporte): string {
+  if (vista === "administracion" && "fechaNacimiento" in r) return r.fechaNacimiento;
+  if (vista === "general" && "edad" in r && !("fechaNacimiento" in r)) return String(r.edad);
+  throw new Error("Fila de reporte individual que no corresponde a la vista del archivo");
+}
+
+function individualRowToArray(r: IndividualReportRow, vista: VistaDeReporte): string[] {
   return [
     r.competencia,
     r.club,
     r.nombreCompleto,
-    r.fechaNacimiento,
+    celdaDeNacimiento(r, vista),
     r.categoria,
     r.prueba,
     r.distancia,
@@ -409,17 +442,19 @@ function relayRowToArray(r: RelayReportRow): string[] {
   ];
 }
 
-export function buildCsv(individualRows: IndividualReportRow[], relayRows: RelayReportRow[]): string {
+const encabezadosIndividuales = (vista: VistaDeReporte) => (vista === "administracion" ? INDIVIDUAL_HEADERS : INDIVIDUAL_HEADERS_CON_EDAD);
+
+export function buildCsv(individualRows: IndividualReportRow[], relayRows: RelayReportRow[], vista: VistaDeReporte): string {
   const parts: string[] = [];
   parts.push("INDIVIDUALES");
-  parts.push(rowsToCsv(INDIVIDUAL_HEADERS, individualRows.map(individualRowToArray)));
+  parts.push(rowsToCsv(encabezadosIndividuales(vista), individualRows.map((r) => individualRowToArray(r, vista))));
   parts.push("");
   parts.push("RELEVOS");
   parts.push(rowsToCsv(RELAY_HEADERS, relayRows.map(relayRowToArray)));
   return parts.join("\r\n");
 }
 
-export async function buildXlsx(individualRows: IndividualReportRow[], relayRows: RelayReportRow[]): Promise<Buffer> {
+export async function buildXlsx(individualRows: IndividualReportRow[], relayRows: RelayReportRow[], vista: VistaDeReporte): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
 
   /**
@@ -431,8 +466,8 @@ export async function buildXlsx(individualRows: IndividualReportRow[], relayRows
   const seguro = (celdas: string[]): string[] => celdas.map(neutralizeSpreadsheetFormula);
 
   const sheet1 = workbook.addWorksheet("Individuales");
-  sheet1.addRow(INDIVIDUAL_HEADERS).font = { bold: true };
-  individualRows.forEach((r) => sheet1.addRow(seguro(individualRowToArray(r))));
+  sheet1.addRow(encabezadosIndividuales(vista)).font = { bold: true };
+  individualRows.forEach((r) => sheet1.addRow(seguro(individualRowToArray(r, vista))));
   sheet1.columns.forEach((col) => {
     col.width = 18;
   });

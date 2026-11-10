@@ -5,11 +5,10 @@ import { api, descargarArchivo } from "../../shared/apiClient";
  * interfaz no lo lee ni lo reenvía: una API anterior a ese cambio todavía lo incluye en su JSON,
  * y la pantalla lo ignora por completo.
  */
-export interface IndividualReportRow {
+interface IndividualReportRowComun {
   competencia: string;
   club: string;
   nombreCompleto: string;
-  fechaNacimiento: string;
   categoria: string;
   prueba: string;
   distancia: string;
@@ -19,6 +18,15 @@ export interface IndividualReportRow {
   jornada: string;
   tipoDePrueba: string;
 }
+
+/**
+ * Contrato por rol (AUD-10), decidido en el backend: la administración recibe la fecha de
+ * nacimiento completa (dd-mm-yyyy); los demás roles reciben la edad a la fecha de corte de la
+ * competencia, sin la fecha. La vista agrupada (`ClubGroupSwimmerRow`) no cambia.
+ */
+export type IndividualReportRow =
+  | (IndividualReportRowComun & { fechaNacimiento: string; edad?: never })
+  | (IndividualReportRowComun & { edad: number; fechaNacimiento?: never });
 
 export interface RelayReportRow {
   competencia: string;

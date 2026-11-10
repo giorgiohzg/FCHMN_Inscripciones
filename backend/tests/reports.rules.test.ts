@@ -15,7 +15,7 @@ describe("reports.rules — mapIndividualRegistrationToRow", () => {
       sessionDate: new Date("2026-08-15"),
       sessionTypeName: "Mañana",
       testTypeName: "Individual",
-    });
+    }, { vista: "administracion" });
 
     expect(row).toEqual({
       competencia: "Campeonato Nacional Máster 2026",
@@ -39,9 +39,9 @@ describe("reports.rules — mapIndividualRegistrationToRow", () => {
       personBirthDate: new Date("2000-01-01"), categoryName: "Cat", distanceMeters: 50,
       strokeName: "Libre", sessionDate: new Date("2026-01-01"), sessionTypeName: "Mañana", testTypeName: "Individual",
     };
-    expect(mapIndividualRegistrationToRow({ ...base, gender: "male" }).genero).toBe("Varones");
-    expect(mapIndividualRegistrationToRow({ ...base, gender: "female" }).genero).toBe("Damas");
-    expect(mapIndividualRegistrationToRow({ ...base, gender: "mixed" }).genero).toBe("Mixto");
+    expect(mapIndividualRegistrationToRow({ ...base, gender: "male" }, { vista: "administracion" }).genero).toBe("Varones");
+    expect(mapIndividualRegistrationToRow({ ...base, gender: "female" }, { vista: "administracion" }).genero).toBe("Damas");
+    expect(mapIndividualRegistrationToRow({ ...base, gender: "mixed" }, { vista: "administracion" }).genero).toBe("Mixto");
   });
 });
 

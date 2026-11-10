@@ -12,7 +12,12 @@ export interface RelayRegistrationItem {
     event: { distance: { meters: number }; stroke: { name: string }; testType: { name: string; swimmersCount: number }; gender: "male" | "female" | "mixed" };
     competitionSession: { sessionType: { name: string }; competitionDate: { date: string } };
   };
-  members: { orderPosition: number; person: { id: string; fullName: string; run: string } }[];
+  /**
+   * `run` depende del alcance (AUD-14): administración y personal del club lo reciben; un
+   * nadador sin esas funciones recibe solo el suyo y la propiedad no viene en sus compañeros.
+   * La interfaz no lo muestra.
+   */
+  members: { orderPosition: number; person: { id: string; fullName: string; run?: string } }[];
 }
 
 export function useRelayRegistrationsApi() {

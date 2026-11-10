@@ -62,6 +62,32 @@ const include = {
  * Se toma el menor de los dos para que configurar una jornada nunca amplíe
  * en silencio lo que la competencia definió como tope.
  */
+/**
+ * AUD-14: qué RUN de los integrantes recibe cada actor en las respuestas de relevos.
+ *
+ * Se decide con el ALCANCE EFECTIVO (`buildActorContext`), con su precedencia de siempre
+ * (administración, luego club, luego nadador), y con la identidad de la persona, nunca con
+ * parámetros del cliente:
+ *   - administración y alcance de club (club, delegado, entrenador, representante legal,
+ *     también si además son nadadores): el relevo tal cual, con el RUN de los integrantes;
+ *   - nadador sin esas funciones: su propio RUN, y la PROPIEDAD `run` de sus compañeros
+ *     eliminada (no vacía ni oculta). Id, nombre, orden y demás datos no cambian.
+ *
+ * No modifica el objeto recibido: el del nadador se arma con copias, y la auditoría y
+ * cualquier otro uso conservan el original.
+ */
+export function presentarRelevoParaActor<R extends { members: Array<{ person: { id: string; fullName: string; run: string } }> }>(relevo: R, actor: ActorContext) {
+  const propio = scopedPersonId(actor);
+  if (propio === null) return relevo;
+  return {
+    ...relevo,
+    members: relevo.members.map((m) => {
+      const { run, ...persona } = m.person;
+      return { ...m, person: m.person.id === propio ? { ...persona, run } : persona };
+    }),
+  };
+}
+
 export function resolveEffectiveRelayLimit(competitionLimit: number, sessionLimit: number | null): number {
   if (sessionLimit === null) return competitionLimit;
   return Math.min(competitionLimit, sessionLimit);
@@ -416,7 +442,8 @@ export async function createRelayRegistration(input: CreateRelayRegistrationInpu
     )
   );
 
-  return relayRegistration;
+  // Solo la respuesta pasa por la presentación: la auditoría ya registró el objeto completo.
+  return presentarRelevoParaActor(relayRegistration, actor);
 }
 
 /**
@@ -450,7 +477,7 @@ export async function listRelayRegistrations(query: RelayRegistrationListQuery, 
     prisma.relayRegistration.count({ where }),
   ]);
 
-  return { items, total, page: query.page, pageSize: query.pageSize };
+  return { items: items.map((r) => presentarRelevoParaActor(r, actor)), total, page: query.page, pageSize: query.pageSize };
 }
 
 /**
@@ -552,7 +579,7 @@ export async function updateRelayRegistration(id: string, input: UpdateRelayRegi
     )
   );
 
-  return updated;
+  return presentarRelevoParaActor(updated, actor);
 }
 
 export async function cancelRelayRegistration(id: string, actor: ActorContext) {

@@ -1344,7 +1344,7 @@ describe("getRegistrationsReport (invocación real)", () => {
     const { competencia } = await montarCompetenciaConInscripciones({ conPiscina: true, nombreClub: "=cmd|'/c calc'!A1" });
 
     const reporte = await reportsService.getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR);
-    const csv = reportsService.buildCsv(reporte.individualRows, reporte.relayRows);
+    const csv = reportsService.buildCsv(reporte.individualRows, reporte.relayRows, "administracion");
 
     expect(csv).toContain("cmd|'/c calc'!A1");
     // Ninguna celda del CSV puede empezar con un carácter de fórmula.
@@ -1360,7 +1360,7 @@ describe("getRegistrationsReport (invocación real)", () => {
     const { competencia } = await montarCompetenciaConInscripciones({ conPiscina: true });
     const reporte = await reportsService.getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR);
 
-    const buffer = await reportsService.buildXlsx(reporte.individualRows, reporte.relayRows);
+    const buffer = await reportsService.buildXlsx(reporte.individualRows, reporte.relayRows, "administracion");
     // Un .xlsx es un ZIP: debe empezar con la firma PK.
     expect(buffer.subarray(0, 2).toString("latin1")).toBe("PK");
     expect(buffer.length).toBeGreaterThan(1000);
@@ -2268,7 +2268,7 @@ describe("Reportes: orden por apellido paterno y por número de programa", () =>
     const esperadas = informe.individualRows.map((r) => r.nombreCompleto);
 
     // CSV
-    const csv = reportsService.buildCsv(informe.individualRows, informe.relayRows);
+    const csv = reportsService.buildCsv(informe.individualRows, informe.relayRows, "administracion");
     const lineasCsv = csv.split("\r\n");
     const iInd = lineasCsv.indexOf("INDIVIDUALES");
     const iRel = lineasCsv.indexOf("RELEVOS");
@@ -2281,7 +2281,7 @@ describe("Reportes: orden por apellido paterno y por número de programa", () =>
 
     // XLSX
     const libro = new ExcelJS.Workbook();
-    await libro.xlsx.load((await reportsService.buildXlsx(informe.individualRows, informe.relayRows)) as never);
+    await libro.xlsx.load((await reportsService.buildXlsx(informe.individualRows, informe.relayRows, "administracion")) as never);
     const hojaInd = libro.getWorksheet("Individuales")!;
     const nombresXlsx: string[] = [];
     hojaInd.eachRow((fila, n) => {
@@ -2366,11 +2366,11 @@ describe("Reportes: orden por apellido paterno y por número de programa", () =>
     expect(planas.map((r) => r.prueba)).toEqual(ana.pruebas.map((l) => l.text.replace(/ \d+:\d{2},\d{2}$/, "")));
 
     // CSV y XLSX respetan ese mismo orden relativo.
-    const csv = reportsService.buildCsv(informe.individualRows, informe.relayRows).split("\r\n");
+    const csv = reportsService.buildCsv(informe.individualRows, informe.relayRows, "administracion").split("\r\n");
     const filasCsv = csv.slice(csv.indexOf("INDIVIDUALES") + 2, csv.indexOf("RELEVOS") - 1).filter((l) => l.includes("Ana Araya Soto"));
     expect(filasCsv.map((l) => l.split(",")[5])).toEqual(planas.map((r) => r.prueba)); // columna «prueba»
     const libro = new ExcelJS.Workbook();
-    await libro.xlsx.load((await reportsService.buildXlsx(informe.individualRows, informe.relayRows)) as never);
+    await libro.xlsx.load((await reportsService.buildXlsx(informe.individualRows, informe.relayRows, "administracion")) as never);
     const pruebasXlsx: string[] = [];
     libro.getWorksheet("Individuales")!.eachRow((fila, n) => {
       if (n > 1 && String(fila.getCell(3).value) === "Ana Araya Soto") pruebasXlsx.push(String(fila.getCell(6).value));
@@ -2641,8 +2641,10 @@ describe("SEC-02: los reportes no entregan el RUN y Team Manager sí", () => {
       for (const fila of informe.groupedByClub.flatMap((g) => g.swimmers)) {
         expect(Object.keys(fila).sort(), rol).toEqual(["categoria", "edad", "genero", "nombreCompleto", "personId", "pruebas", "relevos"]);
       }
+      // AUD-10: la administración recibe la fecha completa; los demás roles, la edad en su lugar.
+      const nacimiento = rol === "admin" ? "fechaNacimiento" : "edad";
       for (const fila of informe.individualRows) {
-        expect(Object.keys(fila), rol).toEqual(["competencia", "club", "nombreCompleto", "fechaNacimiento", "categoria", "prueba", "distancia", "estilo", "genero", "fecha", "jornada", "tipoDePrueba"]);
+        expect(Object.keys(fila), rol).toEqual(["competencia", "club", "nombreCompleto", nacimiento, "categoria", "prueba", "distancia", "estilo", "genero", "fecha", "jornada", "tipoDePrueba"]);
       }
     }
   });
@@ -2683,7 +2685,7 @@ describe("SEC-02: los reportes no entregan el RUN y Team Manager sí", () => {
   it("CSV: la columna RUN no existe (ni vacía), los encabezados son los esperados y cada dato queda bajo el suyo", async () => {
     const m = await montarEscena();
     const informe = await reportsService.getRegistrationsReport({ competitionId: m.competencia.id }, ADMIN_ACTOR);
-    const csv = reportsService.buildCsv(informe.individualRows, informe.relayRows);
+    const csv = reportsService.buildCsv(informe.individualRows, informe.relayRows, "administracion");
     const lineas = csv.split("\r\n");
     const iInd = lineas.indexOf("INDIVIDUALES");
     const iRel = lineas.indexOf("RELEVOS");
@@ -2696,7 +2698,7 @@ describe("SEC-02: los reportes no entregan el RUN y Team Manager sí", () => {
     for (const [i, f] of filas.entries()) {
       expect(f, `fila ${i}: 12 celdas`).toHaveLength(12);
       expect(f[2]).toBe(informe.individualRows[i]!.nombreCompleto);
-      expect(f[3]).toBe(informe.individualRows[i]!.fechaNacimiento);
+      expect(f[3]).toBe((informe.individualRows[i] as { fechaNacimiento?: string }).fechaNacimiento);
       expect(f[5]).toBe(informe.individualRows[i]!.prueba);
     }
     for (const c of TODOS_LOS_CENTINELAS) expect(csv).not.toContain(c);
@@ -2705,7 +2707,7 @@ describe("SEC-02: los reportes no entregan el RUN y Team Manager sí", () => {
   it("XLSX: reabierto no tiene la columna RUN, y ninguna de sus partes XML contiene el RUN", async () => {
     const m = await montarEscena();
     const informe = await reportsService.getRegistrationsReport({ competitionId: m.competencia.id }, ADMIN_ACTOR);
-    const buffer = await reportsService.buildXlsx(informe.individualRows, informe.relayRows);
+    const buffer = await reportsService.buildXlsx(informe.individualRows, informe.relayRows, "administracion");
 
     const libro = new ExcelJS.Workbook();
     await libro.xlsx.load(buffer as never);
@@ -2835,8 +2837,8 @@ describe("SEC-02: los reportes no entregan el RUN y Team Manager sí", () => {
       // Y los reportes del MISMO torneo no llevan ninguno de los cuatro, en ninguna forma.
       vi.useRealTimers();
       const informe = await reportsService.getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR);
-      const csv = reportsService.buildCsv(informe.individualRows, informe.relayRows);
-      const xlsx = await reportsService.buildXlsx(informe.individualRows, informe.relayRows);
+      const csv = reportsService.buildCsv(informe.individualRows, informe.relayRows, "administracion");
+      const xlsx = await reportsService.buildXlsx(informe.individualRows, informe.relayRows, "administracion");
       for (const run of ["8000000-1", "80000001", "80000002", "80000003", "80000004"]) {
         expect(csv).not.toContain(run);
         expect(JSON.stringify(informe)).not.toContain(run);

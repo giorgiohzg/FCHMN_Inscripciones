@@ -11,6 +11,13 @@ import { computeAge } from "../../shared/age.util";
  * internamente solo como desempate del orden (`PersonaOrdenable.run`), pero no
  * forma parte de las filas, de la vista agrupada ni de los nombres de integrantes.
  * La excepción es el archivo de Team Manager, que es otro módulo con su propio formato.
+ *
+ * FECHA DE NACIMIENTO (AUD-10). Solo la administración la recibe completa en las filas
+ * individuales (JSON, CSV y XLSX). Los demás roles reciben en su lugar la EDAD, calculada
+ * con la misma fecha de corte que la vista agrupada (`ageCutoffDate` de la competencia o,
+ * si falta, `getDefaultAgeCutoffDate()`), nunca con la fecha actual. La fecha completa no
+ * viaja en ninguna otra propiedad de esas respuestas; internamente se sigue usando para
+ * calcular la edad y la categoría.
  */
 
 export interface IndividualReportRowInput {
@@ -27,7 +34,15 @@ export interface IndividualReportRowInput {
   testTypeName: string;
 }
 
-export interface IndividualReportRow {
+/**
+ * Qué dato de nacimiento lleva cada fila individual, según el actor:
+ *   - `administracion`: la fecha completa (`fechaNacimiento`, dd-mm-yyyy);
+ *   - `general` (todos los demás roles): la edad a la fecha de corte (`edad`).
+ */
+export type VistaDeReporte = "administracion" | "general";
+
+/** Fila individual de la administración: la estructura de siempre, con la fecha completa. */
+export interface IndividualReportRowAdmin {
   competencia: string;
   club: string;
   nombreCompleto: string;
@@ -42,18 +57,47 @@ export interface IndividualReportRow {
   tipoDePrueba: string;
 }
 
+/** Fila individual de los demás roles: `edad` en el lugar de `fechaNacimiento`; nada más cambia. */
+export interface IndividualReportRowConEdad {
+  competencia: string;
+  club: string;
+  nombreCompleto: string;
+  edad: number;
+  categoria: string;
+  prueba: string;
+  distancia: string;
+  estilo: string;
+  genero: string;
+  fecha: string;
+  jornada: string;
+  tipoDePrueba: string;
+}
+
+export type IndividualReportRow = IndividualReportRowAdmin | IndividualReportRowConEdad;
+
+/** Cómo presentar el dato de nacimiento: la fecha completa, o la edad a una fecha de corte dada. */
+export type PresentacionNacimiento = { vista: "administracion" } | { vista: "general"; fechaDeCorte: Date };
+
 const GENDER_LABELS: Record<string, string> = { male: "Varones", female: "Damas", mixed: "Mixto" };
 
 function formatDate(d: Date): string {
   return d.toISOString().slice(0, 10).split("-").reverse().join("-"); // dd-mm-yyyy, determinístico (UTC)
 }
 
-export function mapIndividualRegistrationToRow(input: IndividualReportRowInput): IndividualReportRow {
+export function mapIndividualRegistrationToRow(input: IndividualReportRowInput, presentacion: { vista: "administracion" }): IndividualReportRowAdmin;
+export function mapIndividualRegistrationToRow(input: IndividualReportRowInput, presentacion: { vista: "general"; fechaDeCorte: Date }): IndividualReportRowConEdad;
+export function mapIndividualRegistrationToRow(input: IndividualReportRowInput, presentacion: PresentacionNacimiento): IndividualReportRow;
+export function mapIndividualRegistrationToRow(input: IndividualReportRowInput, presentacion: PresentacionNacimiento): IndividualReportRow {
+  // La clave va en la MISMA posición en ambas variantes: el orden de las propiedades es el de las columnas.
+  const nacimiento =
+    presentacion.vista === "administracion"
+      ? { fechaNacimiento: formatDate(input.personBirthDate) }
+      : { edad: computeAge(input.personBirthDate, presentacion.fechaDeCorte) };
   return {
     competencia: input.competitionName,
     club: input.clubName,
     nombreCompleto: input.personFullName,
-    fechaNacimiento: formatDate(input.personBirthDate),
+    ...nacimiento,
     categoria: input.categoryName,
     prueba: `${input.distanceMeters}m ${input.strokeName}`,
     distancia: `${input.distanceMeters}m`,

@@ -25,7 +25,10 @@ export async function reportsRoutes(app: FastifyInstance) {
       throw new ValidationError("Formato de exportación inválido (use csv, xlsx o pdf)");
     }
 
-    const { competitionName, individualRows, relayRows } = await reportsService.getRegistrationsReport(parsed.data, buildActorContext(req));
+    const actor = buildActorContext(req);
+    const { competitionName, individualRows, relayRows } = await reportsService.getRegistrationsReport(parsed.data, actor);
+    // AUD-10: la vista sale del mismo alcance efectivo con que se armaron las filas.
+    const vista = reportsService.vistaDeReporteParaActor(actor);
     const safeName = competitionName.replace(/[^\w\- ]/g, "").replace(/\s+/g, "_");
 
     // El archivo se genera ANTES de auditar. Antes la auditoría se escribía
@@ -39,9 +42,9 @@ export async function reportsRoutes(app: FastifyInstance) {
 
     let body: string | Buffer;
     if (format === "csv") {
-      body = reportsService.buildCsv(individualRows, relayRows);
+      body = reportsService.buildCsv(individualRows, relayRows, vista);
     } else if (format === "xlsx") {
-      body = await reportsService.buildXlsx(individualRows, relayRows);
+      body = await reportsService.buildXlsx(individualRows, relayRows, vista);
     } else {
       body = await reportsService.buildPdf(competitionName, individualRows, relayRows);
     }
