@@ -28,7 +28,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **npm fuera de ejecución** | Aviso residual de AUD-B: npm/npx retirados de las imágenes finales de API, migraciones y mantenimiento | **Retirada publicada y desplegada en la API y construida en mantenimiento.** Ver «npm fuera de las imágenes de ejecución» |
 | **AUD-V** | Fórmulas en el CSV de inscritos (Excel 16.0, es-CL, separador `;`) | **Completada: publicada, desplegada (API y web en `d105823`) y probada en local y en CI.** Ver «AUD-V» |
 | **Descancelar** | Botón `cancelada → borrador`, solo administración | **Completado: publicado, desplegado (API y web en `d105823`) y probado en local y en CI.** Ver «Descancelar» |
-| **AUD-10 y AUD-14** | Fecha de nacimiento en reportes (solo administración; edad para los demás) y RUN de los compañeros de relevo (fuera para el nadador) | **Publicadas en el repositorio y validadas localmente; pendientes de despliegue.** Ver «Privacidad de reportes y relevos» |
+| **AUD-10 y AUD-14** | Fecha de nacimiento en reportes (solo administración; edad para los demás) y RUN de los compañeros de relevo (fuera para el nadador) | **Publicadas y desplegadas en la API, dentro de su alcance.** Ver «Privacidad de reportes y relevos» |
 | **AUD-06 y AUD-09** | Capacidad `byClub` visible al nadador; copias completas en la auditoría | **Se conservan por decisión expresa del usuario; no son mitigaciones.** Retención de la auditoría pendiente. Ver «Privacidad de reportes y relevos» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
 
@@ -1401,7 +1401,7 @@ crudas de la librería: son un `ValidationError`. Sin dependencias nuevas ni ais
 - Fastify avisa con la URL cruda cuando hay un fallo de programación (`Reply was already sent`); no hay punto de enganche y no ocurre en el uso normal.
   El aviso `startup_failed` del arranque sigue escribiendo el mensaje del error de configuración.
 - La tabla de auditoría (AUD-09), la capacidad por rol (AUD-06), la fecha de nacimiento (AUD-10), el RUN de compañeros (AUD-14), la validación del CSV (AUD-08) y
-  las imágenes (AUD-01) siguen pendientes. Team Manager conserva el RUN y los reportes no lo incluyen, como antes. *Posterior:* AUD-06 y AUD-09 se conservan por decisión del usuario, y AUD-10 y AUD-14 están publicadas en el repositorio y validadas localmente, pendientes de despliegue (ver «Privacidad de reportes y relevos»).
+  las imágenes (AUD-01) siguen pendientes. Team Manager conserva el RUN y los reportes no lo incluyen, como antes. *Posterior:* AUD-06 y AUD-09 se conservan por decisión del usuario, y AUD-10 y AUD-14 están publicadas y desplegadas en la API, dentro de su alcance (ver «Privacidad de reportes y relevos»).
 - No se observó la interfaz ni se compiló la web; el cambio del tipo del frontend se comprobó con el typecheck y sus pruebas.
 
 ## AUD-B: imágenes base y registro de acceso de Nginx (completada dentro de su alcance: publicada, validada en local y desplegada)
@@ -1816,7 +1816,7 @@ Los 23 avisos **desaparecen del sistema de archivos final** porque se retiró el
 **Opcional y separado:** ejecutar la importación de Meet Events en el mismo proceso aislado que la carga XLSX reduciría las consecuencias de los casos indeterminados, sin corregirlos. No es una tarea aprobada ni un requisito para cerrar esta evaluación.
 
 **Límites.** Evaluación de solo lectura: no se ejecutaron pruebas, no se generaron entradas de corrupción de memoria y no se auditó todo el código C++ de Node. La versión exacta de zlib en las imágenes de producción no se verificó; los resultados de `process.versions.zlib` y de las bibliotecas enlazadas son de imágenes locales. Los demás residuales (los de las imágenes y la causa del 504) no cambian.
-## Privacidad de reportes y relevos: AUD-06, AUD-09, AUD-10 y AUD-14 (AUD-10 y AUD-14 publicadas en el repositorio y validadas localmente; pendientes de despliegue)
+## Privacidad de reportes y relevos: AUD-06, AUD-09, AUD-10 y AUD-14 (AUD-10 y AUD-14 publicadas y desplegadas en la API, dentro de su alcance)
 
 Cuatro hallazgos de privacidad de la auditoría del 2026-11-07. Dos se conservan por decisión funcional y dos se implementaron. No cambian el esquema, las dependencias, la configuración de Render ni datos reales.
 
@@ -1845,9 +1845,17 @@ Cuatro hallazgos de privacidad de la auditoría del 2026-11-07. Dos se conservan
 - *Resultados:* 7 archivos de integración de reportes y relevos (269 pruebas, entre ellas la exportación de Team Manager), 8 unitarios de reportes, relevos y neutralización (172) y 5 del frontend de reportes y relevos (62), en verde. `npm run typecheck` completo del backend y del frontend sin errores; ESLint de lo tocado sin errores (4 avisos `no-explicit-any` previos).
 
 **Límites.**
-- **Publicado en el repositorio; pendiente de despliegue** (producción no está actualizada). No se observó la interfaz en un navegador ni se ejecutaron las suites completas.
+- **Desplegado solo en la API** (ver el cierre más abajo); la web y el mantenimiento no se actualizaron. No se observó la interfaz en un navegador ni se ejecutaron las suites completas.
 - Del PDF solo se comprobó que se sigue generando; su código no cambió.
 - Fuera de este alcance (no se declaran resueltos): otros endpoints que entregan RUN o fecha de nacimiento a quien corresponde (plantel, selectores, personas), la capacidad de AUD-06, las copias de AUD-09 y su retención, y los demás hallazgos.
+**Cierre (despliegue en Render).** API `dbdbda278b2193064a506e6955d1f59c66f83788` → `79bcc2b237fda5cb1ccd9ccd03f9b9987d7dbeb2` ([despliegue](https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80/deploys/dep-dbp6gujm8hqs73d0gvi0)). Render informó «Deploy succeeded» y Live, con Auto-Deploy Off. CI del código `42727571298`, éxito. **La web y el mantenimiento no se desplegaron**: los cambios del frontend eran solo tipos y comentarios.
+
+**Evidencia, por separado.**
+- *Render:* el commit y el estado del despliegue.
+- *HTTP y registros acotados:* 30 `GET /api/health` por la web, todos 200 y sin errores de transporte, del 2026-11-10 00:42:26.8 al 00:47:28.8 UTC (2026-11-09 21:42:26.8 a 21:47:28.8 America/Santiago). La primera instancia nueva se observó en la muestra 8 y se cumplieron las condiciones temporales de estabilidad fijadas. **Hay huecos de unos 10 s entre muestras que no se observaron: no se afirma disponibilidad continua.** Las 30 líneas de registro de `/api/health` de la ventana traen estado 200 y los cuatro campos del upstream. `/api/ready` 200 con base disponible y `/api/auth/me` 401, ambas con `no-store`.
+- *Contratos de AUD-10 y AUD-14:* comprobados **localmente y en la CI**. **No hubo validación funcional autenticada en producción**: la salud y el estado Live no demuestran los contratos por rol.
+
+**Se conserva:** AUD-06 y AUD-09 siguen definidos por decisión del usuario, sin cambios funcionales y sin presentarlos como mitigaciones; la retención de la auditoría sigue pendiente. La fecha completa es solo para administración en los reportes afectados (edad y categoría para los demás); el nadador recibe su RUN y no el de sus compañeros de relevo; administración y el personal autorizado conservan su alcance; los reportes siguen sin RUN para todos y Team Manager no cambió. Personas y plantel quedan fuera de este alcance. **La causa del 504 anterior sigue indeterminada** y los demás residuales siguen abiertos.
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 
 **SEC-01 (listas JSON).** Medido en memoria con Zod 3.25.76 durante la revisión: `.max()` **no** corta el
