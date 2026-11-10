@@ -31,7 +31,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **AUD-10 y AUD-14** | Fecha de nacimiento en reportes (solo administración; edad para los demás) y RUN de los compañeros de relevo (fuera para el nadador) | **Publicadas y desplegadas en la API, dentro de su alcance.** Ver «Privacidad de reportes y relevos» |
 | **AUD-06 y AUD-09** | Capacidad `byClub` visible al nadador; copias completas en la auditoría | **Se conservan por decisión expresa del usuario; no son mitigaciones.** Retención de la auditoría pendiente. Ver «Privacidad de reportes y relevos» |
 | **C-01** | Acceso externo a la base de producción (`fchmn-postgres` admitía `0.0.0.0/0`) | **Mitigado mediante la configuración de red de Postgres:** lista propia vacía, guardada y comprobada; reglas heredadas intactas. Sin prueba de conexión nueva ni de rechazo externo. Ver «C-01: acceso externo a Postgres» |
-| **C-04** | Contraseña actual incorrecta en `/auth/change-password` sin contar | **Publicada en el repositorio y validada en local, incluida la integración** (base desechable). Pendiente de migración y despliegue en producción. Ver «C-04» |
+| **C-04** | Contraseña actual incorrecta en `/auth/change-password` sin contar | **Cerrada dentro de su alcance:** migración aplicada y web y API desplegadas en producción desde `2c3552e`; validada en local (incluida la integración sobre la base desechable) y en la CI; **sin prueba autenticada del límite en producción**. Ver «C-04» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -1881,7 +1881,7 @@ Cuatro hallazgos de privacidad de la auditoría del 2026-11-07. Dos se conservan
 - Una restauración externa autorizada necesita abrir temporalmente la IP del operador (`/32`) y cerrarla al terminar (instructivo de nube, Paso 9).
 - No cambian las credenciales de la base, los permisos del rol de la aplicación sobre la auditoría ni la retención; los demás hallazgos siguen como estaban.
 
-## C-04: intentos de cambio de contraseña por sesión (publicada en el repositorio y validada en local, incluida la integración sobre la base desechable; pendiente de migración y despliegue en producción)
+## C-04: intentos de cambio de contraseña por sesión (cerrada dentro de su alcance: migrada y desplegada en producción)
 
 **Hallazgo.** `/auth/change-password` verificaba la contraseña actual sin contar los fallos: con una sesión robada se podían probar contraseñas sin más límite que el de tasa de `/auth/*`.
 
@@ -1928,8 +1928,27 @@ Cuatro hallazgos de privacidad de la auditoría del 2026-11-07. Dos se conservan
 - `backend/tests/cambio-contrasena-intentos.integration.test.ts`: política secuencial (obligatorio y voluntario), refresh sin reinicio, otra sesión intacta, errores de la contraseña nueva sin contar, el `sid` del token frente a un campo del cuerpo, solapamiento determinista con barrera, reserva vencida y tomada por otra solicitud (fallo y acierto obsoletos), caída inyectada entre el incremento y el cierre, y cambio correcto frente a logout, al quinto fallo de otra solicitud, a una segunda solicitud de la misma sesión y a un cambio simultáneo desde otra sesión.
 - Pruebas existentes adaptadas a la firma nueva (el servicio recibe el `sid`): `sesiones`, `sesiones-concurrencia` (en los dos cambios concurrentes, el segundo se rechaza ahora por su sesión terminada y no por la comparación del hash), `club-inactivo-alcance` y `session-owner-type`.
 
+**Cierre en producción (2026-11-10).** Orden: respaldo, migración, web y API.
+- *Código:* `2c3552e46d4b4530f47014ebcab53ecff1852047`; CI `42873065151`, éxito.
+- *Render, operaciones y estado:*
+  - **Respaldo:** exportación de `fchmn-postgres` terminada y disponible para descarga. No se descargó, no se publicó un enlace firmado y no se abrió el acceso externo a Postgres.
+  - **Mantenimiento:** Manual Build `dep-dbpmirui0phs73cg2cug` ([construcción](https://dashboard.render.com/cron/crn-dbh500bl550s73c5n2o0/deploys/dep-dbpmirui0phs73cg2cug)) sobre `2c3552e`. Estado de migraciones: 38 encontradas, sin fallidas ni divergencias y con una sola pendiente (la de C-04); Prisma 5.22 salió con código 1, que es lo esperado cuando hay migraciones pendientes. Después, la ejecución de migración, sin seed, aplicó **únicamente** `20261110000000_intentos_cambio_contrasena`. Fueron dos ejecuciones del cron (estado y migración): de 26 a 28. El Docker Command quedó vacío y guardado, y la programación (`0 6 1 1 *`) se conservó.
+  - **Web:** `973cacc` → `2c3552e`, despliegue `dep-dbpmmhou01pc73dqumag` ([despliegue](https://dashboard.render.com/web/srv-dbh48scs728c73arlf8g/deploys/dep-dbpmmhou01pc73dqumag)): «Deploy succeeded» y Live.
+  - **API:** `79bcc2b` → `2c3552e`, despliegue `dep-dbpmnd6c6qcc73dgjf90` ([despliegue](https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80/deploys/dep-dbpmnd6c6qcc73dgjf90)): «Deploy succeeded» y Live.
+  - **Auto-Deploy Off** en web, API y mantenimiento.
+- *HTTP observado* (sin credenciales): `/login`, `/api/health` y `/api/ready` con 200 y `/api/auth/me` con 401, todos con `Cache-Control: no-store` y la CSP conservada; la web sirve un paquete JS que contiene `PASSWORD_CHANGE_ATTEMPTS_EXCEEDED`. El muestreo de `/api/health` por la web dio **30 respuestas 200 entre las 19:08:06Z y las 19:13:07Z, con un máximo de 888 ms**; el `uptime` pasó de 66351 s a 14 s entre dos muestras consecutivas (cambio de instancia). **Los intervalos entre muestras no se observaron**: el muestreo acredita disponibilidad en los instantes muestreados, no la ausencia de cortes.
+- *Validación funcional:* las pruebas locales previas (unitarias, las 131 de los cinco archivos de C-04 y la suite de integración completa sobre la base desechable) y la CI. Eran pruebas con autenticación simulada o contra la base desechable, no observaciones de producción.
+- *Producción:* **no se hicieron pruebas autenticadas ni intentos fallidos con cuentas reales.** El límite de cinco intentos, la reserva y el cierre terminal **no se comprobaron en producción**.
+- *Correspondencia local*, en tres comprobaciones separadas:
+  - **Contenido:** el `prisma/` de la imagen del backend coincide con el de `2c3552e` (38 migraciones); el `dist` del backend contiene el código de C-04 y el paquete del frontend contiene `PASSWORD_CHANGE_ATTEMPTS_EXCEEDED`.
+  - **Registro de construcción:** el log de la construcción local nombra las imágenes frontend `2094ef56a597`, backend `69edf76a7cfe` y migraciones `2f8a5fcaded4`, y los contenedores de frontend y backend usan las suyas. La imagen de migraciones no es la de Postgres.
+  - **Migración local:** el registro de la migración local muestra aplicada `20261110000000_intentos_cambio_contrasena`.
+  - En la actualización local anterior se recrearon los contenedores de frontend, backend y Postgres, conservando el volumen `fchmn_inscripciones_pgdata`; al terminar quedaron detenidos y el volumen se conservó. No se repitieron comprobaciones de Docker para este cierre.
+  - **No se declara identidad binaria** entre las imágenes locales y las de Render: el paquete JS del frontend local y el de producción tienen nombres distintos y no se investigó la causa.
+- Conviene recargar las pestañas abiertas para que carguen el paquete nuevo; no se actualizaron las de otros usuarios.
+
 **Límites.**
-- **Publicada en el repositorio; pendiente de migración y despliegue en producción.** La integración se ejecutó solo contra la base desechable local; nada se comprobó en producción. La migración `20261110000000_intentos_cambio_contrasena` (aditiva) debe aplicarse en producción **antes** de desplegar la API.
+- **Cerrada dentro de su alcance** (ver el cierre en producción). La integración se ejecutó solo contra la base desechable local; en producción solo se observaron disponibilidad y cabeceras, **sin prueba autenticada del límite, la reserva ni el cierre terminal**.
 - No hay un límite global de verificaciones Argon2 simultáneas; una operación lenta puede seguir calculando tras perder su reserva, aunque ya no produzca efectos.
 - **C-02 sigue pendiente**, incluida la validación de la IP real del cliente.
 

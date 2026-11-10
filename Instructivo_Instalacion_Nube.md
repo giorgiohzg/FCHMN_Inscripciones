@@ -1562,6 +1562,9 @@ la configuración, la API lo dice explícitamente nombrando la variable:
 4. Render detecta el cambio y vuelve a desplegar los servicios cuyos *build filters* coincidan.
 5. **Si la versión nueva trae migraciones**, ejecútalas con el comando 1 del Paso 6.b. El arranque de la API **no migra solo**, a propósito. El comando 3 —el administrador— **no se repite nunca**.
 6. Comprueba con el Paso 8. Si algo salió mal, Paso 10.
+7. **Actualiza y comprueba también el entorno local.** Cada actualización de Render lleva su correspondencia local:
+
+   > Cada actualización autorizada en Render debe incluir la actualización correspondiente del entorno local con el mismo código aprobado, conservando la configuración propia de cada entorno. Si local ya corresponde al objetivo, se verifica sin reconstruir innecesariamente. La entrega no se declara completada sin comprobar ambos entornos o informar explícitamente el bloqueo pendiente.
 
 > **Si cambian los avisos de licencias**, hay que redistribuirlos antes de subir:
 > `node scripts/distribuir-avisos.mjs`. La integración continua lo comprueba y

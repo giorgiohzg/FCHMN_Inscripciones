@@ -18,6 +18,10 @@ Reglas permanentes. El funcionamiento del sistema está en `README.md` y en `doc
 - No hagas commit, push ni operaciones en producción sin autorización explícita. La autorización vale para la operación nombrada, no para las siguientes.
 - Cuando una operación ya esté autorizada, continúa sin pedir de nuevo el mismo permiso.
 
+## Producción y entorno local
+
+- Cada actualización autorizada en Render debe incluir la actualización correspondiente del entorno local con el mismo código aprobado, conservando la configuración propia de cada entorno. Si local ya corresponde al objetivo, se verifica sin reconstruir innecesariamente. La entrega no se declara completada sin comprobar ambos entornos o informar explícitamente el bloqueo pendiente.
+
 ## Datos sensibles
 
 - No publiques ni reproduzcas datos personales, credenciales, respaldos ni archivos privados, ni en el código, ni en los mensajes de commit, ni en la documentación, ni en los informes.
