@@ -2,8 +2,22 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 
+/**
+ * Dos usos de la misma pantalla y del mismo flujo (`AuthContext.changePassword` →
+ * `/auth/change-password`):
+ *
+ *   - OBLIGATORIO (`mustChangePassword`): contraseña temporal; no se puede salir sin
+ *     cambiarla. No hay `Cancelar`, y el resto de la aplicación redirige aquí.
+ *   - VOLUNTARIO (cualquier cuenta con sesión, administración incluida): se llega desde
+ *     «Cambiar contraseña» en la cabecera y se puede cancelar para volver al panel sin
+ *     enviar nada.
+ *
+ * El modo se decide con `mustChangePassword` del contexto EN CADA RENDER, no al montar:
+ * si otra pestaña o una renovación lo vuelve a poner, el `Cancelar` desaparece.
+ */
 export function ForceChangePasswordPage() {
-  const { changePassword } = useAuth();
+  const { changePassword, mustChangePassword } = useAuth();
+  const obligatorio = mustChangePassword;
   const navigate = useNavigate();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -42,14 +56,21 @@ export function ForceChangePasswordPage() {
 
   return (
     <div className="force-change-password-page">
-      <form onSubmit={handleSubmit} aria-label="Cambio de contraseña obligatorio">
-        <h1>Debe cambiar su contraseña</h1>
-        <p>Por seguridad, debe definir una nueva contraseña antes de continuar.</p>
+      <form onSubmit={handleSubmit} aria-label={obligatorio ? "Cambio de contraseña obligatorio" : "Cambiar contraseña"}>
+        {obligatorio ? (
+          <>
+            <h1>Debe cambiar su contraseña</h1>
+            <p>Por seguridad, debe definir una nueva contraseña antes de continuar.</p>
+          </>
+        ) : (
+          <h1>Cambiar contraseña</h1>
+        )}
 
-        <label htmlFor="currentPassword">Contraseña actual (temporal)</label>
+        <label htmlFor="currentPassword">{obligatorio ? "Contraseña actual (temporal)" : "Contraseña actual"}</label>
         <input
           id="currentPassword"
           type="password"
+          autoComplete="current-password"
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
           required
@@ -59,6 +80,7 @@ export function ForceChangePasswordPage() {
         <input
           id="newPassword"
           type="password"
+          autoComplete="new-password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           required
@@ -70,6 +92,7 @@ export function ForceChangePasswordPage() {
         <input
           id="confirmPassword"
           type="password"
+          autoComplete="new-password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           required
@@ -77,9 +100,16 @@ export function ForceChangePasswordPage() {
 
         {error && <p role="alert" className="error-message">{error}</p>}
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Guardando..." : "Guardar y continuar"}
-        </button>
+        <div className="force-change-password-acciones">
+          <button type="submit" disabled={loading}>
+            {loading ? "Guardando..." : obligatorio ? "Guardar y continuar" : "Guardar contraseña"}
+          </button>
+          {!obligatorio && (
+            <button type="button" className="btn-secondary" onClick={() => navigate("/dashboard")} disabled={loading}>
+              Cancelar
+            </button>
+          )}
+        </div>
       </form>
     </div>
   );

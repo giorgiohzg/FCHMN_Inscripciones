@@ -488,6 +488,7 @@ sesión no viaja.
   roles justo después del cambio; ninguna prueba lo veía porque miraban el servicio o un
   mock del cliente. Ahora hay una prueba de integración que habla HTTP contra el servidor
   real (`backend/tests/cambio-contrasena-contrato.integration.test.ts`).
+- **«Cambiar contraseña» en la cabecera, para toda cuenta con sesión** (administración, club, personal, nadadores y cuentas con varios roles; **publicada en el repositorio y validada localmente; pendiente de despliegue**). Es un enlace junto a «Cerrar sesión» que lleva a `/cambiar-password`, la misma ruta y el mismo flujo del cambio obligatorio (`ForceChangePasswordPage` → `AuthContext.changePassword` → `/auth/change-password`); no hay otro endpoint ni otro mecanismo. La pantalla distingue dos casos según `mustChangePassword`: **voluntario** (título «Cambiar contraseña», contraseña actual, nueva y confirmación, y «Cancelar», que vuelve al panel sin enviar nada) y **obligatorio** (aviso y restricción de siempre, **sin** «Cancelar»). La política de contraseñas, la comprobación de la contraseña actual, la coordinación entre pestañas, la renovación, el CSRF y la revocación de sesiones no cambian. **No incluye** un contador de intentos fallidos al cambiar la contraseña: eso sigue pendiente.
 - **El cambio de contraseña no puede interbloquearse con la renovación.** Corre entero
   dentro del cerrojo de sesión, incluida la petición; si esta responde 401, renueva
   **sin volver a pedir el cerrojo** (`renovarDentroDelCerrojo`) y reintenta una vez. Por eso

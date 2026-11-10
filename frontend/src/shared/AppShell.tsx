@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import logo from "../assets/logo-fchmn.png";
 import { AvisosTerceros } from "./AvisosTerceros";
 import { useAuth } from "../modules/auth/AuthContext";
@@ -157,8 +157,12 @@ export function AppShell({ children }: AppShellProps) {
           <div className="app-title">FCHMN — Gestión de Competencias</div>
           <div className="app-subtitle">Federación Chilena Máster de Natación</div>
         </div>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "1rem" }}>
-          <span style={{ fontSize: "0.85rem", color: "var(--brand-gray-600)" }}>{user?.username}</span>
+        <div className="app-header-acciones">
+          <span className="app-header-usuario">{user?.username}</span>
+          {/* Para toda cuenta con sesión, administración incluida: la ruta y el flujo son los del cambio obligatorio. */}
+          <Link to="/cambiar-password" className="btn-secondary">
+            Cambiar contraseña
+          </Link>
           <button className="btn-secondary" onClick={() => logout()}>
             Cerrar sesión
           </button>
