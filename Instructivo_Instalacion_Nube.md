@@ -1556,13 +1556,70 @@ la configuración, la API lo dice explícitamente nombrando la variable:
 
 ## Actualizar la aplicación en el futuro
 
-1. **Primero, crea y descarga un respaldo** (Paso 9B), sobre todo si la versión nueva trae migraciones.
-2. Reemplaza los archivos en tu carpeta local por los nuevos.
-3. En VS Code, **Source Control** → mensaje corto → **Commit** → **Sync Changes**.
-4. Render detecta el cambio y vuelve a desplegar los servicios cuyos *build filters* coincidan.
-5. **Si la versión nueva trae migraciones**, ejecútalas con el comando 1 del Paso 6.b. El arranque de la API **no migra solo**, a propósito. El comando 3 —el administrador— **no se repite nunca**.
-6. Comprueba con el Paso 8. Si algo salió mal, Paso 10.
-7. **Actualiza y comprueba también el entorno local.** Cada actualización de Render lleva su correspondencia local:
+En producción, web, API y mantenimiento tienen **Auto-Deploy en `Off`**: publicar en
+GitHub **no despliega nada**. Cada servicio se actualiza **a mano**, en esta secuencia, y
+el arranque de la API **no migra solo**, a propósito.
+
+1. **Respaldo.** Antes de tocar nada, sigue el procedimiento del Paso 9B (crear y
+   descargar). No continúes hasta que haya terminado y esté disponible. Es
+   imprescindible si la versión trae migraciones: un *rollback* no deshace una migración
+   (Paso 10).
+2. **Publica el código autorizado y espera la CI.** Con la autorización expresa, publica
+   en `main` (VS Code: **Source Control** → mensaje corto → **Commit** → **Sync Changes**).
+   Si cambiaron los avisos de licencias, redistribúyelos antes de publicar (recuadro al
+   final de esta sección). Espera a que la CI termine **en éxito para el SHA exacto** que
+   vas a desplegar: ese SHA completo es el **objetivo** de todo lo que sigue.
+3. **Revisa la compatibilidad y las migraciones.** Antes de desplegar, compara lo que
+   corre hoy con el objetivo y responde, por escrito:
+   - ¿Hay migraciones nuevas (`backend/prisma/migrations`)? ¿Son solo aditivas?
+   - ¿La API que corre hoy **sigue funcionando con el esquema nuevo**?
+   - ¿La API nueva **exige** el esquema nuevo?
+   - ¿La web nueva y la API anterior son compatibles entre sí, y la web anterior con la API
+     nueva?
+4. **Si hay migraciones, aplícalas antes de desplegar la API que depende de ellas.** Esto
+   solo es seguro si la **API anterior es compatible con el esquema nuevo** mientras dura
+   la transición (por ejemplo, una migración puramente aditiva). **Si no lo es, no sigas
+   con esta secuencia: hace falta otro plan**, definido y autorizado aparte. Si lo es,
+   con el procedimiento de mantenimiento del Paso 6.b:
+   1. **Prepara el mantenimiento con el código correcto.** Reconstruye
+      `fchmn-mantenimiento` con **Manual Deploy** (Paso 6.b). Ese servicio **no ofrece un
+      selector de commit**, así que no se le atribuye uno: **comprueba que el SHA
+      efectivamente construido sea el objetivo** antes de seguir. Si no lo es, detente.
+   2. **Comprueba el estado.** Con el procedimiento de mantenimiento, ejecuta
+      `prisma migrate status` y lee el registro. Continúa solo si la conexión y el
+      historial son válidos, no hay migraciones fallidas ni divergencias, y las únicas
+      pendientes son las que esperabas. Con migraciones pendientes termina con código 1,
+      y eso es lo esperado (ver «Un detalle del panel que confunde», en «Comprobado en el
+      despliegue real de Render»).
+   3. **Aplícalas, una sola vez**, con el comando 1 del Paso 6.b. Debe terminar con
+      `All migrations have been successfully applied.`
+   4. **Vacía el *Docker Command*** y comprueba que quedó vacío (paso 6 del procedimiento),
+      también si hubo errores.
+
+   > **No se ejecutan, en una actualización ordinaria, el comando 2 (datos de
+   > referencia) ni el 3 (administrador).** El comando 3 **no se repite nunca**. Si una
+   > entrega necesitara sembrar datos, es una operación aparte, con su propia autorización.
+   > Si la migración falla, **no despliegues la API**, no restaures respaldos ni reviertas
+   > el esquema por tu cuenta: lee el registro y decide con el Paso 9 y el Paso 10.
+
+   Si no hay migraciones, omite este paso.
+5. **Despliega a mano, conservando Auto-Deploy en `Off`.** Usa **Manual Deploy** en cada
+   servicio que cambió y comprueba el **SHA efectivo**: que el despliegue termine en
+   *Deploy succeeded*, que el servicio quede *Live* y que el SHA mostrado sea el objetivo.
+   No cambies la configuración de Auto-Deploy para desplegar. Un servicio que no cambió
+   no se despliega.
+6. **Orden de web y API: el que dicte la compatibilidad de cada entrega.** No hay un
+   orden universal. Usa la revisión del paso 3: si la web nueva necesita algo que solo la
+   API nueva ofrece, primero la API; si la API nueva retira algo que la web anterior
+   usa, primero la web; si cada una es compatible con la versión anterior de la otra,
+   puede ir cualquiera. Una API que depende de una migración **nunca** va antes que esa
+   migración (paso 4).
+7. **Comprueba producción** con el Paso 8 (los puntos de disponibilidad: la web carga,
+   `/api/health` y `/api/ready`). Estas comprobaciones sin credenciales acreditan
+   disponibilidad y cabeceras, **no** que las funciones autenticadas de la entrega
+   funcionen: eso solo se puede decir si se probaron. Si cambió la web, conviene
+   **recargar las pestañas abiertas**. Si algo salió mal, Paso 10.
+8. **Actualiza y comprueba también el entorno local.** Cada actualización de Render lleva su correspondencia local:
 
    > Cada actualización autorizada en Render debe incluir la actualización correspondiente del entorno local con el mismo código aprobado, conservando la configuración propia de cada entorno. Si local ya corresponde al objetivo, se verifica sin reconstruir innecesariamente. La entrega no se declara completada sin comprobar ambos entornos o informar explícitamente el bloqueo pendiente.
 
