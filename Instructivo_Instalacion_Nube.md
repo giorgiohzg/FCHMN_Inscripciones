@@ -595,6 +595,12 @@ direcciones de conexión.
    > Los *build filters* son siempre relativos a la **raíz del repositorio**,
    > aunque hayas puesto un *Root Directory*.
 
+   > **Auto-Deploy: déjalo en `Off`** (**Settings**, sección *Auto-Deploy*; la de
+   > fábrica es `On Commit`). Así ningún cambio que llegue a GitHub despliega la API:
+   > la actualizas tú, a mano (**Manual Deploy**), con la secuencia de «Actualizar la
+   > aplicación en el futuro». Con `Off`, los *build filters* de arriba son
+   > redundantes; volver a encender Auto-Deploy **no es una decisión rutinaria**.
+
 6. **Crea el servicio.** Render construirá la imagen y la desplegará. La primera
    vez tarda varios minutos.
 
@@ -750,16 +756,26 @@ Sobre esa base se apoyan dos cosas más, en este orden:
 6. **Auto-Deploy: ponlo en `Off`** (**Settings**, sección *Auto-Deploy*). Las
    opciones son `On Commit` (la de fábrica), `After CI Checks Pass` y `Off`.
 
-   > **Por qué `Off` aquí y no en los otros servicios.** Este servicio no sirve
-   > tráfico: no necesita estar al día con cada empujón. Con `Off`, nada de lo que
-   > pase en GitHub lo toca, y tú decides cuándo reconstruirlo —antes de un
-   > mantenimiento que use código nuevo, con **Manual Deploy**—. Es una
-   > protección documentada, a diferencia de suspender el servicio, que la
-   > documentación de Render no explica para cron jobs y que por eso esta guía
-   > no usa.
+   > **Por qué `Off`, y en los tres servicios.** `Off` se aplica a la **web, la API y
+   > el mantenimiento**: nada de lo que pase en GitHub los despliega, y tú decides
+   > cuándo y en qué orden (ver «Actualizar la aplicación en el futuro»). Este
+   > servicio, además, no sirve tráfico: no necesita estar al día con cada empujón,
+   > y tú lo reconstruyes —antes de un mantenimiento que use código nuevo, con
+   > **Manual Build**—. Es una protección documentada, a diferencia de suspender el
+   > servicio, que la documentación de Render no explica para cron jobs y que por
+   > eso esta guía no usa.
+   >
+   > **`Off` no apaga las ejecuciones del cron.** Las ejecuciones programadas y
+   > **Trigger Run** son operaciones distintas de los despliegues automáticos: el
+   > calendario sigue disparando el servicio y tú puedes lanzarlo a mano. Por eso el
+   > último paso del procedimiento, vaciar el *Docker Command*, sigue siendo
+   > obligatorio.
 
 7. **Build Filters**: *Included Path* `backend/**`. (Con `Auto-Deploy: Off` es
-   redundante, pero no estorba si algún día lo vuelves a encender.)
+   redundante: no hay despliegues automáticos que filtrar. Se deja escrito, pero
+   volver a encender Auto-Deploy **no es una decisión rutinaria**: requiere una
+   decisión expresa y revisar la secuencia de «Actualizar la aplicación en el
+   futuro».)
 
 ### El procedimiento de mantenimiento
 
@@ -978,6 +994,12 @@ así que una ejecución accidental no rompe nada.
    >   que `TRUST_PROXY_HOPS=2` es seguro (ver el recuadro del Paso 6).
 
 4. **Build Filters**: *Included Path* `frontend/**`.
+
+   > **Auto-Deploy: déjalo en `Off`** (**Settings**, sección *Auto-Deploy*; la de
+   > fábrica es `On Commit`). Así ningún cambio que llegue a GitHub despliega la
+   > web: la actualizas tú, a mano (**Manual Deploy**), con la secuencia de
+   > «Actualizar la aplicación en el futuro». Con `Off`, el *build filter* de arriba
+   > es redundante; volver a encender Auto-Deploy **no es una decisión rutinaria**.
 
 5. **Crea el servicio** y anota su dirección pública (p. ej.
    `https://fchmn-web.onrender.com`). **Esta es la que compartirás con los
@@ -1582,8 +1604,9 @@ el arranque de la API **no migra solo**, a propósito.
    con esta secuencia: hace falta otro plan**, definido y autorizado aparte. Si lo es,
    con el procedimiento de mantenimiento del Paso 6.b:
    1. **Prepara el mantenimiento con el código correcto.** Reconstruye
-      `fchmn-mantenimiento` con **Manual Deploy** (Paso 6.b). Ese servicio **no ofrece un
-      selector de commit**, así que no se le atribuye uno: **comprueba que el SHA
+      `fchmn-mantenimiento` con **Manual Build** (Paso 6.b), el control propio del cron.
+      Ese servicio **no ofrece un selector de commit** (lo observado es que construye la
+      punta de `main`), así que no se le atribuye uno: **comprueba que el SHA
       efectivamente construido sea el objetivo** antes de seguir. Si no lo es, detente.
    2. **Comprueba el estado.** Con el procedimiento de mantenimiento, ejecuta
       `prisma migrate status` y lee el registro. Continúa solo si la conexión y el
@@ -1603,8 +1626,9 @@ el arranque de la API **no migra solo**, a propósito.
    > el esquema por tu cuenta: lee el registro y decide con el Paso 9 y el Paso 10.
 
    Si no hay migraciones, omite este paso.
-5. **Despliega a mano, conservando Auto-Deploy en `Off`.** Usa **Manual Deploy** en cada
-   servicio que cambió y comprueba el **SHA efectivo**: que el despliegue termine en
+5. **Despliega a mano, conservando Auto-Deploy en `Off`.** Usa **Manual Deploy** en la web
+   y la API, en cada una que cambió (el mantenimiento, si hubo migraciones, ya se
+   reconstruyó en el paso 4), y comprueba el **SHA efectivo**: que el despliegue termine en
    *Deploy succeeded*, que el servicio quede *Live* y que el SHA mostrado sea el objetivo.
    No cambies la configuración de Auto-Deploy para desplegar. Un servicio que no cambió
    no se despliega.
