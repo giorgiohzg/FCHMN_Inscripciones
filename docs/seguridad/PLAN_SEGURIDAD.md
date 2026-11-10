@@ -30,6 +30,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **Descancelar** | Botón `cancelada → borrador`, solo administración | **Completado: publicado, desplegado (API y web en `d105823`) y probado en local y en CI.** Ver «Descancelar» |
 | **AUD-10 y AUD-14** | Fecha de nacimiento en reportes (solo administración; edad para los demás) y RUN de los compañeros de relevo (fuera para el nadador) | **Publicadas y desplegadas en la API, dentro de su alcance.** Ver «Privacidad de reportes y relevos» |
 | **AUD-06 y AUD-09** | Capacidad `byClub` visible al nadador; copias completas en la auditoría | **Se conservan por decisión expresa del usuario; no son mitigaciones.** Retención de la auditoría pendiente. Ver «Privacidad de reportes y relevos» |
+| **C-01** | Acceso externo a la base de producción (`fchmn-postgres` admitía `0.0.0.0/0`) | **Mitigado mediante la configuración de red de Postgres:** lista propia vacía, guardada y comprobada; reglas heredadas intactas. Sin prueba de conexión nueva ni de rechazo externo. Ver «C-01: acceso externo a Postgres» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -1856,6 +1857,29 @@ Cuatro hallazgos de privacidad de la auditoría del 2026-11-07. Dos se conservan
 - *Contratos de AUD-10 y AUD-14:* comprobados **localmente y en la CI**. **No hubo validación funcional autenticada en producción**: la salud y el estado Live no demuestran los contratos por rol.
 
 **Se conserva:** AUD-06 y AUD-09 siguen definidos por decisión del usuario, sin cambios funcionales y sin presentarlos como mitigaciones; la retención de la auditoría sigue pendiente. La fecha completa es solo para administración en los reportes afectados (edad y categoría para los demás); el nadador recibe su RUN y no el de sus compañeros de relevo; administración y el personal autorizado conservan su alcance; los reportes siguen sin RUN para todos y Team Manager no cambió. Personas y plantel quedan fuera de este alcance. **La causa del 504 anterior sigue indeterminada** y los demás residuales siguen abiertos.
+
+## C-01: acceso externo a Postgres (mitigado mediante la configuración de red)
+
+**Hallazgo** (auditoría de seguridad): `fchmn-postgres` no tenía restricción de IP de origen, así que admitía conexiones entrantes desde cualquier dirección de internet; esas conexiones seguían sujetas a autenticación. No se afirma que faltaran otros controles, porque no se inspeccionaron. La aplicación no necesita ese acceso: la API y el mantenimiento usan la red privada de Render.
+
+**Cambio de configuración** (2026-11-10, en Render → `fchmn-postgres` → Networking → «PostgreSQL Inbound IP Rules»).
+- **Antes:** la lista **propia** de la base tenía una única regla `0.0.0.0/0`, «everywhere». (La auditoría la describió inicialmente como «sin reglas propias»; era una lectura incompleta: la regla estaba en campos editables.)
+- **Después:** lista propia **vacía**, guardada y comprobada **tras recargar la página**. Render mostró «0 IP ranges are allowed from outside of your private network» y «All internet traffic is blocked by PostgreSQL inbound IP rules». El guardado pidió confirmar en el diálogo «Block All Inbound IPs» («This PostgreSQL will not be reachable over the public internet»).
+- **Reglas heredadas** del workspace y del entorno (`0.0.0.0/0`): **intactas**. El cierre se apoya en la documentación de Render para Postgres: vaciar la lista propia deshabilita el acceso externo, y los servicios de la misma región siguen conectando por la URL interna.
+
+**Evidencia, por separado.**
+- *Confirmación manual del usuario:* el host de `DATABASE_URL` de `fchmn-api` y de `fchmn-mantenimiento` coincide con el de la Internal Database URL de `fchmn-postgres`. **No lo comprobó la sesión de trabajo**: en el panel la variable es un secreto sin metadato de origen.
+- *Configuración observada en Render:* el estado anterior y el guardado final descritos arriba.
+- *HTTP sin credenciales:* `/api/ready` respondió 200 con `database: ok` y `/api/health` 200, antes y después del cambio.
+
+**No se hizo:** reversión, reinicios, despliegues, SQL ni ejecución del cron.
+
+**Límites.**
+- **No se probó una conexión nueva de la API** después del cambio: `/api/ready` puede reutilizar conexiones ya abiertas del pool, así que su 200 no lo demuestra.
+- **No se probó el rechazo externo** con credenciales (y `nc` no sirve como prueba: Render aplica la regla después de abrir la conexión TCP).
+- Una restauración externa autorizada necesita abrir temporalmente la IP del operador (`/32`) y cerrarla al terminar (instructivo de nube, Paso 9).
+- No cambian las credenciales de la base, los permisos del rol de la aplicación sobre la auditoría ni la retención; los demás hallazgos siguen como estaban.
+
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 
 **SEC-01 (listas JSON).** Medido en memoria con Zod 3.25.76 durante la revisión: `.max()` **no** corta el

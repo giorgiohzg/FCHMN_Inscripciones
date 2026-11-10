@@ -346,11 +346,19 @@ direcciones de conexión.
 | | Para qué sirve |
 |---|---|
 | **Internal Database URL** | La que usan los otros servicios de Render en la misma región. **Es la que vamos a usar.** |
-| **External Database URL** | Para conectarse desde fuera de Render. Solo la usarás para restaurar un respaldo (Paso 9). |
+| **External Database URL** | Para conectarse desde fuera de Render. Solo la usarás para restaurar un respaldo (Paso 9). **El acceso externo está normalmente deshabilitado** (ver el recuadro de abajo). |
 
 > **🔑 Las dos contienen la contraseña de la base.** Trátalas como una
 > credencial: no las pegues en un correo, en un chat ni en un archivo del
 > repositorio. En el Paso 6 no vas a copiarla a mano: Render permite enlazarla.
+
+> **🔒 Acceso externo deshabilitado.** En la página de la base → **Networking** →
+> **PostgreSQL Inbound IP Rules**, la lista propia queda **vacía**: Render indica
+> «All internet traffic is blocked by PostgreSQL inbound IP rules». Los servicios
+> de Render de la misma región siguen conectando por la Internal Database URL. La
+> External Database URL solo funciona mientras se autorice temporalmente una IP
+> concreta, como en la restauración real del Paso 9. **No abras `0.0.0.0/0`**
+> como procedimiento habitual.
 
 ---
 
@@ -1486,10 +1494,28 @@ es la que está comprobada de principio a fin.
 
 Solo cuando haga falta recuperar el servicio, y después de haber practicado:
 
+0. **Abre el acceso externo solo para ti, y solo mientras dure.** El acceso
+   externo está normalmente deshabilitado. En la base de destino → **Networking**
+   → **PostgreSQL Inbound IP Rules**:
+   - **Antes de añadir nada, comprueba que la lista propia está vacía.** Si tiene
+     otras reglas, **detente**: revisa su estado y el alcance autorizado antes de
+     continuar. Añadir una regla `/32` junto a `0.0.0.0/0` **no restringe** el
+     acceso. **No borres reglas que no sean tuyas ni toques las heredadas** del
+     workspace o del entorno.
+   - Con la lista vacía, pulsa **Add source** y añade la **IP pública de salida**
+     del equipo o la herramienta que ejecutará `pg_restore`, con máscara **`/32`**
+     (una sola dirección) y una descripción como «restauración temporal», y
+     guarda. **No uses `0.0.0.0/0`.**
 1. Consigue la **External Database URL** de la base de destino.
 2. El mismo comando del punto 2, cambiando el `--dbname` por esa URL y
    **añadiendo `--clean --if-exists`** para que reemplace los objetos existentes.
 3. Comprueba la aplicación antes de dar por buena la restauración (Paso 8).
+4. **Retira la autorización temporal al finalizar la operación, siempre: también
+   si `pg_restore` falla, se interrumpe o se cancela.** En el mismo control, borra
+   la regla `/32` y guarda (Render pide confirmar «Block All Inbound IPs»
+   escribiendo la frase que indica). **Recarga la página** y comprueba el estado
+   guardado: lista propia vacía y «All internet traffic is blocked by PostgreSQL
+   inbound IP rules». Una edición sin guardar no cuenta.
 
 > **🔑 Ese comando lleva la contraseña de la base dentro de la URL.** No lo
 > guardes en un archivo ni lo pegues en ningún chat. Bórralo del historial de la
