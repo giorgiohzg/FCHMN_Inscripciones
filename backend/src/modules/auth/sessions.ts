@@ -53,7 +53,7 @@ export const OPCIONES_TX_SESION = {
 } as const;
 
 /** Por qué terminó una sesión. Se guarda en `revoked_reason`. */
-export type MotivoDeCierre = "logout" | "password_change" | "admin_revocation" | "reuse_detected";
+export type MotivoDeCierre = "logout" | "password_change" | "admin_revocation" | "reuse_detected" | "password_change_attempts";
 
 type Tx = Prisma.TransactionClient;
 

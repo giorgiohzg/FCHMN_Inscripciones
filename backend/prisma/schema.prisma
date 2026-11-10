@@ -194,6 +194,14 @@ model RefreshSession {
   revokedAt         DateTime? @map("revoked_at")
   revokedReason     String?   @map("revoked_reason")
 
+  // C-04: intentos de `/auth/change-password` de ESTA sesión. Las contraseñas
+  // actuales incorrectas se cuentan durante toda su vida (el refresh no cambia
+  // de sesión); la reserva (token y caducidad) admite una sola comprobación con
+  // efectos a la vez. Ver `auth/cambioContrasena.ts`.
+  passwordChangeFailures      Int       @default(0) @map("password_change_failures")
+  passwordChangeReservation   String?   @map("password_change_reservation")
+  passwordChangeReservedUntil DateTime? @map("password_change_reserved_until")
+
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   refreshTokens RefreshToken[]
 

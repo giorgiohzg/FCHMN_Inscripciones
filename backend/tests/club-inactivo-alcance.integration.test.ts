@@ -267,6 +267,7 @@ describe.each<Cambio>(["bloquear", "inhabilitar", "eliminar"])("club no activo: 
 
     const cambiada = await authService.changePassword(
       e.cuentaEntrenador.id,
+      verifyAccessToken(nuevo.accessToken).sid as string,
       { currentPassword: TEST_PASSWORD, newPassword: "OtraClaveSintetica456", confirmPassword: "OtraClaveSintetica456" },
       { ipAddress: "127.0.0.1" }
     );

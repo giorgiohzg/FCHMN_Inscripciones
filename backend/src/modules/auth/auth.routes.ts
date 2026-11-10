@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import * as authService from "./auth.service";
 import { loginSchema, changePasswordSchema } from "./auth.schemas";
 import { requireAuthDuringPasswordChange } from "./rbac.middleware";
-import { ValidationError } from "../../shared/errors";
+import { UnauthorizedError, ValidationError } from "../../shared/errors";
 import { env, type Env } from "../../shared/env";
 import {
   establecerCookieDeSesion,
@@ -134,7 +134,9 @@ export async function authRoutes(app: FastifyInstance, opciones: { config?: Env 
     const parsed = changePasswordSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Datos inválidos", parsed.error.flatten());
 
-    const { refreshToken, ...respuesta } = await authService.changePassword(req.authUser!.sub, parsed.data, {
+    // El `sid` sale de la sesión que `authenticate` verificó, nunca de la solicitud (C-04).
+    if (!req.authSession) throw new UnauthorizedError("La sesión ya no es válida. Vuelva a iniciar sesión.");
+    const { refreshToken, ...respuesta } = await authService.changePassword(req.authUser!.sub, req.authSession.sid, parsed.data, {
       ipAddress: req.ip,
       userAgent: req.headers["user-agent"],
     });

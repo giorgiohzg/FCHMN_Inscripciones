@@ -1,4 +1,4 @@
-import { extractApiErrorMessage } from "./apiError";
+import { extractApiErrorCode, extractApiErrorMessage } from "./apiError";
 import { tokenCsrfActual } from "../modules/auth/csrf";
 
 /**
@@ -123,7 +123,9 @@ export function conectarSesion(p: PuenteDeSesion): void {
 export class ApiError extends Error {
   constructor(
     message: string,
-    readonly status: number
+    readonly status: number,
+    /** Código estructurado del backend, si lo envió (ver `extractApiErrorCode`). Opcional: los usos existentes no lo necesitan. */
+    readonly code?: string
   ) {
     super(message);
     this.name = "ApiError";
@@ -153,7 +155,7 @@ export class SesionCambiadaError extends ApiError {
 async function interpretar<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(extractApiErrorMessage(body, `Error ${res.status}`), res.status);
+    throw new ApiError(extractApiErrorMessage(body, `Error ${res.status}`), res.status, extractApiErrorCode(body));
   }
   if (res.status === 204) return undefined as T;
   return res.json();
@@ -336,7 +338,7 @@ export async function apiFetchArchivo(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(extractApiErrorMessage(body, `Error ${res.status}`), res.status);
+    throw new ApiError(extractApiErrorMessage(body, `Error ${res.status}`), res.status, extractApiErrorCode(body));
   }
 
   const disposition = res.headers.get("Content-Disposition") ?? "";

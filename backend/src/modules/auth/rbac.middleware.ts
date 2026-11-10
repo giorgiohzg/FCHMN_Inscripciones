@@ -16,6 +16,12 @@ declare module "fastify" {
      */
     authUser?: AccessTokenPayload;
     authState?: { mustChangePassword: boolean };
+    /**
+     * Sesión del JWT, ya VERIFICADA por `authenticate` contra la base (`sesionVigente`).
+     * Es la única fuente válida del `sid` para los servicios: nunca se acepta del cuerpo
+     * ni de otra cabecera del cliente.
+     */
+    authSession?: { sid: string };
   }
 }
 
@@ -90,6 +96,7 @@ async function authenticate(req: FastifyRequest): Promise<{ mustChangePassword: 
     permissions: state.permissions,
   };
   req.authState = { mustChangePassword: state.mustChangePassword };
+  req.authSession = { sid: payload.sid };
   return { mustChangePassword: state.mustChangePassword };
 }
 

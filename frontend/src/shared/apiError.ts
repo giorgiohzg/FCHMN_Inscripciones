@@ -7,6 +7,16 @@
  * prácticamente imposible saber qué corregir cuando fallaba una
  * validación con varios campos posibles.
  */
+/**
+ * Código estructurado del error que envía el backend (`{ error: "CODIGO", message, details }`),
+ * o `undefined` si no hay uno con forma de código. Se usa para reconocer errores concretos sin
+ * comparar el texto del mensaje, que puede cambiar.
+ */
+export function extractApiErrorCode(body: unknown): string | undefined {
+  const codigo = (body as { error?: unknown } | null)?.error;
+  return typeof codigo === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(codigo) ? codigo : undefined;
+}
+
 export function extractApiErrorMessage(body: any, fallback: string): string {
   const baseMessage: string = body?.message ?? fallback;
   const details = body?.details;

@@ -31,6 +31,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **AUD-10 y AUD-14** | Fecha de nacimiento en reportes (solo administración; edad para los demás) y RUN de los compañeros de relevo (fuera para el nadador) | **Publicadas y desplegadas en la API, dentro de su alcance.** Ver «Privacidad de reportes y relevos» |
 | **AUD-06 y AUD-09** | Capacidad `byClub` visible al nadador; copias completas en la auditoría | **Se conservan por decisión expresa del usuario; no son mitigaciones.** Retención de la auditoría pendiente. Ver «Privacidad de reportes y relevos» |
 | **C-01** | Acceso externo a la base de producción (`fchmn-postgres` admitía `0.0.0.0/0`) | **Mitigado mediante la configuración de red de Postgres:** lista propia vacía, guardada y comprobada; reglas heredadas intactas. Sin prueba de conexión nueva ni de rechazo externo. Ver «C-01: acceso externo a Postgres» |
+| **C-04** | Contraseña actual incorrecta en `/auth/change-password` sin contar | **Publicada en el repositorio y validada en local, incluida la integración** (base desechable). Pendiente de migración y despliegue en producción. Ver «C-04» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -1879,6 +1880,58 @@ Cuatro hallazgos de privacidad de la auditoría del 2026-11-07. Dos se conservan
 - **No se probó el rechazo externo** con credenciales (y `nc` no sirve como prueba: Render aplica la regla después de abrir la conexión TCP).
 - Una restauración externa autorizada necesita abrir temporalmente la IP del operador (`/32`) y cerrarla al terminar (instructivo de nube, Paso 9).
 - No cambian las credenciales de la base, los permisos del rol de la aplicación sobre la auditoría ni la retención; los demás hallazgos siguen como estaban.
+
+## C-04: intentos de cambio de contraseña por sesión (publicada en el repositorio y validada en local, incluida la integración sobre la base desechable; pendiente de migración y despliegue en producción)
+
+**Hallazgo.** `/auth/change-password` verificaba la contraseña actual sin contar los fallos: con una sesión robada se podían probar contraseñas sin más límite que el de tasa de `/auth/*`.
+
+**Política.**
+- Se cuentan las contraseñas actuales incorrectas de **cada sesión**, durante toda su vida. El refresh rota tokens dentro de la misma sesión y **no reinicia** el contador.
+- En la **quinta** se termina **solo esa sesión** (`revoked_reason = password_change_attempts`). La cuenta, las demás sesiones y los logins futuros **no cambian**: no hay bloqueo de cuenta.
+- Igual para el cambio **obligatorio** y el **voluntario**. La política de contraseñas y el flujo de cambio correcto no cambian.
+
+**Mecanismo** (`backend/src/modules/auth/cambioContrasena.ts`).
+- **`sid` verificado:** `authenticate` guarda en `req.authSession` el `sid` que ya validó contra la base; la ruta lo pasa al servicio. Nunca se acepta del cuerpo ni de otra cabecera.
+- **Reserva por sesión:** antes de calcular Argon2, un `UPDATE` condicional toma la reserva (token y caducidad de 30 s). Sin reserva no se verifica nada, y la respuesta distingue la causa: sesión revocada o vencida → 401; otra solicitud con la reserva vigente → 429.
+- **Argon2 fuera de las transacciones.** La verificación de la contraseña actual y el hash de la nueva se calculan antes de bloquear nada.
+- **Efectos solo con la reserva propia:** con usuario y sesión bloqueados (orden `users → refresh_sessions`) se comprueba que la sesión sigue vigente y del usuario y que el token sigue siendo el dueño de una reserva no vencida. Si no, el resultado es **obsoleto**: no cuenta, no cambia la contraseña, no libera nada y responde 409 tanto si acertó como si no. En el cambio correcto se conservan después las comprobaciones de la cuenta y la comparación del hash.
+- **Quinto fallo atómico:** el incremento, la revocación de la sesión y su auditoría se confirman en **una sola transacción**; si cualquiera falla, no queda ninguno.
+- **Lo que no cuenta:** los errores de validación de la contraseña nueva (se rechazan en la ruta, antes de reservar), los errores de ejecución y los resultados obsoletos. En esos casos se libera la reserva solo si sigue siendo la propia; si el proceso cae, caduca sola.
+- **Auditoría:** `PASSWORD_CHANGE_FAILED` en cada fallo aplicado y `PASSWORD_CHANGE_ATTEMPTS_EXCEEDED` en el quinto, con el número de intentos y sin contraseñas ni tokens.
+- **Interfaz:** los cuatro primeros fallos muestran el error y no expulsan; 429 y 409 muestran su motivo. El quinto se reconoce por el **código estructurado** `PASSWORD_CHANGE_ATTEMPTS_EXCEEDED`, que `ApiError` transporta ahora (campo `code` opcional, compatible con los usos existentes), no por el texto: es un cierre **terminal**, sin renovar ni reintentar el cambio, tanto en el primer envío como en el **único reintento** que sigue a una renovación válida (sin otra renovación ni un tercer envío). Ambos envíos usan la misma función con su ciclo. Se limpia —y se anuncia a las demás pestañas— **solo** la sesión bajo la que salió la petición; si entre tanto empezó otra, la respuesta antigua no la cierra (`SesionCambiadaError`). El login muestra el motivo. El 401 genérico (access token vencido) conserva la renovación y el reintento único de siempre.
+- **Esquema:** `refresh_sessions` suma `password_change_failures` (entero, 0 por omisión), `password_change_reservation` y `password_change_reserved_until`. Migración aditiva `20261110000000_intentos_cambio_contrasena`, sin backfill. No se crearon tablas del limitador del login ni variables nuevas.
+
+**Comprobado en local (sin la base de datos), primera entrega.**
+- `prisma validate` del esquema y una comparación sin conexión (`prisma migrate diff` entre el esquema anterior y el nuevo): genera exactamente las tres columnas de la migración.
+- `npm run typecheck` completo del backend y del frontend, sin errores; ESLint de los archivos tocados, sin errores (los avisos `no-explicit-any` y de React que muestra ya existían).
+- *Frontend, con el cliente de autenticación simulado:* `cambioContrasenaIntentos.test.tsx` (4 pruebas: cuatro fallos sin expulsión y el quinto al login con su motivo, obligatorio y voluntario; 429 y 409 sin expulsión; el aviso se descarta al reintentar), más 17 archivos de autenticación, App, auditoría y cabecera (382 pruebas), en verde.
+- *Backend, unitarias afectadas:* 8 archivos (184 pruebas), en verde.
+
+**Comprobado en local (sin la base de datos), corrección del cierre en la interfaz.**
+- `npm run typecheck` completo del backend y del frontend, sin errores; ESLint de los archivos tocados, sin errores (3 avisos que ya existían: `no-explicit-any` en `apiError.ts`, `set-state-in-effect` en `AuditLogPage.tsx` y `only-export-components` en `AuthContext.tsx`).
+- *Frontend, con el cliente de autenticación simulado:* `cambioContrasenaIntentos.test.tsx` pasa a 8 pruebas: cuatro fallos sin expulsión y el quinto al login, sin reintento ni renovación, obligatorio y voluntario; cierre terminal con la renovación preparada para fallar por red o con 503, sin invocarla; 401 genérico con renovación válida (renueva, reintenta una vez y adopta la sesión); 429 y 409 sin cierre; el aviso se descarta al reintentar; respuesta terminal antigua tras empezar otra sesión, que no la cierra. Más 26 archivos de autenticación, `shared`, App y auditoría (589 pruebas), en verde. *Contraprueba:* sin la rama terminal fallan 6 de las 8; las 2 restantes son las de comportamiento conservado.
+- *Backend:* la prueba concurrente se reescribió para ser **determinista**: una barrera retiene la primera verificación de contraseña; con ella retenida se comprueba que 6 solicitudes competidoras reciben 429 sin calcular Argon2 ni contar, y después se suelta. Reemplaza a la versión anterior, que dependía del orden de ejecución y no admitía el desenlace de una sesión ya revocada. Tipos y lint sin errores; **no se ejecutó** (requiere la base).
+
+**Comprobado en local (sin la base de datos), cierre terminal en el reintento.**
+- `npm run typecheck` del frontend sin errores; ESLint de los archivos tocados sin errores (1 aviso que ya existía: `only-export-components` en `AuthContext.tsx`).
+- *Frontend, con el cliente de autenticación simulado:* `cambioContrasenaIntentos.test.tsx` pasa a 10 pruebas. Las nuevas: 401 genérico, renovación correcta y 401 terminal en el reintento, que lleva al login con el aviso con exactamente dos envíos y una renovación; y el terminal del reintento que llega tras empezar otra sesión, que no la cierra ni deja aviso. *Contraprueba:* con el reintento antiguo fallan esas 2 y pasan las otras 8.
+- *Transporte real del cliente HTTP, con `fetch` simulado* (`apiClient.test.ts`, 3 pruebas nuevas): un 401 JSON de `/auth/change-password` con `PASSWORD_CHANGE_ATTEMPTS_EXCEEDED` llega como `ApiError` con su status, su `code` y su mensaje, en un solo envío y sin renovar ni cerrar; otros códigos se conservan; sin un código válido queda indefinido; las descargas también lo transportan.
+- Pruebas afectadas: 16 archivos de autenticación y `apiClient` (332 pruebas) y `apiClient.test.ts` (46), en verde.
+
+**Integración sobre la base desechable (validación nueva, posterior a las tres anteriores).**
+- *Antecedente:* en las tres entregas anteriores Docker Desktop no arrancaba («Docker Desktop is unable to start»; su motor WSL se detuvo cuando WSL se actualizó, y no se recuperó sin reiniciarlo). No se reparó desde aquí ni se usó otra base; la integración se ejecutó cuando Docker volvió a responder.
+- *Destino verificado antes de migrar:* el contenedor existente `fchmn_inscripciones_test-postgres-test-1` (proyecto `fchmn_inscripciones_test`, servicio `postgres-test` de `docker-compose.test.yml`, solo en `127.0.0.1:55432`, datos en tmpfs, sin montajes, base `natacion_test`) coincide con `.env.test`, y el guard de `testDb.ts` confirmó «base desechable lista: natacion_test en localhost:55432». Se arrancó con `docker start` —el mismo contenedor, sin recrearlo— y se detuvo al terminar, como estaba (`Exited (0)`).
+- *Migraciones:* `prisma migrate deploy` aplicó las 38, incluida `20261110000000_intentos_cambio_contrasena`, sobre esa base.
+- *El archivo nuevo y los cuatro adaptados* (`cambio-contrasena-intentos`, `sesiones`, `sesiones-concurrencia`, `club-inactivo-alcance` y `session-owner-type`): **5 archivos, 131 pruebas, en verde**, con la configuración real de integración (`vitest.integration.config.ts`).
+- *Suite de integración completa* (`npm run test:integration`): **60 archivos, 1242 pruebas, en verde** (unos 41 minutos). Sin cambios de código, de expectativas ni de tiempos a raíz de esta ejecución.
+- Casos que quedaron ejecutados:
+- `backend/tests/cambio-contrasena-intentos.integration.test.ts`: política secuencial (obligatorio y voluntario), refresh sin reinicio, otra sesión intacta, errores de la contraseña nueva sin contar, el `sid` del token frente a un campo del cuerpo, solapamiento determinista con barrera, reserva vencida y tomada por otra solicitud (fallo y acierto obsoletos), caída inyectada entre el incremento y el cierre, y cambio correcto frente a logout, al quinto fallo de otra solicitud, a una segunda solicitud de la misma sesión y a un cambio simultáneo desde otra sesión.
+- Pruebas existentes adaptadas a la firma nueva (el servicio recibe el `sid`): `sesiones`, `sesiones-concurrencia` (en los dos cambios concurrentes, el segundo se rechaza ahora por su sesión terminada y no por la comparación del hash), `club-inactivo-alcance` y `session-owner-type`.
+
+**Límites.**
+- **Publicada en el repositorio; pendiente de migración y despliegue en producción.** La integración se ejecutó solo contra la base desechable local; nada se comprobó en producción. La migración `20261110000000_intentos_cambio_contrasena` (aditiva) debe aplicarse en producción **antes** de desplegar la API.
+- No hay un límite global de verificaciones Argon2 simultáneas; una operación lenta puede seguir calculando tras perder su reserva, aunque ya no produzca efectos.
+- **C-02 sigue pendiente**, incluida la validación de la IP real del cliente.
 
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 

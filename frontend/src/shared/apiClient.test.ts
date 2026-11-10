@@ -82,6 +82,51 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("código estructurado del servidor (C-04)", () => {
+  const CUERPO_TERMINAL = {
+    error: "PASSWORD_CHANGE_ATTEMPTS_EXCEEDED",
+    message: "Demasiados intentos con una contraseña actual incorrecta. Por seguridad se cerró esta sesión: inicie sesión nuevamente.",
+  };
+
+  it("un 401 de /auth/change-password con su código llega como ApiError con status y code, sin renovar ni cerrar", async () => {
+    fetchSpy.mockResolvedValue(respuesta(401, CUERPO_TERMINAL));
+    const { apiChangePassword } = await import("../modules/auth/authApi");
+
+    const error = await apiChangePassword({ currentPassword: "x", newPassword: "NuevaClave456", confirmPassword: "NuevaClave456" }).catch((e) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.status).toBe(401);
+    expect(error.code).toBe("PASSWORD_CHANGE_ATTEMPTS_EXCEEDED");
+    expect(error.message).toBe(CUERPO_TERMINAL.message);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0]![0]).toBe(`${API_BASE}/auth/change-password`);
+    expect(renovar).not.toHaveBeenCalled();
+    expect(cerrar).not.toHaveBeenCalled();
+  });
+
+  it("los demás errores conservan su código, y sin uno válido queda indefinido", async () => {
+    fetchSpy.mockResolvedValueOnce(respuesta(409, { error: "CONFLICT", message: "Conflicto" }));
+    await expect(apiFetch("/clubs", { method: "POST" })).rejects.toMatchObject({ status: 409, code: "CONFLICT" });
+
+    fetchSpy.mockResolvedValueOnce(respuesta(400, { message: "Sin código" }));
+    const sinCodigo = (await apiFetch("/clubs", { method: "POST" }).catch((e: unknown) => e)) as ApiError;
+    expect(sinCodigo).toBeInstanceOf(ApiError);
+    expect(sinCodigo.code).toBeUndefined();
+
+    for (const raro of ["en minúsculas", 42, { anidado: true }]) {
+      fetchSpy.mockResolvedValueOnce(respuesta(400, { error: raro, message: "Código no válido" }));
+      const error = (await apiFetch("/clubs", { method: "POST" }).catch((e: unknown) => e)) as ApiError;
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error.code).toBeUndefined();
+    }
+  });
+
+  it("las descargas también transportan el código", async () => {
+    fetchSpy.mockResolvedValue(respuesta(403, { error: "FORBIDDEN", message: "Sin permiso" }));
+    await expect(apiFetchArchivo("/reports/export", "informe.csv")).rejects.toMatchObject({ status: 403, code: "FORBIDDEN" });
+  });
+});
+
 describe("forma de la petición", () => {
   it("antepone la URL base y adjunta el token vigente", async () => {
     fetchSpy.mockResolvedValue(respuesta(200, { ok: true }));

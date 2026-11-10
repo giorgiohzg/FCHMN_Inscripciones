@@ -16,8 +16,9 @@ import {
   vencimientoDeRefresh,
   type UsuarioBloqueado,
 } from "./sessions";
-import { ConflictError, UnauthorizedError, ValidationError, type AppError } from "../../shared/errors";
+import { ConflictError, UnauthorizedError, type AppError } from "../../shared/errors";
 import type { LoginInput, ChangePasswordInput } from "./auth.schemas";
+import { aplicarFallo, estadoDeReserva, liberarReserva, reservarCambio, resultadoObsoleto, MENSAJE_SESION_NO_VALIDA } from "./cambioContrasena";
 
 interface RequestContext {
   ipAddress?: string;
@@ -615,12 +616,38 @@ export async function logout(refreshTokenPlain: string, ctx: RequestContext = {}
  * anteriores y emite una sola sesión válida para quien acaba de cambiarla —
  * las sesiones abiertas en otros dispositivos sí se cierran, que es el
  * comportamiento buscado.
+ *
+ * C-04: `sessionId` es la sesión que `authenticate` verificó para esta solicitud. Antes de
+ * calcular Argon2 se toma su RESERVA (`cambioContrasena.ts`); un fallo y un cambio correcto
+ * solo producen efectos si, con usuario y sesión bloqueados, esa reserva sigue siendo la suya.
+ * Si no se aplicó nada —error de ejecución o resultado descartado—, la reserva se libera.
  */
-export async function changePassword(userId: string, input: ChangePasswordInput, ctx: RequestContext) {
+export async function changePassword(userId: string, sessionId: string, input: ChangePasswordInput, ctx: RequestContext) {
+  const reserva = await reservarCambio(sessionId, userId);
+  try {
+    return await cambiarConReserva(userId, reserva, input, ctx);
+  } finally {
+    // Inofensivo si el efecto ya se aplicó (el fallo la libera y el cambio termina la
+    // sesión) o si la reserva ya no es de este token.
+    await liberarReserva(reserva).catch(() => undefined);
+  }
+}
+
+/**
+ * El cambio con una reserva YA tomada. Se exporta solo para que las pruebas puedan
+ * presentar una reserva vencida o ajena; la ruta usa siempre `changePassword`.
+ */
+export async function cambiarConReserva(
+  userId: string,
+  reserva: Awaited<ReturnType<typeof reservarCambio>>,
+  input: ChangePasswordInput,
+  ctx: RequestContext
+) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
+  // Argon2 FUERA de toda transacción.
   const valid = await verifyPassword(user.passwordHash, input.currentPassword);
-  if (!valid) throw new ValidationError("La contraseña actual es incorrecta");
+  if (!valid) throw await aplicarFallo(reserva, ctx);
 
   const newHash = await hashPassword(input.newPassword);
 
@@ -643,6 +670,12 @@ export async function changePassword(userId: string, input: ChangePasswordInput,
    */
   const { sessionId, refreshToken } = await prisma.$transaction(async (tx) => {
     const cuenta = await bloquearUsuario(tx, userId);
+
+    // La reserva primero: una sesión terminada o una reserva perdida no deben revelar,
+    // con otra respuesta, que la contraseña actual era la correcta.
+    const estado = await estadoDeReserva(tx, reserva);
+    if (estado.tipo === "sesion_invalida") throw new UnauthorizedError(MENSAJE_SESION_NO_VALIDA);
+    if (estado.tipo === "obsoleta") throw resultadoObsoleto();
 
     if (!cuenta || cuenta.passwordHash !== user.passwordHash) {
       throw new ConflictError("La contraseña cambió mientras se procesaba la solicitud. Vuelva a intentarlo.");

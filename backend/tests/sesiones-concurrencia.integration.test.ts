@@ -27,7 +27,7 @@ import * as personsService from "../src/modules/persons/persons.service";
 import * as clubsService from "../src/modules/clubs/clubs.service";
 import { hashPassword, verifyPassword } from "../src/modules/auth/password.util";
 import { sesionVigente } from "../src/modules/auth/sessions";
-import { ConflictError, UnauthorizedError } from "../src/shared/errors";
+import { UnauthorizedError } from "../src/shared/errors";
 
 const INCORRECTA = "ClaveIncorrecta1";
 
@@ -175,7 +175,7 @@ describe("refresh contra cambio de contraseña", () => {
     const retencion = await retener(usuario.id);
     const refresco = desenlace(authService.refresh(inicio.refreshToken, {}));
     await enCola(1);
-    const cambiar = desenlace(authService.changePassword(usuario.id, cambio, {}));
+    const cambiar = desenlace(authService.changePassword(usuario.id, sidDe(inicio.accessToken), cambio, {}));
     await enCola(2);
     await retencion.query("COMMIT");
 
@@ -195,7 +195,7 @@ describe("refresh contra cambio de contraseña", () => {
     const inicio = await entrar("c_antes_r");
 
     const retencion = await retener(usuario.id);
-    const cambiar = desenlace(authService.changePassword(usuario.id, cambio, {}));
+    const cambiar = desenlace(authService.changePassword(usuario.id, sidDe(inicio.accessToken), cambio, {}));
     await enCola(1);
     const refresco = desenlace(authService.refresh(inicio.refreshToken, {}));
     await enCola(2);
@@ -394,11 +394,13 @@ describe("login con la cuenta cambiando bajo sus pies", () => {
   it("login antes del cambio de contraseña: su sesión queda revocada por el cambio", async () => {
     const usuario = await createUser({ username: "login_tras_c", roleNames: ["swimmer"] });
     const cambio = { currentPassword: TEST_PASSWORD, newPassword: "ClaveNuevaDos2", confirmPassword: "ClaveNuevaDos2" };
+    // C-04: el cambio sale de una sesión verificada.
+    const propia = await entrar("login_tras_c");
 
     const retencion = await retener(usuario.id);
     const login = desenlace(entrar("login_tras_c"));
     await enCola(1);
-    const cambiar = desenlace(authService.changePassword(usuario.id, cambio, {}));
+    const cambiar = desenlace(authService.changePassword(usuario.id, sidDe(propia.accessToken), cambio, {}));
     await enCola(2);
     await retencion.query("COMMIT");
 
@@ -414,9 +416,11 @@ describe("login con la cuenta cambiando bajo sus pies", () => {
   it("cambio de contraseña antes del login: el login con la credencial anterior falla", async () => {
     const usuario = await createUser({ username: "c_antes_login", roleNames: ["swimmer"] });
     const cambio = { currentPassword: TEST_PASSWORD, newPassword: "ClaveNuevaTres3", confirmPassword: "ClaveNuevaTres3" };
+    // C-04: el cambio sale de una sesión verificada.
+    const propia = await entrar("c_antes_login");
 
     const retencion = await retener(usuario.id);
-    const cambiar = desenlace(authService.changePassword(usuario.id, cambio, {}));
+    const cambiar = desenlace(authService.changePassword(usuario.id, sidDe(propia.accessToken), cambio, {}));
     await enCola(1);
     const login = desenlace(entrar("c_antes_login"));
     await enCola(2);
@@ -435,10 +439,13 @@ describe("cambios de contraseña concurrentes", () => {
     const primera = { currentPassword: TEST_PASSWORD, newPassword: "ClavePrimera11", confirmPassword: "ClavePrimera11" };
     const segunda = { currentPassword: TEST_PASSWORD, newPassword: "ClaveSegunda22", confirmPassword: "ClaveSegunda22" };
 
+    // C-04: cada cambio sale de su propia sesión (una sesión admite una reserva a la vez).
+    const otra = await entrar("dos_cambios");
+
     const retencion = await retener(usuario.id);
-    const a = desenlace(authService.changePassword(usuario.id, primera, {}));
+    const a = desenlace(authService.changePassword(usuario.id, sidDe(inicio.accessToken), primera, {}));
     await enCola(1);
-    const b = desenlace(authService.changePassword(usuario.id, segunda, {}));
+    const b = desenlace(authService.changePassword(usuario.id, sidDe(otra.accessToken), segunda, {}));
     await enCola(2);
     await retencion.query("COMMIT");
 
@@ -446,7 +453,9 @@ describe("cambios de contraseña concurrentes", () => {
     const rb = await b;
     expect(ra.ok).toBe(true);
     expect(rb.ok).toBe(false);
-    if (!rb.ok) expect(rb.error).toBeInstanceOf(ConflictError);
+    // El primero terminó todas las sesiones, incluida la del segundo: este se rechaza por
+    // su sesión antes de comparar el hash, sin revelar si su contraseña actual era la correcta.
+    if (!rb.ok) expect(rb.error).toBeInstanceOf(UnauthorizedError);
 
     const final = await cuenta(usuario.id);
     expect(await verifyPassword(final.passwordHash, "ClavePrimera11"), "vale la del primero").toBe(true);

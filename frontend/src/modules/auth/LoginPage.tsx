@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
+import { descartarAvisoDeAcceso, leerAvisoDeAcceso } from "./avisoDeAcceso";
 import { AvisosTerceros } from "../../shared/AvisosTerceros";
 import logo from "../../assets/logo-fchmn.png";
 
@@ -11,10 +12,14 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Motivo por el que el servidor terminó la sesión anterior (C-04), si lo hubo.
+  const [aviso, setAviso] = useState<string | null>(() => leerAvisoDeAcceso());
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    descartarAvisoDeAcceso();
+    setAviso(null);
     setLoading(true);
     try {
       // Se navega con el valor que devuelve `login`, no con el del contexto:
@@ -57,6 +62,12 @@ export function LoginPage() {
             required
             autoComplete="current-password"
           />
+
+          {aviso && !error && (
+            <p role="status" className="error-message">
+              {aviso}
+            </p>
+          )}
 
           {error && (
             <p role="alert" className="error-message">

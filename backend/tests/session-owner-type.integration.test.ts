@@ -98,9 +98,11 @@ describe("el tipo de dueño sobrevive a la rotación de la sesión", () => {
 
   it("changePassword emite una sesión nueva con el mismo tipo de dueño", async () => {
     const usuario = await createUser({ username: "admin_sesion", roleNames: ["admin"], mustChangePassword: true });
+    const sesion = await authService.login({ username: "admin_sesion", password: TEST_PASSWORD }, CTX);
 
     const resultado = await authService.changePassword(
       usuario.id,
+      verifyAccessToken(sesion.accessToken).sid as string,
       { currentPassword: TEST_PASSWORD, newPassword: "OtraClaveValida456", confirmPassword: "OtraClaveValida456" },
       CTX
     );
@@ -113,9 +115,11 @@ describe("el tipo de dueño sobrevive a la rotación de la sesión", () => {
     const persona = await createPerson({ run: "10000002", username: "coach1", firstName: "Carla", gender: "female", roles: ["coach"] });
     await prisma.clubStaff.create({ data: { clubId: club.id, personId: persona.id, roleType: "coach" } });
     const usuario = await createUser({ username: "coach1", roleNames: ["coach"], personId: persona.id, mustChangePassword: true });
+    const sesion = await authService.login({ username: "coach1", password: TEST_PASSWORD }, CTX);
 
     const resultado = await authService.changePassword(
       usuario.id,
+      verifyAccessToken(sesion.accessToken).sid as string,
       { currentPassword: TEST_PASSWORD, newPassword: "OtraClaveValida456", confirmPassword: "OtraClaveValida456" },
       CTX
     );

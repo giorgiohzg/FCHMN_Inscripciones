@@ -18,6 +18,7 @@ import {
 import {
   conectarSesion,
   ApiError,
+  SesionCambiadaError,
   esMismaSesion,
   type IdentidadDeSesion,
   type RenovacionParaElCliente,
@@ -25,6 +26,7 @@ import {
 import { apiChangePassword } from "./authApi";
 import { asegurarTokenCsrf, renovarTokenCsrf, recordarTokenCsrf, olvidarTokenCsrf } from "./csrf";
 import { validarPerfil, validarRespuestaDeSesion, type PerfilDeSesion } from "./sessionSchema";
+import { dejarAvisoDeAcceso } from "./avisoDeAcceso";
 
 interface AuthState {
   accessToken: string | null;
@@ -124,6 +126,16 @@ function guardarPerfil(user: PerfilDeSesion | null): void {
  * que el wifi parpadeaba o el servidor se reiniciaba, perdiendo lo que
  * estuviera haciendo. La cookie sigue ahí y el siguiente intento funcionará.
  */
+/**
+ * C-04: el servidor terminó la sesión por demasiados intentos con la contraseña actual.
+ * Es TERMINAL: renovar no puede devolverla, y reintentar el cambio no tiene sentido. Se
+ * reconoce por el código estructurado, no por el texto.
+ */
+const CODIGO_INTENTOS_AGOTADOS = "PASSWORD_CHANGE_ATTEMPTS_EXCEEDED";
+function esCierreTerminalDelCambio(err: unknown): err is ApiError {
+  return err instanceof ApiError && err.status === 401 && err.code === CODIGO_INTENTOS_AGOTADOS;
+}
+
 function esSesionInvalida(err: unknown): boolean {
   /**
    * SOLO el 401.
@@ -428,11 +440,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
          * SIN volver a pedir el cerrojo y se reintenta una sola vez. El
          * contador es explícito, no hay recursión y la operación termina sí o sí.
          */
+        /**
+         * Un envío del cambio y su cierre TERMINAL (C-04). Lo usan el primer envío y el
+         * reintento tras una renovación válida, cada uno con el ciclo bajo el que sale.
+         *
+         * Ante `PASSWORD_CHANGE_ATTEMPTS_EXCEEDED` no hay renovación ni otro envío: se
+         * limpia la sesión —y se anuncia a las demás pestañas, que comparten la misma— solo
+         * si sigue siendo la de ese envío; si entre tanto empezó otra, la respuesta es de la
+         * anterior y no se le imputa a la actual. Se sostiene el cerrojo, así que comprobar y
+         * limpiar van seguidos, sin punto de suspensión entre medias.
+         */
+        const enviarCambio = async (cicloDelEnvio: string) => {
+          try {
+            return await apiChangePassword(payload);
+          } catch (err) {
+            if (esCierreTerminalDelCambio(err)) {
+              if (!cicloSigueVigente(cicloDelEnvio)) throw new SesionCambiadaError();
+              limpiarSesion();
+              dejarAvisoDeAcceso(err.message);
+            }
+            throw err;
+          }
+        };
+
         let respuesta: Awaited<ReturnType<typeof apiChangePassword>>;
         try {
-          respuesta = await apiChangePassword(payload);
+          respuesta = await enviarCambio(cicloActual());
         } catch (err) {
-          if (!esSesionInvalida(err)) throw err;
+          // El cierre terminal ya se resolvió en `enviarCambio`: nunca lleva a renovar.
+          if (esCierreTerminalDelCambio(err) || !esSesionInvalida(err)) throw err;
 
           const renovada = await renovarDentroDelCerrojo(dependenciasDeRenovacion());
 
@@ -463,7 +499,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           if (renovada.tipo === "descartada") throw err;
 
-          respuesta = await apiChangePassword(payload);
+          // Único reintento. Su error terminal se trata igual, con el ciclo vigente al
+          // reenviar; cualquier otro error se propaga sin una tercera petición.
+          respuesta = await enviarCambio(cicloActual());
         }
 
         const sesion = validarRespuestaDeSesion(respuesta);

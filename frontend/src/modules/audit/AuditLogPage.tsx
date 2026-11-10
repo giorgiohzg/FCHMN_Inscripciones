@@ -6,6 +6,8 @@ import { useSort, sortItems, SortableTh } from "../../shared/sortableTable";
 const ACTION_BADGE: Record<string, string> = {
   LOGIN_FAILED: "badge-locked",
   USER_LOCKED: "badge-disabled",
+  PASSWORD_CHANGE_FAILED: "badge-locked",
+  PASSWORD_CHANGE_ATTEMPTS_EXCEEDED: "badge-disabled",
   REFRESH_TOKEN_REUSE_DETECTED: "badge-disabled",
 };
 

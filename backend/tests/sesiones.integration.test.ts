@@ -185,7 +185,7 @@ describe("cambio de contraseña", () => {
     const esta = await entrar("cambia");
     const otroEquipo = await entrar("cambia");
 
-    const nueva = await authService.changePassword(usuario.id, cambio, {});
+    const nueva = await authService.changePassword(usuario.id, sidDe(esta.accessToken), cambio, {});
 
     expect(await estadoDelJwt(esta.accessToken)).toBe(401);
     expect(await estadoDelJwt(otroEquipo.accessToken)).toBe(401);
@@ -196,9 +196,9 @@ describe("cambio de contraseña", () => {
 
   it("la cookie de otro dispositivo no cierra la sesión creada por el cambio", async () => {
     const usuario = await createUser({ username: "cookie_vieja", roleNames: ["swimmer"] });
-    await entrar("cookie_vieja");
+    const propia = await entrar("cookie_vieja");
     const otroEquipo = await entrar("cookie_vieja");
-    const nueva = await authService.changePassword(usuario.id, cambio, {});
+    const nueva = await authService.changePassword(usuario.id, sidDe(propia.accessToken), cambio, {});
 
     await expect(authService.refresh(otroEquipo.refreshToken, {})).rejects.toBeInstanceOf(UnauthorizedError);
 
@@ -475,8 +475,9 @@ describe("corte: JWT sin `sid` y tokens sin sesión", () => {
   it("las revocaciones de alcance usuario alcanzan también a los tokens históricos", async () => {
     const usuario = await createUser({ username: "historico_cambio", roleNames: ["swimmer"] });
     await tokenHistorico(usuario.id);
+    const propia = await entrar("historico_cambio");
 
-    await authService.changePassword(usuario.id, { currentPassword: TEST_PASSWORD, newPassword: NUEVA_CLAVE, confirmPassword: NUEVA_CLAVE }, {});
+    await authService.changePassword(usuario.id, sidDe(propia.accessToken), { currentPassword: TEST_PASSWORD, newPassword: NUEVA_CLAVE, confirmPassword: NUEVA_CLAVE }, {});
 
     expect(await prisma.refreshToken.count({ where: { userId: usuario.id, sessionId: null, revokedAt: null } })).toBe(0);
   });
