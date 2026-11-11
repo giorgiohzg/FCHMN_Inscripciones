@@ -546,9 +546,13 @@ sesión no viaja.
 - `IP_CLIENTE_FUENTE` decide de dónde sale la IP del cliente (`backend/src/shared/ipCliente.ts`):
   `socket` (valor por defecto, local y pruebas) usa el par TCP e ignora `X-Forwarded-For`,
   `X-Real-IP` y `CF-Connecting-IP`; `cf-connecting-ip` (Render) usa esa cabecera validada y
-  normalizada, con respaldo al socket. Reemplaza a `TRUST_PROXY_HOPS`. **Publicado en el repositorio
-  y validado localmente; pendiente de despliegue** (producción sigue con `TRUST_PROXY_HOPS=2`). Frontera
-  de confianza y límites en `docs/seguridad/PLAN_SEGURIDAD.md` («IP del cliente»).
+  normalizada, con respaldo al socket. Reemplaza a `TRUST_PROXY_HOPS`. **Desplegado en producción
+  (API y web) desde `7860b1d377abd998f48ec938e73dfc28f62176ba`** (2026-11-11), con
+  `IP_CLIENTE_FUENTE=cf-connecting-ip`; el mantenimiento sigue en `2c3552e`, sin construir ni
+  ejecutar. `TRUST_PROXY_HOPS=2` permanece configurada en la API, pero el código nuevo la ignora
+  (no se ha retirado). La identificación de IP tiene una **validación acotada en producción**
+  (un equipo y una red), no una garantía general. Evidencia, frontera de confianza y límites en
+  `docs/seguridad/PLAN_SEGURIDAD.md` («IP del cliente»); C-02 sigue pendiente.
 
 ## Endpoints del Módulo 2 — Personas
 

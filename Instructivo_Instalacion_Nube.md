@@ -532,10 +532,14 @@ direcciones de conexión.
    > cualquier servicio nuevo** al workspace en esa región, hay que reevaluar esta
    > decisión.
    >
-   > **Estado (2026-11-11):** **publicado en el repositorio y validado
-   > localmente; pendiente de despliegue.** Producción sigue con el mecanismo anterior,
-   > `TRUST_PROXY_HOPS=2`, que en Render atribuía las peticiones a un nodo del
-   > borde y no al cliente. Detalle y límites en
+   > **Estado (2026-11-11):** **desplegado en producción (API y web) desde
+   > `7860b1d377abd998f48ec938e73dfc28f62176ba`**, con `IP_CLIENTE_FUENTE=cf-connecting-ip`
+   > en la API. El mecanismo anterior, `TRUST_PROXY_HOPS=2`, atribuía las peticiones a
+   > un nodo del borde y no al cliente; en esa instalación **sigue configurada, pero el
+   > código nuevo la ignora** y no se ha retirado. Una instalación nueva no necesita
+   > definirla. En las comprobaciones hechas la IP auditada coincidió con la que
+   > Cloudflare ve para el dominio (`/cdn-cgi/trace`), desde un equipo y una red: es una
+   > validación acotada, no una garantía general. Detalle, evidencia y límites en
    > `docs/seguridad/PLAN_SEGURIDAD.md` («IP del cliente»).
    >
    > *Mecanismo anterior, retirado: contaba saltos de `X-Forwarded-For`
@@ -1844,7 +1848,8 @@ desechable** creada y destruida para la prueba (nunca contra datos reales):
 ### El proxy de mismo origen: pruebas HTTP
 
 Con el entorno completo levantado en local (PostgreSQL desechable, la API en
-modo producción con `TRUST_PROXY_HOPS=2` y `AUTH_COOKIE_SAMESITE=lax`, y la web
+modo producción con `TRUST_PROXY_HOPS=2` (mecanismo anterior, hoy sin efecto: antecedente de aquella
+comprobación) y `AUTH_COOKIE_SAMESITE=lax`, y la web
 construida con `VITE_API_URL=/api`), **con una herramienta de línea de
 comandos**:
 

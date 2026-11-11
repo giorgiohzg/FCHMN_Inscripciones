@@ -32,7 +32,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **AUD-06 y AUD-09** | Capacidad `byClub` visible al nadador; copias completas en la auditoría | **Se conservan por decisión expresa del usuario; no son mitigaciones.** Retención de la auditoría pendiente. Ver «Privacidad de reportes y relevos» |
 | **C-01** | Acceso externo a la base de producción (`fchmn-postgres` admitía `0.0.0.0/0`) | **Mitigado mediante la configuración de red de Postgres:** lista propia vacía, guardada y comprobada; reglas heredadas intactas. Sin prueba de conexión nueva ni de rechazo externo. Ver «C-01: acceso externo a Postgres» |
 | **C-04** | Contraseña actual incorrecta en `/auth/change-password` sin contar | **Cerrada dentro de su alcance:** migración aplicada y web y API desplegadas en producción desde `2c3552e`; validada en local (incluida la integración sobre la base desechable) y en la CI; **sin prueba autenticada del límite en producción**. Ver «C-04» |
-| **IP del cliente** | `req.ip` atribuía las peticiones a un nodo del borde de Render, no al cliente | **Publicada en el repositorio y validada localmente; pendiente de despliegue.** `CF-Connecting-IP` validada y normalizada en la API, con respaldo al socket; frontera de confianza del workspace aceptada para los servicios propios actuales. Ver «IP del cliente» |
+| **IP del cliente** | `req.ip` atribuía las peticiones a un nodo del borde de Render, no al cliente | **Desplegada en la API y la web desde `7860b1d`** (2026-11-11; Live, Auto-Deploy Off; mantenimiento sigue en `2c3552e`) y validada en local y en la CI. `CF-Connecting-IP` validada y normalizada en la API, con respaldo al socket; frontera de confianza del workspace aceptada para los servicios propios actuales. **Validación acotada en producción** (un equipo y una red), sin garantía general; `TRUST_PROXY_HOPS=2` sigue configurada pero el código nuevo la ignora. Ver «IP del cliente» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -1953,9 +1953,9 @@ Cuatro hallazgos de privacidad de la auditoría del 2026-11-07. Dos se conservan
 - No hay un límite global de verificaciones Argon2 simultáneas; una operación lenta puede seguir calculando tras perder su reserva, aunque ya no produzca efectos.
 - **C-02 sigue pendiente**, incluida la validación de la IP real del cliente.
 
-## IP del cliente: `CF-Connecting-IP` con respaldo al socket (publicada en el repositorio y validada localmente; pendiente de despliegue)
+## IP del cliente: `CF-Connecting-IP` con respaldo al socket (desplegada en la API y la web desde `7860b1d`; validación acotada en producción)
 
-**Hallazgo.** En producción (2026-11-10, dos `GET /api/health` sin credenciales por la web, una normal y otra con un `X-Forwarded-For` sintético), `req.ip` correspondía a un nodo del borde de Render y no a la salida esperada del operador, y la cabecera sintética no alteró el resultado. Con `TRUST_PROXY_HOPS=2`, la auditoría y los límites por IP atribuían las peticiones a nodos del borde. Las direcciones no se publicaron: se compararon dentro de la página mediante etiquetas PBKDF2 con sal (eso no es anonimato: con la sal, la dirección se podría recuperar por fuerza bruta).
+**Hallazgo (antecedente del mecanismo anterior, `TRUST_PROXY_HOPS`).** En producción (2026-11-10, dos `GET /api/health` sin credenciales por la web, una normal y otra con un `X-Forwarded-For` sintético), `req.ip` correspondía a un nodo del borde de Render y no a la salida esperada del operador, y la cabecera sintética no alteró el resultado. Con `TRUST_PROXY_HOPS=2`, la auditoría y los límites por IP atribuían las peticiones a nodos del borde. Las direcciones no se publicaron: se compararon dentro de la página mediante etiquetas PBKDF2 con sal (eso no es anonimato: con la sal, la dirección se podría recuperar por fuerza bruta).
 
 **Fuente elegida.** El artículo de Render «How can I access a visitor's IP address?» recomienda la cabecera `cf-connecting-ip`, que «contendrá la IP del cliente que hizo la solicitud», y dice que `X-Forwarded-For` no es exacta detrás de su red. La respuesta de soporte de Render, transmitida por el usuario, distingue las conexiones privadas, que no están verificadas por Cloudflare.
 
@@ -1986,30 +1986,54 @@ Cuatro hallazgos de privacidad de la auditoría del 2026-11-07. Dos se conservan
 - **Typecheck y lint del backend:** sin errores; los avisos son preexistentes.
 
 **Límites.**
-- **Publicada en el repositorio y validada localmente; pendiente de despliegue:** producción sigue con `TRUST_PROXY_HOPS=2` y atribuye las peticiones al borde.
-- La documentación de Cloudflare no dice si sobrescribe un `CF-Connecting-IP` enviado por el cliente: hay que comprobarlo en producción.
+- **Desplegada en la API y la web** (ver «Despliegue en producción»). `TRUST_PROXY_HOPS=2` permanece configurada en la API, pero el código nuevo la ignora; **no se ha retirado** y se retirará con otra autorización.
+- **La validación en producción es acotada:** comprobaciones desde **un equipo y una red**, con una muestra única por comprobación. No es una garantía general de que la IP atribuida sea la del cliente en otras redes, protocolos o recorridos.
+- La documentación de Cloudflare no dice si sobrescribe un `CF-Connecting-IP` enviado por el cliente. La única petición sintética hecha en producción recibió **403** y no se repitió. **Ese 403 no garantiza protección general contra la suplantación ni identifica por sí solo la capa que rechazó la petición.** No se encontró el marcador de esa petición en los registros consultados (de Nginx y de la API), lo que no demuestra por sí solo que nunca llegara. La suplantación por el camino público **sigue sin evaluarse**.
+- La IP auditada coincidió con el trace del mismo dominio y **difirió del eco externo**; la causa de esa diferencia **sigue desconocida** (ver «Despliegue en producción»).
 - El respaldo es un origen compartido, que C-02 deberá tratar como tal. El agrupamiento IPv6 por `/64` también queda para C-02.
-- La prueba de Nginx usó la imagen local existente con la plantilla montada, no una imagen nueva. El cambio del Dockerfile es solo un comentario.
+- La prueba de Nginx de la validación previa a la publicación usó la imagen local existente con la plantilla montada, no una imagen nueva. El cambio del Dockerfile es solo un comentario. Las imágenes locales construidas después se registran en «Despliegue en producción».
 - `X-Forwarded-Proto` sigue pasando por el `map` existente de Nginx; ese comportamiento no cambia en esta entrega.
 - **C-02 sigue pendiente**; el limitador del login no cambió.
 
-**Verificación futura en producción** (requiere autorización; no ejecutada). Tras desplegar:
-1. Dos `GET /api/health` por la web: uno normal y otro con `CF-Connecting-IP` y `X-Forwarded-For` sintéticos.
-2. En el registro de la API, las dos líneas deben tener `origenIp` = `cf-connecting-ip` y la misma dirección, distinta de la sintética.
-3. Esa dirección debe **coincidir con la salida del operador obtenida por un medio independiente** del sistema. La comparación se hace sin publicar las IP reales.
-4. Después, un recuento de `respaldo` durante un período, solo con números.
+**Despliegue en producción (2026-11-11).** Orden: respaldo, variable de la API, API y web. Evidencia separada por tipo.
 
-**Despliegue posterior** (sin autorizar):
-1. `IP_CLIENTE_FUENTE=cf-connecting-ip` en la API con «Save only».
-2. API primero. Comprobado en local (simulado, 2026-11-11) con la imagen local de la web, cuya plantilla es idéntica a la de `2c3552e` (la desplegada), sin modificarla, y con el módulo nuevo como destino:
-   - una `CF-Connecting-IP` válida se acepta;
-   - si falta, se usa el respaldo (`ausente`);
-   - dos líneas, iguales o distintas, o una lista, se reenvían tal cual y dan respaldo (`repetida`);
-   - la cadena `X-Forwarded-For` y la `X-Real-IP` que esa plantilla sigue enviando no deciden la IP.
-3. Luego la web.
-4. `TRUST_PROXY_HOPS=2` se conserva en Render hasta estabilizar.
-5. **Reversión:** `IP_CLIENTE_FUENTE=socket`, o volver al despliegue anterior.
-6. **Correspondencia local**, con el mismo SHA y la configuración propia de local (`socket`).
+*Referencias.*
+- **Código:** `7860b1d377abd998f48ec938e73dfc28f62176ba`; CI `43036995896`, éxito (una única ejecución para ese SHA). Sin migraciones, dependencias ni imágenes base nuevas.
+- **Mantenimiento:** permanece en `2c3552e`, **sin construir ni ejecutar**.
+- **Autorización:** API primero, web después, y la correspondencia local.
+
+**1. Render: commit, estado y operaciones.**
+- **Respaldo:** exportación de `fchmn-postgres` creada el 2026-11-11 (12:05 hora de Render, UTC-3) y con su archivo disponible hacia las 12:11. No se descargó ni se abrió su enlace.
+- **Configuración no secreta modificada:** se añadió `IP_CLIENTE_FUENTE=cf-connecting-ip` en la API con «Save only» (no desplegó nada). `TRUST_PROXY_HOPS=2` se conservó.
+- **API:** `2c3552e` → `7860b1d`, despliegue manual `dep-dbq8dmu7bikc73d9and0` ([despliegue](https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80/deploys/dep-dbq8dmu7bikc73d9and0)), iniciado a las 15:16:43Z con el SHA completo seleccionado: Render informó «Deploy succeeded» y Live en 37 s, con origen `7860b1d`.
+- **Web:** `2c3552e` → `7860b1d`, despliegue manual `dep-dbq93el6e07s73ff8cag` ([despliegue](https://dashboard.render.com/web/srv-dbh48scs728c73arlf8g/deploys/dep-dbq93el6e07s73ff8cag)), iniciado a las 16:03:06Z con el SHA completo seleccionado: «Deploy succeeded» y Live en 39,5 s, con origen `7860b1d`.
+- **Auto-Deploy Off** en web, API y mantenimiento, leído de su control exacto antes del despliegue de la web (y el de la web, también después).
+- **Línea de arranque de la API** (15:17:18Z): `fuenteIpCliente = cf-connecting-ip`.
+
+**2. HTTP: disponibilidad y cabeceras.**
+- **Por la web nueva** (sin credenciales): `/login`, `/api/health` y `/api/ready` con 200 y `/api/auth/me` con 401, todas con `Cache-Control: no-store` y la cabecera CSP; `/login` conserva `connect-src 'self'`.
+- **Muestreo durante la transición de la API:** 24 muestras de `GET /api/health` por la web (aún en `2c3552e`) entre las 15:15:31Z y las 15:19:21Z, una cada 10 s: **todas con 200**, con latencias de 249 a 1241 ms (la máxima, en la primera muestra, antes de desplegar). El `uptime` pasó de 72497 s (15:17:21Z) a 16 s (15:17:31Z): cambio de instancia. **Los intervalos entre muestras no fueron observados**: el muestreo acredita disponibilidad en los instantes muestreados, no la ausencia de cortes.
+
+**3. Diagnóstico de la IP** (comparaciones internas; ninguna dirección se publicó).
+- **Con la web anterior** (tras desplegar la API): una petición normal dio 200, `origenIp = cf-connecting-ip` y una dirección distinta de la sintética, pero **no coincidió con la salida del operador obtenida por un servicio de eco externo**. Una segunda petición, con `CF-Connecting-IP` y `X-Forwarded-For` sintéticos, recibió **403**; no se encontró su marcador en los registros consultados (Nginx de la web y API). Esa comparación usó etiquetas PBKDF2 con sal, que **no son anonimato** (con la sal la dirección se podría recuperar por fuerza bruta).
+- **Diagnóstico posterior** (sin repetir la petición sintética), con un canal RSA-OAEP/SHA-256 cuya clave privada vivió solo en la memoria de un proceso temporal: `/cdn-cgi/trace` del mismo dominio, válido y estable; el eco externo, estable; la IP auditada (`req.remoteAddress`, `origenIp = cf-connecting-ip`, sin respaldo) **coincidió con el trace** y **difirió del eco**, y el trace difirió del eco. La causa de la diferencia **sigue desconocida**: es compatible con una salida distinta según el destino, pero no se atribuye a una VPN ni a un proxy concretos.
+- **Con la web nueva:** trace válido y estable antes y después de una petición con marcador único; la IP auditada coincidió con ambos trace, con `origenIp = cf-connecting-ip` y sin respaldo.
+- **Alcance:** comprobaciones desde **un equipo y una red**, con una muestra única. **La identificación de IP tiene validación acotada en producción**; no es una garantía general. C-02 **sigue pendiente**.
+
+**4. Local** (mismo SHA, configuración propia de local, modo `socket`).
+- **Imágenes:** backend `7d3cf39799dc` y frontend `f36589a2f229`, construidas solo para esos dos servicios desde un árbol sin cambios respecto de `7860b1d`. Las anteriores se conservaron con la etiqueta `prev-20261111-1606` (backend `69edf76a7cfe` y frontend `2094ef56a597`); migraciones sigue en `2f8a5fcaded4`, sin reconstruir.
+- **Contenido** (contenedores efímeros): el backend incluye `dist/shared/ipCliente.js`; la plantilla del frontend ya no reenvía `X-Forwarded-For` ni `X-Real-IP`.
+- **Contenedores:** backend y frontend recreados; el Postgres principal existente se arrancó con `docker start` (sin recrearlo) y su volumen `fchmn_inscripciones_pgdata` se conservó. **Sin migraciones ni seed.**
+- **Verificación local** (por el puerto 8080): `/login`, `/api/health` y `/api/ready` con 200, `/api/auth/me` con 401, con `no-store` y CSP; la línea de arranque dice `socket`; una petición con `CF-Connecting-IP` y `X-Forwarded-For` sintéticos quedó con `origenIp = socket` y una dirección privada de Docker distinta de las declaradas.
+- Los contenedores de frontend, backend y Postgres quedaron **detenidos** de nuevo.
+- **No se declara identidad binaria** entre las imágenes locales y las de Render.
+
+**Límites vigentes** (además de los de arriba).
+- Frontera privada aceptada y obligación de reevaluarla antes de incorporar servicios: ver «Frontera de confianza».
+- No se retiró `TRUST_PROXY_HOPS=2`: queda configurada en la API, ignorada por el código nuevo, para poder volver al código anterior.
+- El mantenimiento sigue en `2c3552e`; se reconstruirá cuando un mantenimiento necesite código nuevo (en esta entrega no hay migraciones).
+
+**Reversión** (no ejecutada). Guardar una variable con «Save only» no cambia el proceso en ejecución: hace falta un despliegue manual. Para volver a `socket`: `IP_CLIENTE_FUENTE=socket` y un despliegue manual del mismo SHA (queda un origen compartido, sin suplantación). Para volver al código anterior: rollback de la API y de la web a sus despliegues de `2c3552e`; con `TRUST_PROXY_HOPS=2` conservada, vuelve al comportamiento anterior.
 
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 
