@@ -116,6 +116,27 @@ describe("navegación tras el login", () => {
   });
 });
 
+/**
+ * C-02: el login puede responder 429 (limitador: par, par protegido u origen) o 503 (sin
+ * capacidad, Argon2 saturado o resultado obsoleto). El mensaje del servidor se muestra tal cual,
+ * sin sesión y sin salir del login: no son «usuario o contraseña incorrectos».
+ */
+describe("login limitado o no disponible (C-02)", () => {
+  it.each([
+    [429, "LOGIN_THROTTLED", "Demasiados intentos de inicio de sesión. Espere unos minutos o intente desde otra red."],
+    [503, "SERVICE_UNAVAILABLE", "No se pudo completar el inicio de sesión. Intente nuevamente en unos instantes."],
+  ])("%i: muestra el mensaje del servidor y se queda en el login", async (estado, codigo, mensaje) => {
+    vi.mocked(authApi.apiLogin).mockRejectedValue(new ApiError(mensaje, estado, codigo));
+
+    renderApp();
+    await iniciarSesion();
+
+    expect(await screen.findByText(mensaje)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /panel principal/i })).not.toBeInTheDocument();
+    expect(sessionStorage.getItem("natacion.perfil")).toBeNull();
+  });
+});
+
 describe("recuperación de contraseña", () => {
   it("no ofrece un enlace de auto-recuperación (la ruta no existe)", () => {
     renderApp();

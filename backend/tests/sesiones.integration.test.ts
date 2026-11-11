@@ -21,6 +21,8 @@ import * as personsService from "../src/modules/persons/persons.service";
 import * as clubsService from "../src/modules/clubs/clubs.service";
 import { OPCIONES_TX_SESION, sesionVigente, vencimientoDeRefresh } from "../src/modules/auth/sessions";
 import { UnauthorizedError } from "../src/shared/errors";
+import { PERFIL } from "../src/modules/auth/limitadorClaves";
+import { LoginLimitadoError } from "../src/modules/auth/limitadorLogin";
 
 const HORA = 3_600_000;
 const NUEVA_CLAVE = "ClaveNuevaSintetica1";
@@ -518,25 +520,37 @@ describe("la política del bloqueo temporal no cambia; las respuestas de login s
     expect(inexistente.json().message).toBe("Usuario o contraseña incorrectos");
   });
 
-  it("el bloqueo temporal EXPULSA las sesiones activas mientras dura, sin revocarlas", async () => {
+  /**
+   * C-02: los fallos de un tercero ya NO crean un bloqueo temporal (RB-15), así que tampoco
+   * dejan sin uso las sesiones abiertas de la cuenta. El tercero solo agota su propio par.
+   */
+  it("C-02: fallos de un tercero no tocan la cuenta ni sus sesiones abiertas", async () => {
     const usuario = await createUser({ username: "bloqueo_activo", roleNames: ["swimmer"] });
     const abierta = await entrar("bloqueo_activo");
 
-    for (let i = 0; i < env.LOGIN_MAX_ATTEMPTS; i++) {
-      await expect(authService.login({ username: "bloqueo_activo", password: "ClaveIncorrecta1" }, {})).rejects.toBeInstanceOf(UnauthorizedError);
+    const tercero = { ipAddress: "198.51.100.7" };
+    for (let i = 0; i < PERFIL.parMaxFallos; i++) {
+      await expect(authService.login({ username: "bloqueo_activo", password: "ClaveIncorrecta1" }, tercero)).rejects.toBeInstanceOf(UnauthorizedError);
     }
+    await expect(authService.login({ username: "bloqueo_activo", password: "ClaveIncorrecta1" }, tercero)).rejects.toBeInstanceOf(LoginLimitadoError);
 
     const cuenta = await prisma.user.findUniqueOrThrow({ where: { id: usuario.id } });
-    expect(cuenta.status).toBe("locked");
-    expect(cuenta.lockedUntil).not.toBeNull();
+    expect(cuenta.status).toBe("active");
+    expect(cuenta.lockedUntil).toBeNull();
+    expect(await estadoDelJwt(abierta.accessToken), "la sesión abierta sigue operando").toBe(200);
+    await expect(authService.refresh(abierta.refreshToken, {})).resolves.toBeDefined();
+    expect(await sesionesActivas(usuario.id)).toBe(1);
+  });
 
-    // Comportamiento actual, deliberadamente sin cambios: la petición se rechaza…
+  it("un bloqueo temporal ANTIGUO vigente sigue dejando sin uso las sesiones, sin revocarlas (S10, sin cambios)", async () => {
+    const usuario = await createUser({ username: "bloqueo_antiguo", roleNames: ["swimmer"] });
+    const abierta = await entrar("bloqueo_antiguo");
+    await prisma.user.update({ where: { id: usuario.id }, data: { status: "locked", lockedUntil: new Date(Date.now() + HORA) } });
+
     expect(await estadoDelJwt(abierta.accessToken)).toBe(401);
     await expect(authService.refresh(abierta.refreshToken, {})).rejects.toThrow("Cuenta no disponible");
-    // …y la sesión no se terminó: el bloqueo temporal no es una revocación.
-    expect(await sesionesActivas(usuario.id)).toBe(1);
+    expect(await sesionesActivas(usuario.id), "un bloqueo temporal no es una revocación").toBe(1);
 
-    // Al levantarse el bloqueo, esa misma sesión vuelve a operar.
     await prisma.user.update({ where: { id: usuario.id }, data: { status: "active", lockedUntil: null } });
     expect(await estadoDelJwt(abierta.accessToken)).toBe(200);
   });
@@ -557,35 +571,38 @@ describe("la política del bloqueo temporal no cambia; las respuestas de login s
     expect(cuenta.lockedUntil).toBeNull();
   });
 
-  it("bloqueo temporal VENCIDO + contraseña incorrecta: se levanta y cuenta un intento", async () => {
+  it("bloqueo temporal VENCIDO + contraseña incorrecta: genérico, sin escribir la cuenta (C-02)", async () => {
     const usuario = await createUser({ username: "vencido_mal", roleNames: ["swimmer"], status: "locked", lockedUntil: new Date(Date.now() - 1000) });
 
     await expect(authService.login({ username: "vencido_mal", password: "ClaveIncorrecta1" }, {})).rejects.toBeInstanceOf(UnauthorizedError);
 
     const cuenta = await prisma.user.findUniqueOrThrow({ where: { id: usuario.id } });
-    expect(cuenta.status).toBe("active");
-    expect(cuenta.lockedUntil).toBeNull();
-    expect(cuenta.failedLoginAttempts).toBe(1);
+    expect(cuenta.status, "se levanta solo con el próximo login correcto").toBe("locked");
+    expect(cuenta.failedLoginAttempts).toBe(0);
   });
 
-  it("cada fallo se audita, y el umbral bloquea una sola vez", async () => {
+  it("cada fallo verificado se audita, y ya no existe el bloqueo de la cuenta entera (USER_LOCKED)", async () => {
     const usuario = await createUser({ username: "umbral", roleNames: ["swimmer"] });
 
-    for (let i = 0; i < env.LOGIN_MAX_ATTEMPTS; i++) {
+    for (let i = 0; i < PERFIL.parMaxFallos; i++) {
       await expect(authService.login({ username: "umbral", password: "ClaveIncorrecta1" }, {})).rejects.toBeInstanceOf(UnauthorizedError);
     }
+    await expect(authService.login({ username: "umbral", password: "ClaveIncorrecta1" }, {})).rejects.toBeInstanceOf(LoginLimitadoError);
 
-    expect(await prisma.auditLog.count({ where: { action: "LOGIN_FAILED", userId: usuario.id } })).toBe(env.LOGIN_MAX_ATTEMPTS);
-    expect(await prisma.auditLog.count({ where: { action: "USER_LOCKED", userId: usuario.id } })).toBe(1);
-    expect((await prisma.user.findUniqueOrThrow({ where: { id: usuario.id } })).failedLoginAttempts).toBe(0);
+    expect(await prisma.auditLog.count({ where: { action: "LOGIN_FAILED", userId: usuario.id } })).toBe(PERFIL.parMaxFallos);
+    expect(await prisma.auditLog.count({ where: { action: "USER_LOCKED", userId: usuario.id } })).toBe(0);
+    const cuenta = await prisma.user.findUniqueOrThrow({ where: { id: usuario.id } });
+    expect(cuenta.status).toBe("active");
+    expect(cuenta.failedLoginAttempts).toBe(0);
   });
 
-  it("un login correcto reinicia el contador", async () => {
-    const usuario = await createUser({ username: "reinicia", roleNames: ["swimmer"] });
+  it("un login correcto perdona en su par los fallos anteriores", async () => {
+    await createUser({ username: "reinicia", roleNames: ["swimmer"] });
     await expect(authService.login({ username: "reinicia", password: "ClaveIncorrecta1" }, {})).rejects.toBeInstanceOf(UnauthorizedError);
+    expect(await prisma.limFalloPar.count()).toBe(1);
 
     await entrar("reinicia");
 
-    expect((await prisma.user.findUniqueOrThrow({ where: { id: usuario.id } })).failedLoginAttempts).toBe(0);
+    expect(await prisma.limFalloPar.count()).toBe(0);
   });
 });

@@ -1,10 +1,9 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../../shared/prisma.client";
-import { env } from "../../shared/env";
 import { audit } from "../audit/audit.service";
 import { signAccessToken, verifyAccessToken, type SessionOwnerType } from "./jwt.util";
 import { resolverAutorizacionEfectiva, type AutorizacionEfectiva } from "./authorization";
-import { hashPassword, verifyPassword, verificacionFicticia, generateOpaqueToken, hashOpaqueToken } from "./password.util";
+import { conArgon2, verifyPassword, verificacionFicticia, generateOpaqueToken, hashOpaqueToken } from "./password.util";
 import {
   OPCIONES_TX_SESION,
   bloquearSesion,
@@ -19,10 +18,17 @@ import {
 import { ConflictError, UnauthorizedError, type AppError } from "../../shared/errors";
 import type { LoginInput, ChangePasswordInput } from "./auth.schemas";
 import { aplicarFallo, estadoDeReserva, liberarReserva, reservarCambio, resultadoObsoleto, MENSAJE_SESION_NO_VALIDA } from "./cambioContrasena";
+import * as limitador from "./limitadorLogin";
+import { origenParaLimites } from "../../shared/ipCliente";
 
 interface RequestContext {
   ipAddress?: string;
   userAgent?: string;
+  /**
+   * Origen para los límites de login (`origenParaLimites`): IPv4, /64 de IPv6 o respaldo.
+   * Sin él (llamadas internas y pruebas) se deriva de `ipAddress`.
+   */
+  origen?: string;
 }
 
 type Tx = Prisma.TransactionClient;
@@ -33,54 +39,12 @@ function bloqueoTemporalVencido(cuenta: Pick<UsuarioBloqueado, "status" | "locke
 }
 
 /**
- * RB-15: bloqueo temporal tras N intentos fallidos de login.
- *
- * Este intento se verificó FUERA del bloqueo contra el hash H0, así que para
- * cuando llega aquí la cuenta pudo cambiar. Todo se decide con su estado actual,
- * en UNA transacción: antes eran dos escrituras sin condición, y un intento
- * iniciado antes de un bloqueo administrativo o una inhabilitación podía
- * sobrescribirlos con un bloqueo temporal, que luego vencía y dejaba la cuenta
- * activa.
- *
- * Un intento descartado no escribe nada. Quien llama responde igual en todos los
- * casos.
+ * C-02: ya NO se crean bloqueos temporales de la cuenta entera por intentos fallidos (RB-15).
+ * Los fallos los cuenta el limitador de login (`limitadorLogin.ts`), que nunca cambia el
+ * estado de la cuenta ni sus sesiones. Los bloqueos temporales ANTIGUOS que queden en `users`
+ * se respetan hasta su vencimiento (`bloqueoTemporalVigente`) y se levantan en el siguiente
+ * login correcto (`bloqueoTemporalVencido`), como antes.
  */
-async function registerFailedAttempt(userId: string, hashVerificado: string, ip?: string) {
-  await prisma.$transaction(async (tx) => {
-    const cuenta = await bloquearUsuario(tx, userId);
-    const ahora = new Date();
-
-    if (!cuenta || cuenta.deletedAt !== null) return;
-    // La contraseña cambió: el intento fue contra una credencial que ya no existe.
-    if (cuenta.passwordHash !== hashVerificado) return;
-    if (cuenta.status === "disabled") return;
-
-    const vencido = bloqueoTemporalVencido(cuenta, ahora);
-    // Administrativo o temporal vigente: prevalece, y el intento no cuenta.
-    if (cuenta.status === "locked" && !vencido) return;
-
-    if (cuenta.failedLoginAttempts + 1 >= env.LOGIN_MAX_ATTEMPTS) {
-      const lockedUntil = new Date(ahora.getTime() + env.LOGIN_LOCKOUT_MINUTES * 60_000);
-      await tx.user.update({ where: { id: userId }, data: { status: "locked", lockedUntil, failedLoginAttempts: 0 } });
-      await audit(
-        { userId, action: "USER_LOCKED", entityType: "User", entityId: userId, ipAddress: ip, after: { lockedUntil } },
-        { tx }
-      );
-      return;
-    }
-
-    await tx.user.update({
-      where: { id: userId },
-      data: {
-        failedLoginAttempts: cuenta.failedLoginAttempts + 1,
-        // Reactivar un bloqueo vencido va aquí, con la cuenta bloqueada y su
-        // estado releído. Antes se escribía sin condición ANTES de verificar la
-        // contraseña, y podía deshacer un bloqueo administrativo recién aplicado.
-        ...(vencido ? { status: "active" as const, lockedUntil: null } : {}),
-      },
-    });
-  }, OPCIONES_TX_SESION);
-}
 
 /** Un bloqueo temporal (RB-15) que sigue vigente. El administrativo no tiene `lockedUntil`. */
 function bloqueoTemporalVigente(cuenta: Pick<UsuarioBloqueado, "status" | "lockedUntil">, ahora: Date): boolean {
@@ -235,17 +199,7 @@ function firmarAccessToken(user: SessionUser, sid: string, autorizacion: Autoriz
 }
 
 export async function login(input: LoginInput, ctx: RequestContext) {
-  /**
-   * `findFirst` y no `findUnique`: desde el hallazgo 20, `users.username` es
-   * único solo entre cuentas VIGENTES, así que puede haber varias filas con el
-   * mismo nombre —las eliminadas lógicamente conservan el suyo como historial—
-   * y solo una de ellas está activa. Se busca directamente esa; el rechazo por
-   * `deletedAt` de más abajo se conserva por si alguna llegara igual.
-   */
-  const user = await prisma.user.findFirst({
-    where: { username: input.username, deletedAt: null },
-    include: { person: { select: { status: true, deletedAt: true } }, club: { select: { status: true, deletedAt: true } } },
-  });
+  const user = await buscarCuentaDeLogin(input.username);
 
   // Mensaje genérico: no revelar si el usuario existe o no (evita user enumeration).
   const genericError = credencialesRechazadas;
@@ -255,6 +209,9 @@ export async function login(input: LoginInput, ctx: RequestContext) {
    *
    *   | Situación                                         | Respuesta                          |
    *   |---------------------------------------------------|------------------------------------|
+   *   | Un límite del limitador de login (C-02)           | 429 uniforme, sin verificar nada   |
+   *   | Sin capacidad, Argon2 saturado o error técnico,   | 503, sin contar ningún fallo       |
+   *   |   o un resultado obsoleto                         |                                    |
    *   | Usuario inexistente o eliminado                   | 401 genérico                       |
    *   | Contraseña incorrecta, sea cual sea el estado     | 401 genérico                       |
    *   | Incoherencia persona/cuenta (persona eliminada, o | 401 genérico                       |
@@ -270,71 +227,107 @@ export async function login(input: LoginInput, ctx: RequestContext) {
    * Argon2: sin ella esas respuestas serían las únicas que no pagan su coste, y el tiempo
    * delataría qué usuarios existen o están bloqueados. No iguala los tiempos —quedan las
    * demás consultas—, solo elimina ese camino rápido.
+   *
+   * C-02: la ADMISIÓN va antes de cualquier Argon2. Sus claves dependen del nombre RECIBIDO
+   * y del origen, no de que la cuenta exista: el 429 es igual para todos. `userId` viaja solo
+   * para la auditoría, que ya lo registra; el limitador no lo guarda.
    */
-  if (!user || user.deletedAt) {
-    await verificacionFicticia(input.password);
-    throw genericError();
-  }
+  const admision = await limitador.admitir({
+    username: input.username,
+    origen: ctx.origen ?? origenParaLimites(ctx.ipAddress, undefined),
+    ip: ctx.ipAddress,
+    userId: user?.id,
+  });
 
   /**
-   * El estado de la PERSONA dueña también decide, no solo el de la cuenta.
-   *
-   * `users.status` y `persons.status` son columnas distintas y nada en la
-   * base obliga a que coincidan. Bastaba una incoherencia —una persona
-   * inhabilitada o eliminada cuya cuenta siguiera activa— para que entrara
-   * con normalidad. Los caminos que inhabilitan a una persona ya inhabilitan
-   * su cuenta, así que esa incoherencia no debería ocurrir; por eso rechazarla
-   * es una red de seguridad y no una comprobación de rutina.
-   *
-   * DOS situaciones distintas, que antes se trataban igual:
-   *
-   *  - Estado administrativo HABITUAL: `blockPerson` / `disablePerson` dejan a la persona y
-   *    a su cuenta con el mismo estado. Sigue el flujo normal —se verifica la contraseña—
-   *    y el motivo se decide bajo bloqueo, como para una cuenta sin persona. Rechazar aquí,
-   *    antes de comprobar la contraseña, hacía que ninguna persona bloqueada o inhabilitada
-   *    por el sistema recibiera jamás el mensaje específico.
-   *  - INCOHERENCIA (persona eliminada, estados que no se corresponden): error GENÉRICO
-   *    con cualquier contraseña. Por qué no puede entrar es asunto de la administración.
-   *
-   * Las cuentas `system` y `club` no tienen persona, así que para ellas esto
-   * no cambia nada.
+   * Verificación de TRES estados: `correcta`, `incorrecta` o `ficticia`. Saturación o error
+   * técnico de Argon2 NO son una contraseña incorrecta: la reserva se libera sin cargo
+   * (resultado neutro) y el error, que ya es un 503, se propaga.
    */
-  if (situacionDePersona(user.personId, user.person, user) === "incoherente") {
-    await verificacionFicticia(input.password);
+  let verificacion: "correcta" | "incorrecta" | "ficticia";
+  try {
+    verificacion = await verificarIntento(user, input.password);
+  } catch (err) {
+    await limitador.liquidar(admision, "neutro").catch(() => undefined);
+    throw err;
+  }
+
+  if (verificacion !== "correcta") {
+    // Una reserva vencida o anulada responde 503 —igual que un acierto en la misma situación—
+    // para no revelar cuál fue el resultado.
+    if ((await limitador.liquidar(admision, "fallo")) !== "aplicada") throw limitador.loginNoCompletado();
+    if (verificacion === "incorrecta" && user) {
+      await audit({ userId: user.id, action: "LOGIN_FAILED", entityType: "User", entityId: user.id, ipAddress: ctx.ipAddress });
+    }
     throw genericError();
   }
 
-  // Lo mismo para la cuenta de un club cuyo club no está activo (AUD-04/11): la cuenta
-  // activa de un club bloqueado es una incoherencia y recibe el genérico con cualquier
-  // contraseña; el estado administrativo habitual sigue el flujo y da su motivo abajo.
-  if (situacionDeClub(user.clubId, user.club, user) === "incoherente") {
-    await verificacionFicticia(input.password);
-    throw genericError();
-  }
+  // El acierto se liquida ANTES de crear la sesión: uno obsoleto nunca llega a emitir nada.
+  if ((await limitador.liquidar(admision, "acierto")) !== "aplicada") throw limitador.loginNoCompletado();
+  if (!user) throw genericError(); // inalcanzable: sin cuenta la verificación es ficticia
 
-  // Bloqueo temporal vigente: genérico SIEMPRE, sin mirar la contraseña real. Verificarla
-  // aquí haría que acertar o no cambiara la respuesta de una cuenta bloqueada.
-  if (bloqueoTemporalVigente(user, new Date())) {
-    await verificacionFicticia(input.password);
-    throw genericError();
-  }
+  return emitirSesionDeLogin(user, ctx);
+}
 
-  // Argon2, fuera de cualquier bloqueo. `user.passwordHash` es H0: lo que se
-  // verifique aquí vale solo mientras ese siga siendo el hash de la cuenta.
-  // Una cuenta inhabilitada o bloqueada por un administrador también se verifica: su
-  // motivo solo se revela tras comprobar la contraseña, dentro de la transacción de abajo.
-  const validPassword = await verifyPassword(user.passwordHash, input.password);
-  if (!validPassword) {
-    await registerFailedAttempt(user.id, user.passwordHash, ctx.ipAddress);
-    await audit({
-      userId: user.id,
-      action: "LOGIN_FAILED",
-      entityType: "User",
-      entityId: user.id,
-      ipAddress: ctx.ipAddress,
-    });
-    throw genericError();
+function buscarCuentaDeLogin(username: string) {
+  /**
+   * `findFirst` y no `findUnique`: desde el hallazgo 20, `users.username` es
+   * único solo entre cuentas VIGENTES, así que puede haber varias filas con el
+   * mismo nombre —las eliminadas lógicamente conservan el suyo como historial—
+   * y solo una de ellas está activa. Se busca directamente esa; el rechazo por
+   * `deletedAt` de más abajo se conserva por si alguna llegara igual.
+   */
+  return prisma.user.findFirst({
+    where: { username, deletedAt: null },
+    include: { person: { select: { status: true, deletedAt: true } }, club: { select: { status: true, deletedAt: true } } },
+  });
+}
+
+/** Cuenta tal como la busca el login, con su persona y su club. */
+type CuentaDeLogin = NonNullable<Awaited<ReturnType<typeof buscarCuentaDeLogin>>>;
+
+/**
+ * Qué se verifica, según lo que la cuenta permite comprobar (ver el CONTRATO en `login`).
+ * Una verificación FICTICIA cuenta como fallo igual que una real: el limitador no distingue.
+ *
+ * El estado de la PERSONA dueña también decide, no solo el de la cuenta. `users.status` y
+ * `persons.status` son columnas distintas y nada en la base obliga a que coincidan. Bastaba
+ * una incoherencia —una persona inhabilitada o eliminada cuya cuenta siguiera activa— para que
+ * entrara con normalidad. Los caminos que inhabilitan a una persona ya inhabilitan su cuenta,
+ * así que esa incoherencia no debería ocurrir; por eso rechazarla es una red de seguridad.
+ *
+ * DOS situaciones distintas, que antes se trataban igual:
+ *  - Estado administrativo HABITUAL: `blockPerson` / `disablePerson` dejan a la persona y a su
+ *    cuenta con el mismo estado. Sigue el flujo normal —se verifica la contraseña— y el motivo
+ *    se decide bajo bloqueo, como para una cuenta sin persona.
+ *  - INCOHERENCIA (persona eliminada, estados que no se corresponden): error GENÉRICO con
+ *    cualquier contraseña. Lo mismo para la cuenta de un club cuyo club no está activo
+ *    (AUD-04/11).
+ *
+ * Bloqueo temporal vigente: genérico SIEMPRE, sin mirar la contraseña real. Verificarla haría
+ * que acertar o no cambiara la respuesta de una cuenta bloqueada.
+ */
+async function verificarIntento(user: CuentaDeLogin | null, password: string): Promise<"correcta" | "incorrecta" | "ficticia"> {
+  const sinContrasenaReal =
+    !user ||
+    user.deletedAt !== null ||
+    situacionDePersona(user.personId, user.person, user) === "incoherente" ||
+    situacionDeClub(user.clubId, user.club, user) === "incoherente" ||
+    bloqueoTemporalVigente(user, new Date());
+  if (sinContrasenaReal) {
+    await verificacionFicticia(password);
+    return "ficticia";
   }
+  // Argon2, fuera de cualquier bloqueo. `user.passwordHash` es H0: lo que se verifique aquí
+  // vale solo mientras ese siga siendo el hash de la cuenta. Una cuenta inhabilitada o
+  // bloqueada por un administrador también se verifica: su motivo solo se revela tras
+  // comprobar la contraseña, dentro de la transacción de `emitirSesionDeLogin`.
+  return (await verifyPassword(user.passwordHash, password)) ? "correcta" : "incorrecta";
+}
+
+/** La sesión de un login cuya contraseña se verificó y cuyo acierto ya se liquidó. */
+async function emitirSesionDeLogin(user: CuentaDeLogin, ctx: RequestContext) {
+  const genericError = credencialesRechazadas;
 
   const autorizacion = await resolverAutorizacion(user);
 
@@ -645,11 +638,21 @@ export async function cambiarConReserva(
 ) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
-  // Argon2 FUERA de toda transacción.
-  const valid = await verifyPassword(user.passwordHash, input.currentPassword);
-  if (!valid) throw await aplicarFallo(reserva, ctx);
-
-  const newHash = await hashPassword(input.newPassword);
+  // Argon2 FUERA de toda transacción y en UN SOLO cupo del semáforo: verificar la contraseña
+  // actual y, si es la correcta, calcular el hash de la nueva, sin soltar el cupo entre ambas.
+  // Así la saturación solo puede ocurrir ANTES de verificar (al pedir el cupo), nunca entre
+  // una verificación correcta y el hash. «incorrecta» es SOLO una contraseña que no coincide:
+  // la saturación (`SaturacionArgon2`) o un error de la biblioteca en la verificación o en el
+  // hash (`ErrorTecnicoArgon2`) se LANZAN (503) y nunca llegan a `aplicarFallo`, así que no
+  // suman un intento, no terminan la sesión ni cambian la contraseña; el `finally` de
+  // `changePassword` libera la reserva. Antes `verifyPassword` convertía cualquier excepción
+  // en `false` y ese error se contaba como contraseña incorrecta.
+  const derivacion = await conArgon2(async (ops) => {
+    if ((await ops.verificar(user.passwordHash, input.currentPassword)) === "incorrecta") return null;
+    return ops.hashear(input.newPassword);
+  });
+  if (derivacion === null) throw await aplicarFallo(reserva, ctx);
+  const newHash = derivacion;
 
   // Todo en una sola transacción: cambiar la contraseña, revocar las
   // sesiones anteriores y crear la nueva. Si la creación de la sesión fallara

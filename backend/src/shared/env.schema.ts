@@ -130,8 +130,17 @@ const envSchema = z
      */
     SESSION_ABSOLUTE_HOURS: enteroEnRango(1, 8760, "horas").default(8),
 
-    LOGIN_MAX_ATTEMPTS: enteroEnRango(1, 100, "intentos").default(5),
-    LOGIN_LOCKOUT_MINUTES: enteroEnRango(1, 1440, "minutos").default(15),
+    /**
+     * Secreto del limitador de login (C-02): las claves de origen, cuenta y par se guardan
+     * como HMAC con él, nunca como IP ni nombre de usuario. Obligatorio en todo entorno.
+     *
+     * Reemplaza a `LOGIN_MAX_ATTEMPTS` y `LOGIN_LOCKOUT_MINUTES` (el bloqueo temporal de la
+     * cuenta entera, RB-15), que ya no existen y se ignoran si quedan definidas.
+     *
+     * NO SE ROTA sin un procedimiento específico: el estado del limitador guarda la huella
+     * de este secreto, y un proceso con otro valor se NIEGA A ARRANCAR (sin borrar nada).
+     */
+    AUTH_LIMITER_SECRET: z.string().min(32, "AUTH_LIMITER_SECRET debe tener al menos 32 caracteres"),
 
     PORT: enteroEnRango(1, 65535, "puerto").default(3000),
 
@@ -186,7 +195,22 @@ const envSchema = z
     // imposible ejecutar una suite de pruebas de integración (que hace decenas
     // de logins) sin chocar con el límite de `/auth/*`.
     RATE_LIMIT_GLOBAL_MAX: enteroEnRango(1, 100_000, "solicitudes").default(300),
+    /** Por minuto y por origen, SOLO para `/auth/login`. */
     RATE_LIMIT_AUTH_MAX: enteroEnRango(1, 100_000, "solicitudes").default(20),
+    /**
+     * Por minuto y por origen, para las operaciones de sesión de `/auth/*` (refresh, csrf,
+     * me, logout, change-password). Presupuesto SEPARADO del login: los intentos de login
+     * desde una red ya no consumen el que necesitan las renovaciones de esa red.
+     */
+    RATE_LIMIT_SESION_MAX: enteroEnRango(1, 100_000, "solicitudes").default(60),
+
+    /**
+     * Semáforo de Argon2 (ver `modules/auth/password.util.ts`): derivaciones simultáneas,
+     * cola y espera máxima. Cifras CANDIDATAS, medidas solo en local.
+     */
+    ARGON2_MAX_SIMULTANEAS: enteroEnRango(1, 64, "derivaciones").default(4),
+    ARGON2_MAX_EN_COLA: enteroEnRango(0, 1_000, "derivaciones").default(16),
+    ARGON2_ESPERA_MAX_MS: enteroEnRango(100, 60_000, "milisegundos").default(10_000),
 
     /** URL pública de la API; alimenta el documento OpenAPI. */
     PUBLIC_API_URL: z.string().url("PUBLIC_API_URL debe ser una URL completa").optional(),
@@ -257,9 +281,26 @@ const envSchema = z
       });
     }
 
+    // Separación de propósito: el secreto del limitador no puede ser el de los tokens.
+    if (valores.AUTH_LIMITER_SECRET === valores.JWT_ACCESS_SECRET) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["AUTH_LIMITER_SECRET"],
+        message: "AUTH_LIMITER_SECRET debe ser distinto de JWT_ACCESS_SECRET.",
+      });
+    }
+
     if (valores.NODE_ENV !== "production") return;
 
     // ---- Exigencias que solo aplican en producción ----
+
+    if (/^(reemplazar|replace|cambiar|change|example|ejemplo|secret|test)/i.test(valores.AUTH_LIMITER_SECRET)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["AUTH_LIMITER_SECRET"],
+        message: "AUTH_LIMITER_SECRET parece un valor de ejemplo. Genere uno con: openssl rand -hex 32",
+      });
+    }
 
     /**
      * En producción la cookie de sesión SIEMPRE va `Secure`, con cualquier

@@ -11,6 +11,7 @@ import { withTranslatedPrismaErrors } from "../../shared/prismaErrors";
 import { assertSiglaDisponible, normalizarSigla } from "../../shared/clubCode";
 import { hashPassword, generateOpaqueToken } from "../auth/password.util";
 import { terminarSesionesDelTitular, terminarSesionesDelUsuario } from "../auth/sessions";
+import { anularCuentaEnLimitador } from "../auth/limitadorLogin";
 import { normalizeRun } from "../../shared/run.util";
 import { ValidationError, NotFoundError } from "../../shared/errors";
 import { LONG_TRANSACTION_OPTIONS, type Db } from "../../shared/transaction";
@@ -576,11 +577,13 @@ export async function resetClubCredentials(clubId: string, actor: ActorContext) 
   await withAudit(
     async (tx) => {
       const { status: estadoDelClub } = await tx.club.findUniqueOrThrow({ where: { id: clubId }, select: { status: true } });
-      await tx.user.update({
+      const cuenta = await tx.user.update({
         where: { id: club.user!.id },
         data: { passwordHash, mustChangePassword: true, failedLoginAttempts: 0, status: estadoDelClub, lockedUntil: null },
       });
       await terminarSesionesDelUsuario(tx, club.user!.id, "admin_revocation");
+      // C-02: contadores de la cuenta y de sus pares (no los de ningún origen) y sus reservas.
+      await anularCuentaEnLimitador(tx, cuenta.username);
     },
     () => ({ userId: actor.userId, action: "CLUB_CREDENTIALS_RESET", entityType: "User", entityId: club.user!.id, ipAddress: actor.ipAddress })
   );

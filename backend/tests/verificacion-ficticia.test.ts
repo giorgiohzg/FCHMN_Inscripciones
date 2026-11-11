@@ -83,7 +83,11 @@ describe("verificacionFicticia", () => {
     const { verificacionFicticia } = await modulo();
     const hash = vi.spyOn(argon2, "hash").mockRejectedValueOnce(new Error("fallo sintético"));
 
-    await expect(verificacionFicticia("x")).rejects.toThrow("fallo sintético");
+    // C-02: el fallo llega como error técnico (503), con el original como causa.
+    await expect(verificacionFicticia("x")).rejects.toMatchObject({
+      statusCode: 503,
+      cause: expect.objectContaining({ message: "fallo sintético" }),
+    });
     await expect(verificacionFicticia("x")).resolves.toBe(false);
     expect(hash).toHaveBeenCalledTimes(2);
   });

@@ -23,6 +23,7 @@ function validar(vars: Record<string, string | undefined>) {
 const BASE = {
   DATABASE_URL: "postgresql://u:clave-de-prueba@localhost:5432/db",
   JWT_ACCESS_SECRET: "a".repeat(40),
+  AUTH_LIMITER_SECRET: "l".repeat(40),
   NODE_ENV: "development",
   CORS_ORIGINS: undefined,
   PUBLIC_API_URL: undefined,
@@ -151,8 +152,10 @@ describe("rangos numéricos", () => {
   it.each([
     ["PORT", "0"],
     ["PORT", "70000"],
-    ["LOGIN_MAX_ATTEMPTS", "0"],
-    ["LOGIN_LOCKOUT_MINUTES", "0"],
+    ["RATE_LIMIT_SESION_MAX", "0"],
+    ["ARGON2_MAX_SIMULTANEAS", "0"],
+    ["ARGON2_MAX_SIMULTANEAS", "65"],
+    ["ARGON2_ESPERA_MAX_MS", "50"],
     ["JWT_REFRESH_EXPIRES_IN_DAYS", "0"],
     ["SESSION_ABSOLUTE_HOURS", "0"],
     ["SESSION_ABSOLUTE_HOURS", "8761"],
@@ -172,9 +175,54 @@ describe("rangos numéricos", () => {
   });
 
   it("ACEPTA valores dentro de rango", () => {
-    const r = validar({ ...BASE, PORT: "8080", LOGIN_MAX_ATTEMPTS: "3" });
+    const r = validar({ ...BASE, PORT: "8080", RATE_LIMIT_SESION_MAX: "90" });
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.env.LOGIN_MAX_ATTEMPTS).toBe(3);
+    if (r.ok) expect(r.env.RATE_LIMIT_SESION_MAX).toBe(90);
+  });
+
+  it("las cifras candidatas del semáforo y del límite de sesión tienen valores por omisión", () => {
+    const r = validar(BASE);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.env.RATE_LIMIT_SESION_MAX).toBe(60);
+      expect(r.env.ARGON2_MAX_SIMULTANEAS).toBe(4);
+      expect(r.env.ARGON2_MAX_EN_COLA).toBe(16);
+      expect(r.env.ARGON2_ESPERA_MAX_MS).toBe(10_000);
+    }
+  });
+});
+
+/** C-02: secreto del limitador de login. Reemplaza a LOGIN_MAX_ATTEMPTS / LOGIN_LOCKOUT_MINUTES. */
+describe("secreto del limitador de login (AUTH_LIMITER_SECRET)", () => {
+  it("es obligatorio en todo entorno", () => {
+    const r = validar({ ...BASE, AUTH_LIMITER_SECRET: undefined });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errores.join(" ")).toContain("AUTH_LIMITER_SECRET");
+  });
+
+  it("exige al menos 32 caracteres", () => {
+    expect(validar({ ...BASE, AUTH_LIMITER_SECRET: "corto" }).ok).toBe(false);
+  });
+
+  it("no puede ser el mismo secreto de los tokens", () => {
+    const r = validar({ ...BASE, AUTH_LIMITER_SECRET: BASE.JWT_ACCESS_SECRET });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errores.join(" ")).toMatch(/distinto de JWT_ACCESS_SECRET/);
+  });
+
+  it("en producción rechaza el valor de ejemplo", () => {
+    const r = validar({ ...PRODUCCION, AUTH_LIMITER_SECRET: "reemplazar-por-otro-secreto-de-al-menos-32-caracteres" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errores.join(" ")).toContain("AUTH_LIMITER_SECRET");
+  });
+
+  it("IGNORA LOGIN_MAX_ATTEMPTS y LOGIN_LOCKOUT_MINUTES que queden definidas", () => {
+    const r = validar({ ...BASE, LOGIN_MAX_ATTEMPTS: "5", LOGIN_LOCKOUT_MINUTES: "15" });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(Object.keys(r.env)).not.toContain("LOGIN_MAX_ATTEMPTS");
+      expect(Object.keys(r.env)).not.toContain("LOGIN_LOCKOUT_MINUTES");
+    }
   });
 });
 

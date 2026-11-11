@@ -468,93 +468,73 @@ describe("cambios de contraseña concurrentes", () => {
   });
 });
 
-describe("un intento fallido no sobrescribe un estado posterior", () => {
-  /** En el umbral: sin la revalidación, este intento aplicaría un bloqueo temporal. */
-  async function enElUmbral(username: string) {
+/**
+ * C-02: un login FALLIDO ya no escribe la cuenta (RB-15 retirado). Lo cuenta el limitador, en sus
+ * propias tablas, así que no espera la fila de `users` ni puede sobrescribir un estado que otra
+ * operación aplique mientras tanto. Se comprueba con la fila RETENIDA: el intento termina sin
+ * soltarla y, al confirmar la retención, prevalece exactamente lo que ella escribió.
+ */
+/** Fallos del limitador que siguen contando (no perdonados) en todos los pares. */
+async function fallosVigentes(): Promise<number> {
+  const pares = await prisma.limClave.findMany({ where: { tipo: "par" } });
+  let total = 0;
+  for (const p of pares) total += await prisma.limFalloPar.count({ where: { parId: p.id, seq: { gt: p.perdonadoHastaSeq } } });
+  return total;
+}
+
+describe("C-02: un intento fallido no espera ni escribe la cuenta", () => {
+  /** Con 4 fallos heredados de RB-15: antes, este intento habría aplicado un bloqueo temporal. */
+  async function enElUmbralAntiguo(username: string) {
     const usuario = await createUser({ username, roleNames: ["swimmer"] });
     await prisma.user.update({ where: { id: usuario.id }, data: { failedLoginAttempts: 4 } });
     return usuario;
   }
 
-  it("un bloqueo ADMINISTRATIVO prevalece: no se convierte en temporal", async () => {
-    const usuario = await enElUmbral("fallo_admin");
+  it.each([
+    ["un bloqueo ADMINISTRATIVO", "UPDATE users SET status = 'locked', locked_until = NULL WHERE id = $1", "locked"],
+    ["una INHABILITACIÓN", "UPDATE users SET status = 'disabled' WHERE id = $1", "disabled"],
+    ["una ELIMINACIÓN", "UPDATE users SET status = 'disabled', deleted_at = now() WHERE id = $1", "disabled"],
+  ])("%s aplicado con el intento en curso prevalece", async (_nombre, sentencia, estado) => {
+    const usuario = await enElUmbralAntiguo("fallo_estado");
 
     const retencion = await retener(usuario.id);
-    const intento = desenlace(entrar("fallo_admin", INCORRECTA));
-    await enCola(1);
-    await retencion.query("UPDATE users SET status = 'locked', locked_until = NULL WHERE id = $1", [usuario.id]);
-    await retencion.query("COMMIT");
-
-    const i = await intento;
+    const i = await desenlace(entrar("fallo_estado", INCORRECTA)); // termina con la fila retenida
     expect(i.ok).toBe(false);
     if (!i.ok) expect((i.error as Error).message, "la respuesta no cambia").toBe("Usuario o contraseña incorrectos");
+    await retencion.query(sentencia, [usuario.id]);
+    await retencion.query("COMMIT");
 
     const final = await cuenta(usuario.id);
-    expect(final.status).toBe("locked");
-    expect(final.lockedUntil, "sigue siendo administrativo: nunca vence").toBeNull();
-    expect(final.failedLoginAttempts).toBe(4);
+    expect(final.status).toBe(estado);
+    expect(final.lockedUntil, "nunca se convierte en temporal").toBeNull();
+    expect(final.failedLoginAttempts, "el contador antiguo no se mueve").toBe(4);
     expect(await prisma.auditLog.count({ where: { action: "USER_LOCKED" } })).toBe(0);
+    expect(await fallosVigentes(), "el fallo lo cuenta el limitador").toBe(1);
   });
 
-  it("una INHABILITACIÓN prevalece", async () => {
-    const usuario = await enElUmbral("fallo_disabled");
-
-    const retencion = await retener(usuario.id);
-    const intento = desenlace(entrar("fallo_disabled", INCORRECTA));
-    await enCola(1);
-    await retencion.query("UPDATE users SET status = 'disabled' WHERE id = $1", [usuario.id]);
-    await retencion.query("COMMIT");
-
-    await intento;
-    const final = await cuenta(usuario.id);
-    expect(final.status).toBe("disabled");
-    expect(final.lockedUntil).toBeNull();
-    expect(final.failedLoginAttempts).toBe(4);
-  });
-
-  it("una ELIMINACIÓN prevalece", async () => {
-    const usuario = await enElUmbral("fallo_eliminada");
-
-    const retencion = await retener(usuario.id);
-    const intento = desenlace(entrar("fallo_eliminada", INCORRECTA));
-    await enCola(1);
-    await retencion.query("UPDATE users SET status = 'disabled', deleted_at = now() WHERE id = $1", [usuario.id]);
-    await retencion.query("COMMIT");
-
-    await intento;
-    const final = await cuenta(usuario.id);
-    expect(final.status).toBe("disabled");
-    expect(final.lockedUntil).toBeNull();
-    expect(final.failedLoginAttempts).toBe(4);
-  });
-
-  it("un intento contra un hash SUSTITUIDO no cuenta: no bloquea la credencial nueva", async () => {
-    const usuario = await enElUmbral("fallo_hash");
+  it("un hash SUSTITUIDO durante el intento no se bloquea: la credencial nueva entra", async () => {
+    const usuario = await enElUmbralAntiguo("fallo_hash");
     const hashNuevo = await hashPassword("ClaveRestablecida1");
 
     const retencion = await retener(usuario.id);
-    const intento = desenlace(entrar("fallo_hash", INCORRECTA));
-    await enCola(1);
+    expect((await desenlace(entrar("fallo_hash", INCORRECTA))).ok).toBe(false);
     await retencion.query("UPDATE users SET password_hash = $1, failed_login_attempts = 0 WHERE id = $2", [hashNuevo, usuario.id]);
     await retencion.query("COMMIT");
 
-    await intento;
     const final = await cuenta(usuario.id);
     expect(final.status).toBe("active");
-    expect(final.failedLoginAttempts, "el restablecimiento dejó 0, y sigue en 0").toBe(0);
-    expect(await prisma.auditLog.count({ where: { action: "USER_LOCKED" } })).toBe(0);
+    expect(final.failedLoginAttempts).toBe(0);
+    expect((await desenlace(entrar("fallo_hash", "ClaveRestablecida1"))).ok, "la credencial nueva sigue valiendo").toBe(true);
   });
 
-  it("el intento se sigue auditando aunque no cuente", async () => {
-    const usuario = await enElUmbral("fallo_auditado");
+  it("el intento se audita aunque la cuenta cambie después", async () => {
+    const usuario = await enElUmbralAntiguo("fallo_auditado");
 
     const retencion = await retener(usuario.id);
-    const intento = desenlace(entrar("fallo_auditado", INCORRECTA));
-    await enCola(1);
+    await desenlace(entrar("fallo_auditado", INCORRECTA));
     await retencion.query("UPDATE users SET status = 'disabled' WHERE id = $1", [usuario.id]);
     await retencion.query("COMMIT");
 
-    await intento;
     expect(await prisma.auditLog.count({ where: { action: "LOGIN_FAILED", userId: usuario.id } })).toBe(1);
   });
 });
@@ -563,103 +543,93 @@ describe("la reactivación de un bloqueo temporal vencido no deshace estados pos
   const vencida = async (username: string) =>
     createUser({ username, roleNames: ["swimmer"], status: "locked", lockedUntil: new Date(Date.now() - 60_000) });
 
+  /** Solo la contraseña CORRECTA llega a la transacción de la sesión, que bloquea la fila. */
   it.each([
-    ["contraseña correcta", TEST_PASSWORD],
-    ["contraseña incorrecta", INCORRECTA],
-  ])("%s + bloqueo administrativo concurrente: no vuelve a activa", async (_nombre, clave) => {
-    const usuario = await vencida("vencida_admin");
+    ["bloqueo administrativo", "UPDATE users SET status = 'locked', locked_until = NULL WHERE id = $1", "locked"],
+    ["inhabilitación", "UPDATE users SET status = 'disabled', locked_until = NULL WHERE id = $1", "disabled"],
+  ])("contraseña correcta + %s concurrente: no vuelve a activa", async (_nombre, sentencia, estado) => {
+    const usuario = await vencida("vencida_estado");
 
     const retencion = await retener(usuario.id);
-    const intento = desenlace(entrar("vencida_admin", clave));
+    const intento = desenlace(entrar("vencida_estado"));
     await enCola(1);
-    await retencion.query("UPDATE users SET status = 'locked', locked_until = NULL WHERE id = $1", [usuario.id]);
+    await retencion.query(sentencia, [usuario.id]);
     await retencion.query("COMMIT");
 
     expect((await intento).ok).toBe(false);
+    const final = await cuenta(usuario.id);
+    expect(final.status).toBe(estado);
+    expect(final.lockedUntil).toBeNull();
+    expect(await prisma.refreshSession.count({ where: { userId: usuario.id } })).toBe(0);
+  });
+
+  it("contraseña incorrecta: termina sin esperar la fila y sin escribir; prevalece lo concurrente", async () => {
+    const usuario = await vencida("vencida_incorrecta");
+
+    const retencion = await retener(usuario.id);
+    expect((await desenlace(entrar("vencida_incorrecta", INCORRECTA))).ok).toBe(false);
+    await retencion.query("UPDATE users SET status = 'locked', locked_until = NULL WHERE id = $1", [usuario.id]);
+    await retencion.query("COMMIT");
+
     const final = await cuenta(usuario.id);
     expect(final.status).toBe("locked");
     expect(final.lockedUntil).toBeNull();
     expect(await prisma.refreshSession.count({ where: { userId: usuario.id } })).toBe(0);
   });
-
-  it.each([
-    ["contraseña correcta", TEST_PASSWORD],
-    ["contraseña incorrecta", INCORRECTA],
-  ])("%s + inhabilitación concurrente: no vuelve a activa", async (_nombre, clave) => {
-    const usuario = await vencida("vencida_disabled");
-
-    const retencion = await retener(usuario.id);
-    const intento = desenlace(entrar("vencida_disabled", clave));
-    await enCola(1);
-    await retencion.query("UPDATE users SET status = 'disabled', locked_until = NULL WHERE id = $1", [usuario.id]);
-    await retencion.query("COMMIT");
-
-    expect((await intento).ok).toBe(false);
-    expect((await cuenta(usuario.id)).status).toBe("disabled");
-    expect(await prisma.refreshSession.count({ where: { userId: usuario.id } })).toBe(0);
-  });
 });
 
-describe("umbral de intentos fallidos con solapamiento", () => {
-  it("tres fallos en cola desde 3: bloquea una vez y el tercero ya no cuenta", async () => {
+/** Sustituye al umbral de RB-15: el límite es el del PAR (C-02) y nunca bloquea la cuenta. */
+describe("fallos solapados y límite del par (C-02)", () => {
+  it("tres fallos simultáneos con la fila retenida: se cuentan los tres y la cuenta no cambia", async () => {
     const usuario = await createUser({ username: "umbral_cola", roleNames: ["swimmer"] });
     await prisma.user.update({ where: { id: usuario.id }, data: { failedLoginAttempts: 3 } });
 
     const retencion = await retener(usuario.id);
-    const uno = desenlace(entrar("umbral_cola", INCORRECTA));
-    await enCola(1);
-    const dos = desenlace(entrar("umbral_cola", INCORRECTA));
-    await enCola(2);
-    const tres = desenlace(entrar("umbral_cola", INCORRECTA));
-    await enCola(3);
+    const resultados = await Promise.all([1, 2, 3].map(() => desenlace(entrar("umbral_cola", INCORRECTA))));
     await retencion.query("COMMIT");
-    await Promise.all([uno, dos, tres]);
 
+    expect(resultados.every((r) => !r.ok)).toBe(true);
     const final = await cuenta(usuario.id);
-    expect(final.status).toBe("locked");
-    expect(final.lockedUntil).not.toBeNull();
-    expect(final.failedLoginAttempts, "el bloqueo reinicia el contador, y el tercero no lo mueve").toBe(0);
-    expect(await prisma.auditLog.count({ where: { action: "USER_LOCKED" } }), "un solo bloqueo").toBe(1);
+    expect(final.status).toBe("active");
+    expect(final.lockedUntil).toBeNull();
+    expect(final.failedLoginAttempts).toBe(3);
+    expect(await fallosVigentes(), "ni perdidos ni duplicados").toBe(3);
+    expect(await prisma.auditLog.count({ where: { action: "USER_LOCKED" } })).toBe(0);
     expect(await prisma.auditLog.count({ where: { action: "LOGIN_FAILED" } }), "tres intentos auditados").toBe(3);
   });
 
-  it("un fallo que bloquea, delante de un login correcto: el login ve el bloqueo, con la respuesta genérica", async () => {
+  it("par agotado: el login correcto de ese par recibe 429 sin esperar la fila; desde otro origen, entra", async () => {
     const usuario = await createUser({ username: "umbral_y_ok", roleNames: ["swimmer"] });
-    await prisma.user.update({ where: { id: usuario.id }, data: { failedLoginAttempts: 4 } });
+    for (let i = 0; i < 5; i++) expect((await desenlace(entrar("umbral_y_ok", INCORRECTA))).ok).toBe(false);
 
     const retencion = await retener(usuario.id);
-    const fallo = desenlace(entrar("umbral_y_ok", INCORRECTA));
-    await enCola(1);
-    const correcto = desenlace(entrar("umbral_y_ok"));
-    await enCola(2);
+    const mismoPar = await desenlace(entrar("umbral_y_ok"));
+    expect(mismoPar.ok).toBe(false);
+    if (!mismoPar.ok) expect(mismoPar.error).toMatchObject({ statusCode: 429, code: "LOGIN_THROTTLED" });
+
+    const otroOrigen = desenlace(authService.login({ username: "umbral_y_ok", password: TEST_PASSWORD }, { origen: "4:198.51.100.7" }));
+    await enCola(1); // este sí llega a la transacción de la sesión
     await retencion.query("COMMIT");
 
-    expect((await fallo).ok).toBe(false);
-    const c = await correcto;
-    expect(c.ok).toBe(false);
-    if (!c.ok) {
-      expect(c.error).toBeInstanceOf(UnauthorizedError);
-      expect((c.error as Error).message, "no revela el bloqueo temporal").toBe("Usuario o contraseña incorrectos");
-    }
-    expect(await prisma.refreshSession.count({ where: { userId: usuario.id } })).toBe(0);
+    expect((await otroOrigen).ok).toBe(true);
+    expect((await cuenta(usuario.id)).status, "la cuenta nunca se bloqueó").toBe("active");
+    expect(await sesionesActivas(usuario.id)).toBe(1);
   });
 
-  it("un login correcto delante de un fallo: el contador parte de cero", async () => {
+  it("un login correcto delante de un fallo del mismo par: el acierto no perdona el fallo posterior", async () => {
     const usuario = await createUser({ username: "ok_y_fallo", roleNames: ["swimmer"] });
     await prisma.user.update({ where: { id: usuario.id }, data: { failedLoginAttempts: 4 } });
 
     const retencion = await retener(usuario.id);
     const correcto = desenlace(entrar("ok_y_fallo"));
     await enCola(1);
-    const fallo = desenlace(entrar("ok_y_fallo", INCORRECTA));
-    await enCola(2);
+    expect((await desenlace(entrar("ok_y_fallo", INCORRECTA))).ok, "el fallo no espera la fila").toBe(false);
     await retencion.query("COMMIT");
 
     expect((await correcto).ok).toBe(true);
-    expect((await fallo).ok).toBe(false);
     const final = await cuenta(usuario.id);
     expect(final.status).toBe("active");
-    expect(final.failedLoginAttempts).toBe(1);
+    expect(await fallosVigentes(), "perdón por orden de reserva: el fallo posterior sigue contando").toBe(1);
   });
 });
 

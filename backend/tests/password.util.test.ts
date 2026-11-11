@@ -13,6 +13,10 @@ describe("password.util", () => {
     expect(await verifyPassword(hash, "OtraClave456")).toBe(false);
   });
 
+  it("un hash inválido NO es una contraseña incorrecta: es un error técnico (503)", async () => {
+    await expect(verifyPassword("no-es-un-hash", "MiClave123")).rejects.toMatchObject({ statusCode: 503 });
+  });
+
   it("nunca almacena la contraseña en texto plano dentro del hash", async () => {
     const hash = await hashPassword("SuperSecreta1");
     expect(hash.includes("SuperSecreta1")).toBe(false);

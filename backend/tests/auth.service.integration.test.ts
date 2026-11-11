@@ -4,7 +4,7 @@
  *   npm run test:integration
  *
  * Cubren el flujo completo contra la base de datos real (no mocks) porque
- * las reglas críticas (bloqueo de cuenta, rotación/reuso de refresh token)
+ * las reglas críticas (limitador de login, rotación/reuso de refresh token)
  * dependen de transacciones e índices reales.
  */
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
@@ -50,20 +50,26 @@ describe("auth.service — login", () => {
     ).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
-  it("bloquea la cuenta tras 5 intentos fallidos (RB-15)", async () => {
+  /**
+   * C-02 sustituye a RB-15: los fallos ya no bloquean la cuenta entera. Tras cinco fallos del
+   * mismo par (usuario y origen), el sexto intento de ESE par —incluso con la contraseña
+   * correcta— recibe el 429 uniforme sin verificar nada, y la cuenta sigue intacta.
+   */
+  it("limita el par tras 5 fallos sin bloquear la cuenta (C-02, sustituye a RB-15)", async () => {
     await createTestUser();
     for (let i = 0; i < 5; i++) {
       await expect(
         authService.login({ username: TEST_USERNAME, password: "Incorrecta1" }, {})
       ).rejects.toBeInstanceOf(UnauthorizedError);
     }
-    // El 6to intento, incluso con la contraseña correcta, falla por el bloqueo, pero con
-    // la MISMA respuesta que una credencial incorrecta: no revela que la cuenta está bloqueada.
     await expect(authService.login({ username: TEST_USERNAME, password: TEST_PASSWORD }, {})).rejects.toMatchObject({
-      statusCode: 401,
-      code: "UNAUTHORIZED",
-      message: "Usuario o contraseña incorrectos",
+      statusCode: 429,
+      code: "LOGIN_THROTTLED",
     });
+    const cuenta = await prisma.user.findFirstOrThrow({ where: { username: TEST_USERNAME } });
+    expect(cuenta.status).toBe("active");
+    expect(cuenta.failedLoginAttempts).toBe(0);
+    expect(cuenta.lockedUntil).toBeNull();
   });
 });
 

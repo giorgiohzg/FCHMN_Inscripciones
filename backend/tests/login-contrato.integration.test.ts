@@ -31,6 +31,8 @@ import * as authService from "../src/modules/auth/auth.service";
 import * as personsService from "../src/modules/persons/persons.service";
 import { verificacionFicticia } from "../src/modules/auth/password.util";
 import { UnauthorizedError } from "../src/shared/errors";
+import { PERFIL } from "../src/modules/auth/limitadorClaves";
+import { MENSAJE_LOGIN_LIMITADO } from "../src/modules/auth/limitadorLogin";
 
 const HORA = 3_600_000;
 const INCORRECTA = "ClaveIncorrecta1";
@@ -154,14 +156,19 @@ describe("matriz por estado y contraseña (por HTTP)", () => {
     expect(c.lockedUntil).toBeNull();
   });
 
-  it("bloqueo temporal VENCIDO con contraseña incorrecta: se levanta y cuenta UN intento, como en la Fase 1", async () => {
+  /**
+   * C-02: un fallo ya no escribe en `users`. El bloqueo temporal antiguo, vencido, solo se
+   * levanta con el próximo login CORRECTO (prueba anterior); el fallo lo cuenta el limitador.
+   */
+  it("bloqueo temporal VENCIDO con contraseña incorrecta: genérico, sin escribir la cuenta; el fallo lo cuenta el limitador", async () => {
     await montarEstados();
-    await http("bloq_vencido", INCORRECTA);
+    const res = await http("bloq_vencido", INCORRECTA);
 
+    expect(res.json()).toEqual(GENERICO);
     const c = await cuenta("bloq_vencido");
-    expect(c.status).toBe("active");
-    expect(c.lockedUntil).toBeNull();
-    expect(c.failedLoginAttempts).toBe(1);
+    expect(c.status, "no se reactiva con un fallo").toBe("locked");
+    expect(c.failedLoginAttempts, "RB-15 ya no cuenta intentos en la cuenta").toBe(0);
+    expect(await prisma.limFalloPar.count(), "el par registró un fallo").toBe(1);
   });
 });
 
@@ -195,15 +202,29 @@ describe("el bloqueo temporal vigente no se toca ni se expone", () => {
     expect(await sesiones()).toBe(0);
   });
 
-  it("una cuenta que se bloquea por intentos sigue bloqueándose, y entonces ya no confirma ni la contraseña correcta", async () => {
-    await createUser({ username: "se_bloquea", roleNames: ["swimmer"] });
-    for (let i = 0; i < env.LOGIN_MAX_ATTEMPTS; i++) {
-      expect((await http("se_bloquea", INCORRECTA)).json()).toEqual(GENERICO);
+  /**
+   * C-02 sustituye a RB-15: los fallos de un tercero ya no bloquean la cuenta entera. Se limita
+   * el PAR (5 en 15 min) con un 429 uniforme, y la cuenta sigue entrando desde otro origen.
+   */
+  it("C-02: los fallos ya no bloquean la cuenta; se limita el par y la contraseña correcta entra desde otro origen", async () => {
+    await createUser({ username: "atacada", roleNames: ["swimmer"] });
+    for (let i = 0; i < PERFIL.parMaxFallos; i++) {
+      expect((await http("atacada", INCORRECTA)).json()).toEqual(GENERICO);
     }
 
-    expect((await cuenta("se_bloquea")).status).toBe("locked");
-    expect((await http("se_bloquea", TEST_PASSWORD)).json(), "con la contraseña correcta, igual").toEqual(GENERICO);
-    expect(await sesiones()).toBe(0);
+    const limitado = await http("atacada", TEST_PASSWORD);
+    expect(limitado.statusCode, "el par agotó su presupuesto: ni la correcta se verifica").toBe(429);
+    expect(limitado.json()).toEqual({ error: "LOGIN_THROTTLED", message: MENSAJE_LOGIN_LIMITADO });
+    expect((await cuenta("atacada")).status, "la cuenta NO se bloquea").toBe("active");
+
+    const otroOrigen = await app.inject({
+      method: "POST",
+      url: "/auth/login",
+      payload: { username: "atacada", password: TEST_PASSWORD },
+      remoteAddress: "192.0.2.50",
+    });
+    expect(otroOrigen.statusCode, "desde otra red entra").toBe(200);
+    expect(await sesiones()).toBe(1);
   });
 });
 
@@ -212,10 +233,13 @@ describe("contraseña incorrecta en estados que no cuentan intentos", () => {
     await createUser({ username: "inhab", roleNames: ["swimmer"], status: "disabled" });
     await createUser({ username: "adm", roleNames: ["swimmer"], status: "locked", lockedUntil: null });
 
-    for (let i = 0; i < env.LOGIN_MAX_ATTEMPTS + 2; i++) {
+    // Cinco fallos por cuenta: el sexto ya lo limita el par (C-02), sin tocar la cuenta.
+    for (let i = 0; i < PERFIL.parMaxFallos; i++) {
       expect((await http("inhab", INCORRECTA)).json()).toEqual(GENERICO);
       expect((await http("adm", INCORRECTA)).json()).toEqual(GENERICO);
     }
+    expect((await http("inhab", INCORRECTA)).statusCode).toBe(429);
+    expect((await http("adm", INCORRECTA)).statusCode).toBe(429);
 
     const inhab = await cuenta("inhab");
     expect(inhab.status).toBe("disabled");
@@ -303,7 +327,11 @@ describe("verificación ficticia de Argon2", () => {
     const fresco = await import("../src/modules/auth/password.util");
     const hash = vi.spyOn(argon2, "hash").mockRejectedValueOnce(new Error("fallo sintético"));
 
-    await expect(fresco.verificacionFicticia("x")).rejects.toThrow("fallo sintético");
+    // C-02: el fallo llega como error técnico (503), con el original como causa.
+    await expect(fresco.verificacionFicticia("x")).rejects.toMatchObject({
+      statusCode: 503,
+      cause: expect.objectContaining({ message: "fallo sintético" }),
+    });
     await expect(fresco.verificacionFicticia("x")).resolves.toBe(false);
     expect(hash).toHaveBeenCalledTimes(2);
   });
@@ -357,17 +385,21 @@ describe("errores técnicos y límite por IP conservan su clasificación", () =>
     const falla = Object.assign(new Error("conexión cerrada sintética"), { code: "P1017" });
     const original = prisma.$transaction.bind(prisma) as (...a: unknown[]) => Promise<unknown>;
     let llamadas = 0;
+    // C-02: las dos primeras transacciones son la admisión y la liquidación del acierto en el
+    // limitador; la TERCERA es la de la sesión, la que se hace fallar.
     vi.spyOn(prisma, "$transaction").mockImplementation(((...args: unknown[]) => {
       llamadas++;
-      return llamadas === 1 ? Promise.reject(falla) : original(...args);
+      return llamadas === 3 ? Promise.reject(falla) : original(...args);
     }) as never);
 
     const res = await http("cae_despues", TEST_PASSWORD);
 
+    expect(llamadas).toBe(3);
     expect(res.statusCode).toBe(503);
     expect(res.body).not.toContain("conexión cerrada sintética");
     expect(await sesiones()).toBe(0);
     expect((await prisma.user.findUniqueOrThrow({ where: { id: usuario.id } })).failedLoginAttempts).toBe(0);
+    expect(await prisma.limFalloPar.count(), "un acierto no cuenta como fallo").toBe(0);
   });
 
   it("el límite por IP sigue respondiendo 429, con su propio código", async () => {
@@ -398,12 +430,13 @@ describe("las garantías de sesión del login se conservan", () => {
     expect(c.lastLoginAt).not.toBeNull();
   });
 
-  it("contraseña incorrecta: cuenta el intento y lo audita, sin sesión", async () => {
+  it("contraseña incorrecta: el limitador cuenta el intento y se audita, sin sesión", async () => {
     const usuario = await createUser({ username: "falla", roleNames: ["swimmer"] });
 
     await http("falla", INCORRECTA);
 
-    expect((await cuenta("falla")).failedLoginAttempts).toBe(1);
+    expect((await cuenta("falla")).failedLoginAttempts, "C-02: RB-15 ya no escribe en la cuenta").toBe(0);
+    expect(await prisma.limFalloPar.count({ where: { verificado: true } })).toBe(1);
     expect(await prisma.auditLog.count({ where: { action: "LOGIN_FAILED", entityId: usuario.id } })).toBe(1);
     expect(await sesiones()).toBe(0);
   });
@@ -481,7 +514,8 @@ describe("personas bloqueadas o inhabilitadas por el sistema (flujo real con cue
       expect(sesionRevocada.revokedAt, "el sistema cortó la sesión al bloquear").not.toBeNull();
       expect(sesionRevocada.revokedReason).toBe("admin_revocation");
 
-      for (let i = 0; i < env.LOGIN_MAX_ATTEMPTS + 2; i++) {
+      // Cada acierto perdona en su par los fallos anteriores (C-02), así que el par no se agota.
+      for (let i = 0; i < PERFIL.parMaxFallos + 2; i++) {
         await http("titular", INCORRECTA);
         await http("titular", TEST_PASSWORD);
       }

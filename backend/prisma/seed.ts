@@ -43,9 +43,9 @@ async function main() {
    * ninguno configuraba nada — el primero el 12 de septiembre de 2026 y el
    * segundo el 13:
    *
-   * - `LOGIN_MAX_ATTEMPTS`: nadie la leía. El servicio de autenticación usa
-   *   `env.LOGIN_MAX_ATTEMPTS`, y esa es la única fuente, junto con
-   *   `LOGIN_LOCKOUT_MINUTES`.
+   * - `LOGIN_MAX_ATTEMPTS`: nadie la leía. El servicio de autenticación usaba
+   *   `env.LOGIN_MAX_ATTEMPTS`, junto con `LOGIN_LOCKOUT_MINUTES`; con C-02 ambas
+   *   se retiraron y los límites del login están en `limitadorClaves.ts`.
    * - `SWIMMER_SINGLE_CLUB_ACTIVE`: ponerla en `false` no habilitaba nada. La
    *   migración crea un índice único parcial sobre
    *   `club_swimmers(person_id) WHERE status='active'` de forma incondicional,

@@ -4,6 +4,7 @@ import { loginSchema, changePasswordSchema } from "./auth.schemas";
 import { requireAuthDuringPasswordChange } from "./rbac.middleware";
 import { UnauthorizedError, ValidationError } from "../../shared/errors";
 import { env, type Env } from "../../shared/env";
+import { origenIpDe, origenParaLimites } from "../../shared/ipCliente";
 import {
   establecerCookieDeSesion,
   limpiarCookieDeSesion,
@@ -39,8 +40,9 @@ export async function authRoutes(app: FastifyInstance, opciones: { config?: Env 
 
   /**
    * POST /auth/login
-   * Rate-limit dedicado (ver server.ts) además del bloqueo por intentos
-   * fallidos a nivel de cuenta (RB-15).
+   * Presupuesto en memoria propio del login (ver server.ts), además del limitador
+   * persistente por par, origen y cuenta (C-02, `limitadorLogin.ts`). Ya no existe el
+   * bloqueo temporal de la cuenta entera (RB-15).
    */
   app.post("/auth/login", {
     schema: {
@@ -53,8 +55,10 @@ export async function authRoutes(app: FastifyInstance, opciones: { config?: Env 
     if (!parsed.success) throw new ValidationError("Datos de login inválidos", parsed.error.flatten());
 
     const { refreshToken, ...respuesta } = await authService.login(parsed.data, {
+      // La auditoría conserva la IP completa; el limitador (C-02) agrupa por su origen.
       ipAddress: req.ip,
       userAgent: req.headers["user-agent"],
+      origen: origenParaLimites(req.ip, origenIpDe(req.raw)),
     });
 
     const csrfToken = establecerCookieDeSesion(reply, refreshToken, config);

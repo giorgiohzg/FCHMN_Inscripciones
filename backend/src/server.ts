@@ -24,7 +24,17 @@ import { manejadorDeErrores } from "./shared/manejadorDeErrores";
 import { prisma } from "./shared/prisma.client";
 import { env, swaggerHabilitadoEn, urlPublicaApiDe, type Env } from "./shared/env";
 import { opcionesDeRegistro, ControladorDeRegistroSeguro } from "./shared/registro";
-import { opcionesDeOrigenIp } from "./shared/ipCliente";
+import { opcionesDeOrigenIp, origenIpDe, origenParaLimites } from "./shared/ipCliente";
+import { configurarSemaforoArgon2, prepararHashFicticio } from "./modules/auth/password.util";
+import {
+  asegurarCapacidad,
+  barrer,
+  configurarLimitador,
+  iniciarMantenimientoDelLimitador,
+  purgar,
+  reconciliarCapacidad,
+  verificarConfiguracionDelLimitador,
+} from "./modules/auth/limitadorLogin";
 
 /**
  * Métodos que la aplicación expone.
@@ -63,6 +73,32 @@ export async function buildServer(config: Env = env, opciones: { flujoDeRegistro
     ...opcionesDeOrigenIp(config.IP_CLIENTE_FUENTE),
   });
   app.log.info({ fuenteIpCliente: config.IP_CLIENTE_FUENTE }, "fuente de la IP del cliente");
+
+  /**
+   * C-02 y semáforo de Argon2. Antes de admitir solicitudes (`onReady`, que `listen` espera):
+   *  - el secreto del limitador debe corresponder al estado guardado; si no, el arranque FALLA
+   *    sin borrar ni reiniciar contadores (la rotación no está implementada);
+   *  - las filas de capacidad que falten se crean; las reservas vencidas se cobran, las claves
+   *    vencidas se purgan y la capacidad se reconcilia con el recuento real;
+   *  - el hash de la verificación ficticia se calcula por adelantado.
+   * Después, barrido y purga cada `TECNICO.intervaloDeMantenimientoMs`.
+   */
+  configurarSemaforoArgon2({ max: config.ARGON2_MAX_SIMULTANEAS, cola: config.ARGON2_MAX_EN_COLA, esperaMs: config.ARGON2_ESPERA_MAX_MS });
+  configurarLimitador(config.AUTH_LIMITER_SECRET);
+  let detenerMantenimiento: (() => void) | null = null;
+  app.addHook("onReady", async () => {
+    await verificarConfiguracionDelLimitador(config.AUTH_LIMITER_SECRET);
+    await asegurarCapacidad();
+    await barrer();
+    await purgar();
+    const corregidos = await reconciliarCapacidad();
+    if (corregidos.length > 0) app.log.warn({ recursos: corregidos }, "limitador de login: capacidad reconciliada con el recuento real");
+    await prepararHashFicticio().catch((err) => app.log.error({ err }, "no se pudo preparar el hash ficticio: se calculará al usarlo"));
+    detenerMantenimiento = iniciarMantenimientoDelLimitador(app.log);
+  });
+  app.addHook("onClose", async () => {
+    detenerMantenimiento?.();
+  });
 
   /**
    * `Cache-Control: no-store` EN TODA RESPUESTA de la aplicación.
@@ -163,17 +199,33 @@ export async function buildServer(config: Env = env, opciones: { flujoDeRegistro
     await app.register(swaggerUI, { routePrefix: "/docs" });
   }
 
-  // Rate limit más estricto específicamente para login (defensa adicional
-  // sobre el bloqueo por cuenta de la sección de reglas de negocio RB-15).
+  /**
+   * Límite en memoria de `/auth/*`, primera capa delante del limitador persistente de login
+   * (C-02, `modules/auth/limitadorLogin.ts`).
+   *
+   * DOS PRESUPUESTOS SEPARADOS por origen: `login` (`RATE_LIMIT_AUTH_MAX`) y `sesion` para
+   * refresh, csrf, me, logout y change-password (`RATE_LIMIT_SESION_MAX`). Antes era un único
+   * contador para todo `/auth/*`, así que los intentos de login desde una red consumían el
+   * presupuesto que necesitaban las renovaciones de sesión de esa misma red. La separación se
+   * hace con la clave y el máximo, no con `config.rateLimit` por ruta, que también cambiaría
+   * el límite global de esas rutas.
+   *
+   * El origen es el de `origenParaLimites` (IPv4, /64 en IPv6, o el respaldo compartido).
+   */
+  const grupoDeAuth = (req: { routeOptions: { url?: string } }) => (req.routeOptions.url === "/auth/login" ? "login" : "sesion");
   app.register(async (scoped) => {
     await scoped.register(rateLimit, {
-      max: config.RATE_LIMIT_AUTH_MAX,
+      keyGenerator: (req) => `${origenParaLimites(req.ip, origenIpDe(req.raw))}|${grupoDeAuth(req)}`,
+      max: (req) => (grupoDeAuth(req) === "login" ? config.RATE_LIMIT_AUTH_MAX : config.RATE_LIMIT_SESION_MAX),
       timeWindow: "1 minute",
-      errorResponseBuilder: (_req, context) => ({
+      errorResponseBuilder: (req, context) => ({
         statusCode: 429,
         code: "RATE_LIMIT_EXCEEDED",
         error: "RATE_LIMIT_EXCEEDED",
-        message: `Demasiados intentos de inicio de sesión — espere ${Math.ceil((context.ttl ?? 0) / 1000)} segundos e intente de nuevo.`,
+        message:
+          grupoDeAuth(req) === "login"
+            ? `Demasiados intentos de inicio de sesión — espere ${Math.ceil((context.ttl ?? 0) / 1000)} segundos e intente de nuevo.`
+            : `Demasiadas solicitudes seguidas — espere ${Math.ceil((context.ttl ?? 0) / 1000)} segundos e intente de nuevo.`,
       }),
     });
     // La configuración de la cookie de sesión viaja con las rutas: los

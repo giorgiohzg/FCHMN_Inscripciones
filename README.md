@@ -521,7 +521,19 @@ sesión no viaja.
   **cerrar sesión falla ruidosamente si no llegó al servidor**: la cookie es `HttpOnly` y
   solo el servidor puede revocarla, así que anunciar un cierre que no ocurrió dejaría al
   usuario creyendo que salió de un equipo compartido.
-- **Bloqueo de cuenta tras 5 intentos fallidos** (RB-15), 15 minutos, configurable.
+- **Limitador del login** (C-02, política B; **publicada en el repositorio, con validación local descrita; pendiente de despliegue**;
+  en producción sigue el bloqueo de cuenta RB-15 hasta su despliegue). Sustituye al bloqueo temporal de la cuenta entera tras 5 intentos fallidos,
+  que permitía a un tercero bloquear cualquier cuenta. Límites persistentes en PostgreSQL:
+  5 fallos por **par** usuario–origen en 15 minutos (ventana deslizante), 50 fallos por
+  **origen** por hora (ventana fija) y, con 20 fallos verificados de una **cuenta** en una
+  hora, 60 minutos de protección en los que cada fallo de un par le impone su propia espera
+  de 15 minutos sin afectar a otros orígenes. IPv6 se agrupa por `/64` solo para estas
+  claves; la auditoría conserva la IP completa. Respuesta **429 uniforme** al limitar y
+  **503** ante saturación o error técnico. Las claves se guardan solo como HMAC con
+  `AUTH_LIMITER_SECRET`, que no se puede rotar todavía (la rotación requiere un
+  procedimiento y una autorización posteriores). Retira `LOGIN_MAX_ATTEMPTS` y
+  `LOGIN_LOCKOUT_MINUTES`; los bloqueos temporales antiguos se respetan hasta vencer y los
+  administrativos se conservan. Detalle en `docs/seguridad/PLAN_SEGURIDAD.md` («C-02»).
 - **RBAC** evaluado siempre en backend (`requirePermission` / `requireRole`); el frontend
   solo usa roles y permisos para mostrar/ocultar UI, nunca como control real.
   `hasPermission()` consulta los permisos que trae el access token vigente —que el backend
@@ -532,7 +544,10 @@ sesión no viaja.
 - Mensajes de error de login **genéricos**: no revelan si el nombre de usuario o
   la cuenta existe. (El login es por **nombre de usuario**, no por correo.)
 - Rate limiting global (300 req/min, `RATE_LIMIT_GLOBAL_MAX`) + rate limiting específico
-  y más estricto en `/auth/*` (20 req/min, `RATE_LIMIT_AUTH_MAX`). El contador vive **en
+  y más estricto en `/auth/*` (20 req/min, `RATE_LIMIT_AUTH_MAX`). Con C-02 (pendiente de despliegue),
+  el login y las operaciones de sesión (`/auth/refresh`, `/auth/logout`, `/auth/me`…) tienen
+  presupuestos **separados** (`RATE_LIMIT_SESION_MAX`, 60 por omisión), para que una ráfaga de
+  logins no deje sin renovar las sesiones abiertas. El contador vive **en
   memoria del proceso**, así que el límite es por instancia: el despliegue previsto es de
   una sola instancia. Con más de una habría que volver a un contador compartido
   (ver la nota de Redis en `docs/internas/01_Propuesta_Base.md`).
@@ -552,7 +567,7 @@ sesión no viaja.
   ejecutar. `TRUST_PROXY_HOPS=2` permanece configurada en la API, pero el código nuevo la ignora
   (no se ha retirado). La identificación de IP tiene una **validación acotada en producción**
   (un equipo y una red), no una garantía general. Evidencia, frontera de confianza y límites en
-  `docs/seguridad/PLAN_SEGURIDAD.md` («IP del cliente»); C-02 sigue pendiente.
+  `docs/seguridad/PLAN_SEGURIDAD.md` («IP del cliente»); C-02 está publicada en el repositorio, con validación local descrita; pendiente de despliegue.
 
 ## Endpoints del Módulo 2 — Personas
 
@@ -771,7 +786,7 @@ cuenta `system`.
   - **Fórmulas en el CSV de inscritos:** con Excel 16.0 en es-CL (separador `;`), abrir por doble clic el CSV evaluaba valores como `Club;=1+1;Z`. La exportación CSV neutraliza ahora también cada trozo que una planilla podría tomar como inicio de celda (tras `;`, `|`, tabulador o salto de línea, saltando espacios y comillas). Cambia solo `escapeCsvValue`; la neutralización compartida con XLSX no se toca. Sin cambios de separador, columnas ni estructura. Los casos ensayados ya no producen fórmulas en Excel (doble clic e importación con coma, `;` y tabulador); el BOM y los acentos siguen sin corregirse.
   - **«Descancelar»:** `POST /competitions/:id/uncancel`, solo con el rol `admin` (comprobado en la API además del permiso), lleva una competencia `cancelada` a `borrador`, siempre. Conserva sus datos, no abre inscripciones y audita `COMPETITION_UNCANCEL` en la misma transacción; rechaza otros estados y las repeticiones o solicitudes concurrentes. La página de la competencia muestra el botón solo a administración y con la competencia cancelada, con confirmación.
   - Detalle y límites en `docs/seguridad/PLAN_SEGURIDAD.md` («AUD-V» y «Descancelar»).
-- **Intentos de cambio de contraseña por sesión** (C-04; **cerrada dentro de su alcance: migrada y desplegada en producción**, validada en local y en la CI, **sin prueba autenticada del límite en producción**): `/auth/change-password` cuenta las contraseñas actuales incorrectas de **cada sesión**, durante toda su vida (el refresh no la reinicia). En la quinta termina **solo esa sesión** —la cuenta, las demás sesiones y los logins futuros no cambian— y la interfaz vuelve al login con el motivo; los cuatro primeros fallos no expulsan. Rige igual para el cambio obligatorio y el voluntario. El `sid` sale de la sesión que verificó el servidor, nunca de la solicitud; una reserva por sesión, con token y caducidad, decide qué resultado produce efectos, y Argon2 sigue fuera de las transacciones. No cuentan los errores de la contraseña nueva, los de ejecución ni los resultados que llegan tarde. Esquema: tres columnas nuevas en `refresh_sessions` (migración aditiva). **C-02** (bloqueo de cuentas por terceros en el login) **sigue pendiente**. Detalle y límites en `docs/seguridad/PLAN_SEGURIDAD.md` («C-04»).
+- **Intentos de cambio de contraseña por sesión** (C-04; **cerrada dentro de su alcance: migrada y desplegada en producción**, validada en local y en la CI, **sin prueba autenticada del límite en producción**): `/auth/change-password` cuenta las contraseñas actuales incorrectas de **cada sesión**, durante toda su vida (el refresh no la reinicia). En la quinta termina **solo esa sesión** —la cuenta, las demás sesiones y los logins futuros no cambian— y la interfaz vuelve al login con el motivo; los cuatro primeros fallos no expulsan. Rige igual para el cambio obligatorio y el voluntario. El `sid` sale de la sesión que verificó el servidor, nunca de la solicitud; una reserva por sesión, con token y caducidad, decide qué resultado produce efectos, y Argon2 sigue fuera de las transacciones. No cuentan los errores de la contraseña nueva, los de ejecución ni los resultados que llegan tarde. Esquema: tres columnas nuevas en `refresh_sessions` (migración aditiva). **C-02** (bloqueo de cuentas por terceros en el login) está **publicada en el repositorio, con validación local descrita; pendiente de despliegue**. Su corrección de errores técnicos de C-04 (una excepción de Argon2 o su saturación ya no cuentan como fallo ni terminan la sesión: 503) también queda pendiente de despliegue; el cierre de C-04 descrito arriba no cambia. Detalle y límites en `docs/seguridad/PLAN_SEGURIDAD.md` («C-04»).
   - **Cierre en producción (2026-11-10).** Código `2c3552e46d4b4530f47014ebcab53ecff1852047`; CI `42873065151`, éxito. Respaldo de `fchmn-postgres` terminado y disponible, sin descarga ni enlace firmado. Única migración aplicada: `20261110000000_intentos_cambio_contrasena`, con el cron de mantenimiento (dos ejecuciones, de 26 a 28; Docker Command vacío y programación conservada; [construcción](https://dashboard.render.com/cron/crn-dbh500bl550s73c5n2o0/deploys/dep-dbpmirui0phs73cg2cug)). Despliegues, en este orden: web `973cacc` → `2c3552e` ([despliegue](https://dashboard.render.com/web/srv-dbh48scs728c73arlf8g/deploys/dep-dbpmmhou01pc73dqumag)) y API `79bcc2b` → `2c3552e` ([despliegue](https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80/deploys/dep-dbpmnd6c6qcc73dgjf90)). Render informó «Deploy succeeded» y Live en ambas, con Auto-Deploy Off en web, API y mantenimiento.
   - **Evidencia, por separado.** *Render:* commit, estado y operaciones descritos arriba. *HTTP observado:* `/login`, `/api/health` y `/api/ready` con 200 y `/api/auth/me` sin credenciales con 401, con `Cache-Control: no-store` y la CSP conservada; la web sirve un paquete JS que contiene el código de C-04. El muestreo de `/api/health` dio 30 respuestas 200 entre las 19:08:06Z y las 19:13:07Z, con un máximo de 888 ms; los intervalos entre muestras no se observaron, así que eso acredita disponibilidad en los instantes muestreados. *Validación funcional:* pruebas locales previas (incluida la integración sobre la base desechable) y la CI. *Producción:* **sin pruebas autenticadas del límite, la reserva ni el cierre terminal.** Conviene recargar las pestañas abiertas; no se actualizaron las de otros usuarios.
   - **Correspondencia local.** Imágenes locales: frontend `2094ef56a597`, backend `69edf76a7cfe` y migraciones `2f8a5fcaded4`. *Contenido comprobado:* el `prisma/` de la imagen del backend coincide con el de `2c3552e` (38 migraciones) y el código de C-04 está en el `dist` del backend y en el paquete del frontend. *Registro de construcción:* el log de la construcción nombra esas tres imágenes y los contenedores de frontend y backend usan las suyas. *Migración local:* el registro de la migración local muestra aplicada `20261110000000_intentos_cambio_contrasena`. En la actualización local anterior se recrearon los contenedores de frontend, backend y Postgres, conservando el volumen; ahora quedaron detenidos y el volumen local se conservó. No se declara identidad binaria con las imágenes de Render: el paquete JS del frontend local y el de producción tienen nombres distintos y no se investigó la causa.

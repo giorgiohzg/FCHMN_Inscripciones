@@ -154,6 +154,8 @@ describe("un fallo TRANSITORIO no borra la sesión", () => {
     ["servidor caído (503)", new ApiError("Servicio no disponible", 503)],
     ["error interno (500)", new ApiError("Error interno", 500)],
     ["timeout de la pasarela (504)", new ApiError("Gateway timeout", 504)],
+    // C-02: el presupuesto de las operaciones de sesión puede agotarse en una red compartida.
+    ["límite de solicitudes (429)", new ApiError("Demasiadas solicitudes seguidas", 429, "RATE_LIMIT_EXCEEDED")],
   ])("%s: conserva el perfil y no expulsa al usuario", async (_caso, error) => {
     // Perfil en caché, como tras una recarga con la sesión abierta.
     sessionStorage.setItem("natacion.perfil", JSON.stringify(SESION_ADMIN.user));
@@ -378,6 +380,7 @@ describe("un bootstrap CSRF que falla no expulsa al usuario", () => {
     ["red caída", new TypeError("Failed to fetch")],
     ["error del servidor (500)", new ApiError("Error interno", 500)],
     ["servicio no disponible (503)", new ApiError("No disponible", 503)],
+    ["límite de solicitudes (429)", new ApiError("Demasiadas solicitudes seguidas", 429, "RATE_LIMIT_EXCEEDED")],
   ])("%s: conserva la sesión y NO intenta el refresco a ciegas", async (_caso, error) => {
     sessionStorage.setItem("natacion.perfil", JSON.stringify(SESION_ADMIN.user));
     vi.mocked(authApi.apiCsrf).mockRejectedValue(error);

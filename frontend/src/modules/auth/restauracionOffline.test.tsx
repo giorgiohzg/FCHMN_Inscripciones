@@ -61,6 +61,7 @@ describe("un fallo transitorio de restauración no navega a /login", () => {
     ["servicio no disponible (503)", new ApiError("No disponible", 503)],
     ["timeout de la pasarela (504)", new ApiError("Gateway timeout", 504)],
     ["red caída", new TypeError("Failed to fetch")],
+    ["límite de solicitudes (429)", new ApiError("Demasiadas solicitudes seguidas", 429, "RATE_LIMIT_EXCEEDED")],
   ])("%s: se queda en la ruta protegida y ofrece reintentar", async (_caso, error) => {
     sessionStorage.setItem("natacion.perfil", JSON.stringify(SESION.user));
     vi.mocked(authApi.apiRefresh).mockRejectedValue(error);

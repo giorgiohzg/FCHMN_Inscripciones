@@ -21,6 +21,7 @@ import {
   exigirQueQuedeAlgunAdministrador,
 } from "./admin-access";
 import { terminarSesionesDelTitular, terminarSesionesDelUsuario } from "../auth/sessions";
+import { anularCuentaEnLimitador } from "../auth/limitadorLogin";
 import type { PersonCreateInput, PersonUpdateInput, PersonListQuery } from "./persons.schemas";
 
 interface ActorContext {
@@ -612,11 +613,14 @@ export async function resetCredentials(personId: string, actor: ActorContext) {
   // quedar la contraseña nueva con las sesiones anteriores vivas.
   await withAudit(
     async (tx) => {
-      await tx.user.update({
+      const cuenta = await tx.user.update({
         where: { id: person.user!.id },
         data: { passwordHash, mustChangePassword: true, failedLoginAttempts: 0, status: "active", lockedUntil: null },
       });
       await terminarSesionesDelUsuario(tx, person.user!.id, "admin_revocation");
+      // C-02: borra los contadores de la cuenta y de sus pares (no los de ningún origen) y
+      // anula sus reservas en curso, en esta misma transacción y después de `users` y sesiones.
+      await anularCuentaEnLimitador(tx, cuenta.username);
     },
     () => ({ userId: actor.userId, action: "PERSON_CREDENTIALS_RESET", entityType: "User", entityId: person.user!.id, ipAddress: actor.ipAddress })
   );

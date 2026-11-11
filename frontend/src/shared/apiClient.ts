@@ -23,7 +23,7 @@ export const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
  * Reintentar un 401 de estas rutas no tiene sentido y sí tiene consecuencias:
  *   - `/auth/login`: un 401 significa credenciales incorrectas; renovar no
  *     arregla nada y reintentar duplicaría el intento fallido, acercando el
- *     bloqueo de cuenta por RB-15.
+ *     límite del login (RB-15; con C-02, el del par usuario–origen).
  *   - `/auth/refresh`: es la renovación misma. Renovar ante su propio fallo es
  *     una recursión infinita.
  *   - `/auth/logout`: cerrar sesión no necesita una sesión válida.

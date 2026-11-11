@@ -144,6 +144,29 @@ export function analizarIp(entrada: string | undefined | null): DireccionIp | nu
 }
 
 /**
+ * ORIGEN PARA LOS LÍMITES DE LOGIN (C-02). Es una clave de agrupación, no una dirección:
+ *
+ *  - IPv4 (también las IPv4 mapeadas, que `analizarIp` ya devuelve como IPv4): la dirección.
+ *  - IPv6: su prefijo /64 (`2001:db8:1:2::/64`). Un cliente suele recibir un /64 completo, y
+ *    contar por /128 dejaría rotar direcciones dentro de él para eludir el límite.
+ *  - Respaldo (`CF-Connecting-IP` ausente, repetida o inválida): UN origen compartido, sin
+ *    ningún valor del cliente.
+ *  - Una dirección que no se pueda analizar (no debería ocurrir: `req.ip` ya es canónica):
+ *    otro origen compartido.
+ *
+ * Solo se usa para las claves de los límites. La auditoría conserva la IP completa.
+ */
+export function origenParaLimites(ip: string | undefined, origen: OrigenIp | undefined): string {
+  if (origen?.fuente === "respaldo") return "respaldo";
+  const analizada = analizarIp(ip);
+  if (!analizada) return "desconocido";
+  if (analizada.familia === 4) return `4:${analizada.texto}`;
+  const grupos = gruposIpv6(analizada.texto);
+  if (!grupos) return "desconocido";
+  return `6:${textoIpv6([...grupos.slice(0, 4), 0, 0, 0, 0])}/64`;
+}
+
+/**
  * Restricción para ACEPTAR `CF-Connecting-IP`, separada del análisis: una dirección que no puede
  * ser la de un cliente que se conecta a Cloudflare por internet (sin especificar, loopback,
  * multicast o difusión). Es saneamiento, no autenticación. Las privadas y el rango 240/4 (pseudo

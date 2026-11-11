@@ -54,18 +54,33 @@ vi.mock("../src/modules/audit/audit.service", async (original) => {
 });
 vi.mock("../src/modules/auth/password.util", async (original) => {
   const real = await original<typeof import("../src/modules/auth/password.util")>();
+  const contarYRetener = async () => {
+    control.verificaciones++;
+    const barrera = control.barrera;
+    if (barrera) {
+      control.barrera = null;
+      barrera.alcanzada();
+      await barrera.suelta;
+    }
+  };
   return {
     ...real,
     verifyPassword: async (...args: Parameters<typeof real.verifyPassword>) => {
-      control.verificaciones++;
-      const barrera = control.barrera;
-      if (barrera) {
-        control.barrera = null;
-        barrera.alcanzada();
-        await barrera.suelta;
-      }
+      await contarYRetener();
       return real.verifyPassword(...args);
     },
+    // El cambio de contraseña verifica DENTRO de su cupo (verificación y hash nuevo en una sola
+    // adquisición): el doble envuelve esa verificación con el mismo recuento y la misma barrera.
+    conArgon2: <T,>(fn: Parameters<typeof real.conArgon2<T>>[0]) =>
+      real.conArgon2<T>((ops) =>
+        fn({
+          ...ops,
+          verificar: async (hash, plain) => {
+            await contarYRetener();
+            return ops.verificar(hash, plain);
+          },
+        })
+      ),
   };
 });
 

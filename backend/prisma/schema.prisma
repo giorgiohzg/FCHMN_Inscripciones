@@ -979,3 +979,111 @@ model RelayRegistrationMember {
   @@unique([relayRegistrationId, orderPosition])
   @@map("relay_registration_members")
 }
+
+// ---------------------------------------------------------------------------
+// C-02: LIMITADOR DE LOGIN (ver `src/modules/auth/limitadorLogin.ts`).
+//
+// Sustituye el bloqueo temporal de la cuenta entera (RB-15) por límites por par
+// usuario–origen, por origen y por cuenta. Estas tablas guardan SOLO huellas HMAC
+// (`AUTH_LIMITER_SECRET`), recuentos y fechas: nunca una IP ni un nombre de usuario,
+// ni el `id` de `users`. Todas las operaciones van por SQL explícito, con bloqueos
+// consultivos y la capacidad ajustada al final de cada transacción.
+// ---------------------------------------------------------------------------
+
+/// Una clave del limitador: `origen` (IP, o /64 en IPv6), `cuenta` (nombre recibido) o
+/// `par` (ambos). La cuenta existe o no en `users`: el limitador no lo distingue.
+model LimClave {
+  id                String    @id @default(uuid()) @db.Uuid
+  tipo              String    @db.VarChar(8)
+  claveHmac         Bytes     @map("clave_hmac")
+  /// Huella del secreto con que se calculó `claveHmac` (ver `lim_configuracion`).
+  claveVersion      Bytes     @map("clave_version")
+  /// Fragmento de capacidad (0–15), fijado al crear la fila.
+  fragmento         Int       @db.SmallInt
+  /// Solo en pares: la fila de su cuenta (id estable dentro del limitador).
+  cuentaId          String?   @map("cuenta_id") @db.Uuid
+  /// Ventana FIJA de origen y cuenta: inicio y fallos dentro de ella.
+  ventanaInicio     DateTime? @map("ventana_inicio")
+  fallos            Int       @default(0)
+  /// Solo en cuentas: periodo protegido.
+  protegidoDesde    DateTime? @map("protegido_desde")
+  protegidoHasta    DateTime? @map("protegido_hasta")
+  /// Solo en pares: último fallo (verificado o no) y marca de perdón por orden de reserva.
+  ultimoFalloEn     DateTime? @map("ultimo_fallo_en")
+  perdonadoHastaSeq BigInt    @default(0) @map("perdonado_hasta_seq")
+  /// Rechazos acumulados desde el último aviso agregado en la auditoría.
+  rechazos          Int       @default(0)
+  rechazoAvisadoEn  DateTime? @map("rechazo_avisado_en")
+  venceEn           DateTime  @map("vence_en")
+  creadoEn          DateTime  @default(now()) @map("creado_en")
+
+  cuenta             LimClave?     @relation("ParDeCuenta", fields: [cuentaId], references: [id], onDelete: Cascade)
+  pares              LimClave[]    @relation("ParDeCuenta")
+  fallosDelPar       LimFalloPar[]
+  reservasComoOrigen LimReserva[]  @relation("ReservaOrigen")
+  reservasComoCuenta LimReserva[]  @relation("ReservaCuenta")
+  reservasComoPar    LimReserva[]  @relation("ReservaPar")
+
+  @@unique([tipo, claveHmac, claveVersion])
+  @@index([tipo, venceEn])
+  @@index([cuentaId])
+  @@map("lim_clave")
+}
+
+/// Fallos de un par, para su ventana DESLIZANTE de 15 min. Se conservan solo los más recientes.
+model LimFalloPar {
+  parId      String   @map("par_id") @db.Uuid
+  seq        BigInt
+  creadoEn   DateTime @map("creado_en")
+  /// `false`: reserva vencida convertida en fallo sin verificar la contraseña.
+  verificado Boolean
+
+  par LimClave @relation(fields: [parId], references: [id], onDelete: Cascade)
+
+  @@id([parId, seq])
+  @@map("lim_fallo_par")
+}
+
+/// Una admisión: el permiso para que UNA verificación produzca efectos. Ocupa presupuesto
+/// desde que se crea hasta que se borra (liquidación, conversión o barrido).
+model LimReserva {
+  seq          BigInt   @id @default(autoincrement())
+  token        String   @unique @db.Uuid
+  origenId     String   @map("origen_id") @db.Uuid
+  cuentaId     String?  @map("cuenta_id") @db.Uuid
+  parId        String?  @map("par_id") @db.Uuid
+  reservaHasta DateTime @map("reserva_hasta")
+  /// Anulada por un restablecimiento de credenciales: solo cuenta en el origen.
+  anulada      Boolean  @default(false)
+  creadoEn     DateTime @default(now()) @map("creado_en")
+
+  origen LimClave  @relation("ReservaOrigen", fields: [origenId], references: [id], onDelete: Restrict)
+  cuenta LimClave? @relation("ReservaCuenta", fields: [cuentaId], references: [id], onDelete: SetNull)
+  par    LimClave? @relation("ReservaPar", fields: [parId], references: [id], onDelete: SetNull)
+
+  @@index([origenId])
+  @@index([cuentaId])
+  @@index([parId])
+  @@index([reservaHasta])
+  @@map("lim_reserva")
+}
+
+/// Capacidad atómica: `claves:00`…`claves:15` (filas de `lim_clave` por fragmento) y
+/// `reservas` (filas de `lim_reserva`). `usadas` nunca supera `cupo` (CHECK en la migración).
+model LimCapacidad {
+  recurso String @id @db.VarChar(16)
+  usadas  Int    @default(0)
+  cupo    Int
+
+  @@map("lim_capacidad")
+}
+
+/// Huella del secreto del limitador con que se creó el estado. Una sola fila (CHECK id = 1).
+/// Un proceso con otro secreto se niega a arrancar, sin borrar ni reiniciar nada.
+model LimConfiguracion {
+  id       Int      @id @db.SmallInt
+  huella   Bytes
+  creadoEn DateTime @default(now()) @map("creado_en")
+
+  @@map("lim_configuracion")
+}
