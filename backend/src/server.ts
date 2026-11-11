@@ -24,6 +24,7 @@ import { manejadorDeErrores } from "./shared/manejadorDeErrores";
 import { prisma } from "./shared/prisma.client";
 import { env, swaggerHabilitadoEn, urlPublicaApiDe, type Env } from "./shared/env";
 import { opcionesDeRegistro, ControladorDeRegistroSeguro } from "./shared/registro";
+import { opcionesDeOrigenIp } from "./shared/ipCliente";
 
 /**
  * Métodos que la aplicación expone.
@@ -53,21 +54,15 @@ export async function buildServer(config: Env = env, opciones: { flujoDeRegistro
     logger: opcionesDeRegistro(opciones.flujoDeRegistro),
     logController: new ControladorDeRegistroSeguro(),
     /**
-     * `trustProxy: true` le decía a Fastify que confiara en la cadena
-     * `X-Forwarded-For` COMPLETA, viniera de donde viniera: cualquier cliente
-     * podía declarar la IP que quisiera y con eso falsear el registro de
-     * auditoría y saltarse el límite de tasa por IP. Ahora se declara cuántos
-     * proxies propios hay por delante; con 0 (el valor por defecto) no se
-     * confía en ninguna cabecera reenviada.
+     * IP del cliente (`req.ip`): `trustProxy` y `rewriteUrl` salen juntos de
+     * `shared/ipCliente.ts`. Antes de enrutar y de registrar la petición, se deja en
+     * `X-Forwarded-For` UNA sola dirección decidida por `IP_CLIENTE_FUENTE` —el socket, o
+     * `CF-Connecting-IP` validada con respaldo al socket— y se descarta cualquier cadena
+     * declarada por el cliente. Ver ese archivo para la frontera de confianza.
      */
-    trustProxy:
-      config.TRUST_PROXY_HOPS > 0
-        ? // Se confía en los primeros N saltos contados desde el proxy más
-          // cercano. Es la forma tipada de "trust N hops": los tipos de
-          // Fastify 5 no admiten el número directo, pero sí una función.
-          (_direccion: string, salto: number) => salto < config.TRUST_PROXY_HOPS
-        : false,
+    ...opcionesDeOrigenIp(config.IP_CLIENTE_FUENTE),
   });
+  app.log.info({ fuenteIpCliente: config.IP_CLIENTE_FUENTE }, "fuente de la IP del cliente");
 
   /**
    * `Cache-Control: no-store` EN TODA RESPUESTA de la aplicación.

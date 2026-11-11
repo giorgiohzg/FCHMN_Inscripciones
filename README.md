@@ -543,8 +543,12 @@ sesión no viaja.
   `PUBLIC_API_URL` pasa a ser obligatoria.
 - Sondas separadas: `/health` (vivacidad, no consulta la base) y `/ready`
   (disponibilidad, consulta PostgreSQL y responde 503 si no contesta).
-- `TRUST_PROXY_HOPS` declara cuántos proxies propios hay por delante; con `0` (valor por
-  defecto) no se confía en `X-Forwarded-For`.
+- `IP_CLIENTE_FUENTE` decide de dónde sale la IP del cliente (`backend/src/shared/ipCliente.ts`):
+  `socket` (valor por defecto, local y pruebas) usa el par TCP e ignora `X-Forwarded-For`,
+  `X-Real-IP` y `CF-Connecting-IP`; `cf-connecting-ip` (Render) usa esa cabecera validada y
+  normalizada, con respaldo al socket. Reemplaza a `TRUST_PROXY_HOPS`. **Publicado en el repositorio
+  y validado localmente; pendiente de despliegue** (producción sigue con `TRUST_PROXY_HOPS=2`). Frontera
+  de confianza y límites en `docs/seguridad/PLAN_SEGURIDAD.md` («IP del cliente»).
 
 ## Endpoints del Módulo 2 — Personas
 

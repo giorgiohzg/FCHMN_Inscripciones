@@ -100,7 +100,7 @@ RUN apk add --no-cache 'zlib>=1.4-r0'
 # imagen oficial de Nginx: todo lo que esté en /etc/nginx/templates/*.template).
 # `NGINX_ENVSUBST_FILTER` restringe la sustitución a las DOS variables que la
 # plantilla espera; sin él, `envsubst` vaciaría también `$uri`, `$host`,
-# `$proxy_add_x_forwarded_for` y demás variables de Nginx.
+# `$remote_addr` y demás variables de Nginx.
 #
 # El filtro es una expresión regular que se compara con el NOMBRE de cada
 # variable del entorno. Va anclada (`^...$`) para que no alcance por accidente a

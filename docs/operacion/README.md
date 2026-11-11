@@ -17,7 +17,7 @@ cosas, está en **[`Instructivo_Instalacion_Nube.md`](../../Instructivo_Instalac
 | | Dónde |
 |---|---|
 | Crear los servicios, las variables de entorno y la base | Instructivo de nube, pasos 1 a 7 |
-| `TRUST_PROXY_HOPS` y el resto de la configuración de la API | Instructivo de nube, paso 6 |
+| `IP_CLIENTE_FUENTE` (antes `TRUST_PROXY_HOPS`) y el resto de la configuración de la API | Instructivo de nube, paso 6 |
 | Respaldos: crear la exportación, descargarla, comprobarla y la rutina de retención | Instructivo de nube, «Respaldos y recuperación» |
 | Leer qué commit está desplegado y desactivar o reactivar el despliegue automático | Instructivo de nube |
 | Ensayo de restauración de un respaldo | Instructivo de nube |

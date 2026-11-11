@@ -374,14 +374,31 @@ direcciones de conexión.
 > por la red privada. Como la web llega a la API por ese camino (Paso 7), la API
 > no necesita dirección pública para nada.
 >
-> **Qué pasaría si la dejáramos pública.** La API confía en dos saltos de
-> proxy (`TRUST_PROXY_HOPS=2`), porque ese es el recorrido real cuando se entra
-> por la web. Pero alguien que entrara **directamente por la dirección pública
-> de la API** solo tendría un proxy por delante, y ese salto de más se lo
-> quedaría él: podría inventar su propia dirección IP con una cabecera
-> `X-Forwarded-For`.
+> **Qué pasaría si la dejáramos pública.** Con `IP_CLIENTE_FUENTE=cf-connecting-ip`
+> la API toma la IP del cliente de la cabecera `CF-Connecting-IP`. Hay que
+> distinguir dos cosas:
 >
-> *Comprobado en un entorno local que reproduce el recorrido:*
+> - **Una dirección pública de Render** (`…onrender.com`) pasa por el borde de
+>   Render, con Cloudflare. Ahí Render indica que `CF-Connecting-IP` trae la IP
+>   del cliente. Si el borde **sobrescribe** un `CF-Connecting-IP` que el cliente
+>   envíe por su cuenta no está documentado por Cloudflare ni comprobado en
+>   producción: no se afirma que por ese camino se pueda inventar la IP, ni que
+>   no se pueda.
+> - **Una conexión directa que evita el borde** escribe la cabecera ella misma.
+>   Hoy el único camino así es la red privada de Render, que no pasa por
+>   Cloudflare.
+>
+> La API **sigue siendo un servicio privado**: así no hay una segunda entrada
+> pública que dependa de ese comportamiento del borde sin verificar, y todo el
+> tráfico de internet pasa por el Nginx de la web. Lo que sí queda abierto es la
+> **frontera privada aceptada**: cualquier servicio del mismo workspace y región
+> puede llamar a la API, directo o pasando por la web, con un `CF-Connecting-IP`
+> inventado. Se acepta para los servicios propios actuales (ver el recuadro del
+> Paso 6).
+>
+> *Simulación local del mecanismo ANTERIOR (`TRUST_PROXY_HOPS`, ya retirado del
+> código). Sus resultados valen solo para aquel mecanismo y no se extrapolan al
+> actual, que no se probó por un camino público:*
 >
 > | Camino | IP que queda auditada |
 > |---|---|
@@ -470,7 +487,7 @@ direcciones de conexión.
    | Nombre | Valor |
    |---|---|
    | `AUTH_COOKIE_SAMESITE` | `lax` (ver el recuadro de abajo) |
-   | `TRUST_PROXY_HOPS` | `2` (ver el recuadro de abajo) |
+   | `IP_CLIENTE_FUENTE` | `cf-connecting-ip` (ver el recuadro de abajo) |
    | `PORT` | `3000` |
 
    > **Por qué aquí sí se declara `PORT`.** En un servicio web, Render inyecta
@@ -481,7 +498,7 @@ direcciones de conexión.
    > detalle no documentado. Este valor tiene que coincidir con el que pongas en
    > `API_INTERNA` (Paso 7).
 
-   > ### Por qué `lax` y por qué `2`
+   > ### Por qué `lax` y por qué `cf-connecting-ip`
    >
    > Las dos salen de la misma decisión: **el navegador accede a la web y a la
    > API desde el mismo origen**, porque el Nginx del frontend sirve la API en
@@ -496,21 +513,35 @@ direcciones de conexión.
    > bloquear. `lax` es además más seguro que `none`, porque el navegador no
    > manda la cookie en peticiones nacidas en otro sitio.
    >
-   > **`TRUST_PROXY_HOPS=2`**, porque hay exactamente **dos** proxies por
-   > delante: el borde de Render y el Nginx del frontend. Con ese número, la API
-   > toma como dirección del usuario la que declaró el borde, y descarta
-   > cualquier dirección que el propio cliente haya intentado inyectar. De ahí
-   > dependen el registro de auditoría y el límite de tasa por IP.
+   > **`IP_CLIENTE_FUENTE=cf-connecting-ip`**, porque Render recomienda la cabecera
+   > `CF-Connecting-IP` para identificar al cliente público y advierte que
+   > `X-Forwarded-For` no es exacta detrás de su red. La API la valida (IPv4 o
+   > IPv6 reales), la normaliza (las escrituras equivalentes de una misma
+   > dirección dan la misma clave) y, si falta, está repetida o no es aceptable,
+   > usa el **respaldo**: la dirección del Nginx propio, compartida por todos y
+   > nunca declarada por el cliente. De ahí dependen el registro de auditoría y
+   > el límite de tasa por IP. El Nginx ya no reenvía `X-Forwarded-For` ni
+   > `X-Real-IP`; `CF-Connecting-IP` pasa tal cual.
    >
-   > **Ni uno más ni uno menos.** Con `1`, la API creería que el usuario es el
-   > Nginx del frontend: todas las IP de la auditoría serían la misma y el
-   > límite de tasa sería común a todo el mundo. Con `3`, un cliente podría
-   > inventar una IP y la API se la creería.
+   > **Frontera de confianza.** Las conexiones por la red privada de Render no
+   > pasan por Cloudflare: cualquier servicio del mismo workspace y región puede
+   > llamar a la API, o a la web que la reenvía, con un `CF-Connecting-IP`
+   > inventado. Se acepta para los servicios propios actuales (web, API y
+   > mantenimiento): si uno de ellos quedara comprometido, podría **suplantar la
+   > IP** que queda en la auditoría y en el límite de tasa. **Antes de incorporar
+   > cualquier servicio nuevo** al workspace en esa región, hay que reevaluar esta
+   > decisión.
    >
-   > *Comprobado en un entorno local que reproduce ese recorrido: con `2`, una
-   > petición en la que el borde declara `190.44.12.77` queda auditada con esa
-   > IP; y una en la que el cliente intenta colar `9.9.9.9` por delante queda
-   > auditada igualmente con `190.44.12.77`, descartando la inventada.*
+   > **Estado (2026-11-11):** **publicado en el repositorio y validado
+   > localmente; pendiente de despliegue.** Producción sigue con el mecanismo anterior,
+   > `TRUST_PROXY_HOPS=2`, que en Render atribuía las peticiones a un nodo del
+   > borde y no al cliente. Detalle y límites en
+   > `docs/seguridad/PLAN_SEGURIDAD.md` («IP del cliente»).
+   >
+   > *Mecanismo anterior, retirado: contaba saltos de `X-Forwarded-For`
+   > (`TRUST_PROXY_HOPS`). Su comprobación local con un borde simulado no
+   > reflejaba el borde real: en producción se observó que la IP atribuida era
+   > la de un nodo del borde de Render, no la del cliente.*
 
    **Deja estas SIN DEFINIR — ponerlas causa problemas:**
 
@@ -990,8 +1021,10 @@ así que una ejecución accidental no rompe nada.
    >   entonces se apagaría por inactividad y arrastraría a la API con ella,
    >   porque todo el tráfico pasa por aquí.
    > - **La API no tiene dirección pública en absoluto.** Es un servicio
-   >   privado: el único camino hasta ella es este proxy. Esa es la razón por la
-   >   que `TRUST_PROXY_HOPS=2` es seguro (ver el recuadro del Paso 6).
+   >   privado: desde internet, el único camino hasta ella es este proxy. Por la
+   >   red privada, en cambio, la alcanzan los demás servicios del workspace en
+   >   la misma región: es la frontera de confianza del recuadro del Paso 6
+   >   (`IP_CLIENTE_FUENTE`).
 
 4. **Build Filters**: *Included Path* `frontend/**`.
 
@@ -1727,7 +1760,10 @@ configurado. Los casos más frecuentes: `CORS_ORIGINS` vacía en producción,
 → El servicio del frontend no está sirviendo la imagen de Nginx del proyecto.
 
 **Todas las IP del registro de auditoría son la misma**
-→ Falta `TRUST_PROXY_HOPS=1` en la API.
+→ Comprueba que la API tenga `IP_CLIENTE_FUENTE=cf-connecting-ip` (con el código que
+la usa). El registro de la API dice de dónde salió cada IP en `origenIp`: `socket`
+(la variable falta o vale `socket`) o `respaldo` con su motivo (la cabecera llegó
+ausente, repetida o inválida) explican una IP compartida.
 
 **La primera visita del día tarda muchísimo**
 → Estás en plan **Free**: el servicio se apagó tras 15 minutos sin tráfico y
@@ -1831,10 +1867,12 @@ comandos**:
   omisión de Nginx, 1 MB, habría cortado— llega entero y lo rechaza **la
   aplicación** por su contenido; uno de **25 MB** lo corta Nginx con **413**. El
   límite actúa donde debe.
-- **Dirección del usuario con dos saltos:** con `TRUST_PROXY_HOPS=2`, una
-  petición en la que el borde declara `190.44.12.77` queda auditada con esa IP;
-  y otra en la que el cliente intenta colar `9.9.9.9` por delante queda auditada
-  igualmente con `190.44.12.77`. La IP inventada se descarta.
+- **Dirección del usuario con dos saltos** (mecanismo anterior, retirado): con
+  `TRUST_PROXY_HOPS=2`, una petición en la que el borde simulado declara
+  `190.44.12.77` queda auditada con esa IP; y otra en la que el cliente intenta
+  colar `9.9.9.9` por delante queda auditada igualmente con `190.44.12.77`. Esa
+  simulación no reflejaba el borde real de Render; el mecanismo vigente es
+  `IP_CLIENTE_FUENTE` (Paso 6).
 - **El resolutor DNS** se genera al arrancar a partir de `/etc/resolv.conf`, y
   `envsubst` sustituye la dirección de la API dejando intactas las variables de
   Nginx.
@@ -1842,7 +1880,13 @@ comandos**:
 ### Por qué la API va como servicio privado: la prueba
 
 Mismo entorno local, con la API expuesta además en un puerto propio para
-reproducir qué pasaría si tuviera dirección pública. En los dos casos el
+reproducir qué pasaría si tuviera dirección pública. (Se hizo con el mecanismo
+anterior, `TRUST_PROXY_HOPS`, ya retirado, y sus resultados valen solo para él. Con
+`IP_CLIENTE_FUENTE=cf-connecting-ip` no se repitió: una conexión que llega a la API
+sin pasar por el borde —hoy, solo la red privada— declara `CF-Connecting-IP` ella
+misma, mientras que por una dirección pública de Render la pone el borde, y si
+sobrescribe un valor enviado por el cliente está sin verificar. Ver el recuadro
+«Qué pasaría si la dejáramos pública».) En los dos casos el
 atacante inyecta `X-Forwarded-For: 203.0.113.66` y el borde le añade su IP real
 `198.51.100.9`:
 

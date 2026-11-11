@@ -200,17 +200,22 @@ server {
         #
         # `Host` conserva el dominio público: es lo que la API ve como destino.
         #
-        # `X-Forwarded-For` AÑADE la dirección de quien nos habla a la cadena ya
-        # existente (eso hace `$proxy_add_x_forwarded_for`). Detrás del borde de
-        # un proveedor, la cadena que llega trae la IP real del usuario y aquí se
-        # le suma la del borde. Es lo que permite que la API identifique al
-        # usuario para la auditoría y el límite de tasa, y por eso
-        # `TRUST_PROXY_HOPS` debe declarar DOS saltos cuando se usa este proxy:
-        # el borde del proveedor y este Nginx. Ni uno más —cada salto de más es
-        # una IP que el cliente puede inventar— ni uno menos.
+        # IP DEL CLIENTE. Este Nginx NO decide ni valida la IP: lo hace la API
+        # (`backend/src/shared/ipCliente.ts`, variable `IP_CLIENTE_FUENTE`).
+        #
+        # `X-Forwarded-For` ya NO se reenvía (un valor vacío hace que Nginx no
+        # envíe la cabecera): esa cadena no identifica al cliente detrás de
+        # Render y contarle saltos no puede validar quién escribió cada entrada.
+        # `X-Real-IP` tampoco: la API no la usa.
+        #
+        # `CF-Connecting-IP` —la cabecera que Render recomienda para el cliente
+        # público— pasa TAL CUAL, con el reenvío normal de cabeceras del cliente
+        # (no hay `proxy_set_header` para ella a propósito): así, si llegara
+        # repetida, la API ve todas las líneas y usa el respaldo en vez de elegir
+        # una. En local la API está en modo `socket` y la ignora.
         proxy_set_header Host              $host;
-        proxy_set_header X-Real-IP         $remote_addr;
-        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP         "";
+        proxy_set_header X-Forwarded-For   "";
         proxy_set_header X-Forwarded-Proto $esquema_original;
         proxy_set_header X-Forwarded-Host  $host;
 

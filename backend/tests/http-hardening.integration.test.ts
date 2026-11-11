@@ -176,27 +176,28 @@ describe("CORS con lista blanca configurada", () => {
   });
 });
 
-describe("confianza en proxies", () => {
+describe("IP del cliente", () => {
   /**
    * Con `trustProxy: true` cualquiera podía mandar `X-Forwarded-For` y Fastify
    * lo tomaba como la IP real: bastaba para falsear el registro de auditoría y
    * para saltarse el límite de tasa por IP cambiando la cabecera en cada
-   * intento. Con `TRUST_PROXY_HOPS=0` (el valor por defecto) la cabecera se
-   * ignora.
+   * intento. En modo `socket` (el valor por defecto, ver `shared/ipCliente.ts`)
+   * ninguna cabecera de identidad reenviada decide la IP.
    */
-  it("ignora X-Forwarded-For: la IP que queda auditada no es la declarada por el cliente", async () => {
+  it("modo socket: ni X-Forwarded-For ni CF-Connecting-IP deciden la IP auditada", async () => {
     const { env } = await import("../src/shared/env");
-    expect(env.TRUST_PROXY_HOPS, "el entorno de prueba no declara proxies").toBe(0);
+    expect(env.IP_CLIENTE_FUENTE, "el entorno de prueba usa el socket").toBe("socket");
 
     const { seedRolesAndPermissions, createUser, TEST_PASSWORD } = await import("./helpers/seedRbac");
     await seedRolesAndPermissions();
     await createUser({ username: "admin_proxy", roleNames: ["admin"] });
 
     const IP_FALSEADA = "203.0.113.7";
+    const CF_FALSEADA = "203.0.113.9";
     const res = await app.inject({
       method: "POST",
       url: "/auth/login",
-      headers: { "x-forwarded-for": IP_FALSEADA },
+      headers: { "x-forwarded-for": IP_FALSEADA, "cf-connecting-ip": CF_FALSEADA },
       payload: { username: "admin_proxy", password: TEST_PASSWORD },
     });
     expect(res.statusCode, res.body).toBe(200);
@@ -205,5 +206,44 @@ describe("confianza en proxies", () => {
     // exactamente el dato que se podía falsear.
     const registro = await prisma.auditLog.findFirstOrThrow({ where: { action: "LOGIN" }, orderBy: { createdAt: "desc" } });
     expect(registro.ipAddress, "la cabecera del cliente no puede decidir qué IP se audita").not.toBe(IP_FALSEADA);
+    expect(registro.ipAddress).not.toBe(CF_FALSEADA);
+    expect(registro.ipAddress, "inject usa 127.0.0.1 como socket").toBe("127.0.0.1");
+  });
+
+  /**
+   * Modo `cf-connecting-ip` (Render) sobre `buildServer()` real: la IP que queda en la
+   * auditoría es CF-Connecting-IP en forma canónica, y X-Forwarded-For no interviene.
+   */
+  it("modo cf-connecting-ip: la auditoría guarda CF-Connecting-IP canónica; con valor inválido, el socket", async () => {
+    const { env } = await import("../src/shared/env");
+    // Datos propios: no depende de que otro caso haya creado un usuario. Los roles se
+    // siembran con `upsert` (idempotente) y la cuenta tiene un nombre exclusivo de este caso.
+    const { seedRolesAndPermissions, createUser, TEST_PASSWORD } = await import("./helpers/seedRbac");
+    await seedRolesAndPermissions();
+    const usuario = await createUser({ username: "admin_proxy_cf", roleNames: ["admin"] });
+
+    const appCf = await buildServer({ ...env, IP_CLIENTE_FUENTE: "cf-connecting-ip" });
+    await appCf.ready();
+    try {
+      const login = (headers: Record<string, string>) =>
+        appCf.inject({ method: "POST", url: "/auth/login", headers, payload: { username: "admin_proxy_cf", password: TEST_PASSWORD } });
+      const ultimaIp = async () =>
+        (
+          await prisma.auditLog.findFirstOrThrow({
+            where: { action: "LOGIN", userId: usuario.id },
+            orderBy: { createdAt: "desc" },
+          })
+        ).ipAddress;
+
+      const valida = await login({ "cf-connecting-ip": "2001:DB8:0:0:0:0:0:1", "x-forwarded-for": "203.0.113.7" });
+      expect(valida.statusCode, valida.body).toBe(200);
+      expect(await ultimaIp()).toBe("2001:db8::1");
+
+      const invalida = await login({ "cf-connecting-ip": "no-es-una-ip", "x-forwarded-for": "203.0.113.7" });
+      expect(invalida.statusCode, invalida.body).toBe(200);
+      expect(await ultimaIp(), "respaldo: la dirección del socket").toBe("127.0.0.1");
+    } finally {
+      await appCf.close();
+    }
   });
 });

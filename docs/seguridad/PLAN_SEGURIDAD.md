@@ -32,6 +32,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **AUD-06 y AUD-09** | Capacidad `byClub` visible al nadador; copias completas en la auditoría | **Se conservan por decisión expresa del usuario; no son mitigaciones.** Retención de la auditoría pendiente. Ver «Privacidad de reportes y relevos» |
 | **C-01** | Acceso externo a la base de producción (`fchmn-postgres` admitía `0.0.0.0/0`) | **Mitigado mediante la configuración de red de Postgres:** lista propia vacía, guardada y comprobada; reglas heredadas intactas. Sin prueba de conexión nueva ni de rechazo externo. Ver «C-01: acceso externo a Postgres» |
 | **C-04** | Contraseña actual incorrecta en `/auth/change-password` sin contar | **Cerrada dentro de su alcance:** migración aplicada y web y API desplegadas en producción desde `2c3552e`; validada en local (incluida la integración sobre la base desechable) y en la CI; **sin prueba autenticada del límite en producción**. Ver «C-04» |
+| **IP del cliente** | `req.ip` atribuía las peticiones a un nodo del borde de Render, no al cliente | **Publicada en el repositorio y validada localmente; pendiente de despliegue.** `CF-Connecting-IP` validada y normalizada en la API, con respaldo al socket; frontera de confianza del workspace aceptada para los servicios propios actuales. Ver «IP del cliente» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -1951,6 +1952,64 @@ Cuatro hallazgos de privacidad de la auditoría del 2026-11-07. Dos se conservan
 - **Cerrada dentro de su alcance** (ver el cierre en producción). La integración se ejecutó solo contra la base desechable local; en producción solo se observaron disponibilidad y cabeceras, **sin prueba autenticada del límite, la reserva ni el cierre terminal**.
 - No hay un límite global de verificaciones Argon2 simultáneas; una operación lenta puede seguir calculando tras perder su reserva, aunque ya no produzca efectos.
 - **C-02 sigue pendiente**, incluida la validación de la IP real del cliente.
+
+## IP del cliente: `CF-Connecting-IP` con respaldo al socket (publicada en el repositorio y validada localmente; pendiente de despliegue)
+
+**Hallazgo.** En producción (2026-11-10, dos `GET /api/health` sin credenciales por la web, una normal y otra con un `X-Forwarded-For` sintético), `req.ip` correspondía a un nodo del borde de Render y no a la salida esperada del operador, y la cabecera sintética no alteró el resultado. Con `TRUST_PROXY_HOPS=2`, la auditoría y los límites por IP atribuían las peticiones a nodos del borde. Las direcciones no se publicaron: se compararon dentro de la página mediante etiquetas PBKDF2 con sal (eso no es anonimato: con la sal, la dirección se podría recuperar por fuerza bruta).
+
+**Fuente elegida.** El artículo de Render «How can I access a visitor's IP address?» recomienda la cabecera `cf-connecting-ip`, que «contendrá la IP del cliente que hizo la solicitud», y dice que `X-Forwarded-For` no es exacta detrás de su red. La respuesta de soporte de Render, transmitida por el usuario, distingue las conexiones privadas, que no están verificadas por Cloudflare.
+
+**Mecanismo** (`backend/src/shared/ipCliente.ts`; variable `IP_CLIENTE_FUENTE`, que reemplaza a `TRUST_PROXY_HOPS`).
+- **Dos modos.** `socket` (por omisión: local y pruebas) usa el par TCP e ignora `X-Forwarded-For`, `X-Real-IP`, `CF-Connecting-IP`, `X-Forwarded-Host` y `X-Forwarded-Proto`. `cf-connecting-ip` (Render) usa `CF-Connecting-IP`.
+- **Antes de enrutar y de registrar.** El gancho `rewriteUrl` de Fastify (sin cambiar la URL) deja en `X-Forwarded-For` **una sola dirección** decidida aquí y borra las demás cabeceras de identidad; `trustProxy` confía solo en el salto 0. Vale también para las rutas inexistentes y para el registro «incoming request».
+- **Análisis separado de la aceptación.** `analizarIp` usa `net.isIP` (IPv4 e IPv6 reales; rechaza zonas, corchetes, puertos, espacios y más de 45 caracteres) y devuelve la forma canónica: IPv4 en decimal, IPv6 según RFC 5952 e IPv4 mapeadas como IPv4. `aceptableComoClientePublico` se aplica **solo** a `CF-Connecting-IP` (rechaza sin especificar, loopback, multicast y difusión). El respaldo por socket admite cualquier dirección legítima, también loopback, privadas e IPv4 mapeadas.
+- **Respaldo.** Si la cabecera falta, está repetida (más de una línea, o una lista en una sola), es inválida o no es aceptable, se usa la dirección del socket (el Nginx propio): un origen compartido, nunca un valor del cliente.
+- **Metadato interno.** La fuente y el motivo (`socket`, `cf-connecting-ip` o `respaldo` con `ausente`, `invalida`, `repetida` o `no-aceptable`) quedan en un símbolo de la petición cruda, no en una cabecera, y se registran como `origenIp`, sin la IP.
+- **Nginx.** Ya no reenvía `X-Forwarded-For` ni `X-Real-IP`; `CF-Connecting-IP` pasa con el reenvío normal de cabeceras. No valida nada: la decisión es de la API.
+
+**Frontera de confianza (aceptada por el usuario el 2026-11-11).** Inventario de Render leído ese día (nombres, tipos, región y pertenencia; sin variables ni registros): un workspace con el proyecto `fchmn-inscripciones`, el entorno Production y ningún servicio fuera de proyectos: `fchmn-web` (servicio web), `fchmn-api` (servicio privado), `fchmn-mantenimiento` (cron) y `fchmn-postgres` (PostgreSQL 16), todos en Oregon.
+- **Camino privado 1:** un servicio del workspace llama **directo a la API** con un `CF-Connecting-IP` inventado, y se acepta.
+- **Camino privado 2:** lo llama **a Nginx**, que reenvía la cabecera a la API, y también se acepta. Nginx no puede distinguir al balanceador de Render de otro servicio privado.
+- **Decisión:** web, API y mantenimiento pueden declarar la IP por la red privada. **Riesgo:** un servicio comprometido podría suplantar la IP que queda en la auditoría y en el límite de tasa. **Obligación:** reevaluar esta decisión **antes de incorporar cualquier servicio** al workspace en esa región.
+- **No adoptado:** un secreto entre Nginx y la API cerraría el camino 1, pero no el 2, y quien puede usar uno puede usar el otro. El aislamiento por entorno de Render (plan de workspace Pro o superior) solo separa entornos distintos, y los tres servicios están en el mismo.
+
+**Validación local** (2026-11-11; todo simulado, con direcciones sintéticas de documentación y privadas o loopback de ejemplo):
+- **Unitarias e `inject`:** `tests/ip-cliente.test.ts` (análisis y forma canónica, aceptación, modos, respaldo, frontera del camino 1, límite de tasa con escrituras equivalentes, registro antes del enrutado en una ruta inexistente) y `tests/env-validation.test.ts`; junto con los archivos que leen la plantilla de Nginx y el registro, **7 archivos y 363 pruebas, todas en éxito**.
+- **Duplicados por un socket real en Node:** dos líneas distintas o iguales, y una lista en una sola línea, dan respaldo `repetida`.
+- **Nginx 1.30.6 real con destino simulado:** la imagen local existente del frontend con la plantilla nueva montada, y un destino que ejecuta el `ipCliente` real compilado, en una red temporal.
+  - Dos líneas `CF-Connecting-IP` llegan al destino **como dos líneas** y se usa el respaldo.
+  - Con una variante descartada (`proxy_set_header CF-Connecting-IP $http_cf_connecting_ip`), Nginx las **une en una línea con coma** y también se usa el respaldo. En ningún caso se eligió un valor en silencio.
+  - `X-Forwarded-For` y `X-Real-IP` del cliente no llegan al destino.
+  - Camino privado 2: la cabecera inventada por quien llama a Nginx se acepta, según la frontera.
+  - `nginx -t`: correcto.
+- **Integración focalizada** `http-hardening` sobre la base desechable (contenedor existente, arrancado y detenido): 17 de 17. En modo `socket`, ni `X-Forwarded-For` ni `CF-Connecting-IP` deciden la IP auditada. En modo `cf-connecting-ip`, sobre `buildServer()`, se audita la forma canónica y, con un valor inválido, el socket.
+- **Typecheck y lint del backend:** sin errores; los avisos son preexistentes.
+
+**Límites.**
+- **Publicada en el repositorio y validada localmente; pendiente de despliegue:** producción sigue con `TRUST_PROXY_HOPS=2` y atribuye las peticiones al borde.
+- La documentación de Cloudflare no dice si sobrescribe un `CF-Connecting-IP` enviado por el cliente: hay que comprobarlo en producción.
+- El respaldo es un origen compartido, que C-02 deberá tratar como tal. El agrupamiento IPv6 por `/64` también queda para C-02.
+- La prueba de Nginx usó la imagen local existente con la plantilla montada, no una imagen nueva. El cambio del Dockerfile es solo un comentario.
+- `X-Forwarded-Proto` sigue pasando por el `map` existente de Nginx; ese comportamiento no cambia en esta entrega.
+- **C-02 sigue pendiente**; el limitador del login no cambió.
+
+**Verificación futura en producción** (requiere autorización; no ejecutada). Tras desplegar:
+1. Dos `GET /api/health` por la web: uno normal y otro con `CF-Connecting-IP` y `X-Forwarded-For` sintéticos.
+2. En el registro de la API, las dos líneas deben tener `origenIp` = `cf-connecting-ip` y la misma dirección, distinta de la sintética.
+3. Esa dirección debe **coincidir con la salida del operador obtenida por un medio independiente** del sistema. La comparación se hace sin publicar las IP reales.
+4. Después, un recuento de `respaldo` durante un período, solo con números.
+
+**Despliegue posterior** (sin autorizar):
+1. `IP_CLIENTE_FUENTE=cf-connecting-ip` en la API con «Save only».
+2. API primero. Comprobado en local (simulado, 2026-11-11) con la imagen local de la web, cuya plantilla es idéntica a la de `2c3552e` (la desplegada), sin modificarla, y con el módulo nuevo como destino:
+   - una `CF-Connecting-IP` válida se acepta;
+   - si falta, se usa el respaldo (`ausente`);
+   - dos líneas, iguales o distintas, o una lista, se reenvían tal cual y dan respaldo (`repetida`);
+   - la cadena `X-Forwarded-For` y la `X-Real-IP` que esa plantilla sigue enviando no deciden la IP.
+3. Luego la web.
+4. `TRUST_PROXY_HOPS=2` se conserva en Render hasta estabilizar.
+5. **Reversión:** `IP_CLIENTE_FUENTE=socket`, o volver al despliegue anterior.
+6. **Correspondencia local**, con el mismo SHA y la configuración propia de local (`socket`).
 
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)
 

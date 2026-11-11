@@ -27,7 +27,7 @@ const BASE = {
   CORS_ORIGINS: undefined,
   PUBLIC_API_URL: undefined,
   ENABLE_SWAGGER: undefined,
-  TRUST_PROXY_HOPS: undefined,
+  IP_CLIENTE_FUENTE: undefined,
 };
 
 const PRODUCCION = {
@@ -158,8 +158,6 @@ describe("rangos numéricos", () => {
     ["SESSION_ABSOLUTE_HOURS", "8761"],
     ["SESSION_ABSOLUTE_HOURS", "1.5"],
     ["RATE_LIMIT_GLOBAL_MAX", "0"],
-    ["TRUST_PROXY_HOPS", "-1"],
-    ["TRUST_PROXY_HOPS", "99"],
   ])("RECHAZA %s = %s", (clave, valor) => {
     const r = validar({ ...BASE, [clave]: valor });
     expect(r.ok).toBe(false);
@@ -174,9 +172,41 @@ describe("rangos numéricos", () => {
   });
 
   it("ACEPTA valores dentro de rango", () => {
-    const r = validar({ ...BASE, PORT: "8080", TRUST_PROXY_HOPS: "1", LOGIN_MAX_ATTEMPTS: "3" });
+    const r = validar({ ...BASE, PORT: "8080", LOGIN_MAX_ATTEMPTS: "3" });
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.env.TRUST_PROXY_HOPS).toBe(1);
+    if (r.ok) expect(r.env.LOGIN_MAX_ATTEMPTS).toBe(3);
+  });
+});
+
+/**
+ * Fuente de la IP del cliente (`shared/ipCliente.ts`). Reemplaza a `TRUST_PROXY_HOPS`.
+ */
+describe("fuente de la IP del cliente (IP_CLIENTE_FUENTE)", () => {
+  it("sin definir es `socket`: ninguna cabecera reenviada decide la IP", () => {
+    const r = validar(BASE);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.env.IP_CLIENTE_FUENTE).toBe("socket");
+  });
+
+  it("acepta `cf-connecting-ip`, también en producción", () => {
+    const r = validar({ ...PRODUCCION, IP_CLIENTE_FUENTE: "cf-connecting-ip" });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.env.IP_CLIENTE_FUENTE).toBe("cf-connecting-ip");
+  });
+
+  it.each(["", "CF-Connecting-IP", "x-forwarded-for", "2", "true"])("RECHAZA %j y nombra la variable", (valor) => {
+    const r = validar({ ...BASE, IP_CLIENTE_FUENTE: valor });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errores.join(" ")).toContain("IP_CLIENTE_FUENTE");
+  });
+
+  it("IGNORA un TRUST_PROXY_HOPS que quede definido: ya no decide nada", () => {
+    const r = validar({ ...BASE, TRUST_PROXY_HOPS: "2" });
+    expect(r.ok, "una variable sobrante no debe impedir el arranque").toBe(true);
+    if (r.ok) {
+      expect(Object.keys(r.env)).not.toContain("TRUST_PROXY_HOPS");
+      expect(r.env.IP_CLIENTE_FUENTE).toBe("socket");
+    }
   });
 });
 

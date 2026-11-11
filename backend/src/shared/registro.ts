@@ -18,6 +18,7 @@
  * registro de la petición (`req.log`), no con el global.
  */
 import { LogController, type FastifyReply, type FastifyRequest, type FastifyServerOptions } from "fastify";
+import { origenIpDe } from "./ipCliente";
 
 /** Solo identificadores: letras, dígitos, `_`, `.`, `$` y `-`. Nada con espacios ni signos de valores. */
 const IDENTIFICADOR = /^[\w.$-]{1,80}$/;
@@ -37,7 +38,9 @@ export function urlSinConsulta(url: string): string {
  * —método, ruta, versión, host y origen— con la ruta SIN la cadena de consulta. Las cabeceras
  * y el cuerpo nunca se han registrado y siguen sin registrarse.
  */
-export function serializarPeticion(req: Pick<FastifyRequest, "method" | "url" | "headers" | "host" | "ip" | "socket">) {
+export function serializarPeticion(
+  req: Pick<FastifyRequest, "method" | "url" | "headers" | "host" | "ip" | "socket"> & { raw?: FastifyRequest["raw"] }
+) {
   return {
     method: req.method,
     url: urlSinConsulta(req.url),
@@ -45,6 +48,8 @@ export function serializarPeticion(req: Pick<FastifyRequest, "method" | "url" | 
     host: req.host,
     remoteAddress: req.ip,
     remotePort: req.socket ? req.socket.remotePort : undefined,
+    // De dónde salió `remoteAddress` (`shared/ipCliente.ts`): metadato interno, sin la IP.
+    origenIp: origenIpDe(req.raw),
   };
 }
 

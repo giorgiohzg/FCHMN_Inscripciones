@@ -170,15 +170,17 @@ const envSchema = z
     CORS_ORIGINS: listaDeOrigenes,
 
     /**
-     * Cuántos proxies de confianza hay por delante (0 = ninguno).
+     * De dónde sale la IP del cliente (`req.ip`). Ver `shared/ipCliente.ts`.
      *
-     * Estaba fijo en `trustProxy: true`, que le dice a Fastify que confíe en el
-     * `X-Forwarded-For` COMPLETO venga de donde venga: cualquiera podía
-     * declarar la IP que quisiera y con eso falsear el registro de auditoría y
-     * escaparse del límite de tasa por IP. Con un número, Fastify solo confía
-     * en esa cantidad de saltos desde el final de la cadena.
+     *  - `socket` (por omisión: local y pruebas): la dirección del par TCP; se ignoran las
+     *    cabeceras de identidad reenviadas.
+     *  - `cf-connecting-ip` (Render): la cabecera `CF-Connecting-IP`, validada, con respaldo a la
+     *    dirección del socket si falta, está repetida o no es una IP aceptable.
+     *
+     * Reemplaza a `TRUST_PROXY_HOPS`, que contaba saltos de `X-Forwarded-For` sin poder validar
+     * quién escribió cada entrada. Si esa variable queda definida, se ignora.
      */
-    TRUST_PROXY_HOPS: enteroEnRango(0, 10, "saltos").default(0),
+    IP_CLIENTE_FUENTE: z.enum(["socket", "cf-connecting-ip"]).default("socket"),
 
     // Límites de tasa configurables. Estaban fijos en el código, lo que hacía
     // imposible ejecutar una suite de pruebas de integración (que hace decenas
