@@ -1056,11 +1056,35 @@ en dos capas los permisos de usuario (RBAC + alcance por club).
 
 Filtros soportados (sección 16): `competitionId` (obligatorio), `clubId`, `competitionDateId`, `sessionTypeId`, `competitionEventId`, `categoryId`, `gender`.
 
-### Selector de clubes y resumen por club (estado: publicada; pendiente de despliegue)
+### Selector de clubes y resumen por club (estado: publicada y desplegada; entorno local actualizado)
 
-> **Estado:** publicada en el repositorio y validada localmente; **pendiente de despliegue**. Producción y el entorno local de ejecución todavía no la reciben. El resultado de la CI se comprueba aparte y no se anticipa aquí.
+> **Estado:** publicada en el repositorio (`d8c3acfb39712dcac2ebd29625d8617a24323184`) y **desplegada en la API y en la web**, con el entorno local actualizado. Está **dentro del alcance validado**: no hay comprobación funcional autenticada en producción (ver «Qué no se comprobó»). El mantenimiento no cambió.
 >
-> **Qué se validó y cómo.** El backend, con **pruebas de integración** contra la base desechable de pruebas: autorización por rol, reglas de conteo y regresiones de alcance. La interfaz, con **pruebas automatizadas simuladas** (jsdom) y una **revisión visual en navegador con una API simulada** y datos sintéticos: esa revisión verificó la presentación y el manejo de estado, no el backend integrado ni el contenido de ningún ZIP de Team Manager. Un ajuste de estilo posterior (la celda «Total») se revisó solo por código, sin repetir la observación en navegador.
+> **Qué se validó y cómo** (cada capa por separado):
+>
+> - **Pruebas funcionales locales y CI.** El backend, con **pruebas de integración** contra la base desechable de pruebas: autorización por rol, reglas de conteo y regresiones de alcance. La interfaz, con **pruebas automatizadas simuladas** (jsdom). La CI del código (`43212548298`) terminó en éxito.
+> - **Revisión visual con API simulada.** Se hizo en un navegador real, con una API simulada y datos sintéticos: verificó la presentación y el manejo de estado, no el backend integrado ni el contenido de ningún ZIP de Team Manager. Un ajuste de estilo posterior (la celda «Total») se revisó solo por código, sin repetir la observación en navegador.
+> - **Estado de despliegue observado en Render.** Ver «Producción» más abajo.
+> - **Disponibilidad HTTP.** Ver «Disponibilidad» más abajo: son lecturas públicas sin credenciales.
+>
+> **Qué no se comprobó.** No se hicieron pruebas autenticadas ni exportaciones en producción, así que el resumen administrativo y la exportación a Team Manager no se probaron allí. Las lecturas públicas acreditan disponibilidad, no funcionamiento de estas funciones.
+>
+> **Producción** (Render, Auto-Deploy Off en ambos servicios; despliegue manual por SHA exacto):
+>
+> | Servicio | Versión | Despliegue | Resultado |
+> |---|---|---|---|
+> | `fchmn-api` | `b1b1c2a` → `d8c3acf` | `dep-dbqr4u1srm7s73dno7jg` | Deploy succeeded y Live |
+> | `fchmn-web` | `7860b1d` → `d8c3acf` | `dep-dbqr63mi0phs73dghd1g` | Deploy succeeded y Live |
+> | `fchmn-mantenimiento` | sin cambios, `b1b1c2a` | no se desplegó | — |
+>
+> Sin migraciones, seed ni variables o configuración nuevas.
+>
+> **Disponibilidad** (2026-11-12, sin credenciales):
+>
+> - Muestreo de `/api/health` por la web, de 12:34:05Z a 12:38:56Z: **28 de 28 respuestas con 200**, con latencias de 284 a 675 ms. Los intervalos entre muestras no se observaron. La primera muestra con el uptime de la instancia nueva es de las 12:35:53Z: es una observación, no la hora exacta del reinicio.
+> - Comprobación final: `/login`, `/api/health` y `/api/ready` con 200 (`database: ok`); `/api/auth/me` sin credenciales con 401. Las comprobaciones realizadas conservaron `Cache-Control: no-store` y la CSP.
+>
+> **Entorno local.** Imágenes de backend `598436879063` y de frontend `bfc801c6bb5f`, construidas desde el código limpio de `d8c3acf`. Postgres y su volumen se conservaron. No se ejecutaron migraciones ni seed, y **C-05 no está aplicada**. Al terminar, backend, frontend y Postgres quedaron detenidos, como al inicio. No se afirma identidad binaria con Render: los nombres de los paquetes de JavaScript difieren entre local y producción, y la causa no se investigó.
 
 - **Selector de clubes del reporte detallado (administración).** Al elegir una competencia, el desplegable muestra solo los clubes con al menos una inscripción **confirmada**, individual o de relevo (incluye los que solo tienen relevos). Al cambiar de competencia se actualizan las opciones, se limpia el club si deja de ser válido, se descarta una respuesta tardía de la competencia anterior y se retira el reporte anterior. Las cuentas de club y el personal conservan su club fijo y el nadador su reporte personal: no consultan este endpoint.
 - **Resumen por club** (`/reportes/resumen-por-club`). Exclusivo de administración en la navegación (pestañas de Reportes), en la ruta de la interfaz y en el servidor: `requireRole("admin")` con los roles vigentes de cada solicitud, y el servicio vuelve a exigir el alcance de administración. Cualquier otro rol recibe 403 aunque tenga `reports:read`. El único filtro es la competencia; administración puede elegir también las ocultas.
