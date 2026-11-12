@@ -1098,16 +1098,40 @@ Filtros soportados (sección 16): `competitionId` (obligatorio), `clubId`, `comp
   - La respuesta no lleva RUN, nombres de personas ni fechas de nacimiento.
 - **Team Manager por fila.** Cada fila descarga el ZIP de su club con la exportación existente (`/export/team-manager/zip`), que conserva su contenido, sus validaciones y su control de acceso. No hay exportación global. Cada fila muestra su propio estado y su propio error sin bloquear a las demás.
 
-### Resumen por club: columna de edad con «Edad mínima» configurable (estado: publicada en el repositorio y validada localmente; pendiente de despliegue)
+### Resumen por club: columna de edad con «Edad mínima» configurable (estado: publicada y desplegada en API y web; entorno local actualizado, dentro del alcance validado)
 
-> **Estado:** ampliación posterior al despliegue anterior. Está **publicada en el repositorio y validada localmente; pendiente de despliegue**: producción y el entorno local de ejecución todavía no la tienen. El resultado de la CI se comprueba aparte y no se anticipa aquí.
+> **Estado:** ampliación posterior al cierre de Reportes anterior, que se conserva como antecedente (más arriba). Está **publicada y desplegada en API y web; entorno local actualizado, dentro del alcance validado**: no hubo validación autenticada del filtro ni exportaciones en producción (ver «Qué no se comprobó»). El código es el commit `0f03a0d0db02da5255eb9d6b422e19b9bae5f29a`; el mantenimiento no cambió.
 >
-> **Validación** (cada capa por separado):
+> **Qué se validó y cómo** (cada capa por separado):
 >
-> - **Integración real:** pruebas contra la base desechable de pruebas, con la fecha de corte, el umbral y la validación del parámetro.
-> - **Pruebas puras:** equivalencia exhaustiva con `computeAge`.
-> - **Interfaz, pruebas automatizadas simuladas (jsdom):** interacción, validación, respuestas tardías y exportaciones.
-> - **Revisión visual en navegador con API simulada y datos sintéticos:** verificó presentación e interacción de la interfaz (escritorio y pantalla angosta), no el backend integrado ni el contenido de ningún ZIP de Team Manager.
+> - **Pruebas locales y CI.**
+>   - Integración real contra la base desechable de pruebas, con la fecha de corte, el umbral y la validación del parámetro.
+>   - Pruebas puras de equivalencia exhaustiva con `computeAge`.
+>   - Pruebas automatizadas simuladas de la interfaz (jsdom): interacción, validación, respuestas tardías y exportaciones.
+>   - La CI del código (`43265810427`) terminó en éxito.
+> - **Revisión visual con API simulada.** Se hizo en un navegador real, con una API simulada y datos sintéticos (escritorio y pantalla angosta): verificó presentación e interacción de la interfaz, no el backend integrado ni el contenido de ningún ZIP de Team Manager.
+> - **Estado de despliegue observado en Render.** Ver «Producción» más abajo.
+> - **Lecturas HTTP.** Ver «Disponibilidad» más abajo: son lecturas públicas sin credenciales.
+>
+> **Qué no se comprobó.** No se hicieron pruebas autenticadas del filtro ni exportaciones en producción, así que la columna de edad y el campo «Edad mínima» no se probaron allí. Las lecturas públicas acreditan disponibilidad, no el cálculo del filtro.
+>
+> **Producción** (Render, Auto-Deploy Off en ambos servicios; despliegue manual por SHA exacto):
+>
+> | Servicio | Versión | Despliegue | Resultado |
+> |---|---|---|---|
+> | `fchmn-api` | `d8c3acf` → `0f03a0d` | `dep-dbqvdbe7bikc73c0999g` | Deploy succeeded y Live |
+> | `fchmn-web` | `d8c3acf` → `0f03a0d` | `dep-dbqvf4jbc2fs73fa72j0` | Deploy succeeded y Live |
+> | `fchmn-mantenimiento` | sin cambios, `b1b1c2a` | no se desplegó | — |
+>
+> Sin migraciones, seed ni variables o configuración nuevas.
+>
+> **Disponibilidad** (2026-11-12, sin credenciales):
+>
+> - Muestreo de `/api/health` por la web, de 17:25:00Z a 17:34:05Z: **51 de 51 respuestas con 200**, con latencias de aproximadamente 286 a 939 ms. Los intervalos entre muestras no se observaron. La última muestra es 73 segundos posterior a la observación de la web Live.
+> - Las horas de «Live observado» (API 17:29:00Z, web 17:32:52Z) son las de la consulta espaciada, no las horas exactas de transición. La primera muestra con el uptime de la instancia nueva de la API es de las 17:26:48Z: es una observación, no la hora exacta del reinicio.
+> - Comprobación final: `/login`, `/api/health` y `/api/ready` con 200 (`database: ok`); `/api/auth/me` sin credenciales con 401. Las comprobaciones realizadas conservaron `Cache-Control: no-store` y la CSP.
+>
+> **Entorno local.** Imágenes de backend `0a65cc0c599e` y de frontend `c8084e7faa53`, construidas desde la copia limpia de `0f03a0d`. Postgres y su volumen se conservaron, y solo se recrearon backend y frontend. No se ejecutaron migraciones ni seed, y **C-05 no está aplicada**. Al terminar, los servicios quedaron detenidos, como al inicio. No se afirma identidad binaria con Render: los nombres de los paquetes de JavaScript difieren entre local y producción, y la causa no se investigó.
 
 - **Qué agrega.** Un campo numérico «Edad mínima» junto al selector de competencia, con 70 al inicio, y una columna «Nadadores de N años o más» junto a «Total nadadores», con su total en el pie. Sin endpoints, migraciones ni dependencias nuevas.
 - **Qué controla la edad mínima.** Solo esa columna y su total. No cambia varones, damas, total de nadadores, pruebas individuales, relevos ni total de pruebas. Tampoco cambia qué clubes aparecen (siguen todos los que tienen una inscripción confirmada, aunque su columna de edad sea 0) ni la exportación a Team Manager, que sigue exportando el club completo. El selector de clubes del reporte detallado no cambia.
