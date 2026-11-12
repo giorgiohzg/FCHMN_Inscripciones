@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import * as reportsService from "./reports.service";
 import * as resumenPorClub from "./resumenPorClub.service";
-import { competenciaDelReporteQuerySchema, registrationsReportQuerySchema } from "./reports.schemas";
+import { competenciaDelReporteQuerySchema, registrationsReportQuerySchema, resumenPorClubQuerySchema } from "./reports.schemas";
 import { requireAuth, requirePermission, requireRole } from "../auth/rbac.middleware";
 import { ValidationError } from "../../shared/errors";
 import { audit } from "../audit/audit.service";
@@ -30,11 +30,14 @@ export async function reportsRoutes(app: FastifyInstance) {
     reply.send(await resumenPorClub.listarClubesConInscripciones(parsed.data.competitionId, buildActorContext(req)));
   });
 
-  /** Resumen de inscripciones por club: cifras agregadas, sin datos personales. */
+  /**
+   * Resumen de inscripciones por club: cifras agregadas, sin datos personales. `edadMinima`
+   * (opcional, 70 por omisión) solo cambia la columna de edad; ver `resumenPorClubQuerySchema`.
+   */
   app.get("/reports/clubs-summary", { preHandler: [requirePermission("reports:read"), requireRole("admin")] }, async (req, reply) => {
-    const parsed = competenciaDelReporteQuerySchema.safeParse(req.query);
+    const parsed = resumenPorClubQuerySchema.safeParse(req.query);
     if (!parsed.success) throw new ValidationError("Parámetros de filtro inválidos", parsed.error.flatten());
-    reply.send(await resumenPorClub.obtenerResumenPorClub(parsed.data.competitionId, buildActorContext(req)));
+    reply.send(await resumenPorClub.obtenerResumenPorClub(parsed.data.competitionId, buildActorContext(req), parsed.data.edadMinima));
   });
 
   app.get("/reports/registrations/export", { preHandler: [requirePermission("reports:read")] }, async (req, reply) => {

@@ -32,11 +32,17 @@
  *   Club Solo Canceladas (solo una individual cancelada)                               → fuera
  *
  *   Totales: 15 nadadores (7 V, 8 D), 10 individuales, 3 relevos, 13 pruebas.
+ *   Todos nacieron en 1990 y la competencia no tiene fecha de corte: 0 de 70 años o más.
+ *
+ * La columna de edad («Nadadores de N años o más», `edadMinima` 70 por omisión) se prueba en
+ * competencias aparte, cada una con su fecha de corte (o sin ella, para el respaldo
+ * `getDefaultAgeCutoffDate()`); ver su bloque.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildServer } from "../src/server";
 import { prisma } from "../src/shared/prisma.client";
+import { getDefaultAgeCutoffDate } from "../src/shared/age.util";
 import { truncateAllTables } from "./helpers/testDb";
 import { seedRolesAndPermissions, createClub, createPerson, createUser, addActiveMembership, addClubStaff, TEST_PASSWORD } from "./helpers/seedRbac";
 
@@ -46,6 +52,12 @@ const ctx = {
   competitionId: "",
   competenciaVaciaId: "",
   otraCompetenciaId: "",
+  /** Competencias de la columna de 70 años o más, por su fecha de corte. */
+  edad: {} as Record<"corte2025" | "noBisiesto28Feb" | "noBisiesto1Mar" | "bisiesto29Feb" | "sinFecha", string>,
+  /** Año de `getDefaultAgeCutoffDate()` al sembrar (respaldo sin fecha configurada). */
+  anioCorteRespaldo: 0,
+  /** Fechas de nacimiento sembradas (AAAA-MM-DD), para comprobar que no se entregan. */
+  nacimientos: [] as string[],
   club: {} as Record<string, string>,
   tokens: {} as Record<string, string>,
   adminCombinadoUserId: "",
@@ -62,8 +74,9 @@ async function login(username: string): Promise<string> {
   return res.json().accessToken as string;
 }
 
-const resumen = (token: string | null, competitionId = ctx.competitionId) =>
-  app.inject({ method: "GET", url: `/reports/clubs-summary?competitionId=${competitionId}`, headers: token ? auth(token) : {} });
+/** `extra`: parámetros adicionales tal como irían en la URL (p. ej. «&edadMinima=75»). */
+const resumen = (token: string | null, competitionId = ctx.competitionId, extra = "") =>
+  app.inject({ method: "GET", url: `/reports/clubs-summary?competitionId=${competitionId}${extra}`, headers: token ? auth(token) : {} });
 const opciones = (token: string | null, competitionId = ctx.competitionId) =>
   app.inject({ method: "GET", url: `/reports/registrations/clubs?competitionId=${competitionId}`, headers: token ? auth(token) : {} });
 
@@ -91,12 +104,13 @@ beforeAll(async () => {
 
   const piscina = await prisma.pool.create({ data: { name: "Piscina sintética", courseLength: "long_50m" } });
 
-  async function competencia(nombre: string, status: "open" | "draft") {
+  async function competencia(nombre: string, status: "open" | "draft", ageCutoffDate: Date | null = null) {
     const ahora = new Date();
     const c = await prisma.competition.create({
       data: {
         name: nombre,
         status,
+        ageCutoffDate,
         poolId: piscina.id,
         registrationStartAt: new Date(ahora.getTime() - 86_400_000),
         registrationEndAt: new Date(ahora.getTime() + 86_400_000),
@@ -217,6 +231,57 @@ beforeAll(async () => {
   const E = ctx.club.sinInscritos!;
   await individual(otra.ind1, await persona("e1", "male", E), E);
 
+  // --- Columna «Nadadores de 70 años o más» --------------------------------
+  const utc = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+  const nacida = async (clave: string, gender: "male" | "female", club: string, nacimiento: string) => {
+    const id = await persona(clave, gender, club);
+    await prisma.person.update({ where: { id }, data: { birthDate: utc(nacimiento) } });
+    ctx.nacimientos.push(nacimiento);
+    return id;
+  };
+
+  // Corte 2025-06-15, distinto de hoy. Club Ambos y Club Solo Relevos.
+  const corte2025 = await competencia("Edad: corte 2025-06-15", "open", utc("2025-06-15"));
+  ctx.edad.corte2025 = corte2025.id;
+  const g1 = await nacida("g1", "male", A, "1955-06-16"); //   cumple 70 al día siguiente → fuera
+  const g2 = await nacida("g2", "female", A, "1955-06-15"); // cumple 70 justo en el corte → dentro
+  const g3 = await nacida("g3", "male", A, "1940-01-01"); //   85, solo relevos             → dentro
+  const g4 = await nacida("g4", "female", A, "1956-06-15"); // 69                           → fuera
+  const g5 = await nacida("g5", "male", A, "1956-01-10"); //   69 al corte, 70 HOY          → fuera
+  await individual(corte2025.ind1, g1, A);
+  await individual(corte2025.ind1, g2, A);
+  await individual(corte2025.ind2, g2, A);
+  await relevo(corte2025.rel1, A, [g2, g3, g4, g5]); // g2 repetida en individuales y relevo
+  await individual(corte2025.ind1, await nacida("h1", "female", C, "1950-03-01"), C); // 75 → dentro
+  await individual(corte2025.ind1, await nacida("h2", "male", C, "1960-01-01"), C); //   65 → fuera
+  await individual(corte2025.ind1, await nacida("h3", "female", C, "1950-06-15"), C); // 75 exactos en el corte
+  await individual(corte2025.ind1, await nacida("h4", "male", C, "1950-06-16"), C); //   74: cumple 75 al día siguiente
+
+  // Cumpleaños el 29 de febrero y cortes alrededor de esa fecha.
+  const k1 = await nacida("k1", "female", A, "1952-02-29");
+  const k2 = await nacida("k2", "male", A, "1952-02-28");
+  const noBisiesto28 = await competencia("Edad: corte 2022-02-28", "open", utc("2022-02-28"));
+  ctx.edad.noBisiesto28Feb = noBisiesto28.id;
+  await individual(noBisiesto28.ind1, k1, A); // 69 (computeAge: aún no cumple) → fuera
+  await individual(noBisiesto28.ind1, k2, A); // 70                           → dentro
+  const noBisiesto1 = await competencia("Edad: corte 2022-03-01", "open", utc("2022-03-01"));
+  ctx.edad.noBisiesto1Mar = noBisiesto1.id;
+  await individual(noBisiesto1.ind1, k1, A); // 70 → dentro
+  await individual(noBisiesto1.ind1, k2, A); // 70 → dentro
+  const bisiesto29 = await competencia("Edad: corte 2024-02-29", "open", utc("2024-02-29"));
+  ctx.edad.bisiesto29Feb = bisiesto29.id;
+  await individual(bisiesto29.ind1, k1, A); //                                          72 → dentro
+  await individual(bisiesto29.ind1, await nacida("m1", "male", A, "1954-02-28"), A); //   70 → dentro
+  await individual(bisiesto29.ind1, await nacida("m2", "female", A, "1954-03-01"), A); // 69 → fuera
+
+  // Sin fecha de corte: respaldo getDefaultAgeCutoffDate() = 31 de diciembre del año en curso.
+  ctx.anioCorteRespaldo = getDefaultAgeCutoffDate().getUTCFullYear();
+  const Y = ctx.anioCorteRespaldo;
+  const sinFecha = await competencia("Edad: sin fecha de corte", "open", null);
+  ctx.edad.sinFecha = sinFecha.id;
+  await individual(sinFecha.ind1, await nacida("n1", "male", A, `${Y - 70}-12-31`), A); //   cumple 70 el 31-dic → dentro
+  await individual(sinFecha.ind1, await nacida("n2", "female", A, `${Y - 69}-01-01`), A); // cumple 70 el 1-ene siguiente → fuera
+
   // --- Cuentas por rol -----------------------------------------------------
   ctx.tokens.admin = await login("admin_resumen");
   ctx.tokens.club = await login("club_ambos");
@@ -286,7 +351,17 @@ describe("acceso: exclusivo de administración, verificado en el servidor", () =
 });
 
 describe("resumen: reglas de conteo", () => {
-  type Fila = { clubId: string; clubName: string; varones: number; damas: number; totalNadadores: number; pruebasIndividuales: number; relevos: number; totalPruebas: number };
+  type Fila = {
+    clubId: string;
+    clubName: string;
+    varones: number;
+    damas: number;
+    totalNadadores: number;
+    nadadoresConEdadMinima: number;
+    pruebasIndividuales: number;
+    relevos: number;
+    totalPruebas: number;
+  };
   let cuerpo: { competitionId: string; competitionName: string; clubs: Fila[]; totales: Omit<Fila, "clubId" | "clubName"> };
   const fila = (clave: string) => cuerpo.clubs.find((f) => f.clubId === ctx.club[clave]);
 
@@ -312,6 +387,7 @@ describe("resumen: reglas de conteo", () => {
       varones: 2,
       damas: 3,
       totalNadadores: 5,
+      nadadoresConEdadMinima: 0,
       pruebasIndividuales: 3,
       relevos: 2,
       totalPruebas: 5,
@@ -339,7 +415,7 @@ describe("resumen: reglas de conteo", () => {
   });
 
   it("totales globales = suma de las columnas de todas las filas", () => {
-    expect(cuerpo.totales).toEqual({ varones: 7, damas: 8, totalNadadores: 15, pruebasIndividuales: 10, relevos: 3, totalPruebas: 13 });
+    expect(cuerpo.totales).toEqual({ varones: 7, damas: 8, totalNadadores: 15, nadadoresConEdadMinima: 0, pruebasIndividuales: 10, relevos: 3, totalPruebas: 13 });
     const suma = (k: keyof typeof cuerpo.totales) => cuerpo.clubs.reduce((s, f) => s + f[k], 0);
     for (const k of Object.keys(cuerpo.totales) as (keyof typeof cuerpo.totales)[]) expect(cuerpo.totales[k], k).toBe(suma(k));
   });
@@ -356,13 +432,173 @@ describe("resumen: reglas de conteo", () => {
     for (const run of ctx.runs) expect(texto).not.toContain(run);
     for (const nombre of ctx.nombres) expect(texto).not.toContain(nombre);
     expect(texto).not.toMatch(/birth|nacimiento|\brun\b|person/i);
-    for (const f of cuerpo.clubs) expect(Object.keys(f).sort()).toEqual(["clubId", "clubName", "damas", "pruebasIndividuales", "relevos", "totalNadadores", "totalPruebas", "varones"]);
+    for (const f of cuerpo.clubs)
+      expect(Object.keys(f).sort()).toEqual(["clubId", "clubName", "damas", "nadadoresConEdadMinima", "pruebasIndividuales", "relevos", "totalNadadores", "totalPruebas", "varones"]);
   });
 
   it("competencia sin inscripciones (y oculta): 200 con filas vacías y totales en cero", async () => {
     const res = await resumen(ctx.tokens.admin!, ctx.competenciaVaciaId);
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ clubs: [], totales: { varones: 0, damas: 0, totalNadadores: 0, pruebasIndividuales: 0, relevos: 0, totalPruebas: 0 } });
+    expect(res.json()).toEqual({
+      competitionId: ctx.competenciaVaciaId,
+      competitionName: "Competencia vacía",
+      edadMinima: 70,
+      clubs: [],
+      totales: { varones: 0, damas: 0, totalNadadores: 0, nadadoresConEdadMinima: 0, pruebasIndividuales: 0, relevos: 0, totalPruebas: 0 },
+    });
+  });
+});
+
+describe("resumen: nadadores con la edad mínima o más a la fecha de corte", () => {
+  type Cuerpo = {
+    edadMinima: number;
+    clubs: { clubId: string; totalNadadores: number; nadadoresConEdadMinima: number; varones: number; damas: number }[];
+    totales: { totalNadadores: number; nadadoresConEdadMinima: number };
+  };
+  const pedir = async (competitionId: string, edadMinima?: number): Promise<Cuerpo> => {
+    const res = await resumen(ctx.tokens.admin!, competitionId, edadMinima === undefined ? "" : `&edadMinima=${edadMinima}`);
+    expect(res.statusCode, res.body.slice(0, 300)).toBe(200);
+    return res.json();
+  };
+  const de = (c: Cuerpo, clave: string) => c.clubs.find((f) => f.clubId === ctx.club[clave]);
+
+  it("corte distinto de hoy: 69, 70 al día siguiente y 70 recién hoy fuera; 70 justo en el corte y mayor dentro; ambos sexos; solo relevos; repetida una vez", async () => {
+    const c = await pedir(ctx.edad.corte2025);
+    // Club Ambos: g1..g5 (3 V, 2 D); dentro g2 (D, exactamente 70, en dos individuales y un relevo) y g3 (V, solo relevo).
+    expect(de(c, "ambos")).toMatchObject({ varones: 3, damas: 2, totalNadadores: 5, nadadoresConEdadMinima: 2 });
+    // Club Solo Relevos (aquí con individuales): h1 (75), h3 (75) y h4 (74) dentro; h2 (65) fuera.
+    expect(de(c, "relevos")).toMatchObject({ totalNadadores: 4, nadadoresConEdadMinima: 3 });
+    expect(c.totales).toMatchObject({ totalNadadores: 9, nadadoresConEdadMinima: 5 });
+  });
+
+  it("parámetro omitido: aplica 70, lo informa y responde igual que con edadMinima=70", async () => {
+    const omitido = await pedir(ctx.edad.corte2025);
+    expect(omitido.edadMinima).toBe(70);
+    expect(await pedir(ctx.edad.corte2025, 70)).toEqual(omitido);
+  });
+
+  it.each([
+    // umbral, Club Ambos, Club Solo Relevos, total
+    [0, 5, 4, 9], //   todos: igual al total de nadadores
+    [65, 5, 4, 9], //  h2 cumple 65 exactos
+    [66, 5, 3, 8], //  h2 (65) queda fuera
+    [70, 2, 3, 5],
+    [71, 1, 3, 4], //  g2 (70 exactos) queda fuera
+    [75, 1, 2, 3], //  h3 (75 exactos) dentro; h4 (cumple 75 al día siguiente) fuera
+    [85, 1, 0, 1], //  g3 cumple 85 en el año: el 1-ene
+    [90, 0, 0, 0], //  nadie: los clubes siguen con 0
+    [150, 0, 0, 0],
+  ])("umbral %i: Club Ambos %i, Club Solo Relevos %i, total %i; el resto de las cifras y los clubes no cambian", async (edad, ambos, relevos, total) => {
+    const base = await pedir(ctx.edad.corte2025);
+    const c = await pedir(ctx.edad.corte2025, edad);
+    expect(c.edadMinima).toBe(edad);
+    expect(de(c, "ambos")?.nadadoresConEdadMinima).toBe(ambos);
+    expect(de(c, "relevos")?.nadadoresConEdadMinima).toBe(relevos);
+    expect(c.totales.nadadoresConEdadMinima).toBe(total);
+    expect(c.totales.nadadoresConEdadMinima).toBe(c.clubs.reduce((s, f) => s + f.nadadoresConEdadMinima, 0));
+    // Solo cambia la columna de edad: mismos clubes, en el mismo orden, con las mismas demás cifras.
+    const sinEdad = (x: Cuerpo) => ({
+      clubs: x.clubs.map(({ nadadoresConEdadMinima: _e, ...resto }) => resto),
+      totales: { ...x.totales, nadadoresConEdadMinima: undefined },
+    });
+    expect(sinEdad(c)).toEqual(sinEdad(base));
+  });
+
+  it("29 de febrero con distintos umbrales, como computeAge", async () => {
+    // k1 nació el 29-02-1952, k2 el 28-02-1952.
+    expect(de(await pedir(ctx.edad.noBisiesto28Feb, 69), "ambos")?.nadadoresConEdadMinima, "28-feb-2022, 69").toBe(2);
+    expect(de(await pedir(ctx.edad.noBisiesto28Feb, 70), "ambos")?.nadadoresConEdadMinima, "28-feb-2022, 70: k1 aún no").toBe(1);
+    expect(de(await pedir(ctx.edad.noBisiesto1Mar, 70), "ambos")?.nadadoresConEdadMinima, "1-mar-2022, 70").toBe(2);
+    expect(de(await pedir(ctx.edad.noBisiesto1Mar, 71), "ambos")?.nadadoresConEdadMinima, "1-mar-2022, 71").toBe(0);
+    // Corte el 29-02-2024: k1 cumple 72 justo ese día; m1 (28-02-1954) 70; m2 (01-03-1954) 69.
+    expect(de(await pedir(ctx.edad.bisiesto29Feb, 72), "ambos")?.nadadoresConEdadMinima, "29-feb-2024, 72").toBe(1);
+    expect(de(await pedir(ctx.edad.bisiesto29Feb, 73), "ambos")?.nadadoresConEdadMinima, "29-feb-2024, 73").toBe(0);
+    expect(de(await pedir(ctx.edad.bisiesto29Feb, 69), "ambos")?.nadadoresConEdadMinima, "29-feb-2024, 69").toBe(3);
+  });
+
+  it("sin fecha de corte y con otro umbral: el respaldo sigue siendo getDefaultAgeCutoffDate()", async () => {
+    const Y = ctx.anioCorteRespaldo;
+    expect(getDefaultAgeCutoffDate().getUTCFullYear()).toBe(Y);
+    // n1 cumple 70 el 31-12 del año en curso; n2, el 1-1 siguiente (69 al corte).
+    expect(de(await pedir(ctx.edad.sinFecha, 69), "ambos")?.nadadoresConEdadMinima).toBe(2);
+    expect(de(await pedir(ctx.edad.sinFecha, 71), "ambos")?.nadadoresConEdadMinima).toBe(0);
+  });
+
+  it.each(["", "7.5", "-1", "%2B70", "abc", "Infinity", "NaN", "1e2", "070", "151", "%2070", "70&edadMinima=75"])(
+    "edadMinima=%s → 400 sin cifras",
+    async (valor) => {
+      const res = await resumen(ctx.tokens.admin!, ctx.edad.corte2025, `&edadMinima=${valor}`);
+      expect(res.statusCode, res.body.slice(0, 200)).toBe(400);
+      expect(res.body).not.toContain("Club Ambos");
+    }
+  );
+
+  it("el selector de clubes no cambia: ignora edadMinima, aun inválida", async () => {
+    const sin = await opciones(ctx.tokens.admin!, ctx.edad.corte2025);
+    const con = await app.inject({
+      method: "GET",
+      url: `/reports/registrations/clubs?competitionId=${ctx.edad.corte2025}&edadMinima=abc`,
+      headers: auth(ctx.tokens.admin!),
+    });
+    expect(con.statusCode).toBe(200);
+    expect(con.json()).toEqual(sin.json());
+  });
+
+  it("29 de febrero: con corte el 28-feb de un año no bisiesto aún no cumple; con corte el 1-mar sí (como computeAge)", async () => {
+    expect(de(await pedir(ctx.edad.noBisiesto28Feb), "ambos")).toMatchObject({ totalNadadores: 2, nadadoresConEdadMinima: 1 });
+    expect(de(await pedir(ctx.edad.noBisiesto1Mar), "ambos")).toMatchObject({ totalNadadores: 2, nadadoresConEdadMinima: 2 });
+  });
+
+  it("corte el 29 de febrero de un año bisiesto: nacida el 28-feb dentro, el 1-mar fuera", async () => {
+    const c = await pedir(ctx.edad.bisiesto29Feb);
+    expect(de(c, "ambos")).toMatchObject({ totalNadadores: 3, nadadoresConEdadMinima: 2 });
+    expect(c.totales.nadadoresConEdadMinima).toBe(2);
+  });
+
+  it("sin fecha de corte configurada: usa getDefaultAgeCutoffDate() (31 de diciembre del año en curso)", async () => {
+    expect((await prisma.competition.findUniqueOrThrow({ where: { id: ctx.edad.sinFecha } })).ageCutoffDate).toBeNull();
+    // Protege contra una ejecución que cruce el cambio de año entre la siembra y la consulta.
+    expect(getDefaultAgeCutoffDate().getUTCFullYear()).toBe(ctx.anioCorteRespaldo);
+    const c = await pedir(ctx.edad.sinFecha);
+    expect(de(c, "ambos")).toMatchObject({ totalNadadores: 2, nadadoresConEdadMinima: 1 });
+  });
+
+  it("el total global suma la columna de todas las filas", async () => {
+    for (const id of Object.values(ctx.edad)) {
+      const c = await pedir(id);
+      expect(c.totales.nadadoresConEdadMinima).toBe(c.clubs.reduce((s, f) => s + f.nadadoresConEdadMinima, 0));
+      for (const f of c.clubs) expect(f.nadadoresConEdadMinima).toBeLessThanOrEqual(f.totalNadadores);
+    }
+  });
+
+  it("la respuesta no entrega fechas de nacimiento ni datos personales", async () => {
+    for (const id of Object.values(ctx.edad)) {
+      const texto = JSON.stringify(await pedir(id));
+      for (const fecha of ctx.nacimientos) expect(texto).not.toContain(fecha);
+      for (const run of ctx.runs) expect(texto).not.toContain(run);
+      for (const nombre of ctx.nombres) expect(texto).not.toContain(nombre);
+      expect(texto).not.toMatch(/birth|nacimiento|\brun\b|person|cutoff/i);
+    }
+  });
+
+  it("sigue siendo exclusiva de administración: otro rol con reports:read recibe 403 sin cifras, con o sin edadMinima", async () => {
+    for (const extra of ["", "&edadMinima=75", "&edadMinima=abc"]) {
+      const res = await resumen(ctx.tokens.delegado!, ctx.edad.corte2025, extra);
+      expect(res.statusCode, extra).toBe(403);
+      expect(res.body).not.toContain("nadadoresConEdadMinima");
+      expect(res.body).not.toContain("Club Ambos");
+      expect((await resumen(null, ctx.edad.corte2025, extra)).statusCode, `sin sesión ${extra}`).toBe(401);
+    }
+  });
+
+  it("con cualquier umbral, la respuesta no entrega fechas de nacimiento ni datos personales", async () => {
+    for (const edad of [0, 65, 75, 150]) {
+      const texto = JSON.stringify(await pedir(ctx.edad.corte2025, edad));
+      for (const fecha of ctx.nacimientos) expect(texto).not.toContain(fecha);
+      for (const run of ctx.runs) expect(texto).not.toContain(run);
+      for (const nombre of ctx.nombres) expect(texto).not.toContain(nombre);
+      expect(texto).not.toMatch(/birth|nacimiento|\brun\b|person|cutoff/i);
+    }
   });
 });
 

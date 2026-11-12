@@ -12,10 +12,19 @@
  * describe lo que se inscribió, aunque el nadador haya cambiado de club después.
  */
 import { prisma } from "../../shared/prisma.client";
-import { ForbiddenError, NotFoundError } from "../../shared/errors";
+import { ForbiddenError, NotFoundError, ValidationError } from "../../shared/errors";
 import type { ActorContext } from "../../shared/actorContext";
+import { getDefaultAgeCutoffDate } from "../../shared/age.util";
 import { exigirCompetenciaVisible } from "../competitions/competitions.visibilidad";
-import { compararFilasResumen, sumarTotales, type FilaResumenClub, type TotalesResumen } from "./resumenPorClub.rules";
+import {
+  compararFilasResumen,
+  EDAD_MINIMA_POR_OMISION,
+  esEdadMinimaValida,
+  limiteDeNacimientoPorEdad,
+  sumarTotales,
+  type FilaResumenClub,
+  type TotalesResumen,
+} from "./resumenPorClub.rules";
 
 /**
  * Segunda barrera, además de `requireRole("admin")` en la ruta: el servicio no confía en que
@@ -31,7 +40,7 @@ function exigirAdministracion(actor: ActorContext): void {
 async function competenciaDelReporte(competitionId: string, actor: ActorContext) {
   const competencia = await prisma.competition.findUnique({
     where: { id: competitionId },
-    select: { id: true, name: true, status: true, registrationStartAt: true, registrationEndAt: true },
+    select: { id: true, name: true, status: true, registrationStartAt: true, registrationEndAt: true, ageCutoffDate: true },
   });
   if (!competencia) throw new NotFoundError("Competencia");
   // Administración ve también las ocultas; la regla sigue siendo la única de AUD-07.
@@ -64,6 +73,8 @@ export async function listarClubesConInscripciones(competitionId: string, actor:
 export interface ResumenPorClub {
   competitionId: string;
   competitionName: string;
+  /** Edad mínima APLICADA a `nadadoresConEdadMinima` (la pedida o 70 por omisión). */
+  edadMinima: number;
   clubs: FilaResumenClub[];
   totales: TotalesResumen;
 }
@@ -74,6 +85,7 @@ interface FilaSql {
   varones: number;
   damas: number;
   nadadores: number;
+  mayores: number;
   individuales: number;
   relevos: number;
 }
@@ -92,11 +104,26 @@ interface FilaSql {
  *    relevos cuenta.
  *  - `varones` / `damas`: por el sexo de la PERSONA (`persons.gender`, que solo admite `male`
  *    y `female`), no por el género de la prueba: un relevo mixto no crea un tercer grupo.
+ *  - `nadadoresConEdadMinima`: de esas mismas personas distintas del club, las que tienen
+ *    `edadMinima` años o más (70 por omisión) a la FECHA DE CORTE del reporte: el
+ *    `ageCutoffDate` de la competencia o, si falta, `getDefaultAgeCutoffDate()` (igual que el
+ *    reporte detallado). La edad mínima es el umbral; la fecha de corte, el día al que se mide
+ *    la edad. Equivale a `computeAge(birthDate, fechaDeCorte) >= edadMinima`: ver
+ *    `limiteDeNacimientoPorEdad`. La edad mínima no cambia ninguna otra cifra ni qué clubes
+ *    aparecen. La fecha de nacimiento solo se compara dentro de la base; no sale de ella.
  *  - Se agrupa por `club_id`: dos clubes con el mismo nombre no se fusionan.
  */
-export async function obtenerResumenPorClub(competitionId: string, actor: ActorContext): Promise<ResumenPorClub> {
+export async function obtenerResumenPorClub(
+  competitionId: string,
+  actor: ActorContext,
+  edadMinima: number = EDAD_MINIMA_POR_OMISION
+): Promise<ResumenPorClub> {
   exigirAdministracion(actor);
+  // La ruta ya lo valida; el servicio no confía en quien lo llame.
+  if (!esEdadMinimaValida(edadMinima)) throw new ValidationError("Edad mínima inválida");
   const competencia = await competenciaDelReporte(competitionId, actor);
+  const fechaDeCorte = competencia.ageCutoffDate ?? getDefaultAgeCutoffDate();
+  const limite = limiteDeNacimientoPorEdad(fechaDeCorte, edadMinima);
 
   const filas = await prisma.$queryRaw<FilaSql[]>`
     WITH individuales AS (
@@ -124,7 +151,13 @@ export async function obtenerResumenPorClub(competitionId: string, actor: ActorC
       SELECT n.club_id,
              count(*) FILTER (WHERE p.gender = 'male'::"PersonGender")   AS varones,
              count(*) FILTER (WHERE p.gender = 'female'::"PersonGender") AS damas,
-             count(*)                                                    AS nadadores
+             count(*)                                                    AS nadadores,
+             -- birth_date es TIMESTAMP sin zona, guardado en UTC: sus componentes son los
+             -- mismos que usa computeAge. Comparación de tuplas, sin restar años a una fecha.
+             count(*) FILTER (
+               WHERE (EXTRACT(YEAR FROM p.birth_date)::int, EXTRACT(MONTH FROM p.birth_date)::int, EXTRACT(DAY FROM p.birth_date)::int)
+                     <= (${limite.anio}::int, ${limite.mes}::int, ${limite.dia}::int)
+             )                                                           AS mayores
       FROM nadadores n
       JOIN persons p ON p.id = n.person_id
       GROUP BY n.club_id
@@ -137,6 +170,7 @@ export async function obtenerResumenPorClub(competitionId: string, actor: ActorC
            COALESCE(pn.varones, 0)::int      AS varones,
            COALESCE(pn.damas, 0)::int        AS damas,
            COALESCE(pn.nadadores, 0)::int    AS nadadores,
+           COALESCE(pn.mayores, 0)::int      AS mayores,
            COALESCE(pi.n, 0)::int            AS individuales,
            COALESCE(pe.n, 0)::int            AS relevos
     FROM clubes k
@@ -153,11 +187,12 @@ export async function obtenerResumenPorClub(competitionId: string, actor: ActorC
       varones: f.varones,
       damas: f.damas,
       totalNadadores: f.nadadores,
+      nadadoresConEdadMinima: f.mayores,
       pruebasIndividuales: f.individuales,
       relevos: f.relevos,
       totalPruebas: f.individuales + f.relevos,
     }))
     .sort(compararFilasResumen);
 
-  return { competitionId: competencia.id, competitionName: competencia.name, clubs, totales: sumarTotales(clubs) };
+  return { competitionId: competencia.id, competitionName: competencia.name, edadMinima, clubs, totales: sumarTotales(clubs) };
 }

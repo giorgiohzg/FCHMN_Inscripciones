@@ -1098,6 +1098,33 @@ Filtros soportados (sección 16): `competitionId` (obligatorio), `clubId`, `comp
   - La respuesta no lleva RUN, nombres de personas ni fechas de nacimiento.
 - **Team Manager por fila.** Cada fila descarga el ZIP de su club con la exportación existente (`/export/team-manager/zip`), que conserva su contenido, sus validaciones y su control de acceso. No hay exportación global. Cada fila muestra su propio estado y su propio error sin bloquear a las demás.
 
+### Resumen por club: columna de edad con «Edad mínima» configurable (estado: publicada en el repositorio y validada localmente; pendiente de despliegue)
+
+> **Estado:** ampliación posterior al despliegue anterior. Está **publicada en el repositorio y validada localmente; pendiente de despliegue**: producción y el entorno local de ejecución todavía no la tienen. El resultado de la CI se comprueba aparte y no se anticipa aquí.
+>
+> **Validación** (cada capa por separado):
+>
+> - **Integración real:** pruebas contra la base desechable de pruebas, con la fecha de corte, el umbral y la validación del parámetro.
+> - **Pruebas puras:** equivalencia exhaustiva con `computeAge`.
+> - **Interfaz, pruebas automatizadas simuladas (jsdom):** interacción, validación, respuestas tardías y exportaciones.
+> - **Revisión visual en navegador con API simulada y datos sintéticos:** verificó presentación e interacción de la interfaz (escritorio y pantalla angosta), no el backend integrado ni el contenido de ningún ZIP de Team Manager.
+
+- **Qué agrega.** Un campo numérico «Edad mínima» junto al selector de competencia, con 70 al inicio, y una columna «Nadadores de N años o más» junto a «Total nadadores», con su total en el pie. Sin endpoints, migraciones ni dependencias nuevas.
+- **Qué controla la edad mínima.** Solo esa columna y su total. No cambia varones, damas, total de nadadores, pruebas individuales, relevos ni total de pruebas. Tampoco cambia qué clubes aparecen (siguen todos los que tienen una inscripción confirmada, aunque su columna de edad sea 0) ni la exportación a Team Manager, que sigue exportando el club completo. El selector de clubes del reporte detallado no cambia.
+- **Edad mínima y fecha de corte son cosas distintas.** La edad mínima es el umbral. La fecha de corte es el día al que se mide la edad: el `ageCutoffDate` de la competencia o, si falta, `getDefaultAgeCutoffDate()` (31 de diciembre del año en curso, en UTC), igual que el reporte detallado. Cuenta quien cumple `computeAge(birthDate, fechaDeCorte) >= edadMinima`, incluido quien cumple justo en la fecha de corte.
+- **Contrato** (`GET /reports/clubs-summary`):
+  - Parámetro opcional `edadMinima`. Si se omite, se usa 70.
+  - Se acepta un entero de **0 a 150**, escrito solo con dígitos: sin signo, decimales, espacios, exponente ni ceros a la izquierda. Un valor vacío, `7.5`, `-1`, `abc`, `Infinity`, `1e2`, `070`, `151` o un parámetro repetido reciben 400. El tope de 150 cubre cualquier edad real y mantiene el año límite (año del corte − edad) en años de calendario válidos; el cálculo solo compara enteros.
+  - La respuesta informa `edadMinima` (el umbral aplicado) y cada fila y los totales traen `nadadoresConEdadMinima`.
+- **Cálculo en la base.** En la misma consulta agregada, con las mismas personas distintas por club que «Total nadadores» (individuales e integrantes de relevos confirmados, una vez por club, por el club de la inscripción). Compara la tupla (año, mes, día) del nacimiento con (año del corte − edad mínima, mes del corte, día del corte). No resta años a una fecha, así que quien nació un 29 de febrero cumple en un año no bisiesto recién el 1 de marzo, como en `computeAge`. El total es la suma de la columna.
+- **Interfaz.**
+  - Escribir o borrar en el campo no consulta ni retira la tabla. La edad se confirma con «Aplicar» o Enter, que hacen una sola consulta. Mientras haya un cambio sin aplicar, el campo lo indica y se siguen mostrando los últimos resultados.
+  - Un valor vacío o inválido muestra la validación y no se aplica.
+  - El encabezado sale de la edad que informa la respuesta, no del campo. Mientras se recalcula, la tabla anterior se atenúa y un aviso indica que sus resultados son de la edad anterior. Si la actualización falla, se muestra el error y «Reintentar» vuelve a pedir la misma edad.
+  - Al aplicar otra edad en la misma competencia, la tabla no se vuelve a montar, así que conserva su desplazamiento horizontal. Cambiar de competencia sigue retirando los resultados de la anterior.
+  - Se descarta cualquier respuesta tardía de otra combinación de competencia y edad. Aplicar otra edad no altera el estado de las exportaciones en curso.
+- **Privacidad y acceso.** La fecha de nacimiento solo se compara dentro de la base: la respuesta sigue sin RUN, nombres de personas ni fechas de nacimiento. El acceso sigue siendo exclusivo de administración.
+
 ### Reglas aplicadas en el Módulo 10
 
 - **Una sola fuente de verdad para el formato de fila**: `mapIndividualRegistrationToRow` y `mapRelayRegistrationToRow` (`reports.rules.ts`) son funciones puras que definen el "shape" exacto de cada fila una sola vez; JSON, CSV, XLSX y PDF consumen la misma salida — no hay 4 implementaciones distintas del mismo formato que puedan desincronizarse. **20 pruebas unitarias** verifican el formateo exacto de columnas (incluida la traducción de género) y el escapado CSV (RFC 4180: comillas, comas, saltos de línea).

@@ -102,6 +102,11 @@ export interface FilaResumenClub {
   varones: number;
   damas: number;
   totalNadadores: number;
+  /**
+   * De esas personas distintas, las que tienen la edad mínima (`ResumenPorClub.edadMinima`) o más
+   * a la fecha de corte de la competencia. Lo calcula el servidor.
+   */
+  nadadoresConEdadMinima: number;
   pruebasIndividuales: number;
   relevos: number;
   totalPruebas: number;
@@ -112,6 +117,8 @@ export type TotalesResumen = Omit<FilaResumenClub, "clubId" | "clubName">;
 export interface ResumenPorClub {
   competitionId: string;
   competitionName: string;
+  /** Edad mínima que el servidor APLICÓ a `nadadoresConEdadMinima`. */
+  edadMinima: number;
   clubs: FilaResumenClub[];
   totales: TotalesResumen;
 }
@@ -140,7 +147,8 @@ export function useReportsApi() {
       api.get<{ clubs: OpcionClub[] }>(`/reports/registrations/clubs?${new URLSearchParams({ competitionId })}`),
 
     /** Resumen de inscripciones por club. Solo administración (el servidor lo exige). */
-    getResumenPorClub: (competitionId: string) => api.get<ResumenPorClub>(`/reports/clubs-summary?${new URLSearchParams({ competitionId })}`),
+    getResumenPorClub: (competitionId: string, edadMinima: number) =>
+      api.get<ResumenPorClub>(`/reports/clubs-summary?${new URLSearchParams({ competitionId, edadMinima: String(edadMinima) })}`),
 
     /** Descarga el archivo exportado directamente en el navegador. */
     downloadExport: (filters: ReportFilters, format: "csv" | "xlsx" | "pdf") =>

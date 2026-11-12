@@ -11,6 +11,23 @@ const numero = (n: number) => n.toLocaleString("es-CL");
 
 const SOLO_ADMINISTRACION = "Este reporte es exclusivo de administración.";
 
+/** Valor inicial del campo «Edad mínima». */
+const EDAD_MINIMA_INICIAL = 70;
+/** Mismos límites que el servidor (`resumenPorClubQuerySchema`). */
+const EDAD_MINIMA_MAXIMA = 150;
+const MENSAJE_EDAD_MINIMA = `Ingrese un número entero entre 0 y ${EDAD_MINIMA_MAXIMA}.`;
+
+/**
+ * La edad mínima del campo, o `null` si no es válida: con el mismo criterio que el servidor
+ * (solo dígitos, sin ceros a la izquierda, de 0 a 150), para no pedir nunca una consulta que
+ * rechazaría. Un campo numérico con texto no numérico entrega "": también es `null`.
+ */
+function leerEdadMinima(texto: string): number | null {
+  if (!/^(0|[1-9][0-9]{0,2})$/.test(texto)) return null;
+  const edad = Number(texto);
+  return edad <= EDAD_MINIMA_MAXIMA ? edad : null;
+}
+
 /** Mensaje para el usuario: un 403 dice lo que significa, no el detalle técnico del servidor. */
 function mensajeDeError(err: unknown, porOmision: string): string {
   if (err instanceof ApiError && err.status === 403) return SOLO_ADMINISTRACION;
@@ -19,10 +36,18 @@ function mensajeDeError(err: unknown, porOmision: string): string {
 
 type EstadoExportacion = { generando: true } | { generando: false; error: string };
 
+/** Error de la consulta del resumen. Un 403 no se ofrece reintentar: no cambiaría nada. */
+type ErrorResumen = { mensaje: string; reintentable: boolean };
+
 /**
  * Resumen de inscripciones por club (solo administración).
  *
- * El único filtro es la competencia. Las cifras llegan AGREGADAS del servidor
+ * Se elige la competencia y la «Edad mínima» (70 al inicio). La edad mínima solo cambia la
+ * columna de edad: las demás cifras, los clubes listados y la exportación no dependen de ella.
+ * Escribir en el campo no consulta nada: la edad se confirma con «Aplicar» o Enter, y mientras
+ * tanto se conservan los últimos resultados, identificados por la edad que informó el servidor.
+ * La edad se mide a la fecha de corte de la competencia, que la calcula el servidor. Las cifras
+ * llegan AGREGADAS del servidor
  * (`GET /reports/clubs-summary`): esta pantalla no recibe ni calcula nada a partir de datos
  * personales. Cada fila exporta el ZIP de Team Manager de su club con la exportación
  * existente, que conserva sus validaciones y su control de acceso en el servidor.
@@ -36,10 +61,17 @@ export function ClubSummaryReportPage() {
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [errorCompetencias, setErrorCompetencias] = useState<string | null>(null);
   const [competitionId, setCompetitionId] = useState("");
+  /** Lo que se está escribiendo. No consulta nada hasta «Aplicar» o Enter. */
+  const [edadTexto, setEdadTexto] = useState(String(EDAD_MINIMA_INICIAL));
+  const edadEscrita = leerEdadMinima(edadTexto);
+  /** Edad CONFIRMADA: la única que se pide al servidor. Siempre válida. */
+  const [edadAplicada, setEdadAplicada] = useState(EDAD_MINIMA_INICIAL);
+  /** Sube con cada «Aplicar» o «Reintentar»: vuelve a pedir aunque la combinación no cambie. */
+  const [solicitud, setSolicitud] = useState(0);
 
   const [resumen, setResumen] = useState<ResumenPorClub | null>(null);
   const [cargando, setCargando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorResumen | null>(null);
 
   /** Estado de la exportación de CADA fila, por id de club: una fila no bloquea a las demás. */
   const [exportaciones, setExportaciones] = useState<Record<string, EstadoExportacion>>({});
@@ -77,29 +109,57 @@ export function ClubSummaryReportPage() {
     setResumen(null);
     setError(null);
     setExportaciones({});
+    // La competencia nueva se consulta con la edad YA APLICADA, aunque haya un cambio sin aplicar.
     setCargando(Boolean(id));
+  }
+
+  /** Vuelve a pedir el resumen con la competencia y la edad aplicadas (también para reintentar). */
+  function pedirDeNuevo() {
+    setSolicitud((n) => n + 1);
+    if (competitionId) {
+      setCargando(true);
+      setError(null);
+    }
+  }
+
+  /**
+   * Confirma la edad escrita. Un valor inválido no se aplica (su validación ya está a la vista),
+   * y aplicar la misma edad que ya está a la vista no consulta de nuevo. NO retira la tabla ni
+   * toca las exportaciones: son de la misma competencia y no dependen de la edad.
+   */
+  function aplicarEdad() {
+    if (edadEscrita === null) return;
+    const yaVigente = edadEscrita === edadAplicada && !error && !cargando && (!competitionId || resumen?.edadMinima === edadEscrita);
+    if (yaVigente) return;
+    setEdadAplicada(edadEscrita);
+    pedirDeNuevo();
   }
 
   useEffect(() => {
     if (!esAdmin || !competitionId) return;
     let vigente = true;
     api
-      .getResumenPorClub(competitionId)
+      .getResumenPorClub(competitionId, edadAplicada)
       .then((r) => {
         if (vigente) setResumen(r);
       })
       .catch((err) => {
-        if (vigente) setError(mensajeDeError(err, "No se pudo generar el resumen"));
+        // Se conservan los resultados anteriores de la MISMA competencia, identificados como tales.
+        if (vigente)
+          setError({
+            mensaje: mensajeDeError(err, "No se pudo generar el resumen"),
+            reintentable: !(err instanceof ApiError && err.status === 403),
+          });
       })
       .finally(() => {
         if (vigente) setCargando(false);
       });
-    // Una respuesta tardía de la competencia anterior se descarta.
+    // Una respuesta tardía de otra combinación de competencia y edad mínima se descarta.
     return () => {
       vigente = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [competitionId, esAdmin]);
+  }, [competitionId, edadAplicada, solicitud, esAdmin]);
 
   async function exportar(clubId: string) {
     const competencia = competitionId;
@@ -128,6 +188,12 @@ export function ClubSummaryReportPage() {
 
   const puedeExportar = hasPermission("export:team-manager");
 
+  /** Último resultado de ESTA competencia (el de otra nunca se muestra). */
+  const resumenVisible = resumen && resumen.competitionId === competitionId ? resumen : null;
+  /** El resultado a la vista es de otra edad que la aplicada: se está recalculando o falló. */
+  const resultadoDeOtraEdad = resumenVisible !== null && resumenVisible.edadMinima !== edadAplicada;
+  const cambioSinAplicar = edadTexto !== String(edadAplicada);
+
   return (
     <AppShell>
       <h1 style={{ color: "var(--brand-navy)" }}>Reportes</h1>
@@ -139,19 +205,63 @@ export function ClubSummaryReportPage() {
       ) : (
         <>
           <p style={{ color: "var(--brand-gray-600)", fontSize: "0.9rem" }}>
-            Resumen de inscripciones confirmadas por club: nadadores distintos por sexo, pruebas individuales y relevos.
+            Resumen de inscripciones confirmadas por club: nadadores distintos por sexo, nadadores con la edad mínima elegida o más, pruebas individuales y relevos.
           </p>
 
-          <div style={{ maxWidth: 420 }}>
-            <label htmlFor="resumen-competencia">Competencia</label>
-            <select id="resumen-competencia" value={competitionId} onChange={(e) => cambiarCompetencia(e.target.value)}>
-              <option value="">Seleccionar...</option>
-              {competitions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "flex-start" }}>
+            <div style={{ flex: "1 1 260px", maxWidth: 420 }}>
+              <label htmlFor="resumen-competencia">Competencia</label>
+              <select id="resumen-competencia" value={competitionId} onChange={(e) => cambiarCompetencia(e.target.value)}>
+                <option value="">Seleccionar...</option>
+                {competitions.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {/* Un formulario propio: Enter en el campo equivale a «Aplicar». noValidate: la validación es la de abajo. */}
+            <form
+              noValidate
+              style={{ flex: "0 1 260px" }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                aplicarEdad();
+              }}
+            >
+              <label htmlFor="resumen-edad-minima">Edad mínima</label>
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "stretch" }}>
+                <input
+                  id="resumen-edad-minima"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={EDAD_MINIMA_MAXIMA}
+                  step={1}
+                  value={edadTexto}
+                  onChange={(e) => setEdadTexto(e.target.value)}
+                  aria-invalid={edadEscrita === null}
+                  aria-describedby="resumen-edad-minima-ayuda"
+                  style={{ flex: "1 1 auto", minWidth: 0 }}
+                />
+                <button type="submit" className="btn-secondary" style={{ whiteSpace: "nowrap" }}>
+                  Aplicar
+                </button>
+              </div>
+              {edadEscrita === null ? (
+                <p id="resumen-edad-minima-ayuda" className="error-message" role="alert" style={{ margin: "0.3rem 0 0", fontSize: "0.8rem" }}>
+                  {MENSAJE_EDAD_MINIMA} No se aplica: se mantiene {edadAplicada}.
+                </p>
+              ) : cambioSinAplicar ? (
+                <p id="resumen-edad-minima-ayuda" aria-live="polite" style={{ color: "var(--brand-navy)", fontWeight: 600, fontSize: "0.8rem", margin: "0.3rem 0 0" }}>
+                  Cambio sin aplicar: se mantiene {edadAplicada}. Pulse «Aplicar» o Enter.
+                </p>
+              ) : (
+                <p id="resumen-edad-minima-ayuda" style={{ color: "var(--brand-gray-600)", fontSize: "0.8rem", margin: "0.3rem 0 0" }}>
+                  Años cumplidos a la fecha de corte de la competencia. Solo cambia esa columna.
+                </p>
+              )}
+            </form>
           </div>
 
           {errorCompetencias && <p className="error-message">{errorCompetencias}</p>}
@@ -162,21 +272,48 @@ export function ClubSummaryReportPage() {
 
           {cargando && (
             <p role="status" style={{ marginTop: "1rem" }}>
-              Cargando resumen…
+              {resumenVisible
+                ? `Recalculando con ${edadAplicada} años o más… La tabla muestra todavía los resultados de ${resumenVisible.edadMinima} años o más.`
+                : "Cargando resumen…"}
             </p>
           )}
 
           {error && (
             <p className="error-message" role="alert">
-              {error}
+              {resultadoDeOtraEdad
+                ? `No se pudo actualizar a ${edadAplicada} años o más (${error.mensaje}). La tabla muestra los resultados de ${resumenVisible.edadMinima} años o más.`
+                : error.mensaje}
+              {error.reintentable && (
+                <>
+                  {" "}
+                  <button type="button" className="btn-secondary" onClick={pedirDeNuevo} style={{ marginLeft: "0.5rem" }}>
+                    Reintentar
+                  </button>
+                </>
+              )}
             </p>
           )}
 
-          {resumen && resumen.competitionId === competitionId && (
-            <section style={{ marginTop: "1.5rem" }} aria-label={`Resumen de ${resumen.competitionName}`}>
-              <h2 style={{ fontSize: "1.2rem", color: "var(--brand-navy)" }}>{resumen.competitionName}</h2>
+          {resultadoDeOtraEdad && !cargando && !error && (
+            <p className="error-message" role="alert">
+              Estos resultados son de {resumenVisible.edadMinima} años o más, no de la edad aplicada ({edadAplicada}).
+            </p>
+          )}
 
-              {resumen.clubs.length === 0 ? (
+          {/*
+            Solo resultados de ESTA competencia. El encabezado sale de la respuesta, no del campo. Al
+            aplicar otra edad la sección NO se desmonta (se atenúa y queda marcada como ocupada): así
+            se conserva el desplazamiento horizontal de la tabla.
+          */}
+          {resumenVisible && (
+            <section
+              style={{ marginTop: "1.5rem", opacity: resultadoDeOtraEdad ? 0.55 : 1, transition: "opacity 120ms" }}
+              aria-label={`Resumen de ${resumenVisible.competitionName}`}
+              aria-busy={cargando}
+            >
+              <h2 style={{ fontSize: "1.2rem", color: "var(--brand-navy)" }}>{resumenVisible.competitionName}</h2>
+
+              {resumenVisible.clubs.length === 0 ? (
                 <p style={{ color: "var(--brand-gray-600)", fontSize: "0.9rem" }}>La competencia no tiene inscripciones confirmadas.</p>
               ) : (
                 // En pantallas angostas la tabla se desplaza dentro de su contenedor, sin ensanchar la página.
@@ -188,6 +325,7 @@ export function ClubSummaryReportPage() {
                         <th scope="col" style={{ textAlign: "right" }}>Varones</th>
                         <th scope="col" style={{ textAlign: "right" }}>Damas</th>
                         <th scope="col" style={{ textAlign: "right" }}>Total nadadores</th>
+                        <th scope="col" style={{ textAlign: "right" }}>Nadadores de {resumenVisible.edadMinima} años o más</th>
                         <th scope="col" style={{ textAlign: "right" }}>Pruebas individuales</th>
                         <th scope="col" style={{ textAlign: "right" }}>Relevos</th>
                         <th scope="col" style={{ textAlign: "right" }}>Total pruebas</th>
@@ -195,7 +333,7 @@ export function ClubSummaryReportPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {resumen.clubs.map((f) => {
+                      {resumenVisible.clubs.map((f) => {
                         const estado = exportaciones[f.clubId];
                         return (
                           // Clave: el id del club. Dos clubes pueden llamarse igual.
@@ -206,6 +344,7 @@ export function ClubSummaryReportPage() {
                             <td style={{ textAlign: "right" }}>{numero(f.varones)}</td>
                             <td style={{ textAlign: "right" }}>{numero(f.damas)}</td>
                             <td style={{ textAlign: "right" }}>{numero(f.totalNadadores)}</td>
+                            <td style={{ textAlign: "right" }}>{numero(f.nadadoresConEdadMinima)}</td>
                             <td style={{ textAlign: "right" }}>{numero(f.pruebasIndividuales)}</td>
                             <td style={{ textAlign: "right" }}>{numero(f.relevos)}</td>
                             <td style={{ textAlign: "right" }}>{numero(f.totalPruebas)}</td>
@@ -238,12 +377,13 @@ export function ClubSummaryReportPage() {
                         <th scope="row" style={{ textAlign: "left", fontWeight: 600, background: "transparent", color: "inherit", textTransform: "none", letterSpacing: 0, fontSize: "0.9rem" }}>
                           Total
                         </th>
-                        <td style={{ textAlign: "right", fontWeight: 600 }}>{numero(resumen.totales.varones)}</td>
-                        <td style={{ textAlign: "right", fontWeight: 600 }}>{numero(resumen.totales.damas)}</td>
-                        <td style={{ textAlign: "right", fontWeight: 600 }}>{numero(resumen.totales.totalNadadores)}</td>
-                        <td style={{ textAlign: "right", fontWeight: 600 }}>{numero(resumen.totales.pruebasIndividuales)}</td>
-                        <td style={{ textAlign: "right", fontWeight: 600 }}>{numero(resumen.totales.relevos)}</td>
-                        <td style={{ textAlign: "right", fontWeight: 600 }}>{numero(resumen.totales.totalPruebas)}</td>
+                        <td style={{ textAlign: "right", fontWeight: 600 }}>{numero(resumenVisible.totales.varones)}</td>
+                        <td style={{ textAlign: "right", fontWeight: 600 }}>{numero(resumenVisible.totales.damas)}</td>
+                        <td style={{ textAlign: "right", fontWeight: 600 }}>{numero(resumenVisible.totales.totalNadadores)}</td>
+                        <td style={{ textAlign: "right", fontWeight: 600 }}>{numero(resumenVisible.totales.nadadoresConEdadMinima)}</td>
+                        <td style={{ textAlign: "right", fontWeight: 600 }}>{numero(resumenVisible.totales.pruebasIndividuales)}</td>
+                        <td style={{ textAlign: "right", fontWeight: 600 }}>{numero(resumenVisible.totales.relevos)}</td>
+                        <td style={{ textAlign: "right", fontWeight: 600 }}>{numero(resumenVisible.totales.totalPruebas)}</td>
                         {puedeExportar && <td />}
                       </tr>
                     </tfoot>
