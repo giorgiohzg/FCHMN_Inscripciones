@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import * as reportsService from "./reports.service";
-import { registrationsReportQuerySchema } from "./reports.schemas";
-import { requireAuth, requirePermission } from "../auth/rbac.middleware";
+import * as resumenPorClub from "./resumenPorClub.service";
+import { competenciaDelReporteQuerySchema, registrationsReportQuerySchema } from "./reports.schemas";
+import { requireAuth, requirePermission, requireRole } from "../auth/rbac.middleware";
 import { ValidationError } from "../../shared/errors";
 import { audit } from "../audit/audit.service";
 import { buildActorContext } from "../../shared/actorContext";
@@ -13,6 +14,27 @@ export async function reportsRoutes(app: FastifyInstance) {
     const parsed = registrationsReportQuerySchema.safeParse(req.query);
     if (!parsed.success) throw new ValidationError("Parámetros de filtro inválidos", parsed.error.flatten());
     reply.send(await reportsService.getRegistrationsReport(parsed.data, buildActorContext(req)));
+  });
+
+  /**
+   * Exclusivos de ADMINISTRACIÓN, en el servidor y no solo en la interfaz: `requireRole("admin")`
+   * se evalúa con los roles VIGENTES (recargados de la base en cada solicitud), y el servicio
+   * vuelve a exigir el alcance de administración. Quien combina administración con otro rol
+   * pasa; cualquier otro rol recibe 403, aunque tenga `reports:read`.
+   */
+
+  /** Opciones del selector de clubes: los clubes con inscripciones confirmadas en la competencia. */
+  app.get("/reports/registrations/clubs", { preHandler: [requirePermission("reports:read"), requireRole("admin")] }, async (req, reply) => {
+    const parsed = competenciaDelReporteQuerySchema.safeParse(req.query);
+    if (!parsed.success) throw new ValidationError("Parámetros de filtro inválidos", parsed.error.flatten());
+    reply.send(await resumenPorClub.listarClubesConInscripciones(parsed.data.competitionId, buildActorContext(req)));
+  });
+
+  /** Resumen de inscripciones por club: cifras agregadas, sin datos personales. */
+  app.get("/reports/clubs-summary", { preHandler: [requirePermission("reports:read"), requireRole("admin")] }, async (req, reply) => {
+    const parsed = competenciaDelReporteQuerySchema.safeParse(req.query);
+    if (!parsed.success) throw new ValidationError("Parámetros de filtro inválidos", parsed.error.flatten());
+    reply.send(await resumenPorClub.obtenerResumenPorClub(parsed.data.competitionId, buildActorContext(req)));
   });
 
   app.get("/reports/registrations/export", { preHandler: [requirePermission("reports:read")] }, async (req, reply) => {

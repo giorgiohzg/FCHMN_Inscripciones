@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell } from "../../shared/AppShell";
 import { useAuth } from "../auth/AuthContext";
 import { useCompetitionsApi, type Competition } from "../competitions/competitionsApi";
 import { useClubsApi, type Club } from "../clubs/clubsApi";
-import { useReportsApi, type RegistrationsReportResult, type ReportFilters } from "./reportsApi";
+import { useReportsApi, type OpcionClub, type RegistrationsReportResult, type ReportFilters } from "./reportsApi";
+import { ReportesNav } from "./ReportesNav";
 import { useSwimmerAssignmentApi } from "../swimmer-assignment/assignmentApi";
 import { CircledNumber } from "../../shared/CircledNumber";
 import { traerTodasLasPaginas } from "../../shared/paginacion";
@@ -26,9 +27,16 @@ export function ReportsPage() {
   // filtrado directo a su propio club — el filtro se muestra como texto
   // fijo, no como desplegable (el servidor tampoco permite otro club).
   const isClubScoped = !hasRole("admin") && Boolean(user?.clubId);
+  // Administración elige club entre los que tienen inscripciones confirmadas en la competencia.
+  const esAdmin = hasRole("admin");
 
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [clubs, setClubs] = useState<Club[]>([]);
+  /**
+   * Opciones del selector de administración para la competencia elegida: `null` mientras se
+   * cargan. Solo clubes con al menos una inscripción confirmada (individual o de relevo).
+   */
+  const [opcionesDeClub, setOpcionesDeClub] = useState<OpcionClub[] | null>([]);
   const [ownClubName, setOwnClubName] = useState<string | null>(null);
 
   const [competitionId, setCompetitionId] = useState("");
@@ -38,6 +46,33 @@ export function ReportsPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
+  /**
+   * Número de la consulta vigente del reporte. Cambiar la competencia o el club lo incrementa:
+   * una respuesta que llegue después, de una selección anterior, se descarta.
+   */
+  const consultaVigente = useRef(0);
+
+  function invalidarResultado() {
+    consultaVigente.current++;
+    setResult(null);
+    setLoading(false);
+  }
+
+  function cambiarCompetencia(id: string) {
+    setCompetitionId(id);
+    setError(null);
+    invalidarResultado();
+    if (esAdmin) {
+      // Sin competencia no hay opciones; con una, quedan pendientes hasta que respondan.
+      setOpcionesDeClub(id ? null : []);
+      if (!id) setClubId("");
+    }
+  }
+
+  function cambiarClub(id: string) {
+    setClubId(id);
+    invalidarResultado();
+  }
 
   useEffect(() => {
     // Selector de competencias. Las que la administración ocultó
@@ -87,12 +122,41 @@ export function ReportsPage() {
         .catch((err) => setError(err instanceof Error ? err.message : "No se pudo cargar el club"));
       return;
     }
+    // Administración: las opciones dependen de la competencia (efecto siguiente).
+    if (esAdmin) return;
     // Selector: sin todas las páginas, el club 101 no existía para el informe.
     traerTodasLasPaginas((page, pageSize) => clubsApi.list({ page, pageSize }))
       .then(setClubs)
       .catch((err) => setError(err instanceof Error ? err.message : "No se pudieron cargar los clubes"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!esAdmin || !competitionId) return;
+    let vigente = true;
+    api
+      .getClubesConInscripciones(competitionId)
+      .then(({ clubs: opciones }) => {
+        if (!vigente) return; // respuesta tardía de una competencia anterior
+        setOpcionesDeClub(opciones);
+        // La selección se conserva solo si sigue siendo válida para esta competencia.
+        setClubId((actual) => (opciones.some((c) => c.id === actual) ? actual : ""));
+      })
+      .catch((err) => {
+        if (!vigente) return;
+        setOpcionesDeClub([]);
+        setClubId("");
+        setError(err instanceof Error ? err.message : "No se pudieron cargar los clubes de la competencia");
+      });
+    return () => {
+      vigente = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esAdmin, competitionId]);
+
+  /** Mientras llegan las opciones de la competencia, el club elegido aún no está validado. */
+  const cargandoClubes = esAdmin && Boolean(competitionId) && opcionesDeClub === null;
+  const clubesDelSelector: { id: string; name: string }[] = esAdmin ? (opcionesDeClub ?? []) : clubs;
 
   const filters: ReportFilters | null = competitionId
     ? {
@@ -102,20 +166,23 @@ export function ReportsPage() {
     : null;
 
   async function handleGenerate() {
-    if (!filters) return;
+    if (!filters || cargandoClubes) return;
+    const consulta = ++consultaVigente.current;
     setError(null);
+    setResult(null);
     setLoading(true);
     try {
-      setResult(await api.getRegistrationsReport(filters));
+      const informe = await api.getRegistrationsReport(filters);
+      if (consulta === consultaVigente.current) setResult(informe);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo generar el reporte");
+      if (consulta === consultaVigente.current) setError(err instanceof Error ? err.message : "No se pudo generar el reporte");
     } finally {
-      setLoading(false);
+      if (consulta === consultaVigente.current) setLoading(false);
     }
   }
 
   async function handleExport(format: "csv" | "xlsx" | "pdf") {
-    if (!filters) return;
+    if (!filters || cargandoClubes) return;
     setExporting(format);
     setError(null);
     try {
@@ -128,6 +195,7 @@ export function ReportsPage() {
   }
 
   async function handleTeamManagerExport() {
+    if (cargandoClubes) return;
     if (!competitionId || !clubId) {
       setError("Para exportar a Team Manager debe seleccionar competencia Y club (un archivo es por club).");
       return;
@@ -146,12 +214,13 @@ export function ReportsPage() {
   return (
     <AppShell>
       <h1 style={{ color: "var(--brand-navy)" }}>Reportes</h1>
+      <ReportesNav />
       <p style={{ color: "var(--brand-gray-600)", fontSize: "0.9rem" }}>Listado de nadadores inscritos, con filtros y exportación.</p>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0.75rem", maxWidth: 900 }}>
         <div>
           <label>Competencia</label>
-          <select value={competitionId} onChange={(e) => setCompetitionId(e.target.value)}>
+          <select value={competitionId} onChange={(e) => cambiarCompetencia(e.target.value)}>
             <option value="">Seleccionar...</option>
             {competitions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
@@ -161,30 +230,35 @@ export function ReportsPage() {
           {isPureSwimmer || isClubScoped ? (
             <p style={{ fontSize: "0.9rem", padding: "0.45rem 0" }}>{ownClubName ?? "Cargando..."}</p>
           ) : (
-            <select value={clubId} onChange={(e) => setClubId(e.target.value)}>
-              <option value="">Todos</option>
-              {clubs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            <select
+              aria-label="Club"
+              value={clubId}
+              onChange={(e) => cambiarClub(e.target.value)}
+              disabled={esAdmin && (!competitionId || cargandoClubes)}
+            >
+              <option value="">{cargandoClubes ? "Cargando clubes..." : "Todos"}</option>
+              {clubesDelSelector.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           )}
         </div>
       </div>
 
       <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
-        <button className="btn-primary" onClick={handleGenerate} disabled={!competitionId || loading}>
+        <button className="btn-primary" onClick={handleGenerate} disabled={!competitionId || loading || cargandoClubes}>
           {loading ? "Generando..." : "Generar reporte"}
         </button>
-        <button className="btn-secondary" onClick={() => handleExport("csv")} disabled={!competitionId || exporting !== null}>
+        <button className="btn-secondary" onClick={() => handleExport("csv")} disabled={!competitionId || exporting !== null || cargandoClubes}>
           {exporting === "csv" ? "Exportando..." : "Exportar CSV"}
         </button>
-        <button className="btn-secondary" onClick={() => handleExport("xlsx")} disabled={!competitionId || exporting !== null}>
+        <button className="btn-secondary" onClick={() => handleExport("xlsx")} disabled={!competitionId || exporting !== null || cargandoClubes}>
           {exporting === "xlsx" ? "Exportando..." : "Exportar Excel"}
         </button>
-        <button className="btn-secondary" onClick={() => handleExport("pdf")} disabled={!competitionId || exporting !== null}>
+        <button className="btn-secondary" onClick={() => handleExport("pdf")} disabled={!competitionId || exporting !== null || cargandoClubes}>
           {exporting === "pdf" ? "Exportando..." : "Exportar PDF"}
         </button>
         {/* Solo muestra u oculta: el servidor aplica el permiso y, para el personal de club, que sea SU club. */}
         {hasPermission("export:team-manager") && (
-          <button className="btn-secondary" onClick={handleTeamManagerExport} disabled={!competitionId || exporting !== null}>
+          <button className="btn-secondary" onClick={handleTeamManagerExport} disabled={!competitionId || exporting !== null || cargandoClubes}>
             {exporting === "hy3" ? "Generando..." : "Exportar a Team Manager (.zip)"}
           </button>
         )}

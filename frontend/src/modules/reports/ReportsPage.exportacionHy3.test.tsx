@@ -88,12 +88,13 @@ const clubsList = vi.fn(async () => ({
 const clubsGet = vi.fn(async () => ({ id: "club-1", name: "Club Uno" }));
 const getCurrentClub = vi.fn(async () => null);
 const downloadTeamManagerExport = vi.fn(async () => undefined);
+const getClubesConInscripciones = vi.fn(async () => ({ clubs: [{ id: "club-1", name: "Club Uno" }, { id: "club-2", name: "Club Dos" }] }));
 
 vi.mock("../competitions/competitionsApi", () => ({ useCompetitionsApi: () => ({ list: competitionsList }) }));
 vi.mock("../clubs/clubsApi", () => ({ useClubsApi: () => ({ list: clubsList, get: clubsGet }) }));
 vi.mock("../swimmer-assignment/assignmentApi", () => ({ useSwimmerAssignmentApi: () => ({ getCurrentClub }) }));
 vi.mock("./reportsApi", () => ({
-  useReportsApi: () => ({ getRegistrationsReport: vi.fn(), downloadExport: vi.fn(), downloadTeamManagerExport }),
+  useReportsApi: () => ({ getRegistrationsReport: vi.fn(), downloadExport: vi.fn(), downloadTeamManagerExport, getClubesConInscripciones }),
 }));
 
 const BOTON = "Exportar a Team Manager (.zip)";
@@ -135,6 +136,7 @@ describe("el club que viaja en la descarga", () => {
     expect(await screen.findByText("Club Uno")).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Club Dos" })).not.toBeInTheDocument();
     expect(clubsList).not.toHaveBeenCalled();
+    expect(getClubesConInscripciones, "el personal de club no consulta las opciones de administración").not.toHaveBeenCalled();
 
     fireEvent.change(screen.getAllByRole("combobox")[0]!, { target: { value: "comp-1" } });
     fireEvent.click(screen.getByRole("button", { name: BOTON }));
@@ -144,7 +146,11 @@ describe("el club que viaja en la descarga", () => {
 
   it("el administrador sigue eligiendo club y la nota de «seleccione un club» es suya", async () => {
     await montar("admin");
+    // Las opciones de club dependen de la competencia elegida (clubes con inscripciones confirmadas).
+    fireEvent.change(screen.getAllByRole("combobox")[0]!, { target: { value: "comp-1" } });
     expect(await screen.findByRole("option", { name: "Club Dos" })).toBeInTheDocument();
+    expect(getClubesConInscripciones).toHaveBeenCalledWith("comp-1");
+    expect(clubsList).not.toHaveBeenCalled();
     expect(screen.getByText(/seleccione también un club/i)).toBeInTheDocument();
   });
 

@@ -101,6 +101,7 @@ vi.mock("./modules/relay-registrations/RelayWorkspacePage", () => ({
   RelayWorkspacePage: () => <p>PANTALLA relevos</p>,
 }));
 vi.mock("./modules/reports/ReportsPage", () => ({ ReportsPage: () => <p>PANTALLA reportes</p> }));
+vi.mock("./modules/reports/ClubSummaryReportPage", () => ({ ClubSummaryReportPage: () => <p>PANTALLA resumen por club</p> }));
 
 beforeEach(() => {
   sesion = { accessToken: "t", mustChangePassword: false, roles: ["admin"], restaurando: false, restauracionFallida: false };
@@ -114,12 +115,13 @@ function abrir(ruta: string) {
 }
 
 /**
- * LA FRONTERA ADMINISTRATIVA — LAS CATORCE RUTAS, UNA POR UNA.
+ * LA FRONTERA ADMINISTRATIVA — LAS QUINCE RUTAS, UNA POR UNA.
  *
  * No basta con probar tres y suponer el resto: el guard se declara por bloque,
  * pero una ruta puede salirse del bloque en cualquier edición y nadie lo notaría.
- * De las catorce, **tres** son paramétricas —`/personas/:id`, `/clubes/:id` y
- * `/competencias/:id`—; las once restantes son estáticas. Las tres se recorren con
+ * De las quince, **tres** son paramétricas —`/personas/:id`, `/clubes/:id` y
+ * `/competencias/:id`—; las doce restantes son estáticas (entre ellas el resumen por club de
+ * Reportes, que no es una ruta compartida aunque cuelgue de `/reportes`). Las tres se recorren con
  * un identificador concreto, porque una ruta con parámetro puede dejar de
  * coincidir sin que la estática lo haga.
  *
@@ -141,6 +143,7 @@ const RUTAS_DE_ADMIN: Array<[string, string]> = [
   ["/competencias", "PANTALLA competencias"],
   ["/competencias/importar", "PANTALLA importar competencia"],
   ["/competencias/33333333-3333-3333-3333-333333333333", "PANTALLA ficha de competencia"],
+  ["/reportes/resumen-por-club", "PANTALLA resumen por club"],
 ];
 
 /** Las que no llevan `requiredRole`: el acotamiento lo aplica el servidor. */
@@ -153,7 +156,7 @@ const RUTAS_COMPARTIDAS: Array<[string, string]> = [
   ["/reportes", "PANTALLA reportes"],
 ];
 
-describe("las catorce pantallas de administración exigen el rol admin", () => {
+describe("las quince pantallas de administración exigen el rol admin", () => {
   it.each(RUTAS_DE_ADMIN)("un DELEGADO que abre %s no ve %s", async (ruta, pantalla) => {
     sesion.roles = ["delegate"];
     abrir(ruta);

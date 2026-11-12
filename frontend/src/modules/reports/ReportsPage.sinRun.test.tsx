@@ -51,7 +51,13 @@ vi.mock("../swimmer-assignment/assignmentApi", () => ({ useSwimmerAssignmentApi:
 
 const informe = vi.fn();
 vi.mock("./reportsApi", () => ({
-  useReportsApi: () => ({ getRegistrationsReport: informe, downloadExport: vi.fn(), downloadTeamManagerExport: vi.fn() }),
+  useReportsApi: () => ({
+    getRegistrationsReport: informe,
+    downloadExport: vi.fn(),
+    downloadTeamManagerExport: vi.fn(),
+    // Opciones del selector de administración (clubes con inscripciones en la competencia).
+    getClubesConInscripciones: async () => ({ clubs: [{ id: "club-1", name: "Club Uno" }] }),
+  }),
 }));
 
 const linea = (texto: string) => ({ number: 1, text: texto });
@@ -79,6 +85,8 @@ async function generar() {
   );
   await screen.findByRole("option", { name: "Competencia Uno" });
   fireEvent.change(screen.getAllByRole("combobox")[0]!, { target: { value: "comp-1" } });
+  // Para administración, el botón espera a que lleguen las opciones de club de la competencia.
+  await waitFor(() => expect(screen.getByRole("button", { name: "Generar reporte" })).toBeEnabled());
   fireEvent.click(screen.getByRole("button", { name: "Generar reporte" }));
   await waitFor(() => expect(informe).toHaveBeenCalled());
   await screen.findAllByText(/Ana Homónima/);

@@ -1051,8 +1051,28 @@ en dos capas los permisos de usuario (RBAC + alcance por club).
 |---|---|---|---|
 | GET | `/reports/registrations` | Reporte en JSON (individuales + relevos) con filtros | `reports:read` |
 | GET | `/reports/registrations/export?format=csv\|xlsx\|pdf` | Descarga el mismo reporte en el formato solicitado | `reports:read` |
+| GET | `/reports/registrations/clubs?competitionId=` | Clubes con al menos una inscripción confirmada (individual o de relevo) en la competencia: opciones del selector de club | `reports:read` (además, rol `admin`) |
+| GET | `/reports/clubs-summary?competitionId=` | Resumen de inscripciones por club, con cifras agregadas y sin datos personales | `reports:read` (además, rol `admin`) |
 
 Filtros soportados (sección 16): `competitionId` (obligatorio), `clubId`, `competitionDateId`, `sessionTypeId`, `competitionEventId`, `categoryId`, `gender`.
+
+### Selector de clubes y resumen por club (estado: publicada; pendiente de despliegue)
+
+> **Estado:** publicada en el repositorio y validada localmente; **pendiente de despliegue**. Producción y el entorno local de ejecución todavía no la reciben. El resultado de la CI se comprueba aparte y no se anticipa aquí.
+>
+> **Qué se validó y cómo.** El backend, con **pruebas de integración** contra la base desechable de pruebas: autorización por rol, reglas de conteo y regresiones de alcance. La interfaz, con **pruebas automatizadas simuladas** (jsdom) y una **revisión visual en navegador con una API simulada** y datos sintéticos: esa revisión verificó la presentación y el manejo de estado, no el backend integrado ni el contenido de ningún ZIP de Team Manager. Un ajuste de estilo posterior (la celda «Total») se revisó solo por código, sin repetir la observación en navegador.
+
+- **Selector de clubes del reporte detallado (administración).** Al elegir una competencia, el desplegable muestra solo los clubes con al menos una inscripción **confirmada**, individual o de relevo (incluye los que solo tienen relevos). Al cambiar de competencia se actualizan las opciones, se limpia el club si deja de ser válido, se descarta una respuesta tardía de la competencia anterior y se retira el reporte anterior. Las cuentas de club y el personal conservan su club fijo y el nadador su reporte personal: no consultan este endpoint.
+- **Resumen por club** (`/reportes/resumen-por-club`). Exclusivo de administración en la navegación (pestañas de Reportes), en la ruta de la interfaz y en el servidor: `requireRole("admin")` con los roles vigentes de cada solicitud, y el servicio vuelve a exigir el alcance de administración. Cualquier otro rol recibe 403 aunque tenga `reports:read`. El único filtro es la competencia; administración puede elegir también las ocultas.
+- **Reglas de conteo** (una consulta SQL agregada por competencia, `resumenPorClub.service.ts`):
+  - Solo inscripciones `confirmed`, igual que el reporte detallado y Team Manager.
+  - Se agrupa por el **club de la inscripción** (`club_id`), no por su nombre ni por la membresía actual del nadador: dos clubes homónimos son dos filas.
+  - **Nadadores**: personas distintas por club, uniendo inscritos individuales e integrantes de relevos confirmados. Quien solo nada relevos cuenta, y quien está en varias pruebas cuenta una vez en ese club.
+  - **Varones / Damas**: por el sexo de la persona, no por el género de la prueba; un relevo mixto no crea un tercer grupo.
+  - **Pruebas individuales**: cada inscripción individual confirmada. **Relevos**: cada equipo confirmado, una vez. **Total de pruebas** = individuales + relevos.
+  - **Totales**: suma de cada columna sobre todas las filas. Quien compite por dos clubes en la misma competencia cuenta en ambos.
+  - La respuesta no lleva RUN, nombres de personas ni fechas de nacimiento.
+- **Team Manager por fila.** Cada fila descarga el ZIP de su club con la exportación existente (`/export/team-manager/zip`), que conserva su contenido, sus validaciones y su control de acceso. No hay exportación global. Cada fila muestra su propio estado y su propio error sin bloquear a las demás.
 
 ### Reglas aplicadas en el Módulo 10
 
@@ -1418,7 +1438,7 @@ Estas rutas son del administrador, que no necesita proponerse nada a sí mismo:
 
 ## Inventario completo de endpoints
 
-**118 endpoints**, agrupados por el módulo que los declara. Esta lista no está
+**120 endpoints**, agrupados por el módulo que los declara. Esta lista no está
 escrita a mano: `backend/tests/documentacion.test.ts` la compara con las rutas que
 el código declara y **falla si alguna sobra o falta**. Además comprueba que
 ninguna ruta fuera de las públicas se quede sin guardia, y que el permiso exacto
@@ -1605,6 +1625,8 @@ fuera de producción o con `ENABLE_SWAGGER=true`.
 |---|---|
 | GET | `/reports/registrations` |
 | GET | `/reports/registrations/export` |
+| GET | `/reports/registrations/clubs` |
+| GET | `/reports/clubs-summary` |
 
 ### `swimmer-assignment`
 

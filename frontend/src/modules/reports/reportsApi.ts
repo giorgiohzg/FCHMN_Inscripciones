@@ -86,6 +86,36 @@ export interface ReportFilters {
   gender?: "male" | "female" | "mixed";
 }
 
+/** Club elegible en el selector del reporte detallado (exclusivo de administración). */
+export interface OpcionClub {
+  id: string;
+  name: string;
+}
+
+/**
+ * Una fila del resumen por club (exclusivo de administración). Solo cifras agregadas: la API
+ * no entrega RUN, nombres de personas ni fechas de nacimiento.
+ */
+export interface FilaResumenClub {
+  clubId: string;
+  clubName: string;
+  varones: number;
+  damas: number;
+  totalNadadores: number;
+  pruebasIndividuales: number;
+  relevos: number;
+  totalPruebas: number;
+}
+
+export type TotalesResumen = Omit<FilaResumenClub, "clubId" | "clubName">;
+
+export interface ResumenPorClub {
+  competitionId: string;
+  competitionName: string;
+  clubs: FilaResumenClub[];
+  totales: TotalesResumen;
+}
+
 function buildQs(filters: ReportFilters, extra: Record<string, string> = {}) {
   const qs = new URLSearchParams();
   qs.set("competitionId", filters.competitionId);
@@ -104,6 +134,13 @@ export function useReportsApi() {
   return {
     getRegistrationsReport: (filters: ReportFilters) =>
       api.get<RegistrationsReportResult>(`/reports/registrations?${buildQs(filters)}`),
+
+    /** Clubes con al menos una inscripción confirmada en la competencia. Solo administración (el servidor lo exige). */
+    getClubesConInscripciones: (competitionId: string) =>
+      api.get<{ clubs: OpcionClub[] }>(`/reports/registrations/clubs?${new URLSearchParams({ competitionId })}`),
+
+    /** Resumen de inscripciones por club. Solo administración (el servidor lo exige). */
+    getResumenPorClub: (competitionId: string) => api.get<ResumenPorClub>(`/reports/clubs-summary?${new URLSearchParams({ competitionId })}`),
 
     /** Descarga el archivo exportado directamente en el navegador. */
     downloadExport: (filters: ReportFilters, format: "csv" | "xlsx" | "pdf") =>

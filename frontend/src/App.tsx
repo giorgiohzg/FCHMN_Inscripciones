@@ -21,6 +21,7 @@ import { RegistrationWorkspacePage } from "./modules/registrations/RegistrationW
 import { RelayRegistrationWizardPage } from "./modules/relay-registrations/RelayRegistrationWizardPage";
 import { RelayWorkspacePage } from "./modules/relay-registrations/RelayWorkspacePage";
 import { ReportsPage } from "./modules/reports/ReportsPage";
+import { ClubSummaryReportPage } from "./modules/reports/ClubSummaryReportPage";
 import { AuditLogPage } from "./modules/audit/AuditLogPage";
 import { AdminDashboardPage } from "./modules/dashboard/AdminDashboardPage";
 import { useAuth } from "./modules/auth/AuthContext";
@@ -82,6 +83,8 @@ export function App() {
 
           <Route element={<ProtectedRoute requiredRole="admin" />}>
             <Route path="/auditoria" element={<AuditLogPage />} />
+            {/* Resumen por club: exclusivo de administración (la API también lo exige). */}
+            <Route path="/reportes/resumen-por-club" element={<ClubSummaryReportPage />} />
             <Route path="/personas" element={<PersonsListPage />} />
             <Route path="/personas/carga-masiva" element={<PersonsBulkImportPage />} />
             <Route path="/personas/nueva" element={<PersonFormPage />} />
