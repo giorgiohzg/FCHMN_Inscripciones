@@ -31,9 +31,9 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **AUD-10 y AUD-14** | Fecha de nacimiento en reportes (solo administración; edad para los demás) y RUN de los compañeros de relevo (fuera para el nadador) | **Publicadas y desplegadas en la API, dentro de su alcance.** Ver «Privacidad de reportes y relevos» |
 | **AUD-06 y AUD-09** | Capacidad `byClub` visible al nadador; copias completas en la auditoría | **Se conservan por decisión expresa del usuario; no son mitigaciones.** Retención de la auditoría pendiente. Ver «Privacidad de reportes y relevos» |
 | **C-01** | Acceso externo a la base de producción (`fchmn-postgres` admitía `0.0.0.0/0`) | **Mitigado mediante la configuración de red de Postgres:** lista propia vacía, guardada y comprobada; reglas heredadas intactas. Sin prueba de conexión nueva ni de rechazo externo. Ver «C-01: acceso externo a Postgres» |
-| **C-04** | Contraseña actual incorrecta en `/auth/change-password` sin contar | **Cerrada dentro de su alcance:** migración aplicada y web y API desplegadas en producción desde `2c3552e`; validada en local (incluida la integración sobre la base desechable) y en la CI; **sin prueba autenticada del límite en producción**. Ver «C-04» |
-| **IP del cliente** | `req.ip` atribuía las peticiones a un nodo del borde de Render, no al cliente | **Desplegada en la API y la web desde `7860b1d`** (2026-11-11; Live, Auto-Deploy Off; mantenimiento sigue en `2c3552e`) y validada en local y en la CI. `CF-Connecting-IP` validada y normalizada en la API, con respaldo al socket; frontera de confianza del workspace aceptada para los servicios propios actuales. **Validación acotada en producción** (un equipo y una red), sin garantía general; `TRUST_PROXY_HOPS=2` sigue configurada pero el código nuevo la ignora. Ver «IP del cliente» |
-| **C-02** | Login: cinco fallos de un tercero bloqueaban la cuenta entera (RB-15) | **Política B publicada en el repositorio, con validación local descrita; pendiente de despliegue.** En producción sigue RB-15. Su corrección de errores técnicos de C-04 (una excepción de Argon2 ya no suma intentos ni termina la sesión) también queda pendiente de despliegue; el cierre anterior de C-04 no cambia. **No hubo una ejecución completa local en verde:** la suite completa falló en 22 pruebas y 14 quedaron omitidas, y los archivos afectados pasaron en repeticiones posteriores. La CI de la entrega se consulta aparte; **C-02 no está cerrada**. La rotación del secreto no está implementada. Ver «C-02» |
+| **C-04** | Contraseña actual incorrecta en `/auth/change-password` sin contar | **Cerrada dentro de su alcance:** migración aplicada y web y API desplegadas en producción desde `2c3552e`; validada en local (incluida la integración sobre la base desechable) y en la CI; **sin prueba autenticada del límite en producción**. La corrección de sus errores técnicos de Argon2 se desplegó después con C-02 (API `b1b1c2a`); este cierre no se reescribe. Ver «C-04» y «C-02» |
+| **IP del cliente** | `req.ip` atribuía las peticiones a un nodo del borde de Render, no al cliente | **Desplegada en la API y la web desde `7860b1d`** (2026-11-11; Live, Auto-Deploy Off; mantenimiento seguía en `2c3552e` y se reconstruyó después desde `b1b1c2a`, ver «C-02») y validada en local y en la CI. `CF-Connecting-IP` validada y normalizada en la API, con respaldo al socket; frontera de confianza del workspace aceptada para los servicios propios actuales. **Validación acotada en producción** (un equipo y una red), sin garantía general; `TRUST_PROXY_HOPS=2` sigue configurada pero el código nuevo la ignora. Ver «IP del cliente» |
+| **C-02** | Login: cinco fallos de un tercero bloqueaban la cuenta entera (RB-15) | **Cerrada dentro de su alcance:** migración aplicada y API desplegada en producción desde `b1b1c2a` (2026-11-11; Live, Auto-Deploy Off; la web no se desplegó y sigue en `7860b1d`), validada en local y en la CI (ejecución `43103987572`, con migraciones e integración); **sin pruebas funcionales autenticadas de los límites en producción**. **No hubo una ejecución local completa en verde:** la suite completa falló en 22 pruebas y dejó 14 omitidas, y los archivos afectados pasaron en repeticiones posteriores; eso no debe confundirse con la CI exitosa. Su corrección de errores técnicos de C-04 (una excepción de Argon2 ya no suma intentos ni termina la sesión) se desplegó con ella, sin reescribir el cierre anterior de C-04. La rotación del secreto no está implementada; quedan vigentes los riesgos de redes compartidas, ataques distribuidos y cifras sin calibrar en Render. Ver «C-02» |
 | Vite 5.4.21 | Avisos en una dependencia de desarrollo | **Actualizado a 7.3.7** (SEC-03 B); la web corre desde `2de9dea` una compilación hecha con Vite 7. Ver «Vite» |
 
 **«Validada localmente» significa:** la suite de integración completa y la unitaria se
@@ -1951,8 +1951,8 @@ Cuatro hallazgos de privacidad de la auditoría del 2026-11-07. Dos se conservan
 
 **Límites.**
 - **Cerrada dentro de su alcance** (ver el cierre en producción). La integración se ejecutó solo contra la base desechable local; en producción solo se observaron disponibilidad y cabeceras, **sin prueba autenticada del límite, la reserva ni el cierre terminal**.
-- No hay un límite global de verificaciones Argon2 simultáneas; una operación lenta puede seguir calculando tras perder su reserva, aunque ya no produzca efectos. *(C-02 añade el semáforo de Argon2 y corrige el tratamiento de sus excepciones, **publicado en el repositorio y pendiente de despliegue**; ver «C-02».)*
-- **C-02 sigue pendiente** en producción. *(Después: la IP del cliente se desplegó con validación acotada, y C-02 está publicada en el repositorio, con validación local descrita; pendiente de despliegue; ver «IP del cliente» y «C-02».)*
+- No hay un límite global de verificaciones Argon2 simultáneas; una operación lenta puede seguir calculando tras perder su reserva, aunque ya no produzca efectos. *(C-02 añade el semáforo de Argon2 y corrige el tratamiento de sus excepciones, **desplegado en la API desde `b1b1c2a`**; ver «C-02».)*
+- **C-02 sigue pendiente** en producción. *(Después: la IP del cliente se desplegó con validación acotada, y C-02 se desplegó en la API desde `b1b1c2a`; ver «IP del cliente» y «C-02».)*
 
 ## IP del cliente: `CF-Connecting-IP` con respaldo al socket (desplegada en la API y la web desde `7860b1d`; validación acotada en producción)
 
@@ -1994,7 +1994,7 @@ Cuatro hallazgos de privacidad de la auditoría del 2026-11-07. Dos se conservan
 - El respaldo es un origen compartido, que C-02 deberá tratar como tal. El agrupamiento IPv6 por `/64` también queda para C-02.
 - La prueba de Nginx de la validación previa a la publicación usó la imagen local existente con la plantilla montada, no una imagen nueva. El cambio del Dockerfile es solo un comentario. Las imágenes locales construidas después se registran en «Despliegue en producción».
 - `X-Forwarded-Proto` sigue pasando por el `map` existente de Nginx; ese comportamiento no cambia en esta entrega.
-- **C-02 sigue pendiente**; el limitador del login no cambió.
+- **C-02 sigue pendiente**; el limitador del login no cambió. *(Después: C-02 se desplegó en la API desde `b1b1c2a`; ver «C-02».)*
 
 **Despliegue en producción (2026-11-11).** Orden: respaldo, variable de la API, API y web. Evidencia separada por tipo.
 
@@ -2019,7 +2019,7 @@ Cuatro hallazgos de privacidad de la auditoría del 2026-11-07. Dos se conservan
 - **Con la web anterior** (tras desplegar la API): una petición normal dio 200, `origenIp = cf-connecting-ip` y una dirección distinta de la sintética, pero **no coincidió con la salida del operador obtenida por un servicio de eco externo**. Una segunda petición, con `CF-Connecting-IP` y `X-Forwarded-For` sintéticos, recibió **403**; no se encontró su marcador en los registros consultados (Nginx de la web y API). Esa comparación usó etiquetas PBKDF2 con sal, que **no son anonimato** (con la sal la dirección se podría recuperar por fuerza bruta).
 - **Diagnóstico posterior** (sin repetir la petición sintética), con un canal RSA-OAEP/SHA-256 cuya clave privada vivió solo en la memoria de un proceso temporal: `/cdn-cgi/trace` del mismo dominio, válido y estable; el eco externo, estable; la IP auditada (`req.remoteAddress`, `origenIp = cf-connecting-ip`, sin respaldo) **coincidió con el trace** y **difirió del eco**, y el trace difirió del eco. La causa de la diferencia **sigue desconocida**: es compatible con una salida distinta según el destino, pero no se atribuye a una VPN ni a un proxy concretos.
 - **Con la web nueva:** trace válido y estable antes y después de una petición con marcador único; la IP auditada coincidió con ambos trace, con `origenIp = cf-connecting-ip` y sin respaldo.
-- **Alcance:** comprobaciones desde **un equipo y una red**, con una muestra única. **La identificación de IP tiene validación acotada en producción**; no es una garantía general. C-02 **sigue pendiente**.
+- **Alcance:** comprobaciones desde **un equipo y una red**, con una muestra única. **La identificación de IP tiene validación acotada en producción**; no es una garantía general. C-02 **sigue pendiente**. *(Después: C-02 se desplegó en la API desde `b1b1c2a`; ver «C-02».)*
 
 **4. Local** (mismo SHA, configuración propia de local, modo `socket`).
 - **Imágenes:** backend `7d3cf39799dc` y frontend `f36589a2f229`, construidas solo para esos dos servicios desde un árbol sin cambios respecto de `7860b1d`. Las anteriores se conservaron con la etiqueta `prev-20261111-1606` (backend `69edf76a7cfe` y frontend `2094ef56a597`); migraciones sigue en `2f8a5fcaded4`, sin reconstruir.
@@ -2032,15 +2032,15 @@ Cuatro hallazgos de privacidad de la auditoría del 2026-11-07. Dos se conservan
 **Límites vigentes** (además de los de arriba).
 - Frontera privada aceptada y obligación de reevaluarla antes de incorporar servicios: ver «Frontera de confianza».
 - No se retiró `TRUST_PROXY_HOPS=2`: queda configurada en la API, ignorada por el código nuevo, para poder volver al código anterior.
-- El mantenimiento sigue en `2c3552e`; se reconstruirá cuando un mantenimiento necesite código nuevo (en esta entrega no hay migraciones).
+- El mantenimiento sigue en `2c3552e`; se reconstruirá cuando un mantenimiento necesite código nuevo (en esta entrega no hay migraciones). *(Después: se reconstruyó desde `b1b1c2a` para la migración de C-02.)*
 
 **Reversión** (no ejecutada). Guardar una variable con «Save only» no cambia el proceso en ejecución: hace falta un despliegue manual. Para volver a `socket`: `IP_CLIENTE_FUENTE=socket` y un despliegue manual del mismo SHA (queda un origen compartido, sin suplantación). Para volver al código anterior: rollback de la API y de la web a sus despliegues de `2c3552e`; con `TRUST_PROXY_HOPS=2` conservada, vuelve al comportamiento anterior.
 
-## C-02: limitador del login, política B (publicada en el repositorio, con validación local descrita; pendiente de despliegue)
+## C-02: limitador del login, política B (cerrada dentro de su alcance: migrada y desplegada en la API desde `b1b1c2a`)
 
 **Hallazgo.** RB-15 bloqueaba la **cuenta entera** durante 15 minutos tras 5 contraseñas incorrectas, vinieran de donde vinieran: cualquiera que conociera un nombre de usuario podía dejar fuera a su dueño, y el bloqueo cortaba también sus sesiones.
 
-**Estado.** Publicada en el repositorio sobre `7e83318`, con la validación local descrita abajo. **Pendiente de despliegue:** no está en producción, donde sigue RB-15, y tampoco lo está su corrección de errores técnicos de C-04 (el cierre anterior de C-04 no cambia). **No hubo una ejecución completa local en verde**, y la CI de la entrega no se anticipa ni se declara aquí. **C-02 no está cerrada.**
+**Estado.** **Cerrada dentro de su alcance:** migración aplicada y API desplegada en producción desde `b1b1c2a` (2026-11-11; ver «Cierre en producción»), validada en local y en la CI. **Sin pruebas funcionales autenticadas de los límites en producción.** **No hubo una ejecución local completa en verde** (ver «Validación local»); eso no debe confundirse con la integración exitosa de la CI, que es una ejecución distinta. La web no se desplegó. Su corrección de errores técnicos de C-04 (Argon2) se desplegó con ella; el cierre anterior de C-04 no cambia. La rotación del secreto no está implementada.
 
 **Política (perfil funcional aprobado).**
 
@@ -2106,12 +2106,53 @@ Cuatro hallazgos de privacidad de la auditoría del 2026-11-07. Dos se conservan
 | Purga (lotes de 500) sobre unas 94 500 claves vencidas | 10 llamadas, 5800 filas borradas; p50 de 224 ms y máximo de 2,1 s |
 | 40 admisiones simultáneas de claves distintas | todas admitidas en 2,4 s; 40 reservas ocupadas de 200 |
 
+**Cierre en producción (2026-11-11, hora de Santiago).** Orden: respaldo, construcción del mantenimiento, estado y aplicación de la migración, vaciado del Docker Command, API, verificación y correspondencia local.
+
+**Código y CI.**
+- *Código:* `b1b1c2a5d942e94dd0434bb60f6dc2b008aaeb61`.
+- *CI:* ejecución `43103987572`, éxito en un solo intento, con los pasos «Migraciones sobre la base desechable» y «Pruebas de integración» en éxito.
+
+**Render: operaciones y estado** (commit, estado y operaciones; es una evidencia distinta de las comprobaciones HTTP).
+- **Respaldo:** exportación nueva de `fchmn-postgres`, creada a las 21:58 según el panel y disponible con su archivo. No se descargó ni se obtuvo un enlace firmado.
+- **Mantenimiento:** antes de pulsar el control se comprobó que `main` remoto seguía en el SHA objetivo, porque Manual Build construye la punta de `main`. Un solo Manual Build, `dep-dbqgvqjbc2fs73dc1rt0` ([construcción](https://dashboard.render.com/cron/crn-dbh500bl550s73c5n2o0/deploys/dep-dbqgvqjbc2fs73dc1rt0)), con origen `b1b1c2a`: «Deploy succeeded» (59,3 s mostrados por Render).
+- **Estado de migraciones** (lectura sobre `fchmn_postgres`): 39 migraciones encontradas, ninguna fallida ni divergente y una sola pendiente, `20261111000000_limitador_login`. Salió con código 1, que es lo esperado con una migración pendiente.
+- **Migración:** una sola ejecución de `prisma migrate deploy --schema=/app/prisma/schema.prisma`, **sin seed**. Aplicó únicamente `20261111000000_limitador_login`: cinco tablas nuevas (`lim_clave`, `lim_fallo_par`, `lim_reserva`, `lim_capacidad` y `lim_configuracion`), con lo que quedan 39 migraciones aplicadas.
+- **Docker Command del mantenimiento:** se escribió y se vació (también quedó guardado vacío); tras recargar la página sigue vacío, y la programación (`0 6 1 1 *`) y el Auto-Deploy Off se conservaron. Fueron dos ejecuciones (estado y migración): de 28 a 30 en *Runs*.
+- **API:** `7860b1d` → `b1b1c2a`, despliegue manual `dep-dbqh3o142hec73d436ig` ([despliegue](https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80/deploys/dep-dbqh3o142hec73d436ig)), con «Deploy succeeded» y Live. Auto-Deploy Off.
+- **Web:** **no se desplegó**; sigue en `7860b1d`. Entre `7860b1d` y `b1b1c2a` solo cambiaron, en el frontend, pruebas y un comentario de `apiClient.ts`: su comportamiento no cambió.
+- **`AUTH_LIMITER_SECRET`:** lo configuró el usuario en la API con «Save only» y lo conserva en KeePass. Este documento no incluye su valor ni su huella, y no se leyó en ningún momento: solo se comprobó que la clave existía. **La rotación no está implementada:** cambiarlo requiere un procedimiento y una autorización posteriores, y un proceso con otro valor se niega a arrancar.
+
+**Fechas y duraciones.**
+- **Muestreo de `/api/health` por la web:** de 2026-11-12T01:08:24.032Z a 2026-11-12T01:12:54.233Z, es decir, el 2026-11-11 de 22:08:24 a 22:12:54 en America/Santiago (UTC-3). Fueron 28 muestras, una cada 10 s, **28 de 28 con 200**, con latencias de 275 a 952 ms. **Los intervalos entre muestras no se observaron:** el muestreo acredita disponibilidad en los instantes muestreados, no la ausencia de cortes.
+- **Despliegue de la API:** inicio comunicado por Render a las 01:09:52Z y estado Live observado a las 01:10:41Z (el instante de la consulta, no necesariamente el de la marca de Render): un intervalo de 49 s. Los 35 s de «duración» que mostró el panel de Render son la duración que el panel atribuye al despliegue y **no equivalen** a ese intervalo.
+- **Después de Live:** la última muestra quedó unos 2 min 13 s después de Live. El `uptime` pasó de 35 599 s (01:10:34Z) a 23 s (01:10:44Z) entre dos muestras consecutivas: cambio de instancia.
+
+**HTTP y registros acotados** (disponibilidad, cabeceras y arranque).
+- *Por la web, sin credenciales:* `/login`, `/api/health` y `/api/ready` con 200, y `/api/auth/me` con 401, las cuatro con `Cache-Control: no-store` y la CSP; `/login` conserva `connect-src 'self'`.
+- *Registro de arranque de la API* (lectura acotada, filtrada por palabras clave): `fuenteIpCliente = cf-connecting-ip`, servidor escuchando y ninguna línea de advertencia o error sobre el limitador, `AUTH_LIMITER_SECRET` o el hash ficticio.
+
+**Funcionalidad** (evidencia separada de la de Render y la de HTTP).
+- *Pruebas locales descritas arriba y CI `43103987572` exitosa*, incluidas las migraciones y las pruebas de integración.
+- **Sin pruebas funcionales autenticadas de los límites en producción:** no se hicieron intentos fallidos, bloqueos ni otras pruebas sobre cuentas reales.
+- **No hubo una ejecución local completa en verde:** la suite completa dejó 22 pruebas fallidas y 14 omitidas, y los archivos afectados pasaron en repeticiones posteriores (ver «Validación local»). Eso no debe confundirse con la CI, que es una ejecución distinta y exitosa.
+- Las mediciones de arriba son **locales y anteriores a las últimas correcciones**.
+
+**Local** (mismo SHA; configuración propia de local, con el secreto local conservado y el modo `socket`).
+- **Imágenes:** backend `0f07428ae787` y migraciones `1bf0205ea5f4`, construidas solo para esos dos servicios desde un árbol sin cambios respecto de `b1b1c2a`. El frontend existente, `f36589a2f229`, no se reconstruyó. Las imágenes anteriores de backend (`7d3cf39799dc`) y migraciones (`2f8a5fcaded4`) se conservaron con la etiqueta `prev-20261111-2215`.
+- **Postgres:** el contenedor principal existente, arrancado con `docker start`, con su volumen `fchmn_inscripciones_pgdata` conservado.
+- **Migración:** el estado local mostró 39 migraciones con la nueva como única pendiente, y se aplicó con el comando explícito `prisma migrate deploy --schema=/app/prisma/schema.prisma`, **sin seed** (el comando por omisión del servicio `migrate` de Compose también siembra). La primera consulta de estado falló porque Git Bash reescribió la ruta del esquema; no llegó a la base, y se repitió con la conversión de rutas desactivada.
+- **Verificación:** solo se recreó el backend. Por el puerto 8080, el frontend existente respondió igual que en producción (`/login`, `/api/health` y `/api/ready` con 200 y `/api/auth/me` con 401, con `no-store` y la CSP). En contenedores efímeros, la imagen del backend incluye los módulos del limitador y la de migraciones trae las 39 migraciones, incluida la nueva.
+- **Al terminar:** frontend, backend y Postgres quedaron detenidos. **No se declara identidad binaria** entre las imágenes locales y las de Render.
+
+**Reversión** (no ejecutada). Solo del código: rollback de la API al despliegue de `7860b1d` o despliegue manual de ese commit. Las tablas y los datos del limitador **se conservan**, y el código anterior los ignora y vuelve al bloqueo de RB-15; la migración, por ser aditiva, no se deshace. No se debe asumir qué variables conserva el control Rollback de Render: antes y después de revertir hay que comprobar que `AUTH_LIMITER_SECRET` exista y, si faltara, volver a ingresar **el mismo valor** que conserva el usuario, con «Save only», antes de desplegar C-02 otra vez. **Nunca** se borran tablas, contadores ni `lim_configuracion` para forzar un arranque: con un secreto distinto, la solución es restituir el original.
+
 **Límites.**
-- **Pendiente de despliegue:** publicada en el repositorio, sin migración aplicada ni `AUTH_LIMITER_SECRET` en producción, y sin resultado de CI declarado aquí. Antes de desplegar hacen falta `AUTH_LIMITER_SECRET` en la API, la migración (antes que la API que la usa) y la autorización correspondiente.
+- **Sin pruebas funcionales autenticadas de los límites en producción:** la evidencia funcional es local y de la CI, y no hubo una ejecución local completa en verde.
+- **Variables antiguas sin retirar:** `TRUST_PROXY_HOPS=2` sigue configurada en la API y, si estuvieran definidas, también `LOGIN_MAX_ATTEMPTS` y `LOGIN_LOCKOUT_MINUTES`; el código nuevo las ignora. Retirarlas es una decisión posterior.
 - **Una sola instancia:** los presupuestos en memoria de `/auth/*` siguen siendo por proceso. El limitador persistente sí es compartido.
 - **Redes compartidas:** el límite de origen (50 por hora) puede afectar a usuarios legítimos detrás de una misma salida NAT. El respaldo del socket es un origen compartido.
-- **Rotación del secreto no implementada.**
-- **Cifras sin calibrar en Render:** concurrencia, cola y capacidad salen de un equipo local. La purga de una acumulación grande tarda varias vueltas del mantenimiento.
+- **Rotación del secreto no implementada:** cambiar `AUTH_LIMITER_SECRET` requiere un procedimiento y una autorización posteriores; con otro valor la API no arranca.
+- **Cifras sin calibrar en Render:** concurrencia, cola y capacidad salen de un equipo local. La purga de una acumulación grande tarda varias vueltas del mantenimiento. Esas cifras rigen ahora, sin calibrar, en una instancia de 0,5 CPU y 512 MB, distinta del equipo de las mediciones.
 - **Garantía acotada:** frena el abuso desde un mismo par u origen y evita el bloqueo de la cuenta por terceros. No impide un ataque distribuido lento desde muchos orígenes, que la protección de la cuenta solo endurece.
 
 ## SEC-01 y SEC-03: revisadas (SEC-01 implementada; SEC-03 sin cambios)

@@ -479,7 +479,7 @@ direcciones de conexión.
    |---|---|
    | `DATABASE_URL` | **Enlazada, no escrita a mano.** Render ofrece añadir la base del proyecto; elige la **Internal Database URL** de `fchmn-postgres`. |
    | `JWT_ACCESS_SECRET` | Un valor propio de **al menos 32 caracteres** (ver abajo cómo generarlo). Se rechaza en producción si empieza por `reemplazar`, `replace`, `cambiar`, `change`, `example`, `ejemplo`, `secret` o `test`. |
-   | `AUTH_LIMITER_SECRET` | **Solo desde la entrega de C-02, publicada en el repositorio pero pendiente de despliegue** (su validación local está descrita en `docs/seguridad/PLAN_SEGURIDAD.md`). Un valor propio de **al menos 32 caracteres**, generado igual que `JWT_ACCESS_SECRET` y **distinto** de él. Las mismas palabras de ejemplo se rechazan en producción. Firma las claves del limitador del login: una vez en uso **no se cambia**; el arranque se detiene si no coincide con el guardado en la base, y la rotación requiere un procedimiento y una autorización posteriores que no existen todavía. |
+   | `AUTH_LIMITER_SECRET` | **Obligatoria desde la entrega de C-02, en producción desde `b1b1c2a`** (su evidencia está en `docs/seguridad/PLAN_SEGURIDAD.md`, «C-02»). Se define **antes** de desplegar una API que incluya C-02: sin ella, la API no arranca. Un valor propio de **al menos 32 caracteres**, generado igual que `JWT_ACCESS_SECRET` y **distinto** de él. Las mismas palabras de ejemplo se rechazan en producción. Firma las claves del limitador del login: una vez en uso **no se cambia**; el arranque se detiene si no coincide con el guardado en la base, y la rotación requiere un procedimiento y una autorización posteriores que no existen todavía. |
    | `NODE_ENV` | `production` |
    | `CORS_ORIGINS` | La dirección pública del **frontend**, exacta y **sin barra final**. Se completa en el Paso 7, cuando ya exista. |
 
@@ -560,9 +560,9 @@ direcciones de conexión.
    **Opcionales — tienen valor por omisión:** `JWT_ACCESS_EXPIRES_IN` (`15m`),
    `JWT_REFRESH_EXPIRES_IN_DAYS` (`7`), `SESSION_ABSOLUTE_HOURS` (`8`),
    `RATE_LIMIT_GLOBAL_MAX` (`300`), `RATE_LIMIT_AUTH_MAX` (`20`).
-   Hasta la entrega de C-02 siguen vigentes `LOGIN_MAX_ATTEMPTS` (`5`) y
-   `LOGIN_LOCKOUT_MINUTES` (`15`); con C-02 **dejan de existir** (si quedan definidas se
-   ignoran) y se suman `RATE_LIMIT_SESION_MAX` (`60`, presupuesto por minuto de las
+   Con la entrega de C-02 (en producción desde `b1b1c2a`), `LOGIN_MAX_ATTEMPTS` (`5`) y
+   `LOGIN_LOCKOUT_MINUTES` (`15`) **dejan de existir**: si quedan definidas se ignoran (esa
+   entrega no retiró ninguna variable antigua). Se suman `RATE_LIMIT_SESION_MAX` (`60`, presupuesto por minuto de las
    operaciones de sesión, separado del de login) y, solo si hiciera falta ajustarlas,
    `ARGON2_MAX_SIMULTANEAS` (`4`), `ARGON2_MAX_EN_COLA` (`16`) y `ARGON2_ESPERA_MAX_MS`
    (`10000`). Esas cifras se midieron solo en un equipo local, no en Render.
