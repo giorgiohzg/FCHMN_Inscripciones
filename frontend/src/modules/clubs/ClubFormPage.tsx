@@ -342,7 +342,7 @@ export function ClubFormPage() {
         </div>
       </form>
 
-      {isEdit && <ClubSwimmersSection clubId={id!} />}
+      {isEdit && <ClubSwimmersSection clubId={id!} clubName={club?.name} />}
     </AppShell>
   );
 }

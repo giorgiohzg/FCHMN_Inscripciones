@@ -194,6 +194,21 @@ async function poblarBaseAnterior(client: Client) {
       ('eeeeeee1-0000-0000-0000-000000000002', '55555555-5555-5555-5555-555555555552', '66666666-6666-6666-6666-666666666662',
        'active', '66666666-6666-6666-6666-666666666661', now(), now());
 
+    -- [propuestas-pendientes-duplicadas] (C-05) dos propuestas PENDIENTES del mismo club y persona.
+    -- La versión previa no lo impide en la base: solo el servicio lo rechaza, y no bajo concurrencia.
+    INSERT INTO club_swimmers (id, club_id, person_id, status, requested_by_user_id, updated_at) VALUES
+      ('eeeeeee1-0000-0000-0000-000000000003', '55555555-5555-5555-5555-555555555551', '66666666-6666-6666-6666-666666666663',
+       'pending', '66666666-6666-6666-6666-666666666661', now()),
+      ('eeeeeee1-0000-0000-0000-000000000004', '55555555-5555-5555-5555-555555555551', '66666666-6666-6666-6666-666666666663',
+       'pending', '66666666-6666-6666-6666-666666666661', now());
+
+    -- [membresias-activas-con-inicio-futuro] (C-05) una membresía ACTIVA que empieza dentro de 30 días.
+    -- En esta versión previa «start_date» es TIMESTAMP(3) con el instante en UTC (como lo escribía el
+    -- servicio). La versión previa lo admitía; C-05 no admite fechas efectivas futuras.
+    INSERT INTO club_swimmers (id, club_id, person_id, status, requested_by_user_id, start_date, updated_at) VALUES
+      ('eeeeeee1-0000-0000-0000-000000000005', '55555555-5555-5555-5555-555555555552', '66666666-6666-6666-6666-666666666663',
+       'active', '66666666-6666-6666-6666-666666666661', (now() AT TIME ZONE 'UTC') + interval '30 days', now());
+
     -- [jornada-de-otra-competencia] prueba asociada a la jornada de otra competencia.
     INSERT INTO competition_events (id, competition_id, event_id, competition_session_id, status, updated_at) VALUES
       ('ccccccc1-0000-0000-0000-000000000002', '99999999-9999-9999-9999-999999999991',
@@ -367,6 +382,11 @@ async function corregirConflictos(client: Client) {
     UPDATE registrations SET status = 'cancelled', cancelled_at = now() WHERE id = 'ddddddd1-0000-0000-0000-000000000002';
     UPDATE relay_registrations SET status = 'cancelled', cancelled_at = now() WHERE id = 'fffffff1-0000-0000-0000-000000000002';
     UPDATE club_swimmers SET status = 'ended', end_date = now() WHERE id = 'eeeeeee1-0000-0000-0000-000000000002';
+    -- [propuestas-pendientes-duplicadas] se rechaza la sobrante con los campos del rechazo; no se borra.
+    UPDATE club_swimmers SET status = 'rejected', reviewed_at = now(), reviewed_by_user_id = '66666666-6666-6666-6666-666666666661'
+     WHERE id = 'eeeeeee1-0000-0000-0000-000000000004';
+    -- [membresias-activas-con-inicio-futuro] decisión de la prueba: su inicio real es hoy (Santiago).
+    UPDATE club_swimmers SET start_date = now() AT TIME ZONE 'UTC' WHERE id = 'eeeeeee1-0000-0000-0000-000000000005';
     DELETE FROM competition_events WHERE id = 'ccccccc1-0000-0000-0000-000000000002';
     -- Las fichas duplicadas se eliminan LÓGICAMENTE: el historial se conserva.
     -- Antes esta corrección las borraba físicamente, porque el paso siguiente
@@ -505,7 +525,7 @@ describe("actualización desde la versión anterior con datos", () => {
       expect(output, `${check.id} no puede contarse como verificada`).not.toContain(`OK ${check.title}`);
     }
 
-    expect(CHECKS.length, "si se agregan comprobaciones, hay que sembrar su conflicto arriba").toBe(21);
+    expect(CHECKS.length, "si se agregan comprobaciones, hay que sembrar su conflicto arriba").toBe(23);
 
     // Cada bloqueo nombra la restricción y dice qué hacer, no solo que falla.
     for (const check of aplicables.filter((c) => !SIN_CONFLICTO_POSIBLE.has(c.id))) {

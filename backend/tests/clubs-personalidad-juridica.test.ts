@@ -177,11 +177,10 @@ describe("fecha efectiva: solo fechas de calendario", () => {
     expect(approveAssignmentSchema.safeParse({}).success).toBe(true);
   });
 
-  it("la propuesta NO la admite: una membresía pendiente todavía no tiene fecha de inicio", async () => {
-    const { proposeAssignmentSchema } = await import("../src/modules/swimmer-assignment/assignment.schemas");
-    const r = proposeAssignmentSchema.safeParse({ clubId: UUID, personId: UUID, fechaEfectiva: "2026-10-30" });
-    expect(r.success).toBe(true);
-    // Zod descarta las claves no declaradas: la fecha no llega al servicio.
-    if (r.success) expect("fechaEfectiva" in r.data).toBe(false);
+  it("la postulación NO la admite: una membresía pendiente todavía no tiene fecha de inicio", async () => {
+    // C-05: la postulación es por RUN y su esquema es estricto, así que una fecha se RECHAZA.
+    const { postulacionSchema } = await import("../src/modules/swimmer-assignment/assignment.schemas");
+    expect(postulacionSchema.safeParse({ run: "123456785", fechaEfectiva: "2026-10-30" }).success).toBe(false);
+    expect(postulacionSchema.safeParse({ run: "123456785" }).success).toBe(true);
   });
 });

@@ -83,3 +83,25 @@ export function esFechaCalendarioValida(fecha: string): boolean {
   const d = new Date(`${fecha}T00:00:00.000Z`);
   return !Number.isNaN(d.getTime()) && utcAFechaCalendario(d) === fecha;
 }
+
+/**
+ * El día de CALENDARIO anterior a `fecha` (`AAAA-MM-DD` → `AAAA-MM-DD`).
+ *
+ * C-05: en un cambio de club, la membresía anterior termina el día previo al inicio efectivo
+ * de la nueva (nueva desde el 10 de marzo → anterior hasta el 9 de marzo).
+ *
+ * Es aritmética de CALENDARIO, no de instantes: no se restan 24 horas a ningún reloj. Se
+ * valida la fecha (también que exista: `2026-02-30` se rechaza en vez de normalizarse), se
+ * toma su medianoche UTC —la representación que guarda una columna `DATE`— y se resta un día
+ * a sus componentes UTC. Como UTC no tiene horario de verano, el resultado no depende de la
+ * zona del proceso ni de los cambios de hora de Santiago; el mes, el año y los bisiestos los
+ * resuelve el propio calendario de `Date`.
+ */
+export function diaCalendarioAnterior(fecha: string): string {
+  if (!esFechaCalendarioValida(fecha)) {
+    throw new Error(`Fecha de calendario inválida: "${fecha}". Se espera una fecha AAAA-MM-DD que exista.`);
+  }
+  const d = fechaCalendarioAUtc(fecha);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return utcAFechaCalendario(d)!;
+}

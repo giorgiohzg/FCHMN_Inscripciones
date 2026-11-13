@@ -26,6 +26,7 @@
  */
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma } from "../src/shared/prisma.client";
+import { hoyEnZonaDelNegocio } from "../src/shared/fecha.util";
 import type { ActorContext } from "../src/shared/actorContext";
 import { truncateAllTables } from "./helpers/testDb";
 import { seedRolesAndPermissions, createClub, createPerson, createUser } from "./helpers/seedRbac";
@@ -203,7 +204,7 @@ describe("membresías de nadador — la membresía y el rol derivado son atómic
       ADMIN
     );
 
-    const error = await conFalloEn("PersonRole", "update", () => assignmentService.endAssignment(membresia.id, actorAdmin()));
+    const error = await conFalloEn("PersonRole", "update", () => assignmentService.endAssignment(membresia.id, actorAdmin(), { fechaTermino: hoyEnZonaDelNegocio() }));
 
     expect(error).toBeInstanceOf(FalloInyectado);
 
@@ -221,15 +222,16 @@ describe("membresías de nadador — la membresía y el rol derivado son atómic
     const clubOrigen = await createClub("Club Origen", "COR");
     const clubDestino = await createClub("Club Destino", "CDE");
     const persona = await createPerson({ run: "99999999-9", username: "tras_tx", firstName: "Tere", gender: "female", roles: ["swimmer"] });
+    // Inicio en el pasado: con C-05 un traslado el mismo día del inicio es un conflicto de fechas.
     const membresia = await assignmentService.assignSwimmerDirectly(
-      { clubId: clubOrigen.id, personId: persona.id },
+      { clubId: clubOrigen.id, personId: persona.id, fechaEfectiva: "2026-01-05" },
       ADMIN
     );
 
     // El traspaso finaliza la membresía anterior y crea la nueva: el fallo se
     // inyecta en la creación, con la baja ya escrita.
     const error = await conFalloEn("ClubSwimmer", "create", () =>
-      assignmentService.reassignSwimmerToClub(persona.id, clubDestino.id, ADMIN)
+      assignmentService.reassignSwimmerToClub(persona.id, clubDestino.id, ADMIN, { confirmarFinDeMembresiaId: membresia.id })
     );
 
     expect(error).toBeInstanceOf(FalloInyectado);
@@ -255,7 +257,8 @@ describe("membresías de nadador — la membresía y el rol derivado son atómic
         status: "active",
       },
     });
-    const solicitud = await assignmentService.proposeAssignment({ clubId: club.id, personId: persona.id }, actorAdmin());
+    // C-05: ya no hay propuesta por `personId`; la pendiente se crea directamente para probar la aprobación.
+    const solicitud = await prisma.clubSwimmer.create({ data: { clubId: club.id, personId: persona.id, status: "pending", requestedByUserId: ADMIN.userId } });
 
     const error = await conFalloEn("PersonRole", "create", () => assignmentService.approveAssignment(solicitud.id, ADMIN));
 
@@ -275,7 +278,7 @@ describe("membresías de nadador — la membresía y el rol derivado son atómic
       ADMIN
     );
 
-    await assignmentService.endAssignment(membresia.id, actorAdmin());
+    await assignmentService.endAssignment(membresia.id, actorAdmin(), { fechaTermino: hoyEnZonaDelNegocio() });
 
     const despues = await prisma.clubSwimmer.findUniqueOrThrow({ where: { id: membresia.id } });
     expect(despues.status).toBe("ended");

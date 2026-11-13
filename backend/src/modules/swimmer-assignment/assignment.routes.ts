@@ -1,7 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import * as assignmentService from "./assignment.service";
+import * as postulacion from "../incorporaciones/postulacion.service";
 import {
-  proposeAssignmentSchema,
+  postulacionSchema,
+  endAssignmentSchema,
   rejectAssignmentSchema,
   assignmentListQuerySchema,
   swimmersByClubFilterQuerySchema,
@@ -115,28 +117,31 @@ export async function swimmerAssignmentRoutes(app: FastifyInstance) {
     const { personId } = req.params as { personId: string };
     const parsed = reassignSwimmerSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Datos inválidos", parsed.error.flatten());
-    reply.send(
-      await assignmentService.reassignSwimmerToClub(
-        personId,
-        parsed.data.newClubId,
-        { userId: req.authUser!.sub, ipAddress: req.ip },
-        parsed.data.fechaEfectiva
-      )
-    );
+    const { newClubId, ...opcionesDeActivacion } = parsed.data;
+    reply.send(await assignmentService.reassignSwimmerToClub(personId, newClubId, { userId: req.authUser!.sub, ipAddress: req.ip }, opcionesDeActivacion));
   });
 
   /**
-   * El club o su personal proponen (A-05). Requiere `swimmer-assignment:write`,
-   * que en el seed tienen `admin`, `club` y **todo** el personal del club
-   * —`delegate`, `coach` y `legal_representative` comparten
-   * `CLUB_STAFF_PERMISSIONS`—. El rol `swimmer` no lo tiene.
+   * C-05: POSTULACIÓN POR RUN. Requiere `swimmer-assignment:write`, que en el seed tienen
+   * `admin`, `club` y **todo** el personal del club —`delegate`, `coach` y
+   * `legal_representative` comparten `CLUB_STAFF_PERMISSIONS`—. El rol `swimmer` no lo tiene.
+   *
+   * - Club y personal: el club sale de la sesión, con cuota diaria y cabecera `Idempotency-Key`
+   *   obligatoria (`incorporaciones/postulacion.service.ts`).
+   * - Administración: RUN y club explícito, sin cuota ni periodo.
+   * El cuerpo ya NO acepta `personId` (400).
    */
   app.post("/swimmer-assignments", { preHandler: [requirePermission("swimmer-assignment:write")] }, async (req, reply) => {
-    const parsed = proposeAssignmentSchema.safeParse(req.body);
+    const parsed = postulacionSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Datos de solicitud inválidos", parsed.error.flatten());
 
-    const assignment = await assignmentService.proposeAssignment(parsed.data, buildActorContext(req));
-    reply.code(201).send(assignment);
+    const actor = buildActorContext(req);
+    const clave = req.headers["idempotency-key"];
+    const r =
+      actor.scope.kind === "admin"
+        ? await postulacion.postularComoAdministracion(parsed.data, actor)
+        : await postulacion.postularComoClub(parsed.data, actor, typeof clave === "string" ? clave : undefined);
+    reply.code(r.http).send(r.cuerpo);
   });
 
   /**
@@ -153,7 +158,7 @@ export async function swimmerAssignmentRoutes(app: FastifyInstance) {
     // El cuerpo es opcional: aprobar sin fecha usa el día de hoy en Chile.
     const parsed = approveAssignmentSchema.safeParse(req.body ?? {});
     if (!parsed.success) throw new ValidationError("Datos inválidos", parsed.error.flatten());
-    reply.send(await assignmentService.approveAssignment(id, { userId: req.authUser!.sub, ipAddress: req.ip }, parsed.data.fechaEfectiva));
+    reply.send(await assignmentService.approveAssignment(id, { userId: req.authUser!.sub, ipAddress: req.ip }, parsed.data));
   });
 
   app.post("/swimmer-assignments/:id/reject", { preHandler: [requirePermission("swimmer-assignment:approve")] }, async (req, reply) => {
@@ -171,6 +176,9 @@ export async function swimmerAssignmentRoutes(app: FastifyInstance) {
    */
   app.post("/swimmer-assignments/:id/end", { preHandler: [requirePermission("swimmer-assignment:write")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    reply.send(await assignmentService.endAssignment(id, buildActorContext(req)));
+    // C-05: la fecha de término es obligatoria; sin ella responde 400.
+    const parsed = endAssignmentSchema.safeParse(req.body ?? {});
+    if (!parsed.success) throw new ValidationError("Datos inválidos", parsed.error.flatten());
+    reply.send(await assignmentService.endAssignment(id, buildActorContext(req), parsed.data));
   });
 }

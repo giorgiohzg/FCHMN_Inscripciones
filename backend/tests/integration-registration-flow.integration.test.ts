@@ -95,7 +95,8 @@ describe("Flujo integral — inscripción individual (Módulos 2,3,4,5,6,7 en co
     // Va con ADMIN_ACTOR: `proposeAssignment` exige `isAdmin` o que
     // `actorClubId` coincida con el club — un actor sin club real detrás se
     // rechaza con 403, que es exactamente el comportamiento correcto.
-    const assignment = await assignmentService.proposeAssignment({ clubId, personId }, ADMIN_ACTOR);
+    // C-05: ya no hay propuesta por `personId`; la pendiente se crea directamente para probar la aprobación.
+    const assignment = await prisma.clubSwimmer.create({ data: { clubId, personId, status: "pending", requestedByUserId: ADMIN_ACTOR.userId } });
     await assignmentService.approveAssignment(assignment.id, ADMIN_ACTOR);
 
     // Módulo 5: categoría y prueba

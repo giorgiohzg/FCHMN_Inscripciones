@@ -119,6 +119,7 @@ backend/
 │   │   ├── clubs/
 │   │   ├── competitions/
 │   │   ├── dashboard/
+│   │   ├── incorporaciones/    # C-05: postulación por RUN, cuota, periodos y solicitudes de alta
 │   │   ├── meet-import/        # importa el programa desde un .ev3 de Meet Manager
 │   │   ├── persons/
 │   │   ├── pools/

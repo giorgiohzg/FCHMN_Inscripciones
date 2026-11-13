@@ -11,6 +11,8 @@ import { personsRoutes } from "./modules/persons/persons.routes";
 import { clubsRoutes } from "./modules/clubs/clubs.routes";
 import { poolsRoutes } from "./modules/pools/pools.routes";
 import { swimmerAssignmentRoutes } from "./modules/swimmer-assignment/assignment.routes";
+import { incorporacionesRoutes } from "./modules/incorporaciones/incorporaciones.routes";
+import { configurarIncorporaciones, iniciarMantenimientoDeIncorporaciones } from "./modules/incorporaciones/postulacion.service";
 import { catalogsRoutes } from "./modules/catalogs/catalogs.routes";
 import { competitionsRoutes } from "./modules/competitions/competitions.routes";
 import { registrationsRoutes } from "./modules/registrations/registrations.routes";
@@ -85,7 +87,10 @@ export async function buildServer(config: Env = env, opciones: { flujoDeRegistro
    */
   configurarSemaforoArgon2({ max: config.ARGON2_MAX_SIMULTANEAS, cola: config.ARGON2_MAX_EN_COLA, esperaMs: config.ARGON2_ESPERA_MAX_MS });
   configurarLimitador(config.AUTH_LIMITER_SECRET);
+  // C-05: huellas de idempotencia con el mismo secreto y propósito propio (no toca el limitador).
+  configurarIncorporaciones(config.AUTH_LIMITER_SECRET);
   let detenerMantenimiento: (() => void) | null = null;
+  let detenerMantenimientoDeIncorporaciones: (() => void) | null = null;
   app.addHook("onReady", async () => {
     await verificarConfiguracionDelLimitador(config.AUTH_LIMITER_SECRET);
     await asegurarCapacidad();
@@ -95,9 +100,12 @@ export async function buildServer(config: Env = env, opciones: { flujoDeRegistro
     if (corregidos.length > 0) app.log.warn({ recursos: corregidos }, "limitador de login: capacidad reconciliada con el recuento real");
     await prepararHashFicticio().catch((err) => app.log.error({ err }, "no se pudo preparar el hash ficticio: se calculará al usarlo"));
     detenerMantenimiento = iniciarMantenimientoDelLimitador(app.log);
+    // C-05: intentos interrumpidos y RUN temporal vencido, al arrancar y cada 5 minutos.
+    detenerMantenimientoDeIncorporaciones = iniciarMantenimientoDeIncorporaciones(app.log);
   });
   app.addHook("onClose", async () => {
     detenerMantenimiento?.();
+    detenerMantenimientoDeIncorporaciones?.();
   });
 
   /**
@@ -165,7 +173,8 @@ export async function buildServer(config: Env = env, opciones: { flujoDeRegistro
      * comprobación CSRF, que se exige con cualquier `SameSite`; si no estuviera
      * permitida, el preflight rechazaría toda petición de sesión entre sitios.
      */
-    allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
+    // `Idempotency-Key`: obligatoria en la postulación de incorporaciones (C-05).
+    allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token", "Idempotency-Key"],
   });
   await app.register(multipart, { limits: { fileSize: 15 * 1024 * 1024 } }); // 15MB (carga masiva / importación de competencias)
   await app.register(rateLimit, {
@@ -237,6 +246,7 @@ export async function buildServer(config: Env = env, opciones: { flujoDeRegistro
   await app.register(clubsRoutes);
   await app.register(poolsRoutes);
   await app.register(swimmerAssignmentRoutes);
+  await app.register(incorporacionesRoutes);
   await app.register(catalogsRoutes);
   await app.register(competitionsRoutes);
   await app.register(registrationsRoutes);

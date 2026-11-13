@@ -29,3 +29,28 @@ export const claveOrdenFechaCalendario = (iso: string): string => iso.slice(0, 1
 /** ¿Es una fecha de calendario con la forma que el servidor promete? */
 export const esFechaCalendario = (v: unknown): v is string =>
   typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v);
+
+/**
+ * HOY en America/Santiago como `AAAA-MM-DD`: la zona del negocio, la misma que usa el servidor
+ * para rechazar fechas futuras. No depende de la zona del navegador.
+ */
+export function hoyEnSantiago(ahora: Date = new Date()): string {
+  const partes = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Santiago", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(ahora);
+  const v = (t: string) => partes.find((p) => p.type === t)?.value ?? "";
+  return `${v("year")}-${v("month")}-${v("day")}`;
+}
+
+/** ¿Es `AAAA-MM-DD` y existe en el calendario (sin 30 de febrero)? */
+export function esFechaCalendarioExistente(v: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const [a, m, d] = v.split("-").map(Number) as [number, number, number];
+  const f = new Date(Date.UTC(a, m - 1, d));
+  return f.getUTCFullYear() === a && f.getUTCMonth() === m - 1 && f.getUTCDate() === d;
+}
+
+/** Día de calendario anterior, con componentes UTC (sin restar 24 horas a un reloj). */
+export function diaCalendarioAnterior(fecha: string): string {
+  const [a, m, d] = fecha.slice(0, 10).split("-").map(Number) as [number, number, number];
+  const f = new Date(Date.UTC(a, m - 1, d - 1));
+  return f.toISOString().slice(0, 10);
+}

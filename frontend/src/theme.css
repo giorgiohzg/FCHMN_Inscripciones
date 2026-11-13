@@ -428,3 +428,92 @@ label {
   text-align: center;
   margin-top: 1rem;
 }
+
+/* ---------- C-05: diálogos y avisos de revisión ---------- */
+.dialogo-fondo {
+  position: fixed;
+  inset: 0;
+  background: rgba(31, 41, 55, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 4vh 1rem;
+  overflow-y: auto;
+  z-index: 50;
+}
+.dialogo-caja {
+  background: var(--brand-white);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: 1.25rem 1.5rem;
+  width: 100%;
+  outline: none;
+}
+.dialogo-titulo {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  color: var(--brand-navy);
+}
+.dialogo-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+.aviso {
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.75rem;
+  font-size: 0.85rem;
+  margin: 0.6rem 0;
+  background: var(--brand-bg);
+  border-left: 4px solid var(--brand-blue);
+}
+.aviso-advertencia {
+  background: #FFF4EA;
+  border-left-color: var(--state-warning);
+}
+.aviso-peligro {
+  background: #FCE4E4;
+  border-left-color: var(--state-danger);
+}
+.casilla {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-weight: 600;
+}
+.casilla input[type="checkbox"] {
+  width: auto;
+  margin-top: 0.2rem;
+}
+.ficha-datos {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.9rem;
+  margin: 0.4rem 0;
+}
+.ficha-datos dt {
+  color: var(--brand-gray-600);
+}
+.ficha-datos dd {
+  margin: 0;
+}
+.tabla-desplazable {
+  width: 100%;
+  overflow-x: auto;
+}
+.dialogo-caja button:disabled,
+.c05-pantalla button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+@media (max-width: 768px) {
+  .dialogo-caja {
+    padding: 1rem;
+  }
+  .ficha-datos {
+    grid-template-columns: 1fr;
+  }
+}

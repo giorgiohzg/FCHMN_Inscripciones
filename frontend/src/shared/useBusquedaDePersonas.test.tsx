@@ -39,8 +39,9 @@ vi.mock("../modules/persons/personsApi", () => ({
   usePersonsApi: () => ({ list: personsList, get: personsGet }),
 }));
 
-const assignDirectly = vi.fn(async () => undefined);
-vi.mock("../modules/swimmer-assignment/assignmentApi", () => ({
+const assignDirectly = vi.fn(async (_clubId: string, _personId: string, _opciones?: unknown) => undefined);
+vi.mock("../modules/swimmer-assignment/assignmentApi", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../modules/swimmer-assignment/assignmentApi")>()),
   useSwimmerAssignmentApi: () => ({
     list: vi.fn(async (p: { page?: number } = {}) => ({ items: [], total: 0, page: p.page ?? 1, pageSize: 20 })),
     assignDirectly,
@@ -210,7 +211,11 @@ describe("ClubSwimmersSection: el buscador del plantel también acumula", () => 
     await waitFor(() => expect(screen.getByText(/Se muestran 41 de 41/)).toBeInTheDocument());
 
     fireEvent.click(screen.getByText("Persona 41 (R41)"));
-    await waitFor(() => expect(assignDirectly).toHaveBeenCalledWith("club-1", "p-41"));
+    // C-05: elegirla abre la revisión con la fecha efectiva; se envía al confirmar.
+    const asignar = await screen.findByRole("button", { name: "Asignar" });
+    await waitFor(() => expect(asignar).toBeEnabled());
+    fireEvent.click(asignar);
+    await waitFor(() => expect(assignDirectly).toHaveBeenCalledWith("club-1", "p-41", expect.objectContaining({ fechaEfectiva: expect.any(String) })));
   });
 });
 

@@ -73,6 +73,13 @@ model User {
   userRoles     UserRole[]
   auditLogs     AuditLog[]
 
+  // C-05: incorporaciones por RUN (ver el bloque al final del esquema).
+  periodosCambioCreados    PeriodoCambioClub[]          @relation("PeriodoCreadoPor")
+  periodosCambioCerrados   PeriodoCambioClub[]          @relation("PeriodoCerradoPor")
+  intentosIncorporacion    IntentoIncorporacion[]
+  solicitudesAltaPresentadas SolicitudAltaIncorporacion[] @relation("SolicitudAltaPresentadaPor")
+  solicitudesAltaRevisadas   SolicitudAltaIncorporacion[] @relation("SolicitudAltaRevisadaPor")
+
   @@map("users")
 }
 
@@ -306,6 +313,9 @@ model Person {
   registrations    Registration[]
   relayMemberships RelayRegistrationMember[]
 
+  // C-05: solicitudes de alta resueltas con esta persona.
+  solicitudesAlta SolicitudAltaIncorporacion[]
+
   @@index([status])
   @@map("persons")
 }
@@ -380,6 +390,10 @@ model Club {
   swimmers           ClubSwimmer[]
   registrations      Registration[]
   relayRegistrations RelayRegistration[]
+
+  // C-05
+  intentosIncorporacion IntentoIncorporacion[]
+  solicitudesAlta       SolicitudAltaIncorporacion[]
 
   @@index([status])
   @@map("clubs")
@@ -459,15 +473,28 @@ model ClubSwimmer {
   /// Prisma la escribe y la lee como medianoche UTC: se maneja con
   /// `shared/fecha.util.ts`, nunca con `new Date()` ni `toLocaleDateString()`.
   startDate DateTime? @db.Date @map("start_date")
-  // Sigue siendo un instante: no se muestra en ninguna pantalla. Mismo defecto
-  // que tenía `startDate`, pendiente de decidir aparte.
-  endDate   DateTime? @map("end_date") // se completa al finalizar
+  /// INSTANTE de la operación que finalizó la membresía (se completa al finalizar). No es
+  /// una fecha de pertenencia y no debe usarse como tal (C-05).
+  endDate   DateTime? @map("end_date")
+  /// C-05: fecha de calendario de TÉRMINO de la pertenencia, inclusiva (`@db.Date`, como
+  /// `startDate`). En un traspaso es el día anterior al inicio de la nueva membresía.
+  ///
+  /// NULA en una membresía `ended` significa **término desconocido**: es el caso de todas
+  /// las finalizadas antes de esta migración, que no se completan a partir de `endDate`.
+  /// Solo puede tener valor si la membresía está `ended`, y nunca antes de `startDate`
+  /// (CHECK en la migración `20261112000000_c05_incorporaciones`).
+  fechaTermino DateTime? @db.Date @map("fecha_termino")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   club   Club   @relation(fields: [clubId], references: [id])
   person Person @relation(fields: [personId], references: [id])
+
+  // C-05
+  intentoQueLaPropuso      IntentoIncorporacion?
+  solicitudAltaQueLaCreo   SolicitudAltaIncorporacion?   @relation("SolicitudAltaMembresia")
+  solicitudesAltaResueltas SolicitudAltaIncorporacion[]  @relation("SolicitudAltaPropuestaExistente")
 
   @@index([clubId])
   @@index([personId])
@@ -1086,4 +1113,139 @@ model LimConfiguracion {
   creadoEn DateTime @default(now()) @map("creado_en")
 
   @@map("lim_configuracion")
+}
+
+// ---------------------------------------------------------------------------
+// C-05: INCORPORACIONES POR RUN (fase 1: solo el modelo; sin API todavía).
+//
+// El club inicia una postulación con el RUN. Si la persona está registrada, queda una
+// propuesta `pending` en `club_swimmers`; si no, el club completa nombre y apellido y queda
+// una solicitud de alta, que resuelve la administración. Nada se crea automáticamente.
+//
+// Las restricciones que Prisma no modela (CHECK, índices parciales, exclusión de periodos
+// solapados) están en la migración `20261112000000_c05_incorporaciones`.
+// ---------------------------------------------------------------------------
+
+/// Estado de un intento de postulación. `en_curso` es el único no resuelto: lo crea el cobro
+/// de la cuota (T1) y solo lo resuelve quien presente su `tokenEjecucion` (T2).
+enum EstadoIntentoIncorporacion {
+  en_curso
+  propuesta_creada
+  requiere_alta
+  alta_registrada
+  resuelto_por_propuesta
+  run_invalido
+  club_no_disponible
+  duplicado
+  fuera_de_periodo
+  interrumpido
+  error_tecnico
+}
+
+enum EstadoSolicitudAlta {
+  pendiente
+  aprobada
+  rechazada
+  resuelta_por_propuesta
+}
+
+/// Periodo GLOBAL en que un club puede postular el cambio de club de una persona con
+/// membresía activa. Fechas de calendario de America/Santiago, inclusivas. Lo abre y lo
+/// cierra solo la administración; no se borra (historial). Cerrarlo no toca las solicitudes.
+model PeriodoCambioClub {
+  id               String    @id @default(uuid())
+  inicio           DateTime  @db.Date
+  fin              DateTime  @db.Date
+  motivo           String?   @db.VarChar(300)
+  creadoPorUserId  String    @map("creado_por_user_id")
+  creadoEn         DateTime  @default(now()) @map("creado_en")
+  /// Cierre anticipado: instante de la operación y quién la hizo (los dos o ninguno).
+  cerradoEn        DateTime? @map("cerrado_en")
+  cerradoPorUserId String?   @map("cerrado_por_user_id")
+
+  creadoPor  User  @relation("PeriodoCreadoPor", fields: [creadoPorUserId], references: [id], onDelete: Restrict)
+  cerradoPor User? @relation("PeriodoCerradoPor", fields: [cerradoPorUserId], references: [id], onDelete: Restrict)
+
+  @@index([inicio, fin])
+  @@map("periodos_cambio_club")
+}
+
+/// Un intento de postulación: la FUENTE de la cuota diaria por club (30 por día de Santiago,
+/// compartidos entre las cuentas del club). Cada fila confirmada cuenta, sea cual sea su
+/// resultado. No cuentan las asignaciones administrativas, que no pasan por aquí.
+///
+/// - Idempotencia: `claveIdempotencia` es única por club y usuario, y queda ligada al
+///   contenido por `huellaContenido` (HMAC con propósito propio; nunca el RUN en claro).
+/// - Ejecución única: T2 solo puede resolver la fila si sigue `en_curso` y presenta el
+///   `tokenEjecucion` que le entregó T1. Marcada `interrumpido` o ya resuelta, no continúa.
+/// - Segundo paso (alta): `runNormalizado` solo existe mientras el intento `requiere_alta`
+///   y no se consumió; `expiraEn` lo acota y `consumidoEn` + `huellaAlta` lo hacen de un uso.
+model IntentoIncorporacion {
+  id                String                     @id @default(uuid())
+  clubId            String                     @map("club_id")
+  userId            String                     @map("user_id")
+  /// Día de calendario de America/Santiago en que se cobró el intento.
+  dia               DateTime                   @db.Date
+  claveIdempotencia String                     @map("clave_idempotencia") @db.VarChar(64)
+  huellaContenido   Bytes                      @map("huella_contenido")
+  estado            EstadoIntentoIncorporacion @default(en_curso)
+  tokenEjecucion    String                     @map("token_ejecucion") @db.Uuid
+  creadoEn          DateTime                   @default(now()) @map("creado_en")
+  /// Cuándo dejó de estar `en_curso` (resuelto o interrumpido).
+  resueltoEn        DateTime?                  @map("resuelto_en")
+  runNormalizado    String?                    @map("run_normalizado") @db.VarChar(9)
+  expiraEn          DateTime?                  @map("expira_en")
+  consumidoEn       DateTime?                  @map("consumido_en")
+  huellaAlta        Bytes?                     @map("huella_alta")
+  /// La propuesta que creó este intento (directamente o al completar el alta).
+  propuestaId       String?                    @unique @map("propuesta_id")
+
+  club          Club                        @relation(fields: [clubId], references: [id], onDelete: Restrict)
+  user          User                        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  propuesta     ClubSwimmer?                @relation(fields: [propuestaId], references: [id], onDelete: Restrict)
+  solicitudAlta SolicitudAltaIncorporacion?
+
+  @@unique([clubId, userId, claveIdempotencia])
+  @@index([clubId, dia])
+  @@map("intentos_incorporacion")
+}
+
+/// Solicitud de alta e incorporación de una persona cuyo RUN no está registrado (o solo
+/// coincide con personas eliminadas, de las que el club no recibe nada). Nombre y apellido
+/// son DATOS DECLARADOS por el club, no identidad verificada. La administración la aprueba
+/// (crea la persona y la membresía), la vincula a una persona existente o la rechaza.
+model SolicitudAltaIncorporacion {
+  id                          String              @id @default(uuid())
+  clubId                      String              @map("club_id")
+  intentoId                   String              @unique @map("intento_id")
+  runNormalizado              String              @map("run_normalizado") @db.VarChar(9)
+  nombresDeclarados           String              @map("nombres_declarados") @db.VarChar(120)
+  apellidosDeclarados         String              @map("apellidos_declarados") @db.VarChar(120)
+  solicitadoPorUserId         String              @map("solicitado_por_user_id")
+  estado                      EstadoSolicitudAlta @default(pendiente)
+  creadoEn                    DateTime            @default(now()) @map("creado_en")
+  revisadoPorUserId           String?             @map("revisado_por_user_id")
+  revisadoEn                  DateTime?           @map("revisado_en")
+  motivoRechazo               String?             @map("motivo_rechazo") @db.VarChar(500)
+  /// La persona con que se resolvió: creada al aprobar o la existente al vincular.
+  personaId                   String?             @map("persona_id")
+  /// La membresía activa creada al aprobar.
+  membresiaId                 String?             @unique @map("membresia_id")
+  /// La propuesta pendiente ya existente con que se resolvió (`resuelta_por_propuesta`).
+  propuestaExistenteId        String?             @map("propuesta_existente_id")
+  /// Se creó una persona NUEVA pese a coincidir el RUN con personas eliminadas (decisión
+  /// expresa de la administración; la eliminada no se toca).
+  personaCreadaPeseAEliminada Boolean             @default(false) @map("persona_creada_pese_a_eliminada")
+
+  club               Club                 @relation(fields: [clubId], references: [id], onDelete: Restrict)
+  intento            IntentoIncorporacion @relation(fields: [intentoId], references: [id], onDelete: Restrict)
+  solicitadoPor      User                 @relation("SolicitudAltaPresentadaPor", fields: [solicitadoPorUserId], references: [id], onDelete: Restrict)
+  revisadoPor        User?                @relation("SolicitudAltaRevisadaPor", fields: [revisadoPorUserId], references: [id], onDelete: Restrict)
+  persona            Person?              @relation(fields: [personaId], references: [id], onDelete: Restrict)
+  membresia          ClubSwimmer?         @relation("SolicitudAltaMembresia", fields: [membresiaId], references: [id], onDelete: Restrict)
+  propuestaExistente ClubSwimmer?         @relation("SolicitudAltaPropuestaExistente", fields: [propuestaExistenteId], references: [id], onDelete: Restrict)
+
+  @@index([clubId, estado])
+  @@index([estado, creadoEn])
+  @@map("solicitudes_alta_incorporacion")
 }

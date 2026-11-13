@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "./AuthContext";
+import { puedePostularPorSuClub } from "./alcanceDeClub";
 
 interface ProtectedRouteProps {
   requiredRole?: string;
@@ -103,5 +104,15 @@ export function RequireSession() {
   if (!accessToken) {
     return <Navigate to="/login" replace />;
   }
+  return <Outlet />;
+}
+
+/**
+ * Guard de las pantallas del club. Va DENTRO de `ProtectedRoute` (sesión ya resuelta): aquí solo se
+ * decide el alcance, también para quien entra escribiendo la URL.
+ */
+export function SoloPostulacionDelClub() {
+  const auth = useAuth();
+  if (!puedePostularPorSuClub(auth)) return <Navigate to="/no-autorizado" replace />;
   return <Outlet />;
 }

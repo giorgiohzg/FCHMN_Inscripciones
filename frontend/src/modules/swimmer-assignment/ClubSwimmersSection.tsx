@@ -1,8 +1,11 @@
 import { useEffect, useLayoutEffect, useState, useCallback, useRef } from "react";
-import { useSwimmerAssignmentApi, type ClubSwimmerAssignment } from "./assignmentApi";
+import { useSwimmerAssignmentApi, CODIGOS, codigoDelError, type ClubSwimmerAssignment, type DatosDeBaja, type OpcionesDeActivacion } from "./assignmentApi";
 import { usePersonsApi } from "../persons/personsApi";
 import { useSort, sortItems, SortableTh } from "../../shared/sortableTable";
-import { formatearFechaCalendario, claveOrdenFechaCalendario, esFechaCalendario } from "../../shared/fechaCalendario";
+import { formatearFechaCalendario, claveOrdenFechaCalendario, esFechaCalendario, hoyEnSantiago } from "../../shared/fechaCalendario";
+import { Dialogo } from "../../shared/Dialogo";
+import { BajaDeMembresiaDialog } from "./BajaDeMembresiaDialog";
+import { PanelDeActivacion } from "./PanelDeActivacion";
 import { useBusquedaDePersonas } from "../../shared/useBusquedaDePersonas";
 
 /** Filas por página de la tabla. El pie de página usa este mismo número. */
@@ -123,9 +126,19 @@ const STATUS_BADGE: Record<string, string> = { pending: "badge-locked", active: 
 
 interface ClubSwimmersSectionProps {
   clubId: string;
+  /** Nombre del club, para los diálogos. Opcional: sin él se dice «este club». */
+  clubName?: string;
 }
 
-export function ClubSwimmersSection({ clubId }: ClubSwimmersSectionProps) {
+/**
+ * C-05: diálogo abierto en ESTA vista de club. Se retira al cambiar de club: sus datos y su
+ * resultado pertenecen al club donde se abrió.
+ */
+type DialogoDelPlantel =
+  | { tipo: "asignar"; persona: { id: string; fullName: string; run: string } }
+  | { tipo: "baja"; membresia: ClubSwimmerAssignment };
+
+export function ClubSwimmersSection({ clubId, clubName }: ClubSwimmersSectionProps) {
   const api = useSwimmerAssignmentApi();
   const personsApi = usePersonsApi();
   const [assignments, setAssignments] = useState<ClubSwimmerAssignment[]>([]);
@@ -134,6 +147,8 @@ export function ClubSwimmersSection({ clubId }: ClubSwimmersSectionProps) {
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [dialogo, setDialogo] = useState<DialogoDelPlantel | null>(null);
+  const [errorDeDialogo, setErrorDeDialogo] = useState<string | null>(null);
   /** Hay una carga de la tabla en vuelo: la navegación y las acciones esperan. */
   const [cargando, setCargando] = useState(true);
   /**
@@ -217,6 +232,9 @@ export function ClubSwimmersSection({ clubId }: ClubSwimmersSectionProps) {
     setError(null);
     setMessage(null);
     setCargando(true);
+    // Un diálogo abierto describe el club anterior: se retira sin enviar nada.
+    setDialogo(null);
+    setErrorDeDialogo(null);
   }
   /**
    * Búsqueda de nadadores para asignar: compartida con los demás buscadores de
@@ -385,27 +403,40 @@ export function ClubSwimmersSection({ clubId }: ClubSwimmersSectionProps) {
    * se completó igualmente en el servidor —eso no se puede deshacer—, pero su
    * resultado no se proyecta sobre una vista a la que no pertenece.
    */
-  async function handleAssign(personId: string) {
+  /**
+   * C-05: la asignación directa ya no se envía al elegir a la persona: abre una revisión con la
+   * fecha efectiva (hoy o anterior) y, si el servidor lo pide, la aceptación EXPLÍCITA del
+   * historial incompleto. Sigue sin trasladar: quien está activo en otro club se rechaza.
+   */
+  function abrirAsignacion(persona: { id: string; fullName: string; run: string }) {
+    if (accionEnCurso) return;
+    setError(null);
+    setMessage(null);
+    setErrorDeDialogo(null);
+    setDialogo({ tipo: "asignar", persona });
+  }
+
+  /** Lo llama el panel al confirmar. Lanza si falla, para que el panel interprete el código. */
+  async function enviarAsignacion(personId: string, opciones: OpcionesDeActivacion) {
     const clubDeLaOperacion = clubId;
     // Comprobación SÍNCRONA: el estado deshabilita los controles, pero entre el
     // clic y el repintado cabe otro clic.
     const idDeEstaAccion = reservarAccion(clubDeLaOperacion);
-    if (idDeEstaAccion === null) return;
-
-    setError(null);
-    setMessage(null);
+    if (idDeEstaAccion === null) throw new Error("Ya hay una operación en curso en este club.");
     try {
-      await api.assignDirectly(clubDeLaOperacion, personId);
-      if (clubVigenteRef.current !== clubDeLaOperacion) return;
-
-      setMessage("Nadador asignado directamente al club.");
-      busqueda.limpiar();
-      setPage(1);
-      // Recarga la vista VIGENTE, no un `load` de un render anterior.
-      recargar();
-    } catch (err) {
-      if (clubVigenteRef.current !== clubDeLaOperacion) return;
-      setError(err instanceof Error ? err.message : "No se pudo asignar el nadador");
+      const r = await api.assignDirectly(clubDeLaOperacion, personId, {
+        fechaEfectiva: opciones.fechaEfectiva,
+        aceptarHistorialIncompleto: opciones.aceptarHistorialIncompleto,
+      });
+      if (clubVigenteRef.current === clubDeLaOperacion) {
+        setMessage("Nadador asignado directamente al club.");
+        busqueda.limpiar();
+        setPage(1);
+        setDialogo(null);
+        // Recarga la vista VIGENTE, no un `load` de un render anterior.
+        recargar();
+      }
+      return r;
     } finally {
       // Solo su propia entrada: si mientras tanto empezó otra, esta no puede
       // desbloquearla, y las de otros clubes ni se tocan.
@@ -413,27 +444,45 @@ export function ClubSwimmersSection({ clubId }: ClubSwimmersSectionProps) {
     }
   }
 
-  async function handleEndMembership(a: ClubSwimmerAssignment) {
-    if (!window.confirm(`¿Finalizar la membresía de ${a.person.fullName} en este club?`)) return;
+  function abrirBaja(a: ClubSwimmerAssignment) {
+    if (accionEnCurso) return;
+    setError(null);
+    setMessage(null);
+    setErrorDeDialogo(null);
+    setDialogo({ tipo: "baja", membresia: a });
+  }
+
+  /** Baja con la fecha ELEGIDA en el diálogo. Atada al club donde empezó. */
+  async function confirmarBaja(a: ClubSwimmerAssignment, datos: DatosDeBaja) {
     const clubDeLaOperacion = clubId;
     const idDeEstaAccion = reservarAccion(clubDeLaOperacion);
     if (idDeEstaAccion === null) return;
 
-    setError(null);
-    setMessage(null);
+    setErrorDeDialogo(null);
     try {
-      await api.end(a.id);
+      await api.end(a.id, datos);
       if (clubVigenteRef.current !== clubDeLaOperacion) return;
 
+      setDialogo(null);
       setMessage("Membresía finalizada.");
       recargar();
     } catch (err) {
       if (clubVigenteRef.current !== clubDeLaOperacion) return;
-      setError(err instanceof Error ? err.message : "No se pudo finalizar la membresía");
+      if (codigoDelError(err) === CODIGOS.membresiaNoActiva) {
+        // Otra operación la cambió: el diálogo ya no describe el estado real.
+        // En `message`, no en `error`: una recarga correcta borra `error`, y este aviso debe quedar.
+        setDialogo(null);
+        setMessage(err instanceof Error ? err.message : "La membresía ya no está activa.");
+        recargar();
+      } else {
+        setErrorDeDialogo(err instanceof Error ? err.message : "No se pudo finalizar la membresía");
+      }
     } finally {
       liberarAccion(clubDeLaOperacion, idDeEstaAccion);
     }
   }
+
+  const nombreDelClub = clubName ?? "este club";
 
   return (
     <div style={{ marginTop: "2rem", paddingTop: "1.5rem", borderTop: "1px solid var(--brand-gray-100)", maxWidth: 560 }}>
@@ -455,9 +504,7 @@ export function ClubSwimmersSection({ clubId }: ClubSwimmersSectionProps) {
                 petición para la misma persona: la segunda fallaba con un error
                 sobre una membresía que ya existía.
               */
-              onClick={() => {
-                if (!accionEnCurso) void handleAssign(o.id);
-              }}
+              onClick={() => abrirAsignacion(o)}
               aria-disabled={accionEnCurso}
               style={{
                 padding: "0.5rem 0.75rem",
@@ -562,7 +609,7 @@ export function ClubSwimmersSection({ clubId }: ClubSwimmersSectionProps) {
                 <button
                   className="btn-danger"
                   style={{ padding: "0.2rem 0.6rem", fontSize: "0.8rem" }}
-                  onClick={() => handleEndMembership(a)}
+                  onClick={() => abrirBaja(a)}
                   /*
                     Durante una transición las filas visibles pueden ser las del
                     club anterior: finalizar una membresía ahí sería operar sobre
@@ -611,6 +658,40 @@ export function ClubSwimmersSection({ clubId }: ClubSwimmersSectionProps) {
             </button>
           </div>
         </div>
+      )}
+
+      {dialogo?.tipo === "asignar" && (
+        <Dialogo titulo="Asignar nadador al club" onCerrar={() => setDialogo(null)} bloqueado={accionEnCurso}>
+          <dl className="ficha-datos">
+            <dt>Nadador</dt>
+            <dd>
+              {dialogo.persona.fullName} ({dialogo.persona.run})
+            </dd>
+            <dt>Club</dt>
+            <dd>{nombreDelClub}</dd>
+          </dl>
+          <PanelDeActivacion
+            personaId={dialogo.persona.id}
+            clubDestino={{ id: clubId, name: nombreDelClub }}
+            permiteTraslado={false}
+            hoy={hoyEnSantiago()}
+            etiquetaConfirmar="Asignar"
+            enviar={(opciones) => enviarAsignacion(dialogo.persona.id, opciones)}
+            onExito={() => setDialogo(null)}
+            onCancelar={() => setDialogo(null)}
+          />
+        </Dialogo>
+      )}
+
+      {dialogo?.tipo === "baja" && (
+        <BajaDeMembresiaDialog
+          membresia={{ ...dialogo.membresia, club: dialogo.membresia.club ?? { id: clubId, name: nombreDelClub } }}
+          hoy={hoyEnSantiago()}
+          enviando={accionEnCurso}
+          error={errorDeDialogo}
+          onCancelar={() => setDialogo(null)}
+          onConfirmar={(datos) => void confirmarBaja(dialogo.membresia, datos)}
+        />
       )}
     </div>
   );

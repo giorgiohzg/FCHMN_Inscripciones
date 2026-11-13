@@ -105,29 +105,52 @@ describe("límite de nacimiento para la edad mínima (mismo criterio que compute
     expect(computeAge(d(nacimiento), d(corte)) >= 70).toBe(esperado);
   });
 
-  it("equivale a computeAge(nacimiento, corte) >= edad en todos los días, con varios umbrales y años bisiestos", () => {
-    // Cortes: cada día de 2023 (no bisiesto) y de 2024 (bisiesto), y el 31-dic de 2025.
-    // Nacimientos: cada día de los cuatro años alrededor del umbral (siempre incluye un bisiesto).
-    const dia = 86_400_000;
-    const cortes: Date[] = [];
-    for (let t = Date.UTC(2023, 0, 1); t <= Date.UTC(2024, 11, 31); t += dia) cortes.push(new Date(t));
-    cortes.push(getDefaultAgeCutoffDate(d("2025-03-10")));
-    let comparados = 0;
-    for (const edad of [0, 1, 65, 70, 75, EDAD_MINIMA_MAXIMA]) {
+  /**
+   * Comparación EXHAUSTIVA, un caso por umbral. Antes era una sola prueba síncrona con unos 8 millones
+   * de comparaciones: tardaba 5,8 s aislada y 8,5 s dentro de la suite, frente al límite de 5 s, y
+   * fallaba por tiempo. Tardó más dentro de la suite que aislada; la causa de esa variación no está
+   * confirmada. Separarla por umbral no cambia el dominio ni las
+   * funciones comparadas: cada umbral recorre los mismos cortes y nacimientos que antes, y cada caso
+   * tiene su propio límite de tiempo y localiza mejor un fallo.
+   */
+  const DIA = 86_400_000;
+  // Cortes: cada día de 2023 (no bisiesto) y de 2024 (bisiesto), y el 31-dic de 2025.
+  const CORTES: Date[] = [];
+  for (let t = Date.UTC(2023, 0, 1); t <= Date.UTC(2024, 11, 31); t += DIA) CORTES.push(new Date(t));
+  CORTES.push(getDefaultAgeCutoffDate(d("2025-03-10")));
+
+  it.each([0, 1, 65, 70, 75, EDAD_MINIMA_MAXIMA])(
+    "equivale a computeAge(nacimiento, corte) >= %i en todos los días, con años bisiestos",
+    (edad) => {
+      // Nacimientos: cada día de los cinco años alrededor del umbral (siempre incluye un bisiesto).
       const desde = Date.UTC(2023 - edad - 2, 0, 1);
       const hasta = Date.UTC(2024 - edad + 1, 11, 31);
-      for (const corte of cortes) {
+      const diasDeNacimiento = (hasta - desde) / DIA + 1;
+      let veintinueveDeFebrero = 0;
+      let comparados = 0;
+      for (const corte of CORTES) {
         const limite = limiteDeNacimientoPorEdad(corte, edad);
-        for (let t = desde; t <= hasta; t += dia) {
+        for (let t = desde; t <= hasta; t += DIA) {
           const nacimiento = new Date(t);
           if (nacioHastaElLimite(nacimiento, limite) !== computeAge(nacimiento, corte) >= edad) {
             throw new Error(`Difiere con ${edad}: nacimiento ${nacimiento.toISOString()} corte ${corte.toISOString()}`);
           }
+          if (corte === CORTES[0] && nacimiento.getUTCMonth() === 1 && nacimiento.getUTCDate() === 29) veintinueveDeFebrero++;
           comparados++;
         }
       }
+      // Recuento EXACTO: todos los cortes por todos los días de nacimiento, sin saltos.
+      expect(comparados).toBe(CORTES.length * diasDeNacimiento);
+      expect(veintinueveDeFebrero, "la ventana de nacimientos incluye un 29 de febrero").toBeGreaterThanOrEqual(1);
     }
-    expect(comparados).toBeGreaterThan(5_000_000);
+  );
+
+  it("los seis umbrales juntos superan los 5 millones de comparaciones (el mismo volumen que antes)", () => {
+    const total = [0, 1, 65, 70, 75, EDAD_MINIMA_MAXIMA].reduce(
+      (suma, edad) => suma + CORTES.length * ((Date.UTC(2024 - edad + 1, 11, 31) - Date.UTC(2023 - edad - 2, 0, 1)) / DIA + 1),
+      0
+    );
+    expect(total).toBeGreaterThan(5_000_000);
   });
 
   it("usa los componentes UTC de la fecha de corte, como computeAge", () => {

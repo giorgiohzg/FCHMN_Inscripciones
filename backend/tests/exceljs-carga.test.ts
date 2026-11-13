@@ -64,6 +64,27 @@ function sondar(): Sonda {
   return JSON.parse(bruto) as Sonda;
 }
 
+/**
+ * La sonda es DETERMINISTA: el mismo Node limpio da el mismo resultado. Se ejecuta UNA vez por
+ * archivo, de forma diferida, dentro del primer caso que la necesita (no en un gancho), y su
+ * resultado lo comparten las tres comprobaciones. Antes cada caso lanzaba su propio proceso.
+ *
+ * Si obtenerla falla, el error se guarda y se vuelve a lanzar en CADA caso que la pide: cada
+ * comprobación sigue fallando por sí misma, sin quedar en verde por haber reutilizado nada.
+ */
+let sondaUnica: { resultado: Sonda } | { error: unknown } | null = null;
+function sondaDelArchivo(): Sonda {
+  if (sondaUnica === null) {
+    try {
+      sondaUnica = { resultado: sondar() };
+    } catch (error) {
+      sondaUnica = { error };
+    }
+  }
+  if ("error" in sondaUnica) throw sondaUnica.error;
+  return sondaUnica.resultado;
+}
+
 describe("ExcelJS carga correctamente con unzipper 0.12.5", () => {
   it("el módulo se importa y expone lo que el proyecto usa", () => {
     expect(ExcelJS).toBeDefined();
@@ -80,19 +101,19 @@ describe("ExcelJS carga correctamente con unzipper 0.12.5", () => {
   });
 
   it("en un Node limpio, `require(\"exceljs\")` no lanza", () => {
-    const sonda = sondar();
+    const sonda = sondaDelArchivo();
     expect(sonda.error, "importar exceljs lanzó una excepción").toBeNull();
     expect(sonda.totalModulos).toBeGreaterThan(100);
   });
 
   it("en un Node limpio, unzipper queda cargado y resuelto a 0.12.5", () => {
-    const sonda = sondar();
+    const sonda = sondaDelArchivo();
     expect(sonda.cargados).toContain("unzipper");
     expect(sonda.versionUnzipper).toBe("0.12.5");
   });
 
   it("en un Node limpio, `binary`, `buffers` y `chainsaw` NO se evalúan", () => {
-    const sonda = sondar();
+    const sonda = sondaDelArchivo();
     // Antes del cambio los tres quedaban en memoria con un simple import.
     expect(sonda.cargados).not.toContain("binary");
     expect(sonda.cargados).not.toContain("buffers");

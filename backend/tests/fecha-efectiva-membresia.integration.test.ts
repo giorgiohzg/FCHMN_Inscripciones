@@ -96,22 +96,21 @@ describe("la fecha efectiva que entra es la que queda guardada", () => {
     const a = await crearClub("d4a");
     const b = await crearClub("d4b");
     const persona = await crearPersona(4);
-    await assignmentService.assignSwimmerDirectly({ clubId: a.id, personId: persona.id, fechaEfectiva: "2026-01-15" }, ADMIN);
-    const m = await assignmentService.reassignSwimmerToClub(persona.id, b.id, ADMIN, FECHA);
+    const vigente = await assignmentService.assignSwimmerDirectly({ clubId: a.id, personId: persona.id, fechaEfectiva: "2026-01-15" }, ADMIN);
+    // C-05: el traslado exige confirmar la membresía vigente que se finaliza.
+    const m = await assignmentService.reassignSwimmerToClub(persona.id, b.id, ADMIN, { fechaEfectiva: FECHA, confirmarFinDeMembresiaId: vigente.id });
     expect(await fechaEnLaBase(m.id)).toBe(FECHA);
   });
 
   it("la aprobación de una propuesta también acepta la fecha", async () => {
     const club = await crearClub("d5");
     const persona = await crearPersona(5);
-    const propuesta = await assignmentService.proposeAssignment(
-      { clubId: club.id, personId: persona.id },
-      { userId: ADMIN.userId, scope: { kind: "admin" } } as never
-    );
+    // C-05: ya no hay propuesta por `personId`; la pendiente se crea directamente para probar la aprobación.
+    const propuesta = await prisma.clubSwimmer.create({ data: { clubId: club.id, personId: persona.id, status: "pending", requestedByUserId: ADMIN.userId } });
     // Una propuesta nace SIN fecha de inicio: se le pone al aprobar.
     expect(propuesta.startDate).toBeNull();
 
-    const aprobada = await assignmentService.approveAssignment(propuesta.id, ADMIN, FECHA);
+    const aprobada = await assignmentService.approveAssignment(propuesta.id, ADMIN, { fechaEfectiva: FECHA });
     expect(await fechaEnLaBase(aprobada.id)).toBe(FECHA);
   });
 });

@@ -1,22 +1,22 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../../shared/prisma.client";
-import { audit, withAudit } from "../audit/audit.service";
-import { ValidationError, NotFoundError } from "../../shared/errors";
+import { audit } from "../audit/audit.service";
+import { AppError, ForbiddenError, ValidationError, NotFoundError } from "../../shared/errors";
 import { mensajePublicable } from "../../shared/errorPublicable";
 import { type ActorContext, assertClubAccess } from "../../shared/actorContext";
-import { dbFrom, type Db, type TxOption } from "../../shared/transaction";
-import { evaluateTransition } from "./assignment.rules";
-import type { DirectAssignmentInput, ProposeAssignmentInput, AssignmentListQuery } from "./assignment.schemas";
+import type { Db, TxOption } from "../../shared/transaction";
+import type { DirectAssignmentInput, AssignmentListQuery } from "./assignment.schemas";
 import { fechaCalendarioAUtc, hoyEnZonaDelNegocio } from "../../shared/fecha.util";
+import {
+  bloquearMembresiasDePersona,
+  decidirActivacion,
+  ErrorDeMembresia,
+  fechaEfectivaValida,
+  finalizarPorTraslado,
+  historialDePersona,
+  type OpcionesDeActivacion,
+} from "./membresias.protocolo";
 
-/**
- * La fecha EFECTIVA que se va a guardar, a partir de lo que pidió quien llama.
- *
- * Sin argumento, el día de hoy EN CHILE — no el del reloj del servidor, que en
- * Render es UTC y tres o cuatro horas más adelante. Era el origen del defecto:
- * una asignación hecha a las 23:58 del 30 quedaba guardada como el 31.
- */
-const fechaEfectivaAGuardar = (fecha?: string) => fechaCalendarioAUtc(fecha ?? hoyEnZonaDelNegocio());
 
 /**
  * Quién ejecuta una operación que solo el administrador puede pedir.
@@ -78,7 +78,7 @@ interface ContextoDeAuditoria {
  * sincronizar: un nadador dado de baja conservando el rol activo (y por lo
  * tanto inscribible), o uno recién incorporado sin el rol que necesita.
  */
-async function syncSwimmerRole(personId: string, db: Db) {
+export async function syncSwimmerRole(personId: string, db: Db) {
   const stillActive = await db.clubSwimmer.findFirst({ where: { personId, status: "active" } });
 
   const existingPersonRole = await db.personRole.findUnique({ where: { personId_roleType: { personId, roleType: "swimmer" } } });
@@ -104,7 +104,7 @@ async function syncSwimmerRole(personId: string, db: Db) {
   }
 }
 
-async function assertClubActive(clubId: string, db: Db = prisma) {
+export async function assertClubActive(clubId: string, db: Db = prisma) {
   const club = await db.club.findFirst({ where: { id: clubId, deletedAt: null } });
   if (!club) throw new NotFoundError("Club");
   if (club.status !== "active") throw new ValidationError("El club no está activo");
@@ -180,44 +180,44 @@ export async function getAssignmentById(id: string) {
 
 /**
  * Asignación directa (sin flujo de propuesta/aprobación): un administrador
- * agrega un nadador a un club y la asignación queda ACTIVA de inmediato —
- * el propio admin es quien la solicita y quien la aprobaría, así que el
- * paso intermedio de "pendiente" no aporta nada. El flujo de propuesta
- * (`proposeAssignment`) sigue existiendo tal cual para el club y su personal
- * —delegado, entrenador y representante legal—,
- * que sí requieren la aprobación de un administrador (A-05).
+ * agrega un nadador a un club y la asignación queda ACTIVA de inmediato.
  *
- * Se reutiliza la misma invariante de "un solo club activo" (RB-06) que
- * aplica `approveAssignment`: si el nadador ya tiene una membresía activa en
- * OTRO club, se bloquea con el mismo mensaje claro, en vez de hacer un
- * reemplazo silencioso.
+ * C-05: sigue RECHAZANDO a quien tiene una membresía activa en OTRO club (no es un traslado;
+ * los traslados van por la aprobación con confirmación o por `reassign`). Aplica el protocolo
+ * común (`membresias.protocolo.ts`): bloqueo de la persona y de sus membresías antes de
+ * evaluar, fecha efectiva no futura y comprobación del historial.
  */
-export async function assignSwimmerDirectly(input: DirectAssignmentInput, actor: ContextoDeAuditoria, options?: TxOption) {
-  // `options.tx`: la carga masiva (etapa 6) asigna DENTRO de la transacción de su fila,
-  // así que las comprobaciones y las escrituras usan ese cliente. Sin `tx`, como antes.
-  const db = dbFrom(options);
-  await assertClubActive(input.clubId, db);
+export async function assignSwimmerDirectly(
+  input: DirectAssignmentInput,
+  actor: ContextoDeAuditoria,
+  options?: TxOption & { ahora?: Date }
+) {
+  const ahora = options?.ahora ?? new Date();
+  const fechaEfectiva = fechaEfectivaValida(input.fechaEfectiva, ahora);
 
-  const existingActiveSameClub = await db.clubSwimmer.findFirst({
-    where: { clubId: input.clubId, personId: input.personId, status: "active" },
-  });
-  if (existingActiveSameClub) {
-    throw new ValidationError("El nadador ya pertenece activamente a este club");
-  }
-
-  const currentActive = await db.clubSwimmer.findFirst({
-    where: { personId: input.personId, status: "active" },
-    include: { club: { select: { id: true, name: true } } },
-  });
-  if (currentActive) {
-    throw new ValidationError(
-      `El nadador ya tiene una membresía activa en "${currentActive.club.name}". ` +
-        `Debe finalizarla antes de asignarlo a un nuevo club.`
-    );
-  }
-
-  // La membresía y el rol derivado se escriben juntos o no se escriben.
   const escribir = async (tx: Prisma.TransactionClient) => {
+    await assertClubActive(input.clubId, tx);
+    const bloqueadas = await bloquearMembresiasDePersona(tx, input.personId);
+    // Mismos mensajes que antes de C-05, ahora evaluados con las filas bloqueadas.
+    const activa = bloqueadas.find((m) => m.status === "active");
+    if (activa && activa.club_id === input.clubId) {
+      throw new ValidationError("El nadador ya pertenece activamente a este club");
+    }
+    if (activa) {
+      const clubVigente = await tx.club.findUnique({ where: { id: activa.club_id }, select: { name: true } });
+      throw new ValidationError(
+        `El nadador ya tiene una membresía activa en "${clubVigente?.name ?? "otro club"}". ` + `Debe finalizarla antes de asignarlo a un nuevo club.`
+      );
+    }
+    const historial = await historialDePersona(tx, input.personId);
+    const decision = decidirActivacion(
+      bloqueadas,
+      historial,
+      input.clubId,
+      { fechaEfectiva, aceptarHistorialIncompleto: input.aceptarHistorialIncompleto },
+      { permiteTraslado: false, mensajeSinTraslado: () => "El nadador ya tiene una membresía activa en otro club." }
+    );
+
     const created = await tx.clubSwimmer.create({
       data: {
         clubId: input.clubId,
@@ -226,9 +226,9 @@ export async function assignSwimmerDirectly(input: DirectAssignmentInput, actor:
         requestedByUserId: actor.userId,
         reviewedByUserId: actor.userId,
         // `reviewedAt` es la marca de auditoría: CUÁNDO se hizo. Instante.
-        reviewedAt: new Date(),
+        reviewedAt: ahora,
         // `startDate` es el dato del negocio: DESDE CUÁNDO pertenece. Fecha.
-        startDate: fechaEfectivaAGuardar(input.fechaEfectiva),
+        startDate: fechaCalendarioAUtc(decision.fechaEfectiva),
       },
     });
     await syncSwimmerRole(input.personId, tx);
@@ -239,7 +239,7 @@ export async function assignSwimmerDirectly(input: DirectAssignmentInput, actor:
         entityType: "ClubSwimmer",
         entityId: created.id,
         ipAddress: actor.ipAddress,
-        after: created,
+        after: { ...created, historialIncompletoAceptado: decision.historialIncompletoAceptado },
       },
       { tx }
     );
@@ -303,6 +303,12 @@ export interface BulkAssignRowResult {
   fullName: string;
   status: "assigned" | "error";
   error?: string;
+  /**
+   * C-05: código ESTABLE del rechazo (el de `AppError`, p. ej. `HISTORIAL_INCOMPLETO`,
+   * `CONFLICTO_DE_FECHAS` o `VALIDATION_ERROR`), para que la interfaz decida sin leer el texto.
+   * Ausente en un fallo inesperado, que solo lleva el mensaje genérico.
+   */
+  codigo?: string;
 }
 
 export interface BulkAssignSummary {
@@ -315,27 +321,21 @@ export interface BulkAssignSummary {
 /**
  * Asigna varios nadadores al mismo club de una sola vez, reutilizando
  * exactamente las mismas reglas que `assignSwimmerDirectly` (uno por
- * uno, en el mismo orden en que se pediría manualmente) — un nadador con
- * problemas (ej. ya tiene membresía activa en otro club) NO detiene el
- * procesamiento de los demás; se acumula un reporte por nadador, igual
- * que la carga masiva de Personas.
+ * uno, en una transacción por persona) — un nadador con problemas (ej. ya
+ * tiene membresía activa en otro club) NO detiene el procesamiento de los
+ * demás; se acumula un reporte por nadador.
+ *
+ * La fecha se resuelve y se valida UNA VEZ, antes del bucle: toda la tanda comparte la misma
+ * fecha efectiva, y una fecha futura rechaza la operación entera (400) sin asignar a nadie.
  */
 export async function bulkAssignSwimmers(
-  input: { targetClubId: string; personIds: string[]; fechaEfectiva?: string },
-  actor: ContextoDeAuditoria
+  input: { targetClubId: string; personIds: string[]; fechaEfectiva?: string; aceptarHistorialIncompleto?: boolean },
+  actor: ContextoDeAuditoria,
+  opciones?: { ahora?: Date }
 ): Promise<BulkAssignSummary> {
+  const ahora = opciones?.ahora ?? new Date();
+  const fechaEfectiva = fechaEfectivaValida(input.fechaEfectiva, ahora);
   await assertClubActive(input.targetClubId);
-
-  /**
-   * La fecha se resuelve UNA VEZ, antes del bucle, y se reparte a todas.
-   *
-   * Resolverla dentro del bucle era el otro defecto medido: en una tanda de
-   * 5.071 asignaciones que tardó tres minutos, cada membresía recibía el
-   * instante de su propia escritura, así que no había «una fecha de la carga»
-   * sino 5.071 marcas distintas — y una tanda que cruzara la medianoche
-   * quedaba partida en dos días.
-   */
-  const fechaEfectiva = input.fechaEfectiva ?? hoyEnZonaDelNegocio();
 
   const results: BulkAssignRowResult[] = [];
   let assignedCount = 0;
@@ -344,12 +344,20 @@ export async function bulkAssignSwimmers(
     const person = await prisma.person.findFirst({ where: { id: personId, deletedAt: null } });
     const fullName = person?.fullName ?? personId;
     try {
-      await assignSwimmerDirectly({ clubId: input.targetClubId, personId, fechaEfectiva }, actor);
+      // Sin `ahora`: la fecha ya está fijada para toda la tanda, pero cada fila conserva el
+      // instante real de su escritura en la auditoría.
+      await assignSwimmerDirectly({ clubId: input.targetClubId, personId, fechaEfectiva, aceptarHistorialIncompleto: input.aceptarHistorialIncompleto }, actor);
       results.push({ personId, fullName, status: "assigned" });
       assignedCount++;
     } catch (err) {
       // Solo lo previsto llega al resultado; lo inesperado queda en el registro interno.
-      results.push({ personId, fullName, status: "error", error: mensajePublicable(err, "asignacion-masiva", personId) });
+      results.push({
+        personId,
+        fullName,
+        status: "error",
+        error: mensajePublicable(err, "asignacion-masiva", personId),
+        ...(err instanceof AppError ? { codigo: err.code } : {}),
+      });
     }
   }
 
@@ -357,24 +365,33 @@ export async function bulkAssignSwimmers(
 }
 
 /**
- * Reasigna un nadador a un club distinto en un solo paso: si tiene una
- * membresía activa en otro club, la finaliza automáticamente y crea la
- * nueva como activa — todo en una transacción. Evita el flujo manual de
- * dos pasos ("finalizar" y luego "asignar") al cambiar de club desde la
- * ficha de la persona.
+ * Reasigna un nadador a otro club en un solo paso (traslado administrativo, en cualquier fecha).
+ *
+ * C-05: si hay una membresía activa en otro club, exige CONFIRMAR explícitamente cuál se
+ * finaliza (`confirmarFinDeMembresiaId`); sin ella, o si cambió, responde 409 y no toca nada.
+ * La anterior termina el día calendario previo a la fecha efectiva (`fecha_termino`), y su
+ * `end_date` registra el instante de la operación. Todo en una transacción auditada.
  */
-export async function reassignSwimmerToClub(personId: string, newClubId: string, actor: ContextoDeAuditoria, fechaEfectiva?: string) {
+export async function reassignSwimmerToClub(
+  personId: string,
+  newClubId: string,
+  actor: ContextoDeAuditoria,
+  opcionesDeActivacion: OpcionesDeActivacion = {},
+  opciones?: { ahora?: Date }
+) {
+  const ahora = opciones?.ahora ?? new Date();
+  const fechaEfectiva = fechaEfectivaValida(opcionesDeActivacion.fechaEfectiva, ahora);
   await assertClubActive(newClubId);
 
-  const current = await getCurrentClubForPerson(personId);
-  if (current && current.clubId === newClubId) {
-    throw new ValidationError("El nadador ya pertenece activamente a ese club");
-  }
-
-  const assignment = await prisma.$transaction(async (tx) => {
-    if (current) {
-      await tx.clubSwimmer.update({ where: { id: current.id }, data: { status: "ended", endDate: new Date() } });
+  return prisma.$transaction(async (tx) => {
+    const bloqueadas = await bloquearMembresiasDePersona(tx, personId);
+    if (bloqueadas.some((m) => m.status === "active" && m.club_id === newClubId)) {
+      throw new ValidationError("El nadador ya pertenece activamente a ese club");
     }
+    const historial = await historialDePersona(tx, personId);
+    const decision = decidirActivacion(bloqueadas, historial, newClubId, { ...opcionesDeActivacion, fechaEfectiva }, { permiteTraslado: true });
+
+    const anterior = decision.vigente ? await finalizarPorTraslado(tx, decision.vigente, decision.fechaEfectiva, ahora) : null;
     const created = await tx.clubSwimmer.create({
       data: {
         clubId: newClubId,
@@ -382,13 +399,24 @@ export async function reassignSwimmerToClub(personId: string, newClubId: string,
         status: "active",
         requestedByUserId: actor.userId,
         reviewedByUserId: actor.userId,
-        reviewedAt: new Date(), // marca de auditoría
-        startDate: fechaEfectivaAGuardar(fechaEfectiva), // fecha efectiva
+        reviewedAt: ahora, // marca de auditoría
+        startDate: fechaCalendarioAUtc(decision.fechaEfectiva), // fecha efectiva
       },
     });
-    // Dentro de la transacción: antes quedaba fuera, así que un fallo aquí
-    // dejaba el traspaso hecho y el rol sin recalcular.
     await syncSwimmerRole(personId, tx);
+    if (anterior) {
+      await audit(
+        {
+          userId: actor.userId,
+          action: "SWIMMER_ASSIGNMENT_ENDED_BY_TRANSFER",
+          entityType: "ClubSwimmer",
+          entityId: anterior.id,
+          ipAddress: actor.ipAddress,
+          after: { ...anterior, nuevaMembresiaId: created.id, via: "reassign" },
+        },
+        { tx }
+      );
+    }
     await audit(
       {
         userId: actor.userId,
@@ -396,100 +424,73 @@ export async function reassignSwimmerToClub(personId: string, newClubId: string,
         entityType: "ClubSwimmer",
         entityId: created.id,
         ipAddress: actor.ipAddress,
-        before: current,
-        after: created,
+        before: anterior,
+        after: { ...created, historialIncompletoAceptado: decision.historialIncompletoAceptado },
       },
       { tx }
     );
     return created;
   });
-
-  return assignment;
 }
 
 /**
- * El club o su personal —delegado, entrenador y representante legal comparten
- * `CLUB_STAFF_PERMISSIONS`— proponen incorporar un nadador a su plantel. Queda
- * en estado `pending` hasta que un administrador la revise (A-05).
+ * C-05: ya NO existe una propuesta por `personId`. El club y su personal postulan por RUN
+ * (`incorporaciones/postulacion.service.ts`), y administración también puede postular por RUN
+ * con un club explícito. Este módulo conserva la resolución administrativa.
+ */
+
+/**
+ * A-05: solo un administrador puede aprobar. Activa la MISMA fila pendiente (conserva su id).
  *
- * No se exige que la persona tenga ya el rol `swimmer`: ese rol lo DERIVA
- * `syncSwimmerRole` de la membresía activa, así que pedirlo aquí sería exigir
- * el efecto para permitir la causa, y dejaría fuera del sistema a cualquier
- * nadador nuevo.
+ * C-05: protocolo común. Tras bloquear a la persona y sus membresías, la propuesta debe seguir
+ * pendiente (si no, 409 `SOLICITUD_YA_RESUELTA`). Si la persona tiene una membresía activa en
+ * otro club, la aprobación es un TRASLADO y exige confirmar esa membresía; se finaliza el día
+ * calendario anterior a la fecha efectiva y la nueva se activa, todo en una transacción. La
+ * aprobación no reactiva a la persona ni desbloquea su cuenta.
  */
-export async function proposeAssignment(input: ProposeAssignmentInput, actor: ActorContext) {
-  // El alcance decide, y es exhaustivo: un administrador pasa, el personal de
-  // un club solo sobre SU club, y un nadador no opera a nivel de club.
-  assertClubAccess(actor, input.clubId);
-  await assertClubActive(input.clubId);
-
-  const existingPending = await prisma.clubSwimmer.findFirst({
-    where: { clubId: input.clubId, personId: input.personId, status: "pending" },
-  });
-  if (existingPending) {
-    throw new ValidationError("Ya existe una solicitud pendiente para este nadador en este club");
-  }
-
-  const existingActiveSameClub = await prisma.clubSwimmer.findFirst({
-    where: { clubId: input.clubId, personId: input.personId, status: "active" },
-  });
-  if (existingActiveSameClub) {
-    throw new ValidationError("El nadador ya pertenece activamente a este club");
-  }
-
-  return withAudit(
-    (tx) =>
-      tx.clubSwimmer.create({
-        data: {
-          clubId: input.clubId,
-          personId: input.personId,
-          status: "pending",
-          requestedByUserId: actor.userId,
-        },
-      }),
-    (assignment) => ({
-      userId: actor.userId,
-      action: "SWIMMER_ASSIGNMENT_PROPOSED",
-      entityType: "ClubSwimmer",
-      entityId: assignment.id,
-      ipAddress: actor.ipAddress,
-      after: assignment,
-    })
-  );
-}
-
-/**
- * A-05: solo un administrador puede aprobar. RB-06/A-04: si la regla de
- * "un solo club activo" está habilitada y el nadador ya tiene una
- * asignación activa EN OTRO club, se bloquea la aprobación — el
- * administrador debe finalizar explícitamente la asignación anterior
- * primero (flujo auditable, sin swaps automáticos silenciosos).
- */
-export async function approveAssignment(id: string, actor: ContextoDeAuditoria, fechaEfectiva?: string) {
+export async function approveAssignment(
+  id: string,
+  actor: ContextoDeAuditoria,
+  opcionesDeActivacion: OpcionesDeActivacion = {},
+  opciones?: { ahora?: Date }
+) {
+  const ahora = opciones?.ahora ?? new Date();
+  const fechaEfectiva = fechaEfectivaValida(opcionesDeActivacion.fechaEfectiva, ahora);
   const before = await getAssignmentById(id);
 
-  const transition = evaluateTransition(before.status, "approve");
-  if (!transition.allowed) throw new ValidationError(transition.reason!);
+  return prisma.$transaction(async (tx) => {
+    const bloqueadas = await bloquearMembresiasDePersona(tx, before.personId);
+    const propuesta = bloqueadas.find((m) => m.id === id);
+    if (!propuesta || propuesta.status !== "pending") {
+      throw new ErrorDeMembresia(409, "SOLICITUD_YA_RESUELTA", "La propuesta ya no está pendiente: otra operación la resolvió.");
+    }
+    const historial = await historialDePersona(tx, before.personId);
+    const decision = decidirActivacion(bloqueadas, historial, before.clubId, { ...opcionesDeActivacion, fechaEfectiva }, { permiteTraslado: true });
 
-  const currentActive = await getCurrentClubForPerson(before.personId);
-  if (currentActive && currentActive.clubId !== before.clubId) {
-    throw new ValidationError(
-      `El nadador ya tiene una membresía activa en "${currentActive.club.name}". ` +
-        `Debe finalizarla antes de aprobar esta nueva asignación.`
-    );
-  }
-
-  const assignment = await prisma.$transaction(async (tx) => {
+    const anterior = decision.vigente ? await finalizarPorTraslado(tx, decision.vigente, decision.fechaEfectiva, ahora) : null;
     const updated = await tx.clubSwimmer.update({
       where: { id },
       data: {
         status: "active",
-        startDate: fechaEfectivaAGuardar(fechaEfectiva), // fecha efectiva
+        startDate: fechaCalendarioAUtc(decision.fechaEfectiva), // fecha efectiva
         reviewedByUserId: actor.userId,
-        reviewedAt: new Date(), // marca de auditoría
+        reviewedAt: ahora, // marca de auditoría
       },
     });
     await syncSwimmerRole(before.personId, tx);
+    if (anterior) {
+      await audit(
+        {
+          userId: actor.userId,
+          action: "SWIMMER_ASSIGNMENT_ENDED_BY_TRANSFER",
+          entityType: "ClubSwimmer",
+          entityId: anterior.id,
+          ipAddress: actor.ipAddress,
+          after: { ...anterior, nuevaMembresiaId: id, via: "approve" },
+        },
+        { tx }
+      );
+    }
     await audit(
       {
         userId: actor.userId,
@@ -498,52 +499,98 @@ export async function approveAssignment(id: string, actor: ContextoDeAuditoria, 
         entityId: id,
         ipAddress: actor.ipAddress,
         before,
-        after: updated,
+        after: { ...updated, membresiaFinalizadaId: anterior?.id ?? null, historialIncompletoAceptado: decision.historialIncompletoAceptado },
       },
       { tx }
     );
     return updated;
   });
-
-  return assignment;
 }
 
-export async function rejectAssignment(id: string, reason: string | undefined, actor: ContextoDeAuditoria) {
+/** Rechazar: mismo protocolo; la propuesta debe seguir pendiente tras bloquear. */
+export async function rejectAssignment(id: string, reason: string | undefined, actor: ContextoDeAuditoria, opciones?: { ahora?: Date }) {
+  const ahora = opciones?.ahora ?? new Date();
   const before = await getAssignmentById(id);
 
-  const transition = evaluateTransition(before.status, "reject");
-  if (!transition.allowed) throw new ValidationError(transition.reason!);
-
-  return withAudit(
-    (tx) =>
-      tx.clubSwimmer.update({
-        where: { id },
-        data: { status: "rejected", reviewedByUserId: actor.userId, reviewedAt: new Date(), rejectionReason: reason ?? null },
-      }),
-    (assignment) => ({
-      userId: actor.userId,
-      action: "SWIMMER_ASSIGNMENT_REJECTED",
-      entityType: "ClubSwimmer",
-      entityId: id,
-      ipAddress: actor.ipAddress,
-      before,
-      after: assignment,
-    })
-  );
-}
-
-export async function endAssignment(id: string, actor: ActorContext) {
-  const before = await getAssignmentById(id);
-
-  assertClubAccess(actor, before.clubId);
-
-  const transition = evaluateTransition(before.status, "end");
-  if (!transition.allowed) throw new ValidationError(transition.reason!);
-
-  const assignment = await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
+    const bloqueadas = await bloquearMembresiasDePersona(tx, before.personId);
+    const propuesta = bloqueadas.find((m) => m.id === id);
+    if (!propuesta || propuesta.status !== "pending") {
+      throw new ErrorDeMembresia(409, "SOLICITUD_YA_RESUELTA", "La propuesta ya no está pendiente: otra operación la resolvió.");
+    }
     const updated = await tx.clubSwimmer.update({
       where: { id },
-      data: { status: "ended", endDate: new Date() },
+      data: { status: "rejected", reviewedByUserId: actor.userId, reviewedAt: ahora, rejectionReason: reason ?? null },
+    });
+    await audit(
+      { userId: actor.userId, action: "SWIMMER_ASSIGNMENT_REJECTED", entityType: "ClubSwimmer", entityId: id, ipAddress: actor.ipAddress, before, after: updated },
+      { tx }
+    );
+    return updated;
+  });
+}
+
+/**
+ * Baja simple de una membresía activa (club con alcance propio, o administración).
+ *
+ * C-05: la FECHA DE TÉRMINO la elige quien registra la baja (puede ser una renuncia comunicada
+ * después) y es obligatoria: el servidor no elige ayer ni hoy. Es el último día de pertenencia
+ * (inclusivo) y se guarda en `fecha_termino`; el instante real de la operación queda en
+ * `end_date` y en la auditoría, sin retroceder. No toca inscripciones ni operaciones anteriores.
+ *
+ *  - Igual o anterior a hoy en Santiago (400 `FECHA_FUTURA`).
+ *  - No anterior al inicio CONOCIDO; el mismo día del inicio es válido (409 `CONFLICTO_DE_FECHAS`).
+ *  - Con inicio DESCONOCIDO no se inventa: 409 `HISTORIAL_INCOMPLETO`, que solo administración
+ *    puede aceptar (`aceptarHistorialIncompleto`, auditado). Una cuenta de club que la envíe
+ *    recibe 403: no puede otorgarse esa aceptación.
+ *
+ * Una baja hasta hoy inclusive implica que otra membresía solo podrá empezar después de hoy; una
+ * baja retroactiva admite un inicio posterior a ella, si el historial lo permite.
+ * Protocolo común: bloqueo de la persona, membresía todavía activa tras bloquear, roles y auditoría
+ * en la misma transacción.
+ */
+export async function endAssignment(
+  id: string,
+  actor: ActorContext,
+  input: { fechaTermino: string; aceptarHistorialIncompleto?: boolean },
+  opciones?: { ahora?: Date }
+) {
+  const ahora = opciones?.ahora ?? new Date();
+  const before = await getAssignmentById(id);
+  assertClubAccess(actor, before.clubId);
+  if (input.aceptarHistorialIncompleto === true && actor.scope.kind !== "admin") {
+    throw new ForbiddenError("Solo administración puede aceptar un historial incompleto.");
+  }
+  const hoy = hoyEnZonaDelNegocio(ahora);
+  if (input.fechaTermino > hoy) {
+    throw new ErrorDeMembresia(400, "FECHA_FUTURA", `La fecha de término no puede ser posterior a hoy (${hoy}, America/Santiago).`, { hoy });
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const bloqueadas = await bloquearMembresiasDePersona(tx, before.personId);
+    const membresia = bloqueadas.find((m) => m.id === id);
+    if (!membresia || membresia.status !== "active") {
+      throw new ErrorDeMembresia(409, "MEMBRESIA_NO_ACTIVA", "La membresía ya no está activa: otra operación la cambió.");
+    }
+    let historialIncompletoAceptado: string[] = [];
+    if (membresia.start_date === null) {
+      if (input.aceptarHistorialIncompleto !== true) {
+        throw new ErrorDeMembresia(
+          409,
+          "HISTORIAL_INCOMPLETO",
+          "La membresía no tiene fecha de inicio registrada: la fecha de término no se puede comprobar. Requiere revisión de administración.",
+          { membresias: [id], requiereAdministracion: true }
+        );
+      }
+      historialIncompletoAceptado = [id];
+    } else if (input.fechaTermino < membresia.start_date) {
+      throw new ErrorDeMembresia(409, "CONFLICTO_DE_FECHAS", `La fecha de término no puede ser anterior al inicio de la membresía (${membresia.start_date}).`, {
+        conflictos: [{ membresiaId: id, motivo: `la membresía empezó el ${membresia.start_date}` }],
+      });
+    }
+    const updated = await tx.clubSwimmer.update({
+      where: { id },
+      data: { status: "ended", endDate: ahora, fechaTermino: fechaCalendarioAUtc(input.fechaTermino) },
     });
     await syncSwimmerRole(before.personId, tx);
     await audit(
@@ -554,12 +601,10 @@ export async function endAssignment(id: string, actor: ActorContext) {
         entityId: id,
         ipAddress: actor.ipAddress,
         before,
-        after: updated,
+        after: { ...updated, historialIncompletoAceptado },
       },
       { tx }
     );
     return updated;
   });
-
-  return assignment;
 }

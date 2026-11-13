@@ -4,11 +4,43 @@ import { esFechaCalendarioValida, FORMATO_FECHA_CALENDARIO } from "../../shared/
 import { listaAcotada } from "../../shared/listaAcotada";
 import { LIMITES_LISTAS } from "../../shared/limites-listas";
 
-export const proposeAssignmentSchema = z.object({
-  clubId: uuidField("Club inválido"),
-  personId: uuidField("Nadador inválido"),
-});
-export type ProposeAssignmentInput = z.infer<typeof proposeAssignmentSchema>;
+/**
+ * C-05: la postulación se inicia SOLO con el RUN. El servidor no acepta `personId`: proponer a
+ * una persona por su identificador interno es justamente lo que entregaba su nombre y RUN a un
+ * club cualquiera. Se RECHAZA con un mensaje explícito (no se ignora), para que un cliente
+ * antiguo no crea que su operación se hizo.
+ *
+ * `clubId`: para el club y su personal sale de la sesión; si se envía, debe coincidir (403 si
+ * no). Administración debe indicarlo.
+ */
+export const postulacionSchema = z
+  .object({
+    run: z.string({ error: "Debe indicar el RUN" }).trim().min(1, "Debe indicar el RUN").max(20, "RUN demasiado largo"),
+    clubId: uuidField("Club inválido").optional(),
+    personId: z
+      .undefined({ error: "La postulación se inicia solo con el RUN: el campo personId ya no se acepta." })
+      .optional(),
+  })
+  .strict();
+export type PostulacionInput = z.infer<typeof postulacionSchema>;
+
+/** Segundo paso de un RUN no registrado: nombre y apellido DECLARADOS por el club. Sin RUN. */
+export const segundoPasoSchema = z
+  .object({
+    intentoId: uuidField("Intento inválido"),
+    nombres: z.string({ error: "Debe indicar el nombre" }).trim().min(2, "Debe indicar el nombre").max(120),
+    apellidos: z.string({ error: "Debe indicar el apellido" }).trim().min(2, "Debe indicar el apellido").max(120),
+  })
+  .strict();
+export type SegundoPasoInput = z.infer<typeof segundoPasoSchema>;
+
+/**
+ * Campos comunes de las vías que ACTIVAN membresías (C-05): confirmación explícita de la
+ * membresía activa que se finaliza en un traslado, y aceptación explícita de un historial con
+ * fechas desconocidas.
+ */
+const confirmacionDeTrasladoField = uuidField("Membresía a finalizar inválida").optional();
+const aceptarHistorialIncompletoField = z.boolean().optional();
 
 /**
  * Fecha EFECTIVA de inicio de la membresía: desde cuándo pertenece al club.
@@ -20,7 +52,7 @@ export type ProposeAssignmentInput = z.infer<typeof proposeAssignmentSchema>;
  *
  * Opcional: si no viene, el servicio usa el día de hoy en Chile.
  *
- * No se propone a la hoja de propuesta (`proposeAssignmentSchema`): una
+ * No se propone a la postulación (`postulacionSchema`): una
  * membresía `pending` no tiene fecha de inicio todavía, se le pone al aprobar.
  */
 export const fechaEfectivaField = z
@@ -31,16 +63,39 @@ export const fechaEfectivaField = z
   .optional();
 
 /** Asignación directa: el administrador activa la membresía en un solo paso. */
-export const directAssignmentSchema = proposeAssignmentSchema.extend({
+export const directAssignmentSchema = z.object({
+  clubId: uuidField("Club inválido"),
+  personId: uuidField("Nadador inválido"),
   fechaEfectiva: fechaEfectivaField,
+  aceptarHistorialIncompleto: aceptarHistorialIncompletoField,
 });
 export type DirectAssignmentInput = z.infer<typeof directAssignmentSchema>;
 
 /** Aprobación de una propuesta: es cuando la membresía recibe su fecha efectiva. */
 export const approveAssignmentSchema = z.object({
   fechaEfectiva: fechaEfectivaField,
+  confirmarFinDeMembresiaId: confirmacionDeTrasladoField,
+  aceptarHistorialIncompleto: aceptarHistorialIncompletoField,
 });
 export type ApproveAssignmentInput = z.infer<typeof approveAssignmentSchema>;
+
+/**
+ * C-05: baja simple con fecha de término ELEGIDA por quien la registra (puede ser una renuncia
+ * comunicada después). Obligatoria: sin ella el servidor rechaza, no elige ayer ni hoy en silencio.
+ * Debe ser una fecha de calendario que exista; que no sea futura ni anterior al inicio lo comprueba
+ * el servicio con la membresía bloqueada. `aceptarHistorialIncompleto` es solo de administración.
+ */
+export const endAssignmentSchema = z
+  .object({
+    fechaTermino: z
+      .string({ error: "Debe indicar la fecha de término (AAAA-MM-DD)" })
+      .trim()
+      .regex(FORMATO_FECHA_CALENDARIO, "Use el formato AAAA-MM-DD (fecha de calendario, sin hora)")
+      .refine(esFechaCalendarioValida, "Esa fecha no existe"),
+    aceptarHistorialIncompleto: z.boolean().optional(),
+  })
+  .strict();
+export type EndAssignmentInput = z.infer<typeof endAssignmentSchema>;
 
 export const rejectAssignmentSchema = z.object({
   reason: z.string().trim().max(500).optional(),
@@ -84,11 +139,14 @@ export const bulkAssignSwimmersSchema = z.object({
   // cargadas en una operación compartan la MISMA fecha efectiva, en vez de
   // recibir cada una el instante de su propia escritura.
   fechaEfectiva: fechaEfectivaField,
+  aceptarHistorialIncompleto: aceptarHistorialIncompletoField,
 });
 export type BulkAssignSwimmersInput = z.infer<typeof bulkAssignSwimmersSchema>;
 
 export const reassignSwimmerSchema = z.object({
   newClubId: uuidField("Club inválido"),
   fechaEfectiva: fechaEfectivaField,
+  confirmarFinDeMembresiaId: confirmacionDeTrasladoField,
+  aceptarHistorialIncompleto: aceptarHistorialIncompletoField,
 });
 export type ReassignSwimmerInput = z.infer<typeof reassignSwimmerSchema>;

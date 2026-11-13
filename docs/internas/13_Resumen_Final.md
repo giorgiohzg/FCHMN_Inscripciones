@@ -52,9 +52,9 @@ honesto de lo que falta para llevarlo a producción.
 | Arquitectura de la solución | ✅ `01_Propuesta_Base.md` |
 | Diagrama de componentes | ✅ `01_Propuesta_Base.md` §1.3 |
 | Modelo entidad-relación | ✅ `01_Propuesta_Base.md` §2 + `prisma/schema.prisma` (fuente de verdad) |
-| Esquema de base de datos | ✅ `prisma/schema.prisma` (36 modelos) |
-| Backend completo | ✅ 14 módulos de `src/modules`, Fastify + TypeScript estricto |
-| API REST | ✅ 120 endpoints (inventario completo en `README.md`) |
+| Esquema de base de datos | ✅ `prisma/schema.prisma` (39 modelos) |
+| Backend completo | ✅ 15 módulos de `src/modules`, Fastify + TypeScript estricto |
+| API REST | ✅ 130 endpoints (inventario completo en `README.md`) |
 | Documentación Swagger/OpenAPI | ✅ autogenerada en `/docs` (Módulo 1). **Deshabilitada por defecto en producción**: se publica fuera de producción o con `ENABLE_SWAGGER=true` + `PUBLIC_API_URL`. |
 | Frontend completo | ✅ 13 módulos, React + TypeScript |
 | Pantallas de todos los módulos | ✅ |
@@ -87,7 +87,7 @@ honesto de lo que falta para llevarlo a producción.
 | Frontend | `npm run test` | 23 | 480 |
 | **Total** | | **72** | **1.305** |
 
-- **36 modelos de Prisma**, **120 endpoints** REST, 14 módulos en `backend/src/modules`
+- **39 modelos de Prisma**, **130 endpoints** REST, 15 módulos en `backend/src/modules`
   y 13 en `frontend/src/modules`. El inventario completo de endpoints está en
   `README.md` y una prueba lo compara con el código.
 - **59 acciones distintas** auditadas a lo largo del sistema (eran 41 al cerrar el Módulo 12; crecieron con los módulos posteriores).

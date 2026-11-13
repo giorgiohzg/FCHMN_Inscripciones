@@ -3,7 +3,7 @@ import { AuthProvider } from "./modules/auth/AuthContext";
 import { ToastProvider } from "./shared/ToastProvider";
 import { LoginPage } from "./modules/auth/LoginPage";
 import { ForceChangePasswordPage } from "./modules/auth/ForceChangePasswordPage";
-import { ProtectedRoute, RequireSession, RutaDeAcceso } from "./modules/auth/ProtectedRoute";
+import { ProtectedRoute, RequireSession, RutaDeAcceso, SoloPostulacionDelClub } from "./modules/auth/ProtectedRoute";
 import { AppShell } from "./shared/AppShell";
 import { PersonsListPage } from "./modules/persons/PersonsListPage";
 import { PersonFormPage } from "./modules/persons/PersonFormPage";
@@ -12,6 +12,9 @@ import { ClubsListPage } from "./modules/clubs/ClubsListPage";
 import { ClubFormPage } from "./modules/clubs/ClubFormPage";
 import { SwimmerAssignmentsPage } from "./modules/swimmer-assignment/SwimmerAssignmentsPage";
 import { BulkSwimmerAssignmentPage } from "./modules/swimmer-assignment/BulkSwimmerAssignmentPage";
+import { PeriodosDeCambioPage } from "./modules/swimmer-assignment/PeriodosDeCambioPage";
+import { SolicitudesDeAltaPage } from "./modules/swimmer-assignment/SolicitudesDeAltaPage";
+import { IncorporacionesClubPage } from "./modules/swimmer-assignment/IncorporacionesClubPage";
 import { CatalogsPage } from "./modules/catalogs/CatalogsPage";
 import { CompetitionsListPage } from "./modules/competitions/CompetitionsListPage";
 import { CompetitionDetailPage } from "./modules/competitions/CompetitionDetailPage";
@@ -79,6 +82,10 @@ export function App() {
             <Route path="/inscripciones-relevos" element={<InscripcionesRelevosRouter />} />
             <Route path="/inscripciones-relevos/nueva" element={<RelayRegistrationWizardPage />} />
             <Route path="/reportes" element={<ReportsPage />} />
+            {/* C-05, fase 4: cuenta del club y su personal vigente, en su club. No administración ni nadadores. */}
+            <Route element={<SoloPostulacionDelClub />}>
+              <Route path="/incorporaciones" element={<IncorporacionesClubPage />} />
+            </Route>
           </Route>
 
           <Route element={<ProtectedRoute requiredRole="admin" />}>
@@ -94,6 +101,9 @@ export function App() {
             <Route path="/clubes/:id" element={<ClubFormPage />} />
             <Route path="/asignaciones" element={<SwimmerAssignmentsPage />} />
             <Route path="/asignaciones/masiva" element={<BulkSwimmerAssignmentPage />} />
+            {/* C-05: exclusivas de administración (la API también lo exige). */}
+            <Route path="/asignaciones/periodos" element={<PeriodosDeCambioPage />} />
+            <Route path="/asignaciones/altas" element={<SolicitudesDeAltaPage />} />
             <Route path="/catalogos" element={<CatalogsPage />} />
             <Route path="/competencias" element={<CompetitionsListPage />} />
             <Route path="/competencias/importar" element={<CompetitionMeetImportPage />} />

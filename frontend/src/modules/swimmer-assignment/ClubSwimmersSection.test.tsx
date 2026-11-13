@@ -10,8 +10,9 @@
  * pequeño veía una tabla vacía sin ninguna pista de por qué.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { ClubSwimmersSection } from "./ClubSwimmersSection";
+import { ApiError } from "../../shared/apiClient";
 
 const POR_PAGINA = 20;
 
@@ -30,7 +31,9 @@ function membresia(club: string, n: number) {
 }
 
 /** Servidor por omisión: pagina de verdad. Cada prueba puede sustituirlo. */
-const listaNormal = async (params: { clubId?: string; page?: number; pageSize?: number } = {}) => {
+const listaNormal = async (params: { clubId?: string; personId?: string; page?: number; pageSize?: number } = {}) => {
+  // C-05: la revisión de una asignación pide el historial de la persona; aquí no tiene ninguno.
+  if (params.personId) return { items: [], total: 0, page: params.page ?? 1, pageSize: params.pageSize ?? POR_PAGINA };
   const club = params.clubId ?? "club-grande";
   const total = TOTALES[club] ?? 0;
   const pageSize = params.pageSize ?? POR_PAGINA;
@@ -54,10 +57,12 @@ const assignmentsList = vi.fn(listaNormal);
  */
 // Con la firma real: sin ella, `mock.calls` es una tupla vacía y no se puede
 // comprobar con qué club se llamó.
-const assignDirectly = vi.fn(async (_clubId: string, _personId: string) => undefined);
-const end = vi.fn(async (_id: string) => undefined);
+const assignDirectly = vi.fn(async (_clubId: string, _personId: string, _opciones?: unknown) => undefined);
+const end = vi.fn(async (_id: string, _datos?: unknown) => undefined);
 
-vi.mock("./assignmentApi", () => ({
+// Mock PARCIAL: los códigos y lectores de errores (`CODIGOS`, `codigoDelError`…) son los reales.
+vi.mock("./assignmentApi", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./assignmentApi")>()),
   useSwimmerAssignmentApi: () => ({
     list: assignmentsList,
     assignDirectly,
@@ -77,6 +82,28 @@ const personsList = vi.fn(async () => ({
 vi.mock("../persons/personsApi", () => ({ usePersonsApi: () => ({ list: personsList }) }));
 
 const siguiente = () => screen.getByRole("button", { name: "Siguiente" });
+
+/** Fecha de término usada en las pruebas: posterior al inicio de las filas (2026-01-01) y pasada. */
+const TERMINO = "2026-03-31";
+
+/**
+ * C-05: «Finalizar membresía» abre el diálogo de baja; nada se envía hasta elegir la fecha y
+ * confirmar. Devuelve el botón de confirmar, por si la prueba quiere volver a pulsarlo.
+ */
+async function darDeBaja(boton: HTMLElement, fecha = TERMINO) {
+  fireEvent.click(boton);
+  fireEvent.change(await screen.findByLabelText(/Fecha de término/), { target: { value: fecha } });
+  const confirmar = screen.getByRole("button", { name: "Confirmar baja" });
+  fireEvent.click(confirmar);
+  return confirmar;
+}
+
+/** C-05: elegir a la persona abre la revisión; se confirma con la fecha visible (hoy). */
+async function confirmarAsignacion() {
+  const boton = await screen.findByRole("button", { name: "Asignar" });
+  await waitFor(() => expect(boton).toBeEnabled());
+  fireEvent.click(boton);
+}
 const anterior = () => screen.getByRole("button", { name: "Anterior" });
 
 beforeEach(() => {
@@ -324,7 +351,7 @@ describe("mutaciones que se resuelven después de cambiar de club", () => {
   async function buscarYObtenerSugerencia() {
     const input = screen.getAllByRole("textbox")[0]!;
     fireEvent.change(input, { target: { value: "persona" } });
-    return screen.findByText("Persona 1 (RP1)");
+    return (await screen.findAllByText("Persona 1 (RP1)")).find((e) => e.tagName === "LI")!;
   }
 
   it("ASIGNACIÓN atrasada: no recarga A, no escribe sobre B, no limpia su buscador", async () => {
@@ -334,9 +361,10 @@ describe("mutaciones que se resuelven después de cambiar de club", () => {
     const { rerender } = render(<ClubSwimmersSection clubId="club-grande" />);
     await screen.findByText("Nadador club-grande 1 (R1)");
 
-    // (b) se inicia la asignación en A y queda pendiente.
+    // (b) se inicia la asignación en A (revisada y confirmada) y queda pendiente.
     fireEvent.click(await buscarYObtenerSugerencia());
-    await waitFor(() => expect(assignDirectly).toHaveBeenCalledWith("club-grande", "pp-1"));
+    await confirmarAsignacion();
+    await waitFor(() => expect(assignDirectly).toHaveBeenCalledWith("club-grande", "pp-1", expect.objectContaining({ fechaEfectiva: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) })));
 
     // (c) se cambia a B y carga bien.
     rerender(<ClubSwimmersSection clubId="club-chico" />);
@@ -364,6 +392,7 @@ describe("mutaciones que se resuelven después de cambiar de club", () => {
     const { rerender } = render(<ClubSwimmersSection clubId="club-grande" />);
     await screen.findByText("Nadador club-grande 1 (R1)");
     fireEvent.click(await buscarYObtenerSugerencia());
+    await confirmarAsignacion();
     await waitFor(() => expect(assignDirectly).toHaveBeenCalled());
 
     rerender(<ClubSwimmersSection clubId="club-chico" />);
@@ -383,8 +412,8 @@ describe("mutaciones que se resuelven después de cambiar de club", () => {
     const { rerender } = render(<ClubSwimmersSection clubId="club-grande" />);
     await screen.findByText("Nadador club-grande 1 (R1)");
 
-    fireEvent.click(screen.getAllByRole("button", { name: /Finalizar membresía/ })[0]!);
-    await waitFor(() => expect(end).toHaveBeenCalledWith("club-grande-m1"));
+    await darDeBaja(screen.getAllByRole("button", { name: /Finalizar membresía/ })[0]!);
+    await waitFor(() => expect(end).toHaveBeenCalledWith("club-grande-m1", { fechaTermino: TERMINO }));
 
     rerender(<ClubSwimmersSection clubId="club-chico" />);
     await screen.findByText("Nadador club-chico 1 (R1)");
@@ -485,10 +514,9 @@ describe("estados y recuperación de la tabla", () => {
     render(<ClubSwimmersSection clubId="club-grande" />);
     await screen.findByText("Nadador club-grande 1 (R1)");
 
-    const boton = screen.getAllByRole("button", { name: /Finalizar membresía/ })[0]!;
-    fireEvent.click(boton);
-    await waitFor(() => expect(boton).toBeDisabled());
-    fireEvent.click(boton);
+    const confirmar = await darDeBaja(screen.getAllByRole("button", { name: /Finalizar membresía/ })[0]!);
+    await waitFor(() => expect(confirmar).toBeDisabled());
+    fireEvent.click(confirmar);
 
     expect(end, "el segundo clic no puede mandar otra petición").toHaveBeenCalledTimes(1);
 
@@ -523,7 +551,7 @@ describe("estados y recuperación de la tabla", () => {
 
     // Se finaliza la única fila de la página 3: el total baja a 40.
     total = 40;
-    fireEvent.click(screen.getAllByRole("button", { name: /Finalizar membresía/ })[0]!);
+    await darDeBaja(screen.getAllByRole("button", { name: /Finalizar membresía/ })[0]!);
 
     await waitFor(() => expect(screen.getByText(/40 registro\(s\) — página 2/)).toBeInTheDocument());
     expect(screen.getByText("Nadador club-grande 21 (R21)"), "se ve la última página válida").toBeInTheDocument();
@@ -612,7 +640,7 @@ describe("acción en curso: identidad por operación y por club", () => {
     // (a) se inicia en A y queda pendiente.
     const { rerender } = render(<ClubSwimmersSection clubId="club-grande" />);
     await screen.findByText("Nadador club-grande 1 (R1)");
-    fireEvent.click(botonFinalizar());
+    await darDeBaja(botonFinalizar());
     await waitFor(() => expect(end).toHaveBeenCalledTimes(1));
     expect(botonFinalizar(), "en A sí está bloqueado").toBeDisabled();
 
@@ -622,7 +650,7 @@ describe("acción en curso: identidad por operación y por club", () => {
 
     // (c) B puede iniciar SU operación: la de A no le afecta.
     expect(botonFinalizar(), "la operación de A no bloquea B").toBeEnabled();
-    fireEvent.click(botonFinalizar());
+    await darDeBaja(botonFinalizar());
     await waitFor(() => expect(end).toHaveBeenCalledTimes(2));
     expect(botonFinalizar()).toBeDisabled();
 
@@ -649,12 +677,14 @@ describe("acción en curso: identidad por operación y por club", () => {
     async function sugerir() {
       const input = screen.getAllByRole("textbox")[0]!;
       fireEvent.change(input, { target: { value: "persona" } });
-      return screen.findByText("Persona 1 (RP1)");
+      // La sugerencia de la LISTA: con una revisión abierta el nombre también figura en el diálogo.
+      return (await screen.findAllByText("Persona 1 (RP1)")).find((e) => e.tagName === "LI")!;
     }
 
     const { rerender } = render(<ClubSwimmersSection clubId="club-grande" />);
     await screen.findByText("Nadador club-grande 1 (R1)");
     fireEvent.click(await sugerir());
+    await confirmarAsignacion();
     await waitFor(() => expect(assignDirectly).toHaveBeenCalledTimes(1));
 
     rerender(<ClubSwimmersSection clubId="club-chico" />);
@@ -662,14 +692,16 @@ describe("acción en curso: identidad por operación y por club", () => {
 
     // B puede asignar aunque la de A siga en vuelo.
     fireEvent.click(await sugerir());
+    await confirmarAsignacion();
     await waitFor(() => expect(assignDirectly).toHaveBeenCalledTimes(2));
     expect(assignDirectly.mock.calls[1]![0], "y su club es el visible").toBe("club-chico");
 
     await act(async () => {
       enA.resolver(undefined);
     });
-    // La de B sigue en curso: un tercer clic no manda nada.
+    // La de B sigue en curso: un tercer clic no manda nada (ni siquiera abre otra revisión).
     fireEvent.click(await sugerir());
+    expect(screen.queryAllByRole("button", { name: "Asignar" }), "no se abre una segunda revisión").toHaveLength(0);
     expect(assignDirectly).toHaveBeenCalledTimes(2);
 
     await act(async () => {
@@ -783,14 +815,14 @@ describe("registro de operaciones POR CLUB", () => {
     // A1 pendiente.
     const { rerender } = render(<ClubSwimmersSection clubId="club-grande" />);
     await screen.findByText("Nadador club-grande 1 (R1)");
-    fireEvent.click(botonFinalizar());
+    await darDeBaja(botonFinalizar());
     await waitFor(() => expect(end).toHaveBeenCalledTimes(1));
 
     // Cambiar a B e iniciar B1: la de A no le afecta.
     rerender(<ClubSwimmersSection clubId="club-chico" />);
     await screen.findByText("Nadador club-chico 1 (R1)");
     expect(botonFinalizar()).toBeEnabled();
-    fireEvent.click(botonFinalizar());
+    await darDeBaja(botonFinalizar());
     await waitFor(() => expect(end).toHaveBeenCalledTimes(2));
 
     // Volver a A: A1 SIGUE en vuelo, así que A tiene que estar bloqueado.
@@ -823,17 +855,20 @@ describe("registro de operaciones POR CLUB", () => {
     async function sugerir() {
       const input = screen.getAllByRole("textbox")[0]!;
       fireEvent.change(input, { target: { value: "persona" } });
-      return screen.findByText("Persona 1 (RP1)");
+      // La sugerencia de la LISTA: con una revisión abierta el nombre también figura en el diálogo.
+      return (await screen.findAllByText("Persona 1 (RP1)")).find((e) => e.tagName === "LI")!;
     }
 
     const { rerender } = render(<ClubSwimmersSection clubId="club-grande" />);
     await screen.findByText("Nadador club-grande 1 (R1)");
     fireEvent.click(await sugerir());
+    await confirmarAsignacion();
     await waitFor(() => expect(assignDirectly).toHaveBeenCalledTimes(1));
 
     rerender(<ClubSwimmersSection clubId="club-chico" />);
     await screen.findByText("Nadador club-chico 1 (R1)");
     fireEvent.click(await sugerir());
+    await confirmarAsignacion();
     await waitFor(() => expect(assignDirectly).toHaveBeenCalledTimes(2));
 
     // De vuelta en A, con A1 aún en vuelo: no sale una segunda.
@@ -859,6 +894,7 @@ describe("registro de operaciones POR CLUB", () => {
      * no está en pantalla.
      */
     fireEvent.click(await sugerir());
+    await confirmarAsignacion();
     await waitFor(() => expect(assignDirectly, "A2 ya puede enviarse").toHaveBeenCalledTimes(3));
     expect(assignDirectly.mock.calls[2]![0], "y va al club A").toBe("club-grande");
   });
@@ -1023,11 +1059,87 @@ describe("la página se corrige también cuando el total pasa a CERO", () => {
 
     // El club se queda sin membresías activas mientras se está en la página 3.
     total = 0;
-    fireEvent.click(screen.getAllByRole("button", { name: /Finalizar membresía/ })[0]!);
+    await darDeBaja(screen.getAllByRole("button", { name: /Finalizar membresía/ })[0]!);
 
     await waitFor(() => expect(screen.getByText(/aún no tiene nadadores asignados/)).toBeInTheDocument());
     // Y la última petición fue de la página 1: no quedó atrapada en la 3.
     const ultima = assignmentsList.mock.calls[assignmentsList.mock.calls.length - 1]![0];
     expect(ultima).toMatchObject({ page: 1 });
+  });
+});
+
+/**
+ * C-05, fase 3: baja con fecha elegida y asignación directa revisada.
+ */
+describe("C-05: baja y asignación directa revisadas", () => {
+  const botonFinalizar = () => screen.getAllByRole("button", { name: /Finalizar membresía/ })[0]!;
+
+  it("CANCELAR la baja no envía nada; confirmar envía la fecha elegida", async () => {
+    render(<ClubSwimmersSection clubId="club-grande" clubName="Club Grande" />);
+    await screen.findByText("Nadador club-grande 1 (R1)");
+    fireEvent.click(botonFinalizar());
+    const dialogo = await screen.findByRole("dialog", { name: "Baja de membresía" });
+    expect(within(dialogo).getByText("club-grande"), "el club de la fila").toBeInTheDocument();
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Cancelar" }));
+    expect(end).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    await darDeBaja(botonFinalizar(), "2026-01-01");
+    await waitFor(() => expect(end).toHaveBeenCalledWith("club-grande-m1", { fechaTermino: "2026-01-01" }));
+    expect(await screen.findByText("Membresía finalizada.")).toBeInTheDocument();
+  });
+
+  it("MEMBRESIA_NO_ACTIVA: cierra el diálogo, avisa y recarga; el aviso sobrevive a la recarga", async () => {
+    render(<ClubSwimmersSection clubId="club-grande" />);
+    await screen.findByText("Nadador club-grande 1 (R1)");
+    end.mockRejectedValueOnce(new ApiError("La membresía ya no está activa: otra operación la cambió.", 409, "MEMBRESIA_NO_ACTIVA"));
+    const cargas = assignmentsList.mock.calls.length;
+    await darDeBaja(botonFinalizar());
+    expect(await screen.findByText(/ya no está activa/)).toBeInTheDocument();
+    await waitFor(() => expect(assignmentsList.mock.calls.length).toBeGreaterThan(cargas));
+    await screen.findByText("Nadador club-grande 1 (R1)");
+    expect(screen.getByText(/ya no está activa/)).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("un error de fecha queda DENTRO del diálogo, que sigue abierto para corregir", async () => {
+    render(<ClubSwimmersSection clubId="club-grande" />);
+    await screen.findByText("Nadador club-grande 1 (R1)");
+    end.mockRejectedValueOnce(new ApiError("La fecha de término no puede ser anterior al inicio.", 409, "CONFLICTO_DE_FECHAS"));
+    await darDeBaja(botonFinalizar());
+    const dialogo = await screen.findByRole("dialog", { name: "Baja de membresía" });
+    expect(await within(dialogo).findByText(/no puede ser anterior al inicio/)).toBeInTheDocument();
+  });
+
+  it("asignación directa: HISTORIAL_INCOMPLETO pide aceptación sin marcar y reenvía solo al aceptarla", async () => {
+    render(<ClubSwimmersSection clubId="club-grande" />);
+    await screen.findByText("Nadador club-grande 1 (R1)");
+    fireEvent.change(screen.getAllByRole("textbox")[0]!, { target: { value: "persona" } });
+    fireEvent.click((await screen.findAllByText("Persona 1 (RP1)")).find((e) => e.tagName === "LI")!);
+    assignDirectly.mockRejectedValueOnce(new ApiError("incompleto", 409, "HISTORIAL_INCOMPLETO", { membresias: ["m-x"] }));
+    await confirmarAsignacion();
+    const acepta = await screen.findByRole("checkbox", { name: /historial incompleto/ });
+    expect(acepta).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Asignar" })).toBeDisabled();
+    fireEvent.click(acepta);
+    fireEvent.click(screen.getByRole("button", { name: "Asignar" }));
+    await waitFor(() => expect(assignDirectly).toHaveBeenCalledTimes(2));
+    expect(assignDirectly.mock.calls[1]![2]).toMatchObject({ aceptarHistorialIncompleto: true });
+    expect(assignDirectly.mock.calls[0]![2]).not.toHaveProperty("aceptarHistorialIncompleto", true);
+  });
+
+  it("asignación directa: quien está activo en OTRO club no se puede asignar (no es un traslado)", async () => {
+    assignmentsList.mockImplementation(async (params: { personId?: string; clubId?: string; page?: number; pageSize?: number } = {}) =>
+      params.personId
+        ? { items: [{ ...membresia("club-otro", 9), club: { id: "club-otro", name: "Club Otro" } }], total: 1, page: 1, pageSize: 100 }
+        : listaNormal(params)
+    );
+    render(<ClubSwimmersSection clubId="club-grande" />);
+    await screen.findByText("Nadador club-grande 1 (R1)");
+    fireEvent.change(screen.getAllByRole("textbox")[0]!, { target: { value: "persona" } });
+    fireEvent.click((await screen.findAllByText("Persona 1 (RP1)")).find((e) => e.tagName === "LI")!);
+    expect(await screen.findByText(/no trasladan/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Asignar" })).toBeDisabled();
+    expect(assignDirectly).not.toHaveBeenCalled();
   });
 });

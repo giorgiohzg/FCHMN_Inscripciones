@@ -16,6 +16,8 @@ import { prisma } from "../src/shared/prisma.client";
 import { truncateAllTables } from "./helpers/testDb";
 import { resolvePersonClubId } from "../src/modules/auth/authorization";
 import { seedRolesAndPermissions, createClub, createPerson, createUser, addClubStaff, addActiveMembership, TEST_PASSWORD } from "./helpers/seedRbac";
+import { runValido } from "./helpers/run";
+import { diaCalendarioAnterior, hoyEnZonaDelNegocio } from "../src/shared/fecha.util";
 
 let app: FastifyInstance;
 
@@ -516,8 +518,9 @@ describe("finalizar una membresía: permiso y alcance por club", () => {
     return { personaId: persona.id, membresiaId: membresia.id };
   }
 
+  // C-05: la fecha de término es obligatoria; la membresía empezó hoy, así que hoy es válida.
   const finalizar = (id: string, token: string) =>
-    app.inject({ method: "POST", url: `/swimmer-assignments/${id}/end`, headers: auth(token) });
+    app.inject({ method: "POST", url: `/swimmer-assignments/${id}/end`, headers: auth(token), payload: { fechaTermino: hoyEnZonaDelNegocio() } });
 
   const estadoDe = async (id: string) =>
     (await prisma.clubSwimmer.findUniqueOrThrow({ where: { id } })).status;
@@ -614,54 +617,55 @@ describe("finalizar una membresía: permiso y alcance por club", () => {
  * rutas con una cuenta de club.
  */
 describe("el club opera sobre su propio plantel", () => {
+  // C-05: la postulación es por RUN, con `Idempotency-Key`; ya no por `personId`.
   it("una cuenta de club PUEDE proponer un nadador de su club", async () => {
-    const persona = await createPerson({ run: "90000011", username: "prop_club", firstName: "Propuesta", gender: "female" });
+    await createPerson({ run: runValido(90000011), username: "prop_club", firstName: "Propuesta", gender: "female" });
 
     const res = await app.inject({
       method: "POST",
       url: "/swimmer-assignments",
-      headers: auth(ctx.tokens.club_a!),
-      payload: { clubId: ctx.clubAId, personId: persona.id },
+      headers: { ...auth(ctx.tokens.club_a!), "idempotency-key": "autz-club-a-0001" },
+      payload: { run: runValido(90000011) },
     });
 
     expect(res.statusCode, `el club propone en su propio club; respuesta: ${res.body}`).toBe(201);
-    expect(res.json().status).toBe("pending");
+    expect(res.json().propuesta.status).toBe("pending");
   });
 
   it("pero NO en representación de otro club", async () => {
-    const persona = await createPerson({ run: "90000012", username: "prop_ajena", firstName: "Ajena", gender: "female" });
+    await createPerson({ run: runValido(90000012), username: "prop_ajena", firstName: "Ajena", gender: "female" });
 
     const res = await app.inject({
       method: "POST",
       url: "/swimmer-assignments",
-      headers: auth(ctx.tokens.club_b!),
-      payload: { clubId: ctx.clubAId, personId: persona.id },
+      headers: { ...auth(ctx.tokens.club_b!), "idempotency-key": "autz-club-b-0001" },
+      payload: { clubId: ctx.clubAId, run: runValido(90000012) },
     });
 
     expect(res.statusCode).toBe(403);
   });
 
   it("el personal del club también propone, en el club donde está nombrado", async () => {
-    const persona = await createPerson({ run: "90000013", username: "prop_staff", firstName: "PorStaff", gender: "male" });
+    await createPerson({ run: runValido(90000013), username: "prop_staff", firstName: "PorStaff", gender: "male" });
 
     const res = await app.inject({
       method: "POST",
       url: "/swimmer-assignments",
-      headers: auth(ctx.tokens.deleg_a!),
-      payload: { clubId: ctx.clubAId, personId: persona.id },
+      headers: { ...auth(ctx.tokens.deleg_a!), "idempotency-key": "autz-deleg-a-0001" },
+      payload: { run: runValido(90000013) },
     });
 
     expect(res.statusCode, `respuesta: ${res.body}`).toBe(201);
   });
 
   it("un nadador no puede proponer: le falta el permiso", async () => {
-    const persona = await createPerson({ run: "90000014", username: "prop_nadador", firstName: "PorNadador", gender: "male" });
+    await createPerson({ run: runValido(90000014), username: "prop_nadador", firstName: "PorNadador", gender: "male" });
 
     const res = await app.inject({
       method: "POST",
       url: "/swimmer-assignments",
-      headers: auth(ctx.tokens.nadador_a!),
-      payload: { clubId: ctx.clubAId, personId: persona.id },
+      headers: { ...auth(ctx.tokens.nadador_a!), "idempotency-key": "autz-nadador-0001" },
+      payload: { run: runValido(90000014) },
     });
 
     expect(res.statusCode).toBe(403);
@@ -696,7 +700,7 @@ describe("un nadador activo, un solo club (RB-06)", () => {
     expect(res.json().message).toContain("membresía activa");
   });
 
-  it("aprobar una solicitud pendiente tampoco crea la segunda", async () => {
+  it("aprobar una solicitud pendiente tampoco crea la segunda sin confirmación explícita (C-05)", async () => {
     const persona = await createPerson({ run: "90000022", username: "un_solo_club_2", firstName: "Segunda", gender: "female" });
     await addActiveMembership(ctx.clubAId, persona.id, ctx.adminUserId);
     const pendiente = await prisma.clubSwimmer.create({
@@ -709,19 +713,28 @@ describe("un nadador activo, un solo club (RB-06)", () => {
       headers: auth(ctx.tokens.admin_test!),
     });
 
-    expect(res.statusCode).toBe(400);
+    // C-05: aprobar a quien está activo en otro club es un TRASLADO y exige confirmar la membresía vigente.
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe("CONFIRMACION_REQUERIDA");
     expect(res.json().message).toContain("membresía activa");
     expect((await prisma.clubSwimmer.findUniqueOrThrow({ where: { id: pendiente.id } })).status).toBe("pending");
   });
 
   it("finalizada la anterior, la nueva se acepta", async () => {
     const persona = await createPerson({ run: "90000023", username: "un_solo_club_3", firstName: "Tercera", gender: "female" });
-    const anterior = await addActiveMembership(ctx.clubAId, persona.id, ctx.adminUserId);
+    // C-05: la anterior empezó antes de hoy, el caso común. Darla de baja hoy deja su último día en
+    // ayer y la nueva puede empezar hoy (una que empezó HOY no admite otra el mismo día).
+    const anterior = await prisma.clubSwimmer.create({
+      data: { clubId: ctx.clubAId, personId: persona.id, status: "active", requestedByUserId: ctx.adminUserId, startDate: new Date("2026-01-05T00:00:00Z") },
+    });
 
     const fin = await app.inject({
       method: "POST",
       url: `/swimmer-assignments/${anterior.id}/end`,
       headers: auth(ctx.tokens.admin_test!),
+      // Baja retroactiva hasta ayer: la nueva puede empezar hoy. Una baja hasta HOY exigiría que
+      // la nueva empezara después de hoy.
+      payload: { fechaTermino: diaCalendarioAnterior(hoyEnZonaDelNegocio()) },
     });
     expect(fin.statusCode).toBe(200);
 
@@ -886,6 +899,7 @@ describe("los roles de una persona se derivan de sus relaciones", () => {
       method: "POST",
       url: `/swimmer-assignments/${asignada.id}/end`,
       headers: auth(ctx.tokens.admin_test!),
+      payload: { fechaTermino: hoyEnZonaDelNegocio() },
     });
     expect(fin.statusCode).toBe(200);
 

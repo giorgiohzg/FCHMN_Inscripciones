@@ -125,6 +125,16 @@ describe("código estructurado del servidor (C-04)", () => {
     fetchSpy.mockResolvedValue(respuesta(403, { error: "FORBIDDEN", message: "Sin permiso" }));
     await expect(apiFetchArchivo("/reports/export", "informe.csv")).rejects.toMatchObject({ status: 403, code: "FORBIDDEN" });
   });
+
+  it("C-05: transporta `details` estructurado tal cual; si no es un objeto, no lo inventa", async () => {
+    const details = { membresiaVigente: { id: "m-1", clubId: "c-1", startDate: "2026-01-10" } };
+    fetchSpy.mockResolvedValueOnce(respuesta(409, { error: "CONFIRMACION_REQUERIDA", message: "Confirme", details }));
+    await expect(apiFetch("/swimmer-assignments/x/approve", { method: "POST" })).rejects.toMatchObject({ code: "CONFIRMACION_REQUERIDA", details });
+
+    fetchSpy.mockResolvedValueOnce(respuesta(409, { error: "CONFLICT", message: "Conflicto", details: "texto" }));
+    const sinDetalles = (await apiFetch("/clubs", { method: "POST" }).catch((e: unknown) => e)) as ApiError;
+    expect(sinDetalles.details).toBeUndefined();
+  });
 });
 
 describe("forma de la petición", () => {

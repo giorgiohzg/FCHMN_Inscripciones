@@ -212,6 +212,9 @@ describe("asignación masiva de nadadores", () => {
     const porId = Object.fromEntries(resumen.results.map((r) => [r.personId, r]));
     expect(porId[a.id]!.status).toBe("assigned");
     expect(porId[b.id]).toMatchObject({ status: "error", error: MENSAJE_FILA_INTERNA });
+    // C-05 fase 3: el fallo inesperado no expone un código; el de dominio conserva el suyo.
+    expect(porId[b.id]!.codigo).toBeUndefined();
+    expect(porId[c.id]!.codigo).toBe("VALIDATION_ERROR");
     expect(porId[c.id]!.status).toBe("error");
     expect(porId[c.id]!.error, "el mensaje de validación del dominio se conserva").toMatch(/membresía activa en "Club Otro"/);
     expect(porId[d.id]!.status, "una fila con problemas no detiene las demás").toBe("assigned");

@@ -466,4 +466,57 @@ export const CHECKS: Check[] = [
       "de datos, decidiendo cuál de los dos se conserva (UPDATE users SET username = (SELECT username FROM persons WHERE id = users.person_id) " +
       "WHERE id='...', o al revés). Recuerde que el elegido es el nombre con el que esa persona o club entran al sistema.",
   },
+  {
+    id: "propuestas-pendientes-duplicadas",
+    title: "Propuestas de incorporación pendientes duplicadas (mismo club y persona)",
+    constraint: "club_swimmers_unique_pending_club_person",
+    // C-05. Es la misma condición que la guarda previa de `20261112000000_c05_incorporaciones`,
+    // que se detiene sin crear nada si encuentra duplicados. Aquí se detectan ANTES de migrar.
+    // Solo identificadores (club, persona y membresías): ni el nombre ni el RUN de la persona,
+    // igual que el mensaje de la guarda. `status::text` hace la comparación independiente del
+    // enumerado, como en 'cuenta-dueno-incoherente'.
+    query: `
+      SELECT cs.club_id, cs.person_id, count(*) AS pendientes,
+             string_agg(cs.id::text, ', ' ORDER BY cs.created_at, cs.id) AS membresias
+        FROM club_swimmers cs
+       WHERE cs.status::text = 'pending'
+       GROUP BY cs.club_id, cs.person_id
+      HAVING count(*) > 1`,
+    remediation:
+      "Deje UNA propuesta pendiente por club y persona: rechace las sobrantes desde la revisión de propuestas de la " +
+      "administración, o por base de datos con los mismos campos que usa el rechazo (UPDATE club_swimmers SET status = 'rejected', " +
+      "reviewed_at = now(), reviewed_by_user_id = '<administrador>' WHERE id IN (...)). Decida cuál se conserva: el sistema no " +
+      "elige ni borra propuestas. La migración 20261112000000_c05_incorporaciones se detiene si quedan duplicadas.",
+  },
+  {
+    id: "membresias-activas-con-inicio-futuro",
+    title: "Membresías activas cuya fecha de inicio es posterior a hoy (America/Santiago)",
+    // C-05 no admite fechas efectivas futuras. Una membresía activa que ya empiece en el futuro no
+    // se podría dar de baja (la fecha de término no puede preceder al inicio ni ser futura) ni
+    // trasladar (conflicto de fechas). NO es una restricción SQL: la regla la aplica el servicio, y
+    // por eso se revisa aquí, antes de migrar, para decisión humana.
+    constraint: "ninguna restricción SQL: regla del servicio de C-05 (sin fechas efectivas futuras)",
+    // Se comparan VALORES DATE (cronológicamente, sin pasar por texto ni depender de DateStyle ni
+    // de la zona horaria de la sesión):
+    //  - desde 20261031000000_fecha_efectiva_membresia, `start_date` es DATE y se toma tal cual;
+    //  - en bases anteriores era TIMESTAMP(3) con el instante en UTC, y se convierte igual que esa
+    //    migración: `(start_date AT TIME ZONE 'UTC') AT TIME ZONE 'America/Santiago'`, a DATE.
+    // Las dos ramas son válidas con cualquiera de los dos tipos (`::date` y `::timestamp` existen
+    // para ambos), así que la consulta se analiza igual en las dos versiones; el CASE elige por el
+    // tipo real de la columna. «Hoy» es el día de Santiago de `now()`, con la zona explícita.
+    // Solo lectura y solo identificadores: ni nombre ni RUN.
+    query: `
+      SELECT cs.id, cs.club_id, cs.person_id
+        FROM club_swimmers cs
+       WHERE cs.status::text = 'active'
+         AND cs.start_date IS NOT NULL
+         AND (CASE WHEN pg_typeof(cs.start_date) = 'date'::regtype
+                   THEN cs.start_date::date
+                   ELSE ((cs.start_date::timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'America/Santiago')::date
+              END) > (now() AT TIME ZONE 'America/Santiago')::date
+       ORDER BY cs.id`,
+    remediation:
+      "Revise cada membresía con la administración y decida su fecha de inicio real (hoy o anterior). El preflight no " +
+      "corrige nada: la corrección es una decisión humana, auditada, sobre los identificadores listados.",
+  },
 ];

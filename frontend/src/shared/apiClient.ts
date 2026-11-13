@@ -125,7 +125,13 @@ export class ApiError extends Error {
     message: string,
     readonly status: number,
     /** Código estructurado del backend, si lo envió (ver `extractApiErrorCode`). Opcional: los usos existentes no lo necesitan. */
-    readonly code?: string
+    readonly code?: string,
+    /**
+     * `details` ESTRUCTURADO del backend, tal como llegó (p. ej. `membresiaVigente` o
+     * `membresias` en los 409 de C-05). Es para decidir con datos, nunca extrayendo
+     * identificadores del texto del mensaje. Quien lo use debe validar su forma.
+     */
+    readonly details?: unknown
   ) {
     super(message);
     this.name = "ApiError";
@@ -155,10 +161,16 @@ export class SesionCambiadaError extends ApiError {
 async function interpretar<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(extractApiErrorMessage(body, `Error ${res.status}`), res.status, extractApiErrorCode(body));
+    throw new ApiError(extractApiErrorMessage(body, `Error ${res.status}`), res.status, extractApiErrorCode(body), detallesDelError(body));
   }
   if (res.status === 204) return undefined as T;
   return res.json();
+}
+
+/** `details` del cuerpo de error, si es un objeto; cualquier otra forma se descarta. */
+function detallesDelError(body: unknown): unknown {
+  const d = (body as { details?: unknown } | null)?.details;
+  return typeof d === "object" && d !== null ? d : undefined;
 }
 
 function construirCabeceras(init: RequestInit, accessToken: string | null): Headers {
@@ -338,7 +350,7 @@ export async function apiFetchArchivo(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(extractApiErrorMessage(body, `Error ${res.status}`), res.status, extractApiErrorCode(body));
+    throw new ApiError(extractApiErrorMessage(body, `Error ${res.status}`), res.status, extractApiErrorCode(body), detallesDelError(body));
   }
 
   const disposition = res.headers.get("Content-Disposition") ?? "";

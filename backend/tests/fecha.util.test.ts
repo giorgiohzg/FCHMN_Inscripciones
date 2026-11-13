@@ -4,6 +4,7 @@ import {
   fechaCalendarioAUtc,
   utcAFechaCalendario,
   esFechaCalendarioValida,
+  diaCalendarioAnterior,
 } from "../src/shared/fecha.util";
 
 /**
@@ -96,5 +97,54 @@ describe("esFechaCalendarioValida", () => {
   it("rechaza otras formas de escribir una fecha", () => {
     expect(esFechaCalendarioValida("30-10-2026")).toBe(false);
     expect(esFechaCalendarioValida("2026-10-30T00:00:00Z")).toBe(false);
+  });
+});
+
+/**
+ * C-05: la membresía anterior termina el día de calendario previo al inicio de la nueva.
+ * Fechas sintéticas.
+ */
+describe("diaCalendarioAnterior", () => {
+  it("resta un día dentro del mismo mes (ejemplo de la regla: del 10 al 9 de marzo)", () => {
+    expect(diaCalendarioAnterior("2026-03-10")).toBe("2026-03-09");
+  });
+
+  it("cruza el cambio de mes, con meses de 31, 30 y 28 días", () => {
+    expect(diaCalendarioAnterior("2026-04-01")).toBe("2026-03-31");
+    expect(diaCalendarioAnterior("2026-05-01")).toBe("2026-04-30");
+    expect(diaCalendarioAnterior("2026-03-01")).toBe("2026-02-28");
+  });
+
+  it("cruza el cambio de año", () => {
+    expect(diaCalendarioAnterior("2027-01-01")).toBe("2026-12-31");
+  });
+
+  it("respeta los años bisiestos, incluidas las reglas de los siglos", () => {
+    expect(diaCalendarioAnterior("2028-03-01")).toBe("2028-02-29");
+    expect(diaCalendarioAnterior("2024-03-01")).toBe("2024-02-29");
+    expect(diaCalendarioAnterior("2000-03-01")).toBe("2000-02-29"); // divisible por 400: bisiesto
+    expect(diaCalendarioAnterior("2100-03-01")).toBe("2100-02-28"); // divisible por 100: no bisiesto
+    expect(diaCalendarioAnterior("2028-02-29")).toBe("2028-02-28");
+  });
+
+  it("no se desplaza en los días de cambio de horario de Santiago", () => {
+    // Cambios de hora en Chile (abril y septiembre): un cálculo por instantes restando 24 h
+    // sobre la hora local podía caer en el mismo día o saltarse uno.
+    expect(diaCalendarioAnterior("2026-04-05")).toBe("2026-04-04");
+    expect(diaCalendarioAnterior("2026-04-06")).toBe("2026-04-05");
+    expect(diaCalendarioAnterior("2026-09-06")).toBe("2026-09-05");
+    expect(diaCalendarioAnterior("2026-09-07")).toBe("2026-09-06");
+  });
+
+  it("devuelve una fecha de calendario válida que vuelve a dar la siguiente", () => {
+    const anterior = diaCalendarioAnterior("2026-03-01");
+    expect(esFechaCalendarioValida(anterior)).toBe(true);
+    expect(fechaCalendarioAUtc(anterior).toISOString()).toBe("2026-02-28T00:00:00.000Z");
+  });
+
+  it("rechaza fechas inexistentes o con otro formato, en vez de normalizarlas", () => {
+    for (const invalida of ["2026-02-30", "2027-02-29", "2026-13-01", "2026-00-10", "10-03-2026", "2026-03-10T00:00:00Z", ""]) {
+      expect(() => diaCalendarioAnterior(invalida), invalida).toThrow(/Fecha de calendario inválida/);
+    }
   });
 });

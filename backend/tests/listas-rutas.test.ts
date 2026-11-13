@@ -6,7 +6,7 @@
  * llamó tras el rechazo» es una afirmación sobre el código real de las rutas y los esquemas.
  * Lo observado con la autenticación real y la base real está en `listas-json.integration.test.ts`.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { appConRutas } from "./helpers/app-rutas";
 import { LIMITES_CUERPO_JSON, LIMITES_LISTAS } from "../src/shared/limites-listas";
@@ -160,6 +160,17 @@ beforeEach(() => {
   sim.espias.clear();
   sim.requireAuth.mockClear();
   apps = new Map();
+});
+
+/**
+ * Cada caso construye sus propias instancias (aislamiento) y aquí se CIERRAN al terminar, también
+ * cuando falló una aserción: `afterEach` corre igual. Un error al cerrar NO se oculta: hace fallar
+ * el caso.
+ */
+afterEach(async () => {
+  const abiertas = [...apps.values()];
+  apps = new Map();
+  await Promise.all(abiertas.map((app) => app.close()));
 });
 
 async function appDe(ruta: RutaConLista) {

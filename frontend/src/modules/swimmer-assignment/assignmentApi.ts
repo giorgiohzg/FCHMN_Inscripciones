@@ -1,4 +1,4 @@
-import { api } from "../../shared/apiClient";
+import { api, ApiError } from "../../shared/apiClient";
 
 export type AssignmentStatus = "pending" | "active" | "rejected" | "ended";
 
@@ -25,6 +25,15 @@ export interface ClubSwimmerAssignment {
    * día ANTERIOR. Se formatea con `formatearFechaCalendario`.
    */
   startDate: string | null;
+  /**
+   * C-05: ÚLTIMO DÍA de pertenencia (fecha de calendario, inclusiva). Nula en una
+   * finalizada = término DESCONOCIDO (membresías anteriores a C-05).
+   */
+  fechaTermino?: string | null;
+  /**
+   * INSTANTE en que se registró la operación que finalizó la membresía. **No** es una
+   * fecha de pertenencia: nunca se muestra como «hasta» ni sustituye a `fechaTermino`.
+   */
   endDate: string | null;
   club: { id: string; name: string };
   person: { id: string; fullName: string; run: string };
@@ -50,6 +59,8 @@ export interface BulkAssignRowResult {
   fullName: string;
   status: "assigned" | "error";
   error?: string;
+  /** C-05: código estable del rechazo de la fila (p. ej. `HISTORIAL_INCOMPLETO`). */
+  codigo?: string;
 }
 export interface BulkAssignSummary {
   totalCount: number;
@@ -57,6 +68,58 @@ export interface BulkAssignSummary {
   errorCount: number;
   results: BulkAssignRowResult[];
 }
+
+/**
+ * C-05: opciones de una ACTIVACIÓN (aprobar, reasignar, asignar directo, masiva, resolver un alta).
+ * Todas se envían EXPRESAMENTE: la interfaz no las rellena por su cuenta.
+ */
+export interface OpcionesDeActivacion {
+  /** `AAAA-MM-DD`, hoy o anterior en Santiago. */
+  fechaEfectiva: string;
+  /** Id de la membresía ACTIVA en otro club que administración confirmó finalizar. */
+  confirmarFinDeMembresiaId?: string;
+  /** Aceptación administrativa EXPLÍCITA de un historial con fechas desconocidas. */
+  aceptarHistorialIncompleto?: boolean;
+}
+
+/** C-05: baja simple. `fechaTermino` es OBLIGATORIA; el servidor ya no elige una. */
+export interface DatosDeBaja {
+  fechaTermino: string;
+  aceptarHistorialIncompleto?: boolean;
+}
+
+/** Códigos estables de C-05 con los que la interfaz decide (nunca por el texto). */
+export const CODIGOS = {
+  confirmacionRequerida: "CONFIRMACION_REQUERIDA",
+  revisarDeNuevo: "REVISAR_DE_NUEVO",
+  historialIncompleto: "HISTORIAL_INCOMPLETO",
+  conflictoDeFechas: "CONFLICTO_DE_FECHAS",
+  fechaFutura: "FECHA_FUTURA",
+  membresiaNoActiva: "MEMBRESIA_NO_ACTIVA",
+  yaPertenece: "YA_PERTENECE",
+  solicitudYaResuelta: "SOLICITUD_YA_RESUELTA",
+} as const;
+
+/** `details.conflictos` de un 409 `CONFLICTO_DE_FECHAS`, validado; vacío si no tiene esa forma. */
+export function conflictosDelError(err: unknown): { membresiaId: string; motivo: string }[] {
+  if (!(err instanceof ApiError)) return [];
+  const lista = (err.details as { conflictos?: unknown } | undefined)?.conflictos;
+  if (!Array.isArray(lista)) return [];
+  return lista.filter(
+    (c): c is { membresiaId: string; motivo: string } =>
+      typeof c === "object" && c !== null && typeof (c as { membresiaId?: unknown }).membresiaId === "string" && typeof (c as { motivo?: unknown }).motivo === "string"
+  );
+}
+
+/** `details.membresias` de un 409 `HISTORIAL_INCOMPLETO`, validado. */
+export function membresiasIncompletasDelError(err: unknown): string[] {
+  if (!(err instanceof ApiError)) return [];
+  const lista = (err.details as { membresias?: unknown } | undefined)?.membresias;
+  return Array.isArray(lista) ? lista.filter((x): x is string => typeof x === "string") : [];
+}
+
+/** Código del error, solo si es un `ApiError` con código. */
+export const codigoDelError = (err: unknown): string | undefined => (err instanceof ApiError ? err.code : undefined);
 
 export function useSwimmerAssignmentApi() {
   return {
@@ -70,22 +133,19 @@ export function useSwimmerAssignmentApi() {
       return api.get<AssignmentListResult>(`/swimmer-assignments?${qs}`);
     },
 
-    propose: (clubId: string, personId: string) =>
-      api.post<ClubSwimmerAssignment>(`/swimmer-assignments`, { clubId, personId }),
+    // `propose(clubId, personId)` se retiró: no tenía llamadas y el servidor ya no acepta
+    // `personId`. La postulación por RUN (fase 4) tendrá su propio cliente.
 
-    /** Asignación directa (solo admin): queda activa de inmediato, sin pasar por "pendiente". */
-    assignDirectly: (clubId: string, personId: string, fechaEfectiva?: string) =>
-      api.post<ClubSwimmerAssignment>(`/swimmer-assignments/direct`, { clubId, personId, fechaEfectiva }),
+    /** Asignación directa (solo admin): queda activa de inmediato. No traslada: rechaza a quien está activo en otro club. */
+    assignDirectly: (clubId: string, personId: string, opciones: Omit<OpcionesDeActivacion, "confirmarFinDeMembresiaId">) =>
+      api.post<ClubSwimmerAssignment>(`/swimmer-assignments/direct`, { clubId, personId, ...opciones }),
 
-    /** `fechaEfectiva` en AAAA-MM-DD; sin ella, el servidor usa hoy en Chile. */
-    approve: (id: string, fechaEfectiva?: string) =>
-      api.post<ClubSwimmerAssignment>(`/swimmer-assignments/${id}/approve`, { fechaEfectiva }),
+    approve: (id: string, opciones: OpcionesDeActivacion) => api.post<ClubSwimmerAssignment>(`/swimmer-assignments/${id}/approve`, opciones),
 
-    reject: (id: string, reason?: string) =>
-      api.post<ClubSwimmerAssignment>(`/swimmer-assignments/${id}/reject`, { reason }),
+    reject: (id: string, reason?: string) => api.post<ClubSwimmerAssignment>(`/swimmer-assignments/${id}/reject`, { reason }),
 
-    end: (id: string) =>
-      api.post<ClubSwimmerAssignment>(`/swimmer-assignments/${id}/end`),
+    /** Baja simple con la fecha de término ELEGIDA (obligatoria). */
+    end: (id: string, datos: DatosDeBaja) => api.post<ClubSwimmerAssignment>(`/swimmer-assignments/${id}/end`, datos),
 
     // ---------- Asignación masiva ----------
 
@@ -100,14 +160,14 @@ export function useSwimmerAssignmentApi() {
      * `fechaEfectiva` (AAAA-MM-DD) se aplica a TODA la tanda: una sola fecha
      * para todas las membresías, no el instante de cada escritura.
      */
-    bulkAssign: (targetClubId: string, personIds: string[], fechaEfectiva?: string) =>
-      api.post<BulkAssignSummary>(`/swimmer-assignments/bulk-assign`, { targetClubId, personIds, fechaEfectiva }),
+    bulkAssign: (targetClubId: string, personIds: string[], opciones: Omit<OpcionesDeActivacion, "confirmarFinDeMembresiaId">) =>
+      api.post<BulkAssignSummary>(`/swimmer-assignments/bulk-assign`, { targetClubId, personIds, ...opciones }),
 
     /** Club actual del nadador (null si no tiene ninguno activo). Solo el club: no la membresía. */
     getCurrentClub: (personId: string) => api.get<ClubActual | null>(`/swimmer-assignments/current-club/${personId}`),
 
-    /** Cambia de club en un solo paso (finaliza el anterior si existía). */
-    reassign: (personId: string, newClubId: string, fechaEfectiva?: string) =>
-      api.post<ClubSwimmerAssignment>(`/swimmer-assignments/reassign/${personId}`, { newClubId, fechaEfectiva }),
+    /** Traslado administrativo: con membresía vigente exige confirmarla (`confirmarFinDeMembresiaId`). */
+    reassign: (personId: string, newClubId: string, opciones: OpcionesDeActivacion) =>
+      api.post<ClubSwimmerAssignment>(`/swimmer-assignments/reassign/${personId}`, { newClubId, ...opciones }),
   };
 }

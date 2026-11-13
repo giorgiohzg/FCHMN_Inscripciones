@@ -811,10 +811,20 @@ cuenta `system`.
 |---|---|---|---|
 | GET | `/swimmer-assignments` | Lista solicitudes (filtro por club/nadador/estado, paginado) | `swimmer-assignment:read` |
 | GET | `/swimmer-assignments/:id` | Detalle de una solicitud | `swimmer-assignment:read` |
-| POST | `/swimmer-assignments` | El club o su personal —delegado, entrenador o representante legal— propone incorporar un nadador (queda `pending`) | `swimmer-assignment:write` |
-| POST | `/swimmer-assignments/:id/approve` | Aprueba y activa la asignación. Cuerpo opcional: `fechaEfectiva` (`AAAA-MM-DD`) | `swimmer-assignment:approve` (solo `admin`) |
+| POST | `/swimmer-assignments` | C-05 (fase 2, pendiente de despliegue): postulación **por RUN** (`{ run }`; ya no acepta `personId`). El club y su personal —delegado, entrenador o representante legal— postulan en su club con cabecera `Idempotency-Key` y cuota de 30 intentos diarios por club; administración indica `clubId`. Queda `pending` | `swimmer-assignment:write` |
+| POST | `/swimmer-assignments/:id/approve` | Aprueba y activa la MISMA propuesta. Cuerpo opcional: `fechaEfectiva` (`AAAA-MM-DD`, no futura), `confirmarFinDeMembresiaId` (traslado) y `aceptarHistorialIncompleto` | `swimmer-assignment:approve` (solo `admin`) |
 | POST | `/swimmer-assignments/:id/reject` | Rechaza la solicitud | `swimmer-assignment:approve` (solo `admin`) |
-| POST | `/swimmer-assignments/:id/end` | Finaliza una membresía activa | `swimmer-assignment:write` + alcance: el `admin`, o el personal **del mismo club** |
+| POST | `/swimmer-assignments/:id/end` | Baja simple de una membresía activa. C-05 (pendiente de despliegue): cuerpo **obligatorio** `fechaTermino` (`AAAA-MM-DD`, último día de pertenencia; no futura ni anterior al inicio; el mismo día del inicio sí). Con inicio desconocido, solo administración puede aceptarlo con `aceptarHistorialIncompleto` | `swimmer-assignment:write` + alcance: el `admin`, o el personal **del mismo club** |
+| GET | `/swimmer-assignments/cuota` | C-05: intentos usados hoy (Santiago) del propio club; administración indica `clubId` | `swimmer-assignment:write` |
+| GET | `/swimmer-assignments/periodos-cambio/vigente` | C-05: si hay un periodo de cambio vigente hoy | `swimmer-assignment:write` |
+| GET | `/swimmer-assignments/periodos-cambio` | C-05: lista los periodos de cambio | `swimmer-assignment:approve` (solo `admin`) |
+| POST | `/swimmer-assignments/periodos-cambio` | C-05: crea un periodo global (`inicio`, `fin` inclusivos de Santiago) | `swimmer-assignment:approve` (solo `admin`) |
+| POST | `/swimmer-assignments/periodos-cambio/:id/cerrar` | C-05: cierre anticipado; no hay edición ni reapertura | `swimmer-assignment:approve` (solo `admin`) |
+| POST | `/swimmer-assignments/altas` | C-05: segundo paso de un RUN no registrado (`intentoId`, `nombres`, `apellidos`); crea la solicitud de alta | `swimmer-assignment:write` (club y su personal) |
+| GET | `/swimmer-assignments/altas` | C-05: solicitudes de alta del propio club; administración ve todas | `swimmer-assignment:write` |
+| GET | `/swimmer-assignments/altas/:id` | C-05: detalle; administración ve además las coincidencias del RUN | `swimmer-assignment:write` + alcance |
+| POST | `/swimmer-assignments/altas/:id/aprobar` | C-05: crea o vincula a la persona y la asigna al club solicitante | `swimmer-assignment:approve` + `persons:write` (solo `admin`) |
+| POST | `/swimmer-assignments/altas/:id/rechazar` | C-05: rechaza la solicitud de alta | `swimmer-assignment:approve` (solo `admin`) |
 
 ### Reglas aplicadas en el Módulo 4
 
@@ -831,6 +841,13 @@ cuenta `system`.
   El permiso habilita la acción; el alcance lo decide `endAssignment` comparando
   el club del actor con el de la membresía, y está cubierto en
   `tests/authorization.integration.test.ts`.
+
+  C-05 (pendiente de despliegue): la **fecha de término la elige quien registra la baja**
+  (`fechaTermino`, obligatoria; puede ser una renuncia comunicada después) y se
+  guarda en `fecha_termino`. El instante real de la operación queda en `end_date`
+  y en la auditoría, sin retroceder. Una baja hasta hoy implica que otra membresía
+  solo puede empezar después de hoy; una retroactiva admite un inicio posterior a
+  ella si el historial lo permite.
 - **La fecha efectiva de la membresía es un dato del negocio, no una marca de auditoría.**
   `club_swimmers.start_date` es una columna **`DATE`** —una fecha de calendario,
   sin hora y sin zona— y responde «desde cuándo pertenece al club». La marca de
@@ -841,7 +858,8 @@ cuenta `system`.
   formato `AAAA-MM-DD`: `/direct`, `/bulk-assign`, `/:id/approve` y
   `/reassign/:personId`. Si no viene, se usa **el día de hoy en Chile**, no el del
   reloj del servidor. En `bulk-assign` la fecha se resuelve **una vez** y se
-  aplica a toda la tanda.
+  aplica a toda la tanda. Con C-05 la fecha efectiva **nunca puede ser futura**
+  (400 `FECHA_FUTURA`) y se contrasta con el historial del nadador.
 
   > **Antes los dos campos recibían `new Date()` en la misma operación**, así que
   > `start_date` era una segunda copia de `reviewed_at`. Medido: una asignación
@@ -855,13 +873,23 @@ cuenta `system`.
   > `shared/fechaCalendario.ts` en el frontend y `shared/fecha.util.ts` en el
   > backend.
   >
-  > **Pendiente:** la pantalla de asignación masiva todavía no tiene el campo de
-  > fecha, así que desde la interfaz se usa el día de hoy. La API sí la acepta.
+  > *Antecedente:* la pantalla de asignación masiva no tenía el campo de fecha y
+  > usaba el día de hoy. Con C-05 la pantalla pide la fecha efectiva
+  > **expresamente** (hoy o anterior) y la envía para toda la tanda.
 - **RB-06 — un nadador activo, un solo club. Es una invariante, no un parámetro.**
-  Si el nadador ya tiene una membresía activa en **otro** club, tanto la
-  aprobación como la asignación directa se **bloquean** con un mensaje explícito:
-  hay que finalizar la anterior primero. No se hace un intercambio automático
-  silencioso, para que el historial quede completo y auditable.
+  Nunca hay dos membresías activas a la vez, y ningún cambio de club ocurre en
+  silencio. Con C-05, si el nadador ya tiene una membresía activa en **otro** club:
+  - **aprobar una propuesta** (y `reassign` o resolver una solicitud de alta) admite
+    un **traslado** solo con la **confirmación expresa** de la membresía vigente que
+    se finalizará (`confirmarFinDeMembresiaId`); sin ella responde 409
+    `CONFIRMACION_REQUERIDA`, y si la vigente cambió, `REVISAR_DE_NUEVO`. La anterior
+    termina el día calendario previo al nuevo inicio, y todo ocurre en una
+    transacción auditada;
+  - **`/direct` y `bulk-assign` NO trasladan**: siguen rechazando a quien está activo
+    en otro club.
+
+  > *Antecedente (antes de C-05):* aprobar y asignar directamente se bloqueaban por
+  > igual y había que finalizar la anterior primero.
 
   Hubo un parámetro `SWIMMER_SINGLE_CLUB_ACTIVE` en `system_settings` y **se
   retiró**: no configuraba nada. La base tiene un índice único parcial
@@ -875,11 +903,19 @@ cuenta `system`.
   deriva de la membresía —`syncSwimmerRole` lo activa al quedar la persona con
   una membresía activa y lo desactiva cuando no le queda ninguna—, así que
   exigirlo antes de proponer sería pedir el efecto para permitir la causa. Lo
-  que sí se exige al proponer: que el club esté `active`, que el alcance del
-  actor sea ese club y que la persona no tenga ya una membresía activa en otro
-  (RB-06).
+  que sí se exige al postular (C-05, por RUN): que el club esté `active` y que el
+  alcance del actor sea ese club. Una persona **sin membresía activa** se puede
+  postular todo el año; una **con membresía activa en otro club**, solo durante un
+  **periodo de cambio habilitado** por administración (fuera de él, 409
+  `MEMBRESIA_ACTIVA_FUERA_DE_PERIODO`). La aprobación del traslado sigue RB-06.
+
+  > *Antecedente (antes de C-05):* se proponía por `personId` y se exigía que la
+  > persona no tuviera una membresía activa en otro club.
 - `getCurrentClubForPerson()` queda expuesto como utilidad reutilizable para módulos futuros (ej. inscripciones, que deben determinar automáticamente el club vigente de un nadador — sección 9 del requerimiento).
-- En el frontend: la ficha de cada club (`ClubFormPage`) incluye una sección de "Plantel de nadadores" donde el club busca y propone nadadores directamente; el administrador aprueba/rechaza desde una pantalla dedicada (`/asignaciones`) accesible desde el menú lateral.
+- En el frontend: la ficha de cada club (`ClubFormPage`) es **de administración** e incluye la sección "Plantel de nadadores", donde administración asigna directamente (con fecha) y registra bajas. **No es la pantalla de postulación del club**: el club y su personal postulan por RUN en `/incorporaciones` (C-05). Administración aprueba o rechaza las propuestas en `/asignaciones`, accesible desde el menú lateral.
+  > *Antecedente:* esta línea decía que en la ficha del club «el club busca y propone»; esa ficha ya era solo de administración.
+- C-05, fase 3 (pendiente de despliegue): las pantallas de administración piden la fecha expresamente (baja con calendario; activaciones con fecha no futura), revisan y confirman los traslados y la aceptación de un historial incompleto, y agregan `/asignaciones/periodos` (periodos de cambio) y `/asignaciones/altas` (solicitudes de alta). Ver `docs/seguridad/PLAN_SEGURIDAD.md`, C-05.
+- C-05, fase 4 (pendiente de despliegue): la cuenta del club y su personal vigente (delegado, entrenador, representante legal) postulan por RUN en `/incorporaciones` (enlace «Incorporaciones» del menú), con el segundo paso de nombre y apellido declarados, la cuota y el periodo informados por el servidor, y la lista de propuestas y solicitudes de alta del propio club. Administración y nadadores no acceden a esa pantalla. Nada de C-05 está publicado ni desplegado.
 
 ## Endpoints del Módulo 5 — Tipos de Pruebas, Categorías y Pruebas
 
@@ -1494,7 +1530,7 @@ Estas rutas son del administrador, que no necesita proponerse nada a sí mismo:
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
 | POST | `/swimmer-assignments/direct` | Asigna un nadador a un club sin pasar por `pending` | `swimmer-assignment:approve` |
-| POST | `/swimmer-assignments/bulk-assign` | Asignación masiva | `swimmer-assignment:approve` |
+| POST | `/swimmer-assignments/bulk-assign` | Asignación masiva. C-05 (pendiente de despliegue): cada fila rechazada trae `codigo` estable (p. ej. `HISTORIAL_INCOMPLETO`) | `swimmer-assignment:approve` |
 | POST | `/swimmer-assignments/reassign/:personId` | Traslada un nadador a otro club | `swimmer-assignment:approve` |
 | GET | `/swimmer-assignments/swimmers-by-club` | Plantel agrupado por club | `swimmer-assignment:approve` |
 | GET | `/swimmer-assignments/current-club/:personId` | Club vigente de un nadador | `swimmer-assignment:read` |
@@ -1513,7 +1549,7 @@ Estas rutas son del administrador, que no necesita proponerse nada a sí mismo:
 
 ## Inventario completo de endpoints
 
-**120 endpoints**, agrupados por el módulo que los declara. Esta lista no está
+**130 endpoints**, agrupados por el módulo que los declara. Esta lista no está
 escrita a mano: `backend/tests/documentacion.test.ts` la compara con las rutas que
 el código declara y **falla si alguna sobra o falta**. Además comprueba que
 ninguna ruta fuera de las públicas se quede sin guardia, y que el permiso exacto
@@ -1635,6 +1671,21 @@ fuera de producción o con `ENABLE_SWAGGER=true`.
 | Método | Ruta |
 |---|---|
 | GET | `/dashboard/stats` |
+
+### `incorporaciones`
+
+| Método | Ruta |
+|---|---|
+| GET | `/swimmer-assignments/cuota` |
+| GET | `/swimmer-assignments/periodos-cambio/vigente` |
+| GET | `/swimmer-assignments/periodos-cambio` |
+| POST | `/swimmer-assignments/periodos-cambio` |
+| POST | `/swimmer-assignments/periodos-cambio/:id/cerrar` |
+| POST | `/swimmer-assignments/altas` |
+| GET | `/swimmer-assignments/altas` |
+| GET | `/swimmer-assignments/altas/:id` |
+| POST | `/swimmer-assignments/altas/:id/aprobar` |
+| POST | `/swimmer-assignments/altas/:id/rechazar` |
 
 ### `meet-import`
 
