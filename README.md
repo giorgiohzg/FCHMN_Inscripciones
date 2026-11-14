@@ -1242,9 +1242,49 @@ Filtros soportados (sección 16): `competitionId` (obligatorio), `clubId`, `comp
   - Se descarta cualquier respuesta tardía de otra combinación de competencia y edad. Aplicar otra edad no altera el estado de las exportaciones en curso.
 - **Privacidad y acceso.** La fecha de nacimiento solo se compara dentro de la base: la respuesta sigue sin RUN, nombres de personas ni fechas de nacimiento. El acceso sigue siendo exclusivo de administración.
 
-### Competencia por defecto y presentación del listado (estado: publicada en el repositorio y validada dentro del alcance descrito; pendiente de despliegue y actualización local)
+### Competencia por defecto y presentación del listado (estado: publicada y desplegada en API y web; entorno local actualizado, dentro del alcance validado)
 
-> **Estado:** **publicada en el repositorio y validada dentro del alcance descrito; pendiente de despliegue y de la actualización del entorno local de ejecución.** Producción sigue con el comportamiento anterior. Los cierres anteriores de Reportes se conservan como antecedentes, más arriba.
+> **Estado:** **publicada y desplegada en API y web; entorno local actualizado, dentro del alcance validado.** El código es el commit `e02ba9466ba3fff4117a9b8d1036bd1b78edb106`. No hubo validación funcional autenticada en producción (ver «Qué no se comprobó»). Los cierres anteriores de Reportes se conservan como antecedentes, más arriba. *Antecedente:* hasta el despliegue, este estado decía «publicada en el repositorio y validada dentro del alcance descrito; pendiente de despliegue y actualización local».
+>
+> **Qué se validó y cómo** (cada capa por separado):
+>
+> - **Pruebas funcionales locales y CI.** Las de «Validación local», más abajo: pruebas automatizadas simuladas de la interfaz (jsdom), unitarias del backend e integración real sobre la base desechable. La CI del código (`43595888561`) terminó en éxito.
+> - **Revisión visual con API simulada.** Frontend real y API simulada con datos sintéticos (ver «Validación local»). Verifica presentación e interacción, no el backend integrado ni ningún ZIP de Team Manager.
+> - **Estado observado en Render.** Ver «Producción».
+> - **Disponibilidad y cabeceras HTTP.** Ver «Disponibilidad»: lecturas sin credenciales.
+>
+> **Producción** (Render, Auto-Deploy Off en ambos servicios; despliegue manual por SHA exacto):
+>
+> | Servicio | Versión | Despliegue | Resultado |
+> |---|---|---|---|
+> | `fchmn-api` | `5780336` → `e02ba94` | [`dep-dbs6aguk1f9s738d0oi0`](https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80/deploys/dep-dbs6aguk1f9s738d0oi0) | Deploy succeeded y Live |
+> | `fchmn-web` | `5780336` → `e02ba94` | [`dep-dbs6bfu1egvs73cv6du0`](https://dashboard.render.com/web/srv-dbh48scs728c73arlf8g/deploys/dep-dbs6bfu1egvs73cv6du0) | Deploy succeeded y Live |
+> | `fchmn-mantenimiento` | sin cambios, `5780336` | no se desplegó | — |
+>
+> Sin migraciones, seed, variables o configuración nuevas, y sin operaciones de respaldo: el tramo `5780336..e02ba94` no cambia esquema, paquetes ni Dockerfiles.
+>
+> **Disponibilidad** (2026-11-14, sin credenciales):
+>
+> - Muestreo de `/api/health` por la web, de 13:41:44Z a 13:47:16Z: **32 de 32 respuestas con 200**, con latencias de aproximadamente 0,28 a 0,74 s. Los intervalos entre muestras no se observaron, así que esto no acredita disponibilidad continua.
+> - La muestra de las 13:42:59Z es la primera que observó la instancia nueva de la API: es una observación, no la hora exacta del reinicio.
+> - Comprobación final:
+>   - `/login`, `/api/health` y `/api/ready` respondieron 200, y `/api/auth/me` sin credenciales, 401;
+>   - las cabeceras de seguridad de `/login` coincidieron con las previas al despliegue, y `/api/health` conservó `Cache-Control: no-store`;
+>   - el paquete del frontend se sirvió correctamente, con los textos nuevos. Eso acredita la entrega del paquete, no una prueba funcional.
+>
+> **Entorno local.**
+> - Imágenes de backend `7ae3e21a5a54` y de frontend `7d1fe37ef07b`, construidas desde la copia limpia de `e02ba94`.
+> - PostgreSQL y su volumen se conservaron, sin migraciones ni seed, y solo se recrearon backend y frontend. Al terminar, los tres servicios quedaron detenidos, como al inicio.
+> - Las imágenes anteriores se conservan para la reversión.
+> - No se afirma identidad binaria con Render.
+>
+> **Qué no se comprobó y qué queda pendiente.**
+> - No hubo validación funcional autenticada ni escrituras de prueba en producción.
+> - Team Manager no se modificó, y no se ejecutaron exportaciones reales ni comparaciones de ZIP. CSV, XLSX y PDF no cambian.
+> - Siguen pendientes:
+>   - la comprobación en Safari de macOS real;
+>   - la configuración de accesos por rol, que está solo diseñada;
+>   - los dos problemas preexistentes de anchura, descritos al final de esta sección.
 
 - **Competencia por defecto en Reportes.** «Listado de inscritos» (el de «Generar reporte») y «Resumen por club» preseleccionan la competencia por defecto con el **mismo criterio** de los paneles de Inscripción y de Relevos (`competenciaPreseleccionada`; ver «Competencia por defecto de los paneles»):
   - Solo si está entre las competencias que esa cuenta puede elegir. Administración conserva su excepción para las ocultas. Si no hay una accesible, el selector queda vacío.
