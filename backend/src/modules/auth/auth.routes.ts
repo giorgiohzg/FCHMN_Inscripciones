@@ -1,7 +1,8 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import * as authService from "./auth.service";
 import { loginSchema, changePasswordSchema } from "./auth.schemas";
 import { requireAuthDuringPasswordChange } from "./rbac.middleware";
+import { verificarFunciones } from "../accesos/accesos.middleware";
 import { UnauthorizedError, ValidationError } from "../../shared/errors";
 import { env, type Env } from "../../shared/env";
 import { origenIpDe, origenParaLimites } from "../../shared/ipCliente";
@@ -26,6 +27,17 @@ import {
  *
  * Consecuencia para el cliente: estas rutas necesitan `credentials: "include"`.
  */
+/**
+ * El cambio VOLUNTARIO de contraseña es configurable por rol (`cuenta.cambio_voluntario_contrasena`).
+ * El OBLIGATORIO no: con `mustChangePassword` vigente esta comprobación ni siquiera lee la
+ * configuración, así que un fallo al cargarla o la función apagada nunca impiden salir de ese
+ * estado. Va antes del servicio: una denegación no cuenta como intento fallido (C-04).
+ */
+async function exigirCambioVoluntarioHabilitado(req: FastifyRequest): Promise<void> {
+  if (req.authState?.mustChangePassword) return;
+  await verificarFunciones(req, ["cuenta.cambio_voluntario_contrasena"]);
+}
+
 export async function authRoutes(app: FastifyInstance, opciones: { config?: Env } = {}) {
   /**
    * La configuración llega desde `buildServer`, no se lee del proceso.
@@ -134,7 +146,7 @@ export async function authRoutes(app: FastifyInstance, opciones: { config?: Env 
    * Devuelve una sesión nueva: el cambio revoca las sesiones anteriores, así
    * que el cliente debe reemplazar sus tokens por los de esta respuesta.
    */
-  app.post("/auth/change-password", { preHandler: [requireAuthDuringPasswordChange] }, async (req, reply) => {
+  app.post("/auth/change-password", { preHandler: [requireAuthDuringPasswordChange, exigirCambioVoluntarioHabilitado] }, async (req, reply) => {
     const parsed = changePasswordSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Datos inválidos", parsed.error.flatten());
 

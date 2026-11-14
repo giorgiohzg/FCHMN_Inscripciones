@@ -158,10 +158,36 @@ export class SesionCambiadaError extends ApiError {
   }
 }
 
+/**
+ * ACCESOS POR ROL: el servidor deniega una función configurada como apagada con 403
+ * `FUNCION_DESHABILITADA`. No es una sesión inválida ni un fallo de CSRF: no se cierra ni se
+ * renueva nada. Solo se avisa a quien mantiene las funciones efectivas (`AccesosProvider`), que
+ * vuelve a pedirlas y oculta el control.
+ */
+export const CODIGO_FUNCION_DESHABILITADA = "FUNCION_DESHABILITADA";
+type OyenteDeFuncionDeshabilitada = () => void;
+const oyentesDeFuncion = new Set<OyenteDeFuncionDeshabilitada>();
+
+export function alDenegarFuncion(oyente: OyenteDeFuncionDeshabilitada): () => void {
+  oyentesDeFuncion.add(oyente);
+  return () => {
+    oyentesDeFuncion.delete(oyente);
+  };
+}
+
+/** ¿Es una denegación por función? Si lo es, avisa a los oyentes. */
+export function avisarSiFuncionDeshabilitada(err: unknown): boolean {
+  if (!(err instanceof ApiError) || err.status !== 403 || err.code !== CODIGO_FUNCION_DESHABILITADA) return false;
+  for (const oyente of [...oyentesDeFuncion]) oyente();
+  return true;
+}
+
 async function interpretar<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(extractApiErrorMessage(body, `Error ${res.status}`), res.status, extractApiErrorCode(body), detallesDelError(body));
+    const error = new ApiError(extractApiErrorMessage(body, `Error ${res.status}`), res.status, extractApiErrorCode(body), detallesDelError(body));
+    avisarSiFuncionDeshabilitada(error);
+    throw error;
   }
   if (res.status === 204) return undefined as T;
   return res.json();

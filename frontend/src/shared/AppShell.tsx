@@ -4,6 +4,7 @@ import logo from "../assets/logo-fchmn.png";
 import { AvisosTerceros } from "./AvisosTerceros";
 import { useAuth } from "../modules/auth/AuthContext";
 import { puedePostularPorSuClub } from "../modules/auth/alcanceDeClub";
+import { useAccesos } from "../modules/auth/AccesosContext";
 import {
   HomeIcon,
   PersonsIcon,
@@ -22,24 +23,35 @@ interface AppShellProps {
   children: ReactNode;
 }
 
-const NAV_ITEMS = [
+interface ItemDeMenu {
+  to: string;
+  label: string;
+  icon: typeof HomeIcon;
+  roles: string[] | undefined;
+  /** Función del catálogo de accesos por rol que, apagada, oculta el ítem. */
+  funcion?: string;
+}
+
+const NAV_ITEMS: ItemDeMenu[] = [
   { to: "/dashboard", label: "Inicio", icon: HomeIcon, roles: undefined },
   { to: "/personas", label: "Personas", icon: PersonsIcon, roles: ["admin"] },
   { to: "/clubes", label: "Clubes", icon: ClubIcon, roles: ["admin"] },
   { to: "/asignaciones", label: "Asignación de Nadadores", icon: SwimmerIcon, roles: ["admin"] },
   { to: "/catalogos", label: "Catálogos", icon: CatalogIcon, roles: ["admin"] },
   { to: "/competencias", label: "Competencias", icon: CompetitionIcon, roles: ["admin"] },
-  { to: "/inscripciones", label: "Inscripciones", icon: RegistrationIcon, roles: undefined },
-  { to: "/inscripciones-relevos", label: "Inscripciones de Relevo", icon: RelayIcon, roles: undefined },
-  { to: "/reportes", label: "Reportes", icon: ReportsIcon, roles: undefined },
+  { to: "/inscripciones", label: "Inscripciones", icon: RegistrationIcon, roles: undefined, funcion: "menu.inscripciones" },
+  { to: "/inscripciones-relevos", label: "Inscripciones de Relevo", icon: RelayIcon, roles: undefined, funcion: "menu.relevos" },
+  { to: "/reportes", label: "Reportes", icon: ReportsIcon, roles: undefined, funcion: "menu.reportes" },
   { to: "/auditoria", label: "Auditoría", icon: AuditIcon, roles: ["admin"] },
+  // Accesos por rol: exclusiva de administración.
+  { to: "/administracion/accesos", label: "Accesos por rol", icon: AuditIcon, roles: ["admin"] },
 ];
 
 /**
  * C-05, fase 4: «Incorporaciones» no depende de un rol fijo sino del alcance de la sesión (club o
  * personal vigente con permiso, nunca administración ni un nadador): misma regla que su ruta.
  */
-const ITEM_INCORPORACIONES = { to: "/incorporaciones", label: "Incorporaciones", icon: SwimmerIcon, roles: undefined };
+const ITEM_INCORPORACIONES: ItemDeMenu = { to: "/incorporaciones", label: "Incorporaciones", icon: SwimmerIcon, roles: undefined, funcion: "menu.incorporaciones" };
 
 const SIDEBAR_COLLAPSED_KEY = "natacion.sidebarCollapsed";
 const SIDEBAR_WIDTH_KEY = "natacion.sidebarWidth";
@@ -61,6 +73,8 @@ function acotarAncho(px: number): number {
 
 export function AppShell({ children }: AppShellProps) {
   const { user, logout, hasRole, hasPermission } = useAuth();
+  // Accesos por rol: solo OCULTA lo que la administración apagó; el servidor lo deniega igual.
+  const { deshabilitada } = useAccesos();
   const items = puedePostularPorSuClub({ user, hasRole, hasPermission })
     ? [...NAV_ITEMS.slice(0, 1), ITEM_INCORPORACIONES, ...NAV_ITEMS.slice(1)]
     : NAV_ITEMS;
@@ -169,10 +183,12 @@ export function AppShell({ children }: AppShellProps) {
         </div>
         <div className="app-header-acciones">
           <span className="app-header-usuario">{user?.username}</span>
-          {/* Para toda cuenta con sesión, administración incluida: la ruta y el flujo son los del cambio obligatorio. */}
-          <Link to="/cambiar-password" className="btn-secondary">
-            Cambiar contraseña
-          </Link>
+          {/* Para toda cuenta con sesión, administración incluida: la ruta y el flujo son los del cambio obligatorio. El voluntario se puede apagar por rol. */}
+          {!deshabilitada("cuenta.cambio_voluntario_contrasena") && (
+            <Link to="/cambiar-password" className="btn-secondary">
+              Cambiar contraseña
+            </Link>
+          )}
           <button className="btn-secondary" onClick={() => logout()}>
             Cerrar sesión
           </button>
@@ -194,7 +210,7 @@ export function AppShell({ children }: AppShellProps) {
           >
             <CollapseIcon />
           </button>
-          {items.filter((item) => !item.roles || item.roles.some((r) => hasRole(r))).map((item) => {
+          {items.filter((item) => (!item.roles || item.roles.some((r) => hasRole(r))) && !(item.funcion && deshabilitada(item.funcion))).map((item) => {
             const ItemIcon = item.icon;
             return (
               <NavLink key={item.to} to={item.to} className={({ isActive }) => (isActive ? "active" : "")} title={collapsed ? item.label : undefined}>

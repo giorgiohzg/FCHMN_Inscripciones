@@ -94,6 +94,7 @@ Arquitectura de 3 capas desacopladas, contenedorizada, con separación estricta 
 frontend/
 ├── src/
 │   ├── modules/
+│   │   ├── accesos/            (pantalla de accesos por rol, solo administración)
 │   │   ├── audit/
 │   │   ├── auth/
 │   │   ├── catalogs/           (tipos de prueba, categorías, distancias, estilos, pruebas)
@@ -113,6 +114,7 @@ frontend/
 backend/
 ├── src/
 │   ├── modules/
+│   │   ├── accesos/            # accesos por rol: catálogo fijo, guarda de función y configuración versionada
 │   │   ├── audit/
 │   │   ├── auth/               # login, refresh, RBAC middleware, CSRF
 │   │   ├── catalogs/

@@ -13,7 +13,7 @@ import { formatEventLabel } from "../../shared/eventLabel";
 import { sortBySessionTypeName } from "../../shared/sessionOrder";
 import { CircledNumber } from "../../shared/CircledNumber";
 import { formatCalendarDate } from "../../shared/calendarDate";
-import { parseSwimTimeInput, formatSwimTimeReadable } from "../../shared/swimTime";
+import { parseSwimTimeInput, formatSwimTimeReadable, formatSwimTimeCentiseconds, AYUDA_ENTRADA_DE_TIEMPO } from "../../shared/swimTime";
 import { useAuth } from "../auth/AuthContext";
 import { useSwimmerAssignmentApi } from "../swimmer-assignment/assignmentApi";
 import { traerTodasLasPaginas } from "../../shared/paginacion";
@@ -22,6 +22,8 @@ import { compararNadadores, coincideConBusqueda, nombreConEdad } from "../../sha
 import { PanelDeHistorial } from "../../shared/PanelDeHistorial";
 import { ZonaDesplazable } from "../../shared/ZonaDesplazable";
 import { COLUMNAS_INSCRIPCIONES, cargadorDeInscripciones } from "../../shared/filasDeHistorial";
+import { useAccesos } from "../auth/AccesosContext";
+import { AvisoEditorCerrado } from "../auth/RequiereFuncion";
 
 const DRAG_ROSTER = "application/x-roster-swimmer";
 
@@ -131,6 +133,17 @@ export function RegistrationWorkspacePage() {
   const soloLectura = cargandoLaVista || cargaDeEstaVista?.fase === "error";
 
   /**
+   * ACCESOS POR ROL: acciones que la administración puede apagar para los roles de esta cuenta.
+   * Solo se OCULTAN los controles; el servidor deniega igual (`FUNCION_DESHABILITADA`). Deshacer
+   * es una cancelación (`POST /registrations/:id/cancel`): sigue a «Cancelar».
+   */
+  const { deshabilitada } = useAccesos();
+  const puedeCrear = !deshabilitada("inscripciones.crear");
+  const puedeEditarTiempo = !deshabilitada("inscripciones.editar_tiempo");
+  const puedeCancelar = !deshabilitada("inscripciones.cancelar");
+  const puedeVerHistorial = !deshabilitada("inscripciones.historial");
+
+  /**
    * INSCRIPCIONES INDIVIDUALES CERRADAS PARA QUIEN NO SEA ADMINISTRADOR.
    *
    * Ocurre en los DOS estados de cierre: `individual_closed` —se alcanzó el
@@ -228,6 +241,26 @@ export function RegistrationWorkspacePage() {
   // Edición del tiempo de una inscripción ya confirmada, directo en la prueba.
   const [editingRegistrationId, setEditingRegistrationId] = useState<string | null>(null);
   const [editTime, setEditTime] = useState("");
+
+  /**
+   * EDITOR ABIERTO Y ACCIÓN APAGADA. Si llegan funciones efectivas nuevas que apagan
+   * `inscripciones.editar_tiempo` con el editor abierto, se cierra en el MISMO dibujo (ajuste de
+   * estado durante el render, sin un dibujo intermedio con el campo operativo): no queda un campo
+   * ni un «Guardar» que aparenten funcionar y se avisa. El servidor deniega igual.
+   *
+   * Si el guardado YA SE ENVIÓ (operación en curso sobre esa inscripción), el aviso no afirma que no
+   * se guardó: el servidor puede confirmarlo, y su respuesta se informa como siempre.
+   */
+  const [avisoEditorCerrado, setAvisoEditorCerrado] = useState<string | null>(null);
+  if (editingRegistrationId !== null && !puedeEditarTiempo) {
+    const guardadoEnviado = operacionEnCurso(`registro:${editingRegistrationId}`);
+    setEditingRegistrationId(null);
+    setAvisoEditorCerrado(
+      guardadoEnviado
+        ? "La edición del tiempo se deshabilitó para su cuenta y se cerró el editor. El guardado ya se había enviado: su resultado se informará cuando responda el servidor."
+        : "La edición del tiempo se deshabilitó para su cuenta: se cerró el editor sin enviar cambios."
+    );
+  }
 
   /**
    * QUÉ VISTA ES LA VIGENTE, para que una operación que empezó en otra pueda
@@ -517,7 +550,7 @@ export function RegistrationWorkspacePage() {
   }
 
   async function handleConfirmTime(competitionEventId: string) {
-    if (soloLectura) return;
+    if (soloLectura || !puedeCrear) return;
     if (!selectedPersonId || !selectedSwimmer) return;
     // La vista donde empieza esta escritura. Se conserva para que la recarga
     // posterior sepa si todavía corresponde.
@@ -546,12 +579,17 @@ export function RegistrationWorkspacePage() {
       const accion: AccionDeshacer = { clave: claveDeLaOperacion, registrationId: created.id, enCurso: false };
       // Solo la entrada de SU vista: una creación atrasada de otra competencia no
       // puede desplazar la acción de la que se está mirando.
-      deshacerPorVista.current.set(claveDeLaOperacion, accion);
-      showToast(`✓ ${selectedSwimmer.fullName} inscrito(a). (Ctrl+Z para deshacer)`, "success", {
-        label: "Deshacer",
-        // El aviso captura SU acción y la vuelve a presentar al pulsarse.
-        onClick: () => void deshacerUltimaInscripcion(accion),
-      });
+      if (puedeCancelar) {
+        deshacerPorVista.current.set(claveDeLaOperacion, accion);
+        showToast(`✓ ${selectedSwimmer.fullName} inscrito(a). (Ctrl+Z para deshacer)`, "success", {
+          label: "Deshacer",
+          // El aviso captura SU acción y la vuelve a presentar al pulsarse.
+          onClick: () => void deshacerUltimaInscripcion(accion),
+        });
+      } else {
+        // «Cancelar» apagado para esta cuenta: sin deshacer (también es una cancelación).
+        showToast(`✓ ${selectedSwimmer.fullName} inscrito(a).`, "success");
+      }
       setPendingTimes((prev) => {
         const next = { ...prev };
         delete next[competitionEventId];
@@ -658,7 +696,7 @@ export function RegistrationWorkspacePage() {
         // El teclado actúa sobre la acción de la vista que se está mirando, y la
         // pasa explícita: nunca sobre la de otra competencia.
         const vigente = deshacerPorVista.current.get(claveVigenteRef.current);
-        if (vigente) {
+        if (vigente && puedeCancelar) {
           e.preventDefault();
           void deshacerUltimaInscripcion(vigente);
         }
@@ -669,7 +707,7 @@ export function RegistrationWorkspacePage() {
   });
 
   async function handleRemove(registration: RegistrationItem) {
-    if (soloLectura) return;
+    if (soloLectura || !puedeCancelar) return;
     const idOperacion = `registro:${registration.id}`;
     const token = reservarOperacion(idOperacion);
     if (token === null) return; // ya hay otra operación sobre esta fila en vuelo
@@ -698,12 +736,14 @@ export function RegistrationWorkspacePage() {
   }
 
   function startEditRegistration(r: RegistrationItem) {
+    setAvisoEditorCerrado(null);
     setEditingRegistrationId(r.id);
-    setEditTime(r.seedTimeCentiseconds !== null ? String(r.seedTimeCentiseconds).padStart(6, "0") : "");
+    // Lo guardado son centésimas TOTALES: se precarga con el formato del campo, no con el número.
+    setEditTime(r.seedTimeCentiseconds !== null ? formatSwimTimeCentiseconds(r.seedTimeCentiseconds) : "");
   }
 
   async function handleSaveEditedTime(id: string) {
-    if (soloLectura) return;
+    if (soloLectura || !puedeEditarTiempo) return;
 
     // El tiempo se valida ANTES de reservar: un formato inválido no es una
     // operación en curso, y bloquear la identidad por ello dejaría el control
@@ -813,10 +853,17 @@ export function RegistrationWorkspacePage() {
             nadador (o arrástrelo sobre una prueba) para seleccionarlo y habilitar el campo de tiempo. Las inscripciones ya confirmadas se pueden
             editar directamente en la prueba.
             {" "}
-            <span title="/ enfoca la búsqueda · Escape cancela la selección · Ctrl+Z deshace la última inscripción">
-              Atajos: <kbd>/</kbd> buscar, <kbd>Esc</kbd> cancelar, <kbd>Ctrl+Z</kbd> deshacer.
-            </span>
+            {puedeCancelar ? (
+              <span title="/ enfoca la búsqueda · Escape cancela la selección · Ctrl+Z deshace la última inscripción">
+                Atajos: <kbd>/</kbd> buscar, <kbd>Esc</kbd> cancelar, <kbd>Ctrl+Z</kbd> deshacer.
+              </span>
+            ) : (
+              <span title="/ enfoca la búsqueda · Escape cancela la selección">
+                Atajos: <kbd>/</kbd> buscar, <kbd>Esc</kbd> cancelar.
+              </span>
+            )}
           </p>
+          {avisoEditorCerrado && <AvisoEditorCerrado mensaje={avisoEditorCerrado} alCerrar={() => setAvisoEditorCerrado(null)} />}
 
           {/* Columnas y desplazamiento con poco espacio: `theme.css` («Panel de Inscripción…») y `ZonaDesplazable`. */}
           <div className="panel-trabajo">
@@ -874,7 +921,7 @@ export function RegistrationWorkspacePage() {
                         const isEligibleTarget = selectedSwimmer?.eligibleEvents.some((e) => e.competitionEventId === ce.id);
                         const isRegisteredTarget = selectedSwimmer?.registeredEventIds.includes(ce.id);
                         const showTimeInput =
-                          Boolean(selectedSwimmer) && isEligibleTarget && !isRegisteredTarget && !individualesBloqueadas;
+                          Boolean(selectedSwimmer) && isEligibleTarget && !isRegisteredTarget && !individualesBloqueadas && puedeCrear;
                         const confirmed = eventRegistrations(ce);
 
                         let borderColor = "var(--brand-gray-100)";
@@ -915,6 +962,7 @@ export function RegistrationWorkspacePage() {
                                   onChange={(e) => setPendingTimes((prev) => ({ ...prev, [ce.id]: e.target.value }))}
                                   onKeyDown={(e) => { if (e.key === "Enter") handleConfirmTime(ce.id); }}
                                   placeholder="mmsscc"
+                                  title={AYUDA_ENTRADA_DE_TIEMPO}
                                   maxLength={6}
                                   style={{ maxWidth: 80, fontSize: "0.78rem" }}
                                 />
@@ -936,9 +984,9 @@ export function RegistrationWorkspacePage() {
                                     <span className="panel-nombre">{nombreConEdad(r.person, r.edadAlCorte)}</span>
                                     {editingRegistrationId === r.id ? (
                                       <span style={{ display: "flex", gap: "0.2rem" }}>
-                                        <input value={editTime} onChange={(e) => setEditTime(e.target.value)} placeholder="mmsscc" maxLength={6} style={{ maxWidth: 65, fontSize: "0.72rem" }} />
-                                        <button className="btn-primary" style={{ padding: "0.05rem 0.3rem", fontSize: "0.68rem" }} onClick={() => handleSaveEditedTime(r.id)} disabled={soloLectura || operacionEnCurso(`registro:${r.id}`)}>✓</button>
-                                        <button className="btn-secondary" style={{ padding: "0.05rem 0.3rem", fontSize: "0.68rem" }} onClick={() => setEditingRegistrationId(null)}>✕</button>
+                                        <input value={editTime} onChange={(e) => setEditTime(e.target.value)} placeholder="mmsscc" title={AYUDA_ENTRADA_DE_TIEMPO} maxLength={6} style={{ maxWidth: 65, fontSize: "0.72rem" }} />
+                                        <button className="btn-primary" style={{ padding: "0.05rem 0.3rem", fontSize: "0.68rem" }} onClick={() => handleSaveEditedTime(r.id)} disabled={soloLectura || operacionEnCurso(`registro:${r.id}`)} aria-label="Guardar tiempo" title="Guardar tiempo">✓</button>
+                                        <button className="btn-secondary" style={{ padding: "0.05rem 0.3rem", fontSize: "0.68rem" }} onClick={() => setEditingRegistrationId(null)} aria-label="Cancelar edición" title="Cancelar edición (no cancela la inscripción)">✕</button>
                                       </span>
                                     ) : (
                                       <span style={{ display: "flex", gap: "0.3rem", alignItems: "center", color: "var(--brand-gray-600)" }}>
@@ -946,8 +994,12 @@ export function RegistrationWorkspacePage() {
                                         {formatSwimTimeReadable(r.seedTimeCentiseconds)}
                                         {!individualesBloqueadas && (
                                           <>
-                                            <button className="btn-secondary" style={{ padding: "0.05rem 0.3rem", fontSize: "0.65rem" }} onClick={() => startEditRegistration(r)} disabled={soloLectura || operacionEnCurso(`registro:${r.id}`)}>Editar</button>
-                                            <button className="btn-danger" style={{ padding: "0.05rem 0.3rem", fontSize: "0.65rem" }} onClick={() => handleRemove(r)} disabled={soloLectura || operacionEnCurso(`registro:${r.id}`)}>×</button>
+                                            {puedeEditarTiempo && (
+                                              <button className="btn-secondary" style={{ padding: "0.05rem 0.3rem", fontSize: "0.65rem" }} onClick={() => startEditRegistration(r)} disabled={soloLectura || operacionEnCurso(`registro:${r.id}`)}>Editar</button>
+                                            )}
+                                            {puedeCancelar && (
+                                              <button className="btn-danger" style={{ padding: "0.05rem 0.3rem", fontSize: "0.65rem" }} onClick={() => handleRemove(r)} disabled={soloLectura || operacionEnCurso(`registro:${r.id}`)}>×</button>
+                                            )}
                                           </>
                                         )}
                                       </span>
@@ -976,7 +1028,7 @@ export function RegistrationWorkspacePage() {
         arriba no es una tabla de consulta —decide qué plazas están ocupadas— y
         mezclar canceladas ahí bloquearía inscripciones legítimas.
       */}
-      {competitionId && (
+      {competitionId && puedeVerHistorial && (
         <PanelDeHistorial
           nombrePlural="inscripciones"
           dependencias={[competitionId, clubId]}

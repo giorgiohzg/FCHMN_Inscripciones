@@ -1,5 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./modules/auth/AuthContext";
+import { AccesosProvider } from "./modules/auth/AccesosContext";
+import { RequiereFuncion, CambioDeContrasenaPermitido } from "./modules/auth/RequiereFuncion";
+import { AccesosPorRolPage } from "./modules/accesos/AccesosPorRolPage";
 import { ToastProvider } from "./shared/ToastProvider";
 import { LoginPage } from "./modules/auth/LoginPage";
 import { ForceChangePasswordPage } from "./modules/auth/ForceChangePasswordPage";
@@ -62,6 +65,7 @@ export function App() {
   return (
     <ToastProvider>
     <AuthProvider>
+    <AccesosProvider>
       <BrowserRouter>
         <Routes>
           {/* El formulario es solo para quien no tiene sesión; con sesión lleva al panel. */}
@@ -72,24 +76,42 @@ export function App() {
 
           {/* Exige sesión, pero no que la contraseña ya esté cambiada. */}
           <Route element={<RequireSession />}>
-            <Route path="/cambiar-password" element={<ForceChangePasswordPage />} />
+            {/* El cambio VOLUNTARIO se puede apagar por rol; el obligatorio, nunca. */}
+            <Route element={<CambioDeContrasenaPermitido />}>
+              <Route path="/cambiar-password" element={<ForceChangePasswordPage />} />
+            </Route>
           </Route>
 
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<DashboardRouter />} />
-            <Route path="/inscripciones" element={<InscripcionesRouter />} />
-            <Route path="/inscripciones/nueva" element={<RegistrationWizardPage />} />
-            <Route path="/inscripciones-relevos" element={<InscripcionesRelevosRouter />} />
-            <Route path="/inscripciones-relevos/nueva" element={<RelayRegistrationWizardPage />} />
-            <Route path="/reportes" element={<ReportsPage />} />
+            {/* Accesos por rol: cada pantalla y su asistente, también por URL directa. */}
+            <Route element={<RequiereFuncion funciones={["menu.inscripciones"]} titulo="Inscripciones" />}>
+              <Route path="/inscripciones" element={<InscripcionesRouter />} />
+            </Route>
+            <Route element={<RequiereFuncion funciones={["menu.inscripciones", "inscripciones.crear"]} titulo="Nueva inscripción" />}>
+              <Route path="/inscripciones/nueva" element={<RegistrationWizardPage />} />
+            </Route>
+            <Route element={<RequiereFuncion funciones={["menu.relevos"]} titulo="Inscripciones de Relevo" />}>
+              <Route path="/inscripciones-relevos" element={<InscripcionesRelevosRouter />} />
+            </Route>
+            <Route element={<RequiereFuncion funciones={["menu.relevos", "relevos.armar"]} titulo="Nuevo relevo" />}>
+              <Route path="/inscripciones-relevos/nueva" element={<RelayRegistrationWizardPage />} />
+            </Route>
+            <Route element={<RequiereFuncion funciones={["menu.reportes"]} titulo="Reportes" />}>
+              <Route path="/reportes" element={<ReportsPage />} />
+            </Route>
             {/* C-05, fase 4: cuenta del club y su personal vigente, en su club. No administración ni nadadores. */}
             <Route element={<SoloPostulacionDelClub />}>
-              <Route path="/incorporaciones" element={<IncorporacionesClubPage />} />
+              <Route element={<RequiereFuncion funciones={["menu.incorporaciones"]} titulo="Incorporaciones" />}>
+                <Route path="/incorporaciones" element={<IncorporacionesClubPage />} />
+              </Route>
             </Route>
           </Route>
 
           <Route element={<ProtectedRoute requiredRole="admin" />}>
             <Route path="/auditoria" element={<AuditLogPage />} />
+            {/* Accesos por rol: exclusiva de administración (la API también lo exige). */}
+            <Route path="/administracion/accesos" element={<AccesosPorRolPage />} />
             {/* Resumen por club: exclusivo de administración (la API también lo exige). */}
             <Route path="/reportes/resumen-por-club" element={<ClubSummaryReportPage />} />
             <Route path="/personas" element={<PersonsListPage />} />
@@ -121,6 +143,7 @@ export function App() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
+    </AccesosProvider>
     </AuthProvider>
     </ToastProvider>
   );

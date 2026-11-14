@@ -6,6 +6,7 @@
  */
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { requireAuth, requirePermission } from "../auth/rbac.middleware";
+import { requireFuncion } from "../accesos/accesos.middleware";
 import { ForbiddenError, ValidationError } from "../../shared/errors";
 import { buildActorContext } from "../../shared/actorContext";
 import { segundoPasoSchema } from "../swimmer-assignment/assignment.schemas";
@@ -33,7 +34,7 @@ export async function incorporacionesRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireAuth);
 
   /** Cuota del día (Santiago): el club ve la suya; administración indica el club. */
-  app.get("/swimmer-assignments/cuota", { preHandler: [requirePermission("swimmer-assignment:write")] }, async (req, reply) => {
+  app.get("/swimmer-assignments/cuota", { preHandler: [requirePermission("swimmer-assignment:write"), requireFuncion("incorporaciones.postular", "incorporaciones.listados")] }, async (req, reply) => {
     const { clubId } = datos(cuotaQuerySchema, req.query);
     const actor = buildActorContext(req);
     let club: string;
@@ -50,7 +51,7 @@ export async function incorporacionesRoutes(app: FastifyInstance) {
   });
 
   /** Si hay un periodo de cambio vigente hoy. Sin datos personales. */
-  app.get("/swimmer-assignments/periodos-cambio/vigente", { preHandler: [requirePermission("swimmer-assignment:write")] }, async (_req, reply) => {
+  app.get("/swimmer-assignments/periodos-cambio/vigente", { preHandler: [requirePermission("swimmer-assignment:write"), requireFuncion("incorporaciones.postular", "incorporaciones.listados")] }, async (_req, reply) => {
     reply.send(await periodos.periodoVigente());
   });
 
@@ -70,16 +71,16 @@ export async function incorporacionesRoutes(app: FastifyInstance) {
   });
 
   // --- Segundo paso y solicitudes de alta ----------------------------------
-  app.post("/swimmer-assignments/altas", { preHandler: [requirePermission("swimmer-assignment:write")] }, async (req, reply) => {
+  app.post("/swimmer-assignments/altas", { preHandler: [requirePermission("swimmer-assignment:write"), requireFuncion("incorporaciones.completar_alta")] }, async (req, reply) => {
     const r = await postulacion.completarAlta(datos(segundoPasoSchema, req.body), buildActorContext(req));
     reply.code(r.http).send(r.cuerpo);
   });
 
-  app.get("/swimmer-assignments/altas", { preHandler: [requirePermission("swimmer-assignment:write")] }, async (req, reply) => {
+  app.get("/swimmer-assignments/altas", { preHandler: [requirePermission("swimmer-assignment:write"), requireFuncion("incorporaciones.listados")] }, async (req, reply) => {
     reply.send(await altas.listarSolicitudes(datos(listarSolicitudesQuerySchema, req.query), buildActorContext(req)));
   });
 
-  app.get("/swimmer-assignments/altas/:id", { preHandler: [requirePermission("swimmer-assignment:write")] }, async (req, reply) => {
+  app.get("/swimmer-assignments/altas/:id", { preHandler: [requirePermission("swimmer-assignment:write"), requireFuncion("incorporaciones.listados")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     reply.send(await altas.obtenerSolicitud(id, buildActorContext(req)));
   });

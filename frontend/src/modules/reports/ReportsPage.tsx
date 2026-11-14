@@ -10,6 +10,8 @@ import { CircledNumber } from "../../shared/CircledNumber";
 import { traerTodasLasPaginas } from "../../shared/paginacion";
 import { competenciaPreseleccionada } from "../../shared/competenciaPredeterminada";
 import { partesDeLineaDelReporte } from "./presentacionReporte";
+import { useAccesos } from "../auth/AccesosContext";
+import { avisarSiFuncionDeshabilitada } from "../../shared/apiClient";
 
 export function ReportsPage() {
   const { user, hasRole, hasPermission } = useAuth();
@@ -17,6 +19,13 @@ export function ReportsPage() {
   const clubsApi = useClubsApi();
   const assignmentApi = useSwimmerAssignmentApi();
   const api = useReportsApi();
+  /**
+   * ACCESOS POR ROL: «Generar reporte» y las exportaciones CSV, Excel y PDF se pueden apagar.
+   * Team Manager NO es configurable: conserva su botón y sus permisos actuales.
+   */
+  const { deshabilitada } = useAccesos();
+  const puedeGenerar = !deshabilitada("reportes.generar");
+  const puedeExportar = !deshabilitada("reportes.exportar");
 
   // Un nadador "puro" (sin club real de delegado/entrenador) ve su propio
   // club de la misma forma que en Inscripciones/Inscripciones de Relevo:
@@ -218,6 +227,8 @@ export function ReportsPage() {
     try {
       await api.downloadExport(filters, format);
     } catch (err) {
+      // Las descargas no pasan por el aviso del cliente JSON: si fue una función apagada, se avisa aquí.
+      avisarSiFuncionDeshabilitada(err);
       setError(err instanceof Error ? err.message : "No se pudo exportar el reporte");
     } finally {
       setExporting(null);
@@ -274,18 +285,24 @@ export function ReportsPage() {
       </div>
 
       <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
-        <button className="btn-primary" onClick={handleGenerate} disabled={!competitionId || loading || cargandoClubes}>
-          {loading ? "Generando..." : "Generar reporte"}
-        </button>
-        <button className="btn-secondary" onClick={() => handleExport("csv")} disabled={!competitionId || exporting !== null || cargandoClubes}>
-          {exporting === "csv" ? "Exportando..." : "Exportar CSV"}
-        </button>
-        <button className="btn-secondary" onClick={() => handleExport("xlsx")} disabled={!competitionId || exporting !== null || cargandoClubes}>
-          {exporting === "xlsx" ? "Exportando..." : "Exportar Excel"}
-        </button>
-        <button className="btn-secondary" onClick={() => handleExport("pdf")} disabled={!competitionId || exporting !== null || cargandoClubes}>
-          {exporting === "pdf" ? "Exportando..." : "Exportar PDF"}
-        </button>
+        {puedeGenerar && (
+          <button className="btn-primary" onClick={handleGenerate} disabled={!competitionId || loading || cargandoClubes}>
+            {loading ? "Generando..." : "Generar reporte"}
+          </button>
+        )}
+        {puedeExportar && (
+          <>
+            <button className="btn-secondary" onClick={() => handleExport("csv")} disabled={!competitionId || exporting !== null || cargandoClubes}>
+              {exporting === "csv" ? "Exportando..." : "Exportar CSV"}
+            </button>
+            <button className="btn-secondary" onClick={() => handleExport("xlsx")} disabled={!competitionId || exporting !== null || cargandoClubes}>
+              {exporting === "xlsx" ? "Exportando..." : "Exportar Excel"}
+            </button>
+            <button className="btn-secondary" onClick={() => handleExport("pdf")} disabled={!competitionId || exporting !== null || cargandoClubes}>
+              {exporting === "pdf" ? "Exportando..." : "Exportar PDF"}
+            </button>
+          </>
+        )}
         {/* Solo muestra u oculta: el servidor aplica el permiso y, para el personal de club, que sea SU club. */}
         {hasPermission("export:team-manager") && (
           <button className="btn-secondary" onClick={handleTeamManagerExport} disabled={!competitionId || exporting !== null || cargandoClubes}>

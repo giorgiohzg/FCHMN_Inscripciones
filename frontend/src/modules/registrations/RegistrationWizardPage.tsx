@@ -9,7 +9,7 @@ import { useSwimmerAssignmentApi } from "../swimmer-assignment/assignmentApi";
 import { formatCalendarDate } from "../../shared/calendarDate";
 import { formatEventLabel } from "../../shared/eventLabel";
 import { formatShortName } from "../../shared/personDisplayName";
-import { parseSwimTimeInput, formatSwimTimeReadable } from "../../shared/swimTime";
+import { parseSwimTimeInput, formatSwimTimeReadable, AYUDA_ENTRADA_DE_TIEMPO } from "../../shared/swimTime";
 import { traerTodasLasPaginas } from "../../shared/paginacion";
 
 interface BatchRowResult {
@@ -255,7 +255,7 @@ export function RegistrationWizardPage() {
           <>
             <label>4. Pruebas disponibles — marque las que desea inscribir e ingrese el tiempo estimado de cada una</label>
             <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "-0.3rem" }}>
-              Formato del tiempo: mmsscc (ej: 012567 = 1 minuto 25,67 segundos). Es opcional para cada prueba.
+              Tiempo: {AYUDA_ENTRADA_DE_TIEMPO} Es opcional para cada prueba.
             </p>
             {personId && competitionId && availableEvents.length === 0 && (
               <p style={{ fontSize: "0.85rem", color: "var(--brand-gray-600)" }}>
@@ -265,7 +265,7 @@ export function RegistrationWizardPage() {
             )}
             {availableEvents.length > 0 && (
               <table className="data-table" style={{ marginTop: "0.5rem" }}>
-                <thead><tr><th></th><th>Prueba</th><th>Categoría</th><th>Fecha / Jornada</th><th>Tiempo estimado (mmsscc)</th></tr></thead>
+                <thead><tr><th></th><th>Prueba</th><th>Categoría</th><th>Fecha / Jornada</th><th>Tiempo estimado</th></tr></thead>
                 <tbody>
                   {availableEvents.map((ev) => (
                     <tr key={ev.competitionEventId}>
@@ -280,6 +280,7 @@ export function RegistrationWizardPage() {
                           value={batchTimes[ev.competitionEventId] ?? ""}
                           onChange={(e) => setBatchTimes((prev) => ({ ...prev, [ev.competitionEventId]: e.target.value }))}
                           placeholder="mmsscc"
+                          title={AYUDA_ENTRADA_DE_TIEMPO}
                           maxLength={6}
                           style={{ maxWidth: 100 }}
                         />
@@ -335,8 +336,8 @@ export function RegistrationWizardPage() {
               </p>
             )}
 
-            <label>Tiempo estimado (opcional) — formato mmsscc</label>
-            <input value={timeInput} onChange={(e) => setTimeInput(e.target.value)} placeholder="012567" maxLength={6} style={{ maxWidth: 120 }} />
+            <label title={AYUDA_ENTRADA_DE_TIEMPO}>Tiempo estimado (opcional) — hasta 6 dígitos, de derecha a izquierda (ej.: 13236 = 1:32,36)</label>
+            <input value={timeInput} onChange={(e) => setTimeInput(e.target.value)} placeholder="13236" title={AYUDA_ENTRADA_DE_TIEMPO} maxLength={6} style={{ maxWidth: 120 }} />
 
             <button className="btn-primary" style={{ marginTop: "1.25rem" }} onClick={handleConfirm} disabled={!competitionEventId || !clubId || loading}>
               {loading ? "Confirmando..." : "Confirmar inscripción"}

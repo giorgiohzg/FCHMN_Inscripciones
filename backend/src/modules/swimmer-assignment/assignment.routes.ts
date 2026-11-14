@@ -13,6 +13,7 @@ import {
   approveAssignmentSchema,
 } from "./assignment.schemas";
 import { requireAuth, requirePermission } from "../auth/rbac.middleware";
+import { requireFuncion } from "../accesos/accesos.middleware";
 import { ValidationError, ForbiddenError } from "../../shared/errors";
 import { buildActorContext, scopedClubId } from "../../shared/actorContext";
 import { LIMITES_CUERPO_JSON } from "../../shared/limites-listas";
@@ -40,13 +41,13 @@ function alcanceDeListado(req: FastifyRequest): string | null | undefined {
 export async function swimmerAssignmentRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireAuth);
 
-  app.get("/swimmer-assignments", { preHandler: [requirePermission("swimmer-assignment:read")] }, async (req, reply) => {
+  app.get("/swimmer-assignments", { preHandler: [requirePermission("swimmer-assignment:read"), requireFuncion("incorporaciones.listados")] }, async (req, reply) => {
     const parsed = assignmentListQuerySchema.safeParse(req.query);
     if (!parsed.success) throw new ValidationError("Parámetros de búsqueda inválidos", parsed.error.flatten());
     reply.send(await assignmentService.listAssignments(parsed.data, alcanceDeListado(req)));
   });
 
-  app.get("/swimmer-assignments/:id", { preHandler: [requirePermission("swimmer-assignment:read")] }, async (req, reply) => {
+  app.get("/swimmer-assignments/:id", { preHandler: [requirePermission("swimmer-assignment:read"), requireFuncion("incorporaciones.listados")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const assignment = await assignmentService.getAssignmentById(id);
 
@@ -131,7 +132,7 @@ export async function swimmerAssignmentRoutes(app: FastifyInstance) {
    * - Administración: RUN y club explícito, sin cuota ni periodo.
    * El cuerpo ya NO acepta `personId` (400).
    */
-  app.post("/swimmer-assignments", { preHandler: [requirePermission("swimmer-assignment:write")] }, async (req, reply) => {
+  app.post("/swimmer-assignments", { preHandler: [requirePermission("swimmer-assignment:write"), requireFuncion("incorporaciones.postular")] }, async (req, reply) => {
     const parsed = postulacionSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Datos de solicitud inválidos", parsed.error.flatten());
 

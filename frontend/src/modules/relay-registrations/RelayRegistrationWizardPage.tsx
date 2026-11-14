@@ -10,7 +10,7 @@ import { formatEventLabel } from "../../shared/eventLabel";
 import { computeAgeClientPreview } from "../../shared/ageClientPreview";
 import { formatCalendarDate } from "../../shared/calendarDate";
 import { relayPositionLabels } from "../../shared/relayOrder";
-import { parseSwimTimeInput, formatSwimTimeReadable } from "../../shared/swimTime";
+import { parseSwimTimeInput, formatSwimTimeReadable, AYUDA_ENTRADA_DE_TIEMPO } from "../../shared/swimTime";
 import { traerTodasLasPaginas } from "../../shared/paginacion";
 
 export function RelayRegistrationWizardPage() {
@@ -239,8 +239,8 @@ export function RelayRegistrationWizardPage() {
           Seleccionados: {selectedIds.length} / 4
         </p>
 
-        <label>5. Tiempo estimado del relevo (opcional) — formato mmsscc</label>
-        <input value={timeInput} onChange={(e) => setTimeInput(e.target.value)} placeholder="012567" maxLength={6} style={{ maxWidth: 120 }} />
+        <label title={AYUDA_ENTRADA_DE_TIEMPO}>5. Tiempo estimado del relevo (opcional) — hasta 6 dígitos, de derecha a izquierda (ej.: 13236 = 1:32,36)</label>
+        <input value={timeInput} onChange={(e) => setTimeInput(e.target.value)} placeholder="13236" title={AYUDA_ENTRADA_DE_TIEMPO} maxLength={6} style={{ maxWidth: 120 }} />
 
         <label>Categoría (calculada automáticamente por la edad combinada del equipo)</label>
         {categoryPreview === null && <p style={{ fontSize: "0.85rem", color: "var(--brand-gray-600)" }}>Seleccione los 4 nadadores para calcularla.</p>}

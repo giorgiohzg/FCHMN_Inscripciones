@@ -80,6 +80,10 @@ model User {
   solicitudesAltaPresentadas SolicitudAltaIncorporacion[] @relation("SolicitudAltaPresentadaPor")
   solicitudesAltaRevisadas   SolicitudAltaIncorporacion[] @relation("SolicitudAltaRevisadaPor")
 
+  // Accesos por rol (ver el bloque al final del esquema).
+  configuracionAccesosActualizada ConfiguracionAccesos[]
+  accesosPorRolActualizados       AccesoPorRol[]
+
   @@map("users")
 }
 
@@ -1257,4 +1261,40 @@ model SolicitudAltaIncorporacion {
   @@index([clubId, estado])
   @@index([estado, creadoEn])
   @@map("solicitudes_alta_incorporacion")
+}
+
+// =============================================================================
+// ACCESOS POR ROL (opción A: solo restringir y restituir los accesos actuales)
+// =============================================================================
+// El catálogo de funciones es FIJO en el código (`src/modules/accesos/catalogo.ts`).
+// Estas tablas solo guardan qué celdas (rol configurable, función) apagó la
+// administración. SIN filas, el comportamiento es exactamente el actual.
+
+/// Fila ÚNICA (id = 1) con la versión de la configuración. La migración la crea con
+/// versión 0 y sin restricciones; cada guardado la incrementa con control optimista.
+model ConfiguracionAccesos {
+  id                   Int       @id
+  version              Int       @default(0)
+  actualizadoPorUserId String?   @map("actualizado_por_user_id")
+  actualizadoEn        DateTime? @map("actualizado_en")
+
+  actualizadoPor User? @relation(fields: [actualizadoPorUserId], references: [id], onDelete: Restrict)
+
+  @@map("configuracion_accesos")
+}
+
+/// Una celda configurada. Solo se guardan las apagadas (`habilitada = false`): restituir
+/// borra la fila. Un CHECK limita `rol` a nadador, delegado y entrenador; que la función
+/// pertenezca al catálogo y aplique al rol lo valida el servicio contra el código.
+model AccesoPorRol {
+  rol                  String   @db.VarChar(20)
+  funcion              String   @db.VarChar(80)
+  habilitada           Boolean
+  actualizadoPorUserId String   @map("actualizado_por_user_id")
+  actualizadoEn        DateTime @default(now()) @map("actualizado_en")
+
+  actualizadoPor User @relation(fields: [actualizadoPorUserId], references: [id], onDelete: Restrict)
+
+  @@id([rol, funcion])
+  @@map("accesos_por_rol")
 }

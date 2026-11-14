@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import * as relayService from "./relay-registrations.service";
 import { createRelayRegistrationSchema, updateRelayRegistrationSchema, relayRegistrationListQuerySchema } from "./relay-registrations.schemas";
 import { requireAuth, requirePermission } from "../auth/rbac.middleware";
+import { requireFuncion, requireFuncionSegun, estadoDeLaConsulta } from "../accesos/accesos.middleware";
 import { ValidationError, ForbiddenError } from "../../shared/errors";
 import { buildActorContext } from "../../shared/actorContext";
 import { LIMITES_CUERPO_JSON } from "../../shared/limites-listas";
@@ -13,6 +14,11 @@ function assertCanOperateOnTeams(actor: ReturnType<typeof buildActorContext>, ac
   }
 }
 
+/** Igual que en inscripciones: lista operativa (`status=confirmed`) o historial. */
+const listaOHistorialDeRelevos = requireFuncionSegun(["menu.relevos", "relevos.historial"], (req) =>
+  estadoDeLaConsulta(req) === "confirmed" ? ["menu.relevos"] : ["relevos.historial"]
+);
+
 export async function relayRegistrationsRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireAuth);
 
@@ -22,13 +28,13 @@ export async function relayRegistrationsRoutes(app: FastifyInstance) {
   // (`GET /registrations/club-swimmers` y `GET /competitions/:id/enabled-events`)
   // — no se duplican aquí.
 
-  app.get("/relay-registrations", { preHandler: [requirePermission("registrations:read")] }, async (req, reply) => {
+  app.get("/relay-registrations", { preHandler: [requirePermission("registrations:read"), listaOHistorialDeRelevos] }, async (req, reply) => {
     const parsed = relayRegistrationListQuerySchema.safeParse(req.query);
     if (!parsed.success) throw new ValidationError("Parámetros inválidos", parsed.error.flatten());
     reply.send(await relayService.listRelayRegistrations(parsed.data, buildActorContext(req)));
   });
 
-  app.post("/relay-registrations", { bodyLimit: LIMITES_CUERPO_JSON.relevos, preHandler: [requirePermission("registrations:write")] }, async (req, reply) => {
+  app.post("/relay-registrations", { bodyLimit: LIMITES_CUERPO_JSON.relevos, preHandler: [requirePermission("registrations:write"), requireFuncion("relevos.armar")] }, async (req, reply) => {
     const actor = buildActorContext(req);
     assertCanOperateOnTeams(actor, "inscribir equipos");
     const parsed = createRelayRegistrationSchema.safeParse(req.body);
@@ -37,14 +43,14 @@ export async function relayRegistrationsRoutes(app: FastifyInstance) {
     reply.code(201).send(relay);
   });
 
-  app.post("/relay-registrations/:id/cancel", { preHandler: [requirePermission("registrations:write")] }, async (req, reply) => {
+  app.post("/relay-registrations/:id/cancel", { preHandler: [requirePermission("registrations:write"), requireFuncion("relevos.cancelar")] }, async (req, reply) => {
     const actor = buildActorContext(req);
     assertCanOperateOnTeams(actor, "cancelarlos");
     const { id } = req.params as { id: string };
     reply.send(await relayService.cancelRelayRegistration(id, actor));
   });
 
-  app.put("/relay-registrations/:id", { bodyLimit: LIMITES_CUERPO_JSON.relevos, preHandler: [requirePermission("registrations:write")] }, async (req, reply) => {
+  app.put("/relay-registrations/:id", { bodyLimit: LIMITES_CUERPO_JSON.relevos, preHandler: [requirePermission("registrations:write"), requireFuncion("relevos.editar")] }, async (req, reply) => {
     const actor = buildActorContext(req);
     assertCanOperateOnTeams(actor, "editarlos");
     const { id } = req.params as { id: string };

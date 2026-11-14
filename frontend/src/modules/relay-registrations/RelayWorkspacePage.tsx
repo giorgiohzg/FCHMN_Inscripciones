@@ -11,7 +11,7 @@ import { sortBySessionTypeName } from "../../shared/sessionOrder";
 import { CircledNumber } from "../../shared/CircledNumber";
 import { relayPositionLabels } from "../../shared/relayOrder";
 import { computeAgeClientPreview } from "../../shared/ageClientPreview";
-import { parseSwimTimeInput, formatSwimTimeReadable } from "../../shared/swimTime";
+import { parseSwimTimeInput, formatSwimTimeReadable, formatSwimTimeCentiseconds, AYUDA_ENTRADA_DE_TIEMPO } from "../../shared/swimTime";
 import { useAuth } from "../auth/AuthContext";
 import { useSwimmerAssignmentApi } from "../swimmer-assignment/assignmentApi";
 import { traerTodasLasPaginas } from "../../shared/paginacion";
@@ -20,6 +20,8 @@ import { compararNadadores, coincideConBusqueda, nombreConEdad } from "../../sha
 import { PanelDeHistorial } from "../../shared/PanelDeHistorial";
 import { ZonaDesplazable } from "../../shared/ZonaDesplazable";
 import { COLUMNAS_RELEVOS, cargadorDeRelevos } from "../../shared/filasDeHistorial";
+import { useAccesos } from "../auth/AccesosContext";
+import { AvisoEditorCerrado } from "../auth/RequiereFuncion";
 
 const DRAG_ROSTER = "application/x-roster-swimmer";
 const DRAG_SLOT = "application/x-slot-index";
@@ -99,15 +101,54 @@ export function RelayWorkspacePage() {
   /** Mientras la fotografía no esté completa, no se arma ni se cancela nada. */
   const soloLectura = cargandoLaVista || cargaDeEstaVista?.fase === "error";
 
+  /**
+   * ACCESOS POR ROL: acciones que la administración puede apagar. Solo se OCULTAN o desactivan
+   * los controles; el servidor deniega igual (`FUNCION_DESHABILITADA`).
+   */
+  const { deshabilitada } = useAccesos();
+  const puedeArmar = !deshabilitada("relevos.armar");
+  const puedeEditarEquipo = !deshabilitada("relevos.editar");
+  const puedeCancelarEquipo = !deshabilitada("relevos.cancelar");
+  const puedeVerHistorial = !deshabilitada("relevos.historial");
+
   const [activeEventId, setActiveEventId] = useState("");
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null); // null = armando equipo nuevo
   const [slots, setSlots] = useState<string[]>(["", "", "", ""]); // 4 personId ordenados
   const [timeInput, setTimeInput] = useState("");
   const [search, setSearch] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  /**
+   * CONSTRUCTOR ABIERTO Y ACCIÓN APAGADA. El constructor sirve a dos acciones independientes:
+   * armar un equipo nuevo (`relevos.armar`) y editar uno existente (`relevos.editar`). Si llegan
+   * funciones efectivas nuevas que apagan la acción del constructor abierto, se cierra en el MISMO
+   * dibujo (ajuste de estado durante el render): no quedan puestos, tiempo ni «Confirmar» que
+   * aparenten funcionar. Se avisa solo si había algo en curso; cerrar el constructor vacío que
+   * queda tras guardar una edición no es una deshabilitación. Si el guardado YA SE ENVIÓ
+   * (`saving`), el aviso no afirma que no se guardó: el servidor puede confirmarlo y su respuesta
+   * se informa como siempre.
+   */
+  const [avisoEditorCerrado, setAvisoEditorCerrado] = useState<string | null>(null);
+  const constructorPermitido = editingTeamId ? puedeEditarEquipo : puedeArmar;
+  if (activeEventId && !constructorPermitido) {
+    const habiaAlgoEnCurso = editingTeamId !== null || slots.some(Boolean) || timeInput.trim() !== "";
+    setActiveEventId("");
+    setEditingTeamId(null);
+    setSlots(["", "", "", ""]);
+    setTimeInput("");
+    if (habiaAlgoEnCurso) {
+      const accion = editingTeamId ? "La edición de equipos de relevo" : "El armado de equipos de relevo";
+      const editor = editingTeamId ? "el editor" : "el constructor";
+      setAvisoEditorCerrado(
+        saving
+          ? `${accion} se deshabilitó para su cuenta y se cerró ${editor}. El guardado ya se había enviado: su resultado se informará cuando responda el servidor.`
+          : `${accion} se deshabilitó para su cuenta: se cerró ${editor} sin enviar cambios.`
+      );
+    }
+  }
 
   const [draggingRosterId, setDraggingRosterId] = useState<string | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
-  const [saving, setSaving] = useState(false);
   /**
    * QUÉ VISTA ES LA VIGENTE, para que una operación que empezó en otra pueda
    * darse cuenta. Se registra en un efecto y se consulta en el momento de actuar,
@@ -332,6 +373,7 @@ export function RelayWorkspacePage() {
   }
 
   function selectEvent(ce: EnabledCompetitionEvent) {
+    setAvisoEditorCerrado(null);
     setActiveEventId((cur) => (cur === ce.id ? "" : ce.id));
     resetBuilder();
   }
@@ -356,11 +398,14 @@ export function RelayWorkspacePage() {
         e.competitionSession.sessionType.name === t.competitionEvent.competitionSession.sessionType.name &&
         e.competitionSession.competitionDate.date === t.competitionEvent.competitionSession.competitionDate.date
     );
+    setAvisoEditorCerrado(null);
     if (matched) setActiveEventId(matched.id);
     setEditingTeamId(t.id);
     const ordered = t.members.slice().sort((a, b) => a.orderPosition - b.orderPosition).map((m) => m.person.id);
     setSlots([ordered[0] ?? "", ordered[1] ?? "", ordered[2] ?? "", ordered[3] ?? ""]);
-    setTimeInput(t.seedTimeCentiseconds ? String(t.seedTimeCentiseconds).padStart(6, "0") : "");
+    // Lo guardado son centésimas TOTALES: se precarga con el formato del campo, no con el número.
+    // (Se conserva la condición de siempre: un tiempo guardado 0 se muestra vacío.)
+    setTimeInput(t.seedTimeCentiseconds ? formatSwimTimeCentiseconds(t.seedTimeCentiseconds) : "");
   }
 
   function placeInSlot(index: number, personId: string) {
@@ -429,6 +474,7 @@ export function RelayWorkspacePage() {
 
   async function handleSaveTeam() {
     if (soloLectura) return;
+    if (editingTeamId ? !puedeEditarEquipo : !puedeArmar) return;
     if (!activeEvent || filledCount !== 4) return;
     // La vista donde empieza esta escritura, conservada para la recarga posterior.
     const claveDeLaOperacion = claveDeLaVista;
@@ -457,7 +503,7 @@ export function RelayWorkspacePage() {
   }
 
   async function handleDeleteTeam(t: RelayRegistrationItem) {
-    if (soloLectura) return;
+    if (soloLectura || !puedeCancelarEquipo) return;
     if (!window.confirm(`¿Cancelar el equipo de relevo de ${t.club.name}?`)) return;
     const claveDeLaOperacion = claveDeLaVista;
     try {
@@ -535,6 +581,7 @@ export function RelayWorkspacePage() {
             Cada columna es un día de la competencia, con sus pruebas de relevo agrupadas por jornada. Haga clic en una prueba para armar o editar su
             equipo — arrastre nadadores desde la izquierda hacia los 4 puestos.
           </p>
+          {avisoEditorCerrado && <AvisoEditorCerrado mensaje={avisoEditorCerrado} alCerrar={() => setAvisoEditorCerrado(null)} />}
 
           {/* Columnas y desplazamiento con poco espacio: `theme.css` («Panel de Inscripción…») y `ZonaDesplazable`. */}
           <div className="panel-trabajo">
@@ -613,9 +660,9 @@ export function RelayWorkspacePage() {
                                  * el foco llegara por otra vía, y
                                  * `aria-disabled` anuncia el estado.
                                  */
-                                onClick={() => { if (!isPureSwimmer && !relevosBloqueados) selectEvent(ce); }}
+                                onClick={() => { if (!isPureSwimmer && !relevosBloqueados && puedeArmar) selectEvent(ce); }}
                                 onKeyDown={(e) => {
-                                  if (isPureSwimmer || relevosBloqueados) return;
+                                  if (isPureSwimmer || relevosBloqueados || !puedeArmar) return;
                                   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectEvent(ce); }
                                 }}
                                 {...(isPureSwimmer || relevosBloqueados ? { "aria-disabled": true } : {})}
@@ -640,7 +687,7 @@ export function RelayWorkspacePage() {
                                   <div style={{ marginTop: "0.4rem", borderTop: "1px solid var(--brand-gray-100)", paddingTop: "0.4rem" }} onClick={(e) => e.stopPropagation()}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                       <strong style={{ fontSize: "0.75rem" }}>{editingTeamId ? "Editando equipo" : "Nuevo equipo"}</strong>
-                                      {editingTeamId && <button className="btn-secondary" style={{ padding: "0.05rem 0.3rem", fontSize: "0.65rem" }} onClick={resetBuilder}>Nuevo</button>}
+                                      {editingTeamId && puedeArmar && <button className="btn-secondary" style={{ padding: "0.05rem 0.3rem", fontSize: "0.65rem" }} onClick={resetBuilder}>Nuevo</button>}
                                     </div>
                                     {editingTeamId && (
                                       <p style={{ fontSize: "0.68rem", color: "var(--brand-gray-600)", margin: "0.15rem 0 0.3rem" }}>
@@ -698,8 +745,8 @@ export function RelayWorkspacePage() {
                                     </div>
 
                                     <div style={{ marginTop: "0.4rem" }}>
-                                      <label style={{ fontSize: "0.7rem" }}>Tiempo estimado (opcional) — mmsscc</label>
-                                      <input value={timeInput} onChange={(e) => setTimeInput(e.target.value)} placeholder="012567" maxLength={6} style={{ maxWidth: 100, fontSize: "0.78rem" }} />
+                                      <label style={{ fontSize: "0.7rem" }} title={AYUDA_ENTRADA_DE_TIEMPO}>Tiempo estimado (opcional) — hasta 6 dígitos, de derecha a izquierda</label>
+                                      <input value={timeInput} onChange={(e) => setTimeInput(e.target.value)} placeholder="13236" title={AYUDA_ENTRADA_DE_TIEMPO} maxLength={6} style={{ maxWidth: 100, fontSize: "0.78rem" }} />
                                     </div>
 
                                     <div style={{ fontSize: "0.72rem", marginTop: "0.3rem" }}>
@@ -716,7 +763,7 @@ export function RelayWorkspacePage() {
                                       className="btn-primary"
                                       style={{ marginTop: "0.4rem", padding: "0.2rem 0.5rem", fontSize: "0.75rem" }}
                                       onClick={handleSaveTeam}
-                                      disabled={soloLectura || filledCount !== 4 || saving || !combinedAgePreview || "error" in (combinedAgePreview ?? {})}
+                                      disabled={soloLectura || (editingTeamId ? !puedeEditarEquipo : !puedeArmar) || filledCount !== 4 || saving || !combinedAgePreview || "error" in (combinedAgePreview ?? {})}
                                     >
                                       {saving ? "Guardando..." : editingTeamId ? "Guardar cambios" : "Confirmar equipo"}
                                     </button>
@@ -732,8 +779,12 @@ export function RelayWorkspacePage() {
                                           <span style={{ color: "var(--brand-gray-600)" }}>{t.category.name} — {formatSwimTimeReadable(t.seedTimeCentiseconds)}</span>
                                           {!isPureSwimmer && !relevosBloqueados && (
                                             <span style={{ display: "flex", gap: "0.2rem" }}>
-                                              <button className="btn-secondary" style={{ padding: "0.05rem 0.3rem", fontSize: "0.65rem" }} onClick={() => loadTeamForEdit(t)} disabled={soloLectura}>Editar</button>
-                                              <button className="btn-danger" style={{ padding: "0.05rem 0.3rem", fontSize: "0.65rem" }} onClick={() => handleDeleteTeam(t)} disabled={soloLectura}>×</button>
+                                              {puedeEditarEquipo && (
+                                                <button className="btn-secondary" style={{ padding: "0.05rem 0.3rem", fontSize: "0.65rem" }} onClick={() => loadTeamForEdit(t)} disabled={soloLectura}>Editar</button>
+                                              )}
+                                              {puedeCancelarEquipo && (
+                                                <button className="btn-danger" style={{ padding: "0.05rem 0.3rem", fontSize: "0.65rem" }} onClick={() => handleDeleteTeam(t)} disabled={soloLectura}>×</button>
+                                              )}
                                             </span>
                                           )}
                                         </div>
@@ -759,7 +810,7 @@ export function RelayWorkspacePage() {
         </>
       )}
       {/* Historial de relevos, incluidos los CANCELADOS: ver la nota del panel. */}
-      {competitionId && (
+      {competitionId && puedeVerHistorial && (
         <PanelDeHistorial
           nombrePlural="equipos de relevo"
           dependencias={[competitionId, clubId]}

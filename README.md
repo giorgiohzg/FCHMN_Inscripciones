@@ -1005,7 +1005,7 @@ Administración puede marcar en **Competencias** (columna «Por defecto») **una
 
 #### Estado de estas mejoras (competencia por defecto, alta con club, presentación y desplazamiento)
 
-**Publicadas, migradas y desplegadas en producción; entorno local actualizado, dentro del alcance validado.** Se desplegaron el 2026-11-14 junto con C-05 y el preflight empaquetado, desde `5780336338febd668615d3e4a66219a13f6cc12a` (CI `43550942111`, aprobada para ese SHA). La migración `20261114000000_competencia_predeterminada` se aplicó, sin seed, en producción y en la base local de trabajo, y la API (`dep-dbrtl3mi0phs73bgp91g`) y la web (`dep-dbrtm8rl550s73erpcv0`) quedaron Live en ese SHA. El registro del despliegue (respaldo, ejecuciones del mantenimiento, muestreo HTTP, entorno local y límites) está en `docs/seguridad/PLAN_SEGURIDAD.md`, C-05, «Despliegue en producción y entorno local». No hubo validación funcional autenticada ni escrituras de prueba en producción: lo observado allí acredita disponibilidad y cabeceras, no el funcionamiento con sesión. La configuración de accesos por rol sigue **solo diseñada** (`docs/internas/14_Diseno_Accesos_Por_Rol.md`), pendiente de decidir si podrá conceder atribuciones nuevas.
+**Publicadas, migradas y desplegadas en producción; entorno local actualizado, dentro del alcance validado.** Se desplegaron el 2026-11-14 junto con C-05 y el preflight empaquetado, desde `5780336338febd668615d3e4a66219a13f6cc12a` (CI `43550942111`, aprobada para ese SHA). La migración `20261114000000_competencia_predeterminada` se aplicó, sin seed, en producción y en la base local de trabajo, y la API (`dep-dbrtl3mi0phs73bgp91g`) y la web (`dep-dbrtm8rl550s73erpcv0`) quedaron Live en ese SHA. El registro del despliegue (respaldo, ejecuciones del mantenimiento, muestreo HTTP, entorno local y límites) está en `docs/seguridad/PLAN_SEGURIDAD.md`, C-05, «Despliegue en producción y entorno local». No hubo validación funcional autenticada ni escrituras de prueba en producción: lo observado allí acredita disponibilidad y cabeceras, no el funcionamiento con sesión. La configuración de accesos por rol sigue **solo diseñada** (`docs/internas/14_Diseno_Accesos_Por_Rol.md`), pendiente de decidir si podrá conceder atribuciones nuevas. *Estado posterior:* se decidió la opción A (solo restringir y restituir) y quedó publicada en el repositorio, pendiente de migración y despliegue; ver «Accesos por rol».
 
 *Antecedente:* hasta ese despliegue figuraban publicadas en el repositorio y pendientes de despliegue, con la migración aplicada solo a la base desechable de pruebas.
 
@@ -1283,7 +1283,7 @@ Filtros soportados (sección 16): `competitionId` (obligatorio), `clubId`, `comp
 > - Team Manager no se modificó, y no se ejecutaron exportaciones reales ni comparaciones de ZIP. CSV, XLSX y PDF no cambian.
 > - Siguen pendientes:
 >   - la comprobación en Safari de macOS real;
->   - la configuración de accesos por rol, que está solo diseñada;
+>   - la configuración de accesos por rol, que está solo diseñada (al cierre de este despliegue; después quedó publicada en el repositorio, pendiente de migración y despliegue: ver «Accesos por rol»);
 >   - los dos problemas preexistentes de anchura, descritos al final de esta sección.
 
 - **Competencia por defecto en Reportes.** «Listado de inscritos» (el de «Generar reporte») y «Resumen por club» preseleccionan la competencia por defecto con el **mismo criterio** de los paneles de Inscripción y de Relevos (`competenciaPreseleccionada`; ver «Competencia por defecto de los paneles»):
@@ -1680,9 +1680,98 @@ Estas rutas son del administrador, que no necesita proponerse nada a sí mismo:
 | PUT | `/competition-events/reorder` | Reordena las pruebas del programa | `competitions:write` |
 | PUT | `/catalogs/distances/:id`, `/catalogs/strokes/:id` | Edición de los catálogos base | `catalogs:write` |
 
+### Entrada del tiempo estimado (estado: publicada en el repositorio y validada localmente; pendiente de migración, despliegue y actualización del entorno local)
+
+> **Estado:** publicada en el repositorio y validada localmente; pendiente de migración, despliegue y actualización del entorno local. Forma parte de la misma entrega que «Accesos por rol»; su validación final conjunta está allí. *Antecedente:* hasta esta publicación, el estado decía «cambio local: sin publicar ni desplegar».
+
+En los paneles de Inscripción y de Relevos y en sus asistentes, el tiempo estimado se escribe con **1 a 6 dígitos, sin separadores, leídos de derecha a izquierda**: los dos últimos son centésimas, los dos anteriores segundos y los restantes minutos (hasta 99); lo que falta a la izquierda vale cero. No hace falta completar seis dígitos ni escribir ceros iniciales: `13236` = 1:32,36; `2356` = 0:23,56; `023600` = 2:36,00; `10000` = 1:00,00; `1` = 0:00,01. Se mantienen las demás reglas: segundos entre 00 y 59 (no se convierten en minutos), el tiempo cero se rechaza, no se admiten signos, decimales, exponentes ni separadores, y se ignoran los espacios exteriores. El campo vacío conserva su significado en cada operación. La interfaz envía **centésimas totales** al backend, que no cambia (`frontend/src/shared/swimTime.ts`).
+
+Al **editar**, el campo se precarga con el tiempo guardado convertido al formato del campo (`formatSwimTimeCentiseconds`): un tiempo guardado de 20000 centésimas (3:20,00) aparece como `032000`, y guardar sin cambios envía exactamente 20000. Antes se precargaba el número guardado rellenado con ceros (`020000`, que se lee 2:00,00), así que guardar sin tocarlo podía cambiar los tiempos de un minuto o más. No se corrigieron registros existentes: no se sabe cuáles pudieron verse afectados.
+
+**Limitaciones.** El backend conserva su propio `swimTime.util.ts` con 6 dígitos fijos (ninguna ruta lo usa para leer entradas: recibe centésimas). Un tiempo guardado igual a 0 conserva el comportamiento anterior (en Relevos se precarga vacío; en Inscripción, `000000`, que se rechaza). Los tiempos de 100 minutos o más y el ancho del campo de edición de Inscripción (65 px) no cambiaron. Los asistentes no se revisaron en pantalla: sus ayudas se comprobaron por código y tipos.
+
+### Accesos por rol (estado: publicada en el repositorio y validada localmente; pendiente de migración, despliegue y actualización del entorno local)
+
+> **Estado:** **publicada en el repositorio y validada localmente**, dentro del alcance descrito abajo; **pendiente de migración, despliegue y actualización del entorno local**. Producción sigue sin esta pantalla, sin las guardas de función y sin la migración `20261115000000_accesos_por_rol`. Diseño completo, catálogo y correspondencia con rutas en `docs/internas/14_Diseno_Accesos_Por_Rol.md`. *Antecedente:* hasta esta publicación, el estado decía «implementada y validada en local; sin publicar ni desplegar».
+
+Pantalla exclusiva de administración (`/administracion/accesos`, menú «Accesos por rol») para **restringir y restituir** los menús y acciones que hoy tienen el **nadador**, el **delegado** y el **entrenador** (opción A, confirmada): la configuración **nunca concede** funciones nuevas.
+
+- **Reglas.**
+  - Una función se permite si **cualquiera** de los roles efectivos de la persona la permite.
+  - **Administración** conserva siempre el acceso completo, aunque tenga otros roles.
+  - La **cuenta de club** y el **representante legal** conservan sus atribuciones actuales, sin configuración.
+  - Se evalúa sobre los roles **efectivos** de cada solicitud, que el servidor recarga de la base y ya vienen reducidos si el club no está operativo; nunca sobre la copia del JWT.
+  - Las asignaciones de roles y las membresías no se modifican.
+- **Catálogo fijo** (`backend/src/modules/accesos/catalogo.ts`), con identificadores estables, menú, pantallas, rutas, permisos y roles en que aplica. Comprende los menús Inscripciones, Inscripciones de Relevo, Reportes e Incorporaciones con sus acciones independientes (inscribir, editar el tiempo, cancelar y deshacer, historial; armar, editar, cancelar e historial de relevos; generar y exportar CSV, Excel o PDF; postular, completar el alta y listados), y el **cambio voluntario de contraseña**. Donde un rol no tiene hoy la función, la pantalla muestra **«No aplica»**.
+- **Siempre disponibles:** cerrar sesión, el cambio **obligatorio** de contraseña, el inicio y la restauración y renovación de la sesión.
+- **Servidor.**
+  - Cada ruta del catálogo lleva una guarda de función **además** de su permiso, sus guardas de rol y su alcance, nunca en su lugar.
+  - Las rutas compartidas se permiten si **alguna** de sus funciones lo está: `enabled-events` y `club-swimmers` sirven a Inscripciones y a Relevos; la cuota y el periodo vigente, a postular y a los listados.
+  - `GET /registrations` y `GET /relay-registrations` son la lista operativa con `status=confirmed` y el historial en los demás casos.
+  - Una función apagada responde **403 `FUNCION_DESHABILITADA`**.
+  - Si la configuración no se puede leer, responde **503 `CONFIGURACION_ACCESOS_NO_DISPONIBLE`**: nunca concede.
+  - Ninguno de los dos cierra la sesión.
+- **Persistencia** (migración aditiva `20261115000000_accesos_por_rol`):
+  - `configuracion_accesos` es una fila única de versión; la migración la crea con versión 0 y sin restricciones.
+  - `accesos_por_rol` guarda solo las celdas apagadas. Sin filas, el comportamiento es exactamente el anterior.
+  - Cada guardado envía el estado completo con la versión leída. Una versión desactualizada responde **409 `CONFIGURACION_CAMBIADA`** con el estado vigente, sin escribir ni reintentar.
+  - La auditoría `ROLE_ACCESS_UPDATED` (actor, versiones y solo las celdas cambiadas) va en la misma transacción.
+- **Sesiones abiertas.** El servidor aplica la configuración vigente desde la **siguiente solicitud**, también con tokens ya emitidos y por llamada directa. La interfaz pide sus funciones efectivas (`GET /auth/accesos`) al iniciar o restaurar la sesión, al renovarla y al recibir `FUNCION_DESHABILITADA`. Por eso un menú puede seguir a la vista hasta la siguiente renovación (programada cada 12 minutos; es el intervalo previsto, no un plazo garantizado), pero sus operaciones ya se deniegan. Lo cargado pertenece a la cuenta **con sus roles efectivos y su club**: si los roles cambian sin cambiar la cuenta, se descarta y se vuelve a pedir, y administración nunca hereda restricciones (tiene prioridad haya datos o no). Un editor abierto (tiempo de una inscripción, constructor de un equipo de relevo) cuya acción se apaga se cierra con un aviso: si aún no había enviado nada, dice que se cerró sin enviar cambios; si el guardado ya se había enviado, no afirma que no se guardó y su respuesta se informa como siempre, sin otra petición; «Cancelar edición» solo cierra el editor y no depende del permiso de cancelación.
+- **Team Manager, excepción explícita.** La exportación a Team Manager **no es configurable**: conserva sus permisos actuales y sus rutas no llevan guarda de función. Ocultar el menú Reportes **no** revoca el acceso directo al exportador. CSV, XLSX y PDF quedan sujetos a la acción «Exportar» sin cambios en su contenido, formato ni descarga.
+
+- **Validación local, con resultados reales** (datos sintéticos):
+  - **Backend, unitarias** (catálogo, techo frente a `rbac.definitions.ts`, evaluación, validación, Team Manager sin guarda) y las de rutas afectadas: 4 archivos, 119 de 119. Prueba documental: 12 de 12.
+  - **Integración** sobre la base desechable de `docker-compose.test.yml`, donde se aplicó la migración:
+    - `accesos-por-rol.integration.test.ts`: 25 de 25. Cubre:
+      - cada rol y sus combinaciones;
+      - administración con otros roles;
+      - cuenta de club y representante legal;
+      - menú y acción apagados y su restitución;
+      - todas las rutas del catálogo, compartidas y alternativas;
+      - lista frente a historial;
+      - sesión abierta antes del cambio;
+      - club no operativo y alcance;
+      - cambio voluntario apagado frente al obligatorio;
+      - configuración inicial;
+      - 409 y guardados simultáneos;
+      - auditoría atómica y fallo de carga;
+      - Team Manager.
+    - Archivos de integración que ejercen las rutas modificadas o las migraciones: 40 archivos, 976 de 977. El único fallo fue la prueba de C-05 que fija la cantidad y la última migración: se actualizó a 42, y después C-05 y accesos dieron 68 de 68.
+  - **Frontend** (jsdom, API simulada):
+    - las pruebas existentes de las áreas tocadas, 39 archivos, 667 de 667;
+    - nuevas: sesión y rutas 12 de 12, pantalla 9 de 9 y paneles 10 de 10.
+  - Tipos sin errores. Lint sin errores nuevos.
+  - **Revisión visual con capturas** en Chromium (navegador integrado visible), con el frontend real y una API simulada, a 1280 px y 375 px efectivos:
+    - la matriz, «No aplica» y Team Manager como no configurable;
+    - el menú apagado, con sus acciones atenuadas y sus casillas conservadas;
+    - el resumen, el guardado y la última modificación;
+    - el conflicto 409;
+    - el delegado sin el menú, el aviso por URL directa y sin «Cambiar contraseña».
+
+    La revisión encontró y corrigió dos defectos propios:
+    - tras un 409, confirmar revertía los cambios de la otra persona: ahora el borrador se rehace sobre el estado vigente;
+    - a 375 px la tabla no era utilizable con el menú lateral abierto: ahora se apila por función.
+  - **Validación final conjunta de la entrega** (accesos por rol y correcciones de tiempos), ejecutada una vez sobre el mismo contenido, cada suite por separado y sin solaparse:
+    - **Frontend, suite completa** (`npm test`): 76 archivos, 1267 de 1267 pruebas aprobadas, sin omitidas.
+    - **Backend, integración completa** (`npm run test:integration`, configuración real) sobre el contenedor desechable de `docker-compose.test.yml`, con el guard de destino previo: 69 archivos, 1487 de 1487 pruebas aprobadas, sin omitidas. Las **42 migraciones** se aplicaron **solo en esa base desechable**; las bases auxiliares que crean las pruebas de migración se eliminaron y el contenedor volvió a quedar detenido.
+    - **Advertencias:** 13 avisos `DEP0190` de Node (`shell: true` al lanzar `npx` en Windows), del código de pruebas existente; no afectan el resultado.
+    - Una huella SHA-256 de los archivos de la entrega, tomada antes y comprobada después, confirmó que no cambiaron durante la validación.
+  - **Correcciones posteriores a la primera validación**, cada una reproducida antes con pruebas que fallaban por el motivo esperado: el **contexto de autorización** (lo cargado pertenece a la cuenta con sus roles efectivos y su club; administración tiene prioridad), los **editores abiertos** cuya acción se apaga (incluido el aviso con un guardado ya en curso) y la entrada y precarga de **tiempos** (ver «Entrada del tiempo estimado»).
+- **Limitaciones.**
+  - No se probó con sesión real en un navegador contra la API real (la revisión visual usa una API simulada).
+  - No se probó en Safari.
+  - Un menú puede seguir a la vista hasta la siguiente renovación de la sesión.
+  - La migración usa el nombre `20261115000000_accesos_por_rol`, que ordena después de las anteriores.
+
+| Método | Ruta | Descripción | Permiso |
+|---|---|---|---|
+| GET | `/auth/accesos` | Funciones del catálogo que la sesión tiene deshabilitadas, con la versión evaluada y la cuenta. Solo sirve para ocultar controles | Sesión válida (sin cambio obligatorio pendiente) |
+| GET | `/accesos-por-rol` | Configuración vigente, versión, última modificación y catálogo para la pantalla | Rol `admin` |
+| PUT | `/accesos-por-rol` | Guarda el estado completo con la versión leída; 409 si cambió | Rol `admin` |
+
 ## Inventario completo de endpoints
 
-**132 endpoints**, agrupados por el módulo que los declara. Esta lista no está
+**135 endpoints**, agrupados por el módulo que los declara. Esta lista no está
 escrita a mano: `backend/tests/documentacion.test.ts` la compara con las rutas que
 el código declara y **falla si alguna sobra o falta**. Además comprueba que
 ninguna ruta fuera de las públicas se quede sin guardia, y que el permiso exacto
@@ -1706,6 +1795,14 @@ fuera de producción o con `ENABLE_SWAGGER=true`.
 |---|---|
 | GET | `/health` |
 | GET | `/ready` |
+
+### `accesos`
+
+| Método | Ruta |
+|---|---|
+| GET | `/accesos-por-rol` |
+| PUT | `/accesos-por-rol` |
+| GET | `/auth/accesos` |
 
 ### `audit`
 

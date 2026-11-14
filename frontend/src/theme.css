@@ -625,3 +625,122 @@ label {
     flex-basis: min(260px, 85%);
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Accesos por rol (pantalla de administración)
+   La tabla se desplaza dentro de su contenedor en pantallas angostas, con la
+   columna de funciones fija a la izquierda para no perder la referencia.
+   --------------------------------------------------------------------------- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.accesos-contenedor {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.accesos-tabla {
+  min-width: 520px;
+}
+.accesos-tabla tbody th,
+.accesos-tabla tfoot th {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: var(--brand-white);
+  color: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.88rem;
+  z-index: 1;
+}
+.accesos-tabla .accesos-menu th {
+  font-weight: 700;
+  color: var(--brand-navy);
+  background: var(--brand-bg);
+}
+.accesos-tabla .accesos-menu td {
+  background: var(--brand-bg);
+}
+.accesos-tabla th.accesos-accion {
+  font-weight: 400;
+  padding-left: 1.5rem;
+}
+.accesos-tabla input[type="checkbox"] {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+.accesos-no-aplica,
+.accesos-no-configurable {
+  color: var(--brand-gray-600);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+.accesos-atenuada {
+  opacity: 0.55;
+}
+.accesos-nota-menu {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--brand-gray-600);
+}
+.accesos-restablecer {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  white-space: normal;
+}
+/* Pantalla angosta: cada función es un bloque con una fila por rol (nombre del rol + casilla).
+   La tabla ancha con desplazamiento lateral no era utilizable con el menú lateral abierto. */
+@media (max-width: 760px) {
+  .accesos-tabla {
+    min-width: 0;
+  }
+  .accesos-tabla thead {
+    display: none;
+  }
+  .accesos-tabla,
+  .accesos-tabla tbody,
+  .accesos-tabla tfoot,
+  .accesos-tabla tr,
+  .accesos-tabla th,
+  .accesos-tabla td {
+    display: block;
+    width: auto;
+  }
+  .accesos-tabla tbody th,
+  .accesos-tabla tfoot th {
+    position: static;
+    padding: 0.5rem 0.75rem 0.25rem;
+  }
+  .accesos-tabla th.accesos-accion {
+    padding-left: 1rem;
+  }
+  .accesos-tabla td[data-rol] {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.35rem 0.75rem 0.35rem 1.5rem;
+    text-align: left !important;
+  }
+  .accesos-tabla td[data-rol]::before {
+    content: attr(data-rol);
+    font-size: 0.8rem;
+    color: var(--brand-gray-600);
+    font-style: normal;
+  }
+  .accesos-tabla .accesos-no-configurable {
+    padding: 0.35rem 0.75rem 0.5rem 1.5rem;
+  }
+  .accesos-nota-menu {
+    display: inline;
+    margin-left: 0.35rem;
+  }
+}

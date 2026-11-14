@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { AppShell } from "../../shared/AppShell";
 import { useAuth } from "../auth/AuthContext";
+import { useAccesos } from "../auth/AccesosContext";
 import { ApiError } from "../../shared/apiClient";
 import { formatearFechaCalendario } from "../../shared/fechaCalendario";
 import { validarPaginaRecibida } from "../../shared/paginacion";
@@ -107,6 +108,15 @@ interface SegundoPaso {
 
 function PostulacionDelClub() {
   const api = usePostulacionApi();
+  /**
+   * ACCESOS POR ROL: postular, completar el alta y ver los listados se apagan por separado. Cuota y
+   * periodo sirven a postular y a los listados. Solo se ocultan controles: el servidor deniega igual.
+   */
+  const { deshabilitada } = useAccesos();
+  const puedePostular = !deshabilitada("incorporaciones.postular");
+  const puedeCompletarAlta = !deshabilitada("incorporaciones.completar_alta");
+  const puedeVerListados = !deshabilitada("incorporaciones.listados");
+  const veContexto = puedePostular || puedeVerListados;
   const operacion = useOperacionUnica();
   const idRun = useId();
   const [run, setRun] = useState("");
@@ -149,8 +159,8 @@ function PostulacionDelClub() {
   }, []);
 
   useEffect(() => {
-    void cargarContexto();
-  }, [cargarContexto]);
+    if (veContexto) void cargarContexto();
+  }, [cargarContexto, veContexto]);
 
   function cambiarRun(v: string) {
     if (operacion.ocupada()) return;
@@ -322,6 +332,7 @@ function PostulacionDelClub() {
         activa se puede postular durante todo el año; un cambio desde otro club, solo durante un periodo habilitado por la administración.
       </p>
 
+      {veContexto && (
       <section aria-label="Cuota y periodo" className="aviso">
         {errorDeContexto ? (
           <span className="error-message">
@@ -347,8 +358,13 @@ function PostulacionDelClub() {
           </>
         )}
       </section>
+      )}
 
-      {!paso && (
+      {!paso && !puedePostular && (
+        <p role="note" style={{ color: "var(--brand-gray-600)" }}>La postulación por RUN está deshabilitada para su cuenta.</p>
+      )}
+
+      {!paso && puedePostular && (
         <section style={{ maxWidth: 480 }} aria-labelledby={`${idRun}-titulo`}>
           <h2 id={`${idRun}-titulo`} style={{ fontSize: "1.05rem", color: "var(--brand-navy)" }}>
             Postular por RUN
@@ -375,7 +391,11 @@ function PostulacionDelClub() {
         </section>
       )}
 
-      {paso && (
+      {paso && !puedeCompletarAlta && (
+        <p role="note" style={{ color: "var(--brand-gray-600)" }}>Completar el alta está deshabilitado para su cuenta.</p>
+      )}
+
+      {paso && puedeCompletarAlta && (
         <section style={{ maxWidth: 520 }} aria-labelledby={`${idRun}-paso`}>
           <h2 id={`${idRun}-paso`} style={{ fontSize: "1.05rem", color: "var(--brand-navy)" }}>
             Datos declarados por el club
@@ -434,8 +454,12 @@ function PostulacionDelClub() {
         </p>
       )}
 
-      <PropuestasDelClub recargas={recargas} />
-      <SolicitudesDelClub recargas={recargas} />
+      {puedeVerListados && (
+        <>
+          <PropuestasDelClub recargas={recargas} />
+          <SolicitudesDelClub recargas={recargas} />
+        </>
+      )}
     </div>
   );
 }

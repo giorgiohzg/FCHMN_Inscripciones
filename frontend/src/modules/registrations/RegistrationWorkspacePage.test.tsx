@@ -1144,7 +1144,7 @@ describe("dos escrituras no se desbloquean entre sí", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Editar" }));
     // Tres pulsaciones en el MISMO `act`: ver la nota de la prueba 1.
-    const guardar = await screen.findByRole("button", { name: "✓" });
+    const guardar = await screen.findByRole("button", { name: "Guardar tiempo" });
     await act(async () => {
       guardar.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       guardar.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -1288,11 +1288,11 @@ describe("una sola operación por inscripción a la vez", () => {
     await montarCon([ce], [inscripcion("r1", ce)]);
 
     fireEvent.click(await screen.findByRole("button", { name: "Editar" }));
-    fireEvent.click(await screen.findByRole("button", { name: "✓" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Guardar tiempo" }));
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
 
     // La «✕» local solo cierra el formulario; el guardado sigue viajando.
-    fireEvent.click(screen.getByRole("button", { name: "✕" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar edición" }));
 
     const eliminar = await screen.findByRole("button", { name: "×" });
     expect(eliminar, "la fila está ocupada por el guardado").toBeDisabled();
@@ -1317,7 +1317,7 @@ describe("una sola operación por inscripción a la vez", () => {
     const editar = screen.getByRole("button", { name: "Editar" });
     expect(editar, "no se abre el editor de algo que se está cancelando").toBeDisabled();
     fireEvent.click(editar);
-    expect(screen.queryByRole("button", { name: "✓" }), "el editor no se abrió").not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Guardar tiempo" }), "el editor no se abrió").not.toBeInTheDocument();
     expect(update).not.toHaveBeenCalled();
 
     await act(async () => {

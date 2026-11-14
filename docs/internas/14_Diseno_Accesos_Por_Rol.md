@@ -1,6 +1,6 @@
 # Diseño: configuración administrativa de accesos por rol
 
-**Estado: diseño, sin implementar.** Falta una decisión del responsable (ver «Decisión pendiente»). Nada de esto cambia el comportamiento actual.
+**Estado: opción A, publicada en el repositorio y validada localmente; pendiente de migración, despliegue y actualización del entorno local.** El responsable confirmó la opción A: solo restringir y restituir los accesos actuales. La implementación y sus precisiones están en «Implementación (opción A)», al final. Las secciones de diseño se conservan como base; donde difieran, rige la implementación.
 
 **Alcance.** Una pantalla exclusiva de administración para elegir qué menús y qué acciones de cada menú tienen disponibles tres roles: **Nadador** (`swimmer`), **Delegado** (`delegate`) y **Entrenador** (`coach`). Cada acción se configura por separado de su menú, y el cambio voluntario de contraseña es una función configurable más.
 
@@ -10,9 +10,9 @@
 - **Administración siempre tiene acceso completo**, aunque tenga otros roles y aunque sus casillas estén desmarcadas.
 - La **cuenta de club** y el **representante legal** quedan fuera de los roles configurables.
 
-## Decisión pendiente
+## Decisión (resuelta: opción A)
 
-¿La pantalla podrá **conceder** funciones que hoy esos roles no tienen, o solo **restringir y restituir** sus accesos actuales?
+*Antecedente:* la pregunta pendiente era si la pantalla podría **conceder** funciones que hoy esos roles no tienen, o solo **restringir y restituir** sus accesos actuales. El responsable confirmó **A**.
 
 | | A. Solo restringir y restituir | B. También conceder |
 |---|---|---|
@@ -20,7 +20,7 @@
 | Riesgo | Ninguna ampliación de atribuciones: lo peor que puede pasar es que un rol vea menos | Cada función concedible necesita una revisión propia de alcance de datos (por ejemplo, un nadador con «Exportar a Team Manager» vería el club entero) |
 | Trabajo | Una guarda adicional por ruta | Además, reglas de alcance nuevas por función y por rol |
 
-La confirmación del acceso administrativo **no** autoriza ampliar las atribuciones de los demás roles. Mientras no se decida, el diseño se limita a **A**. **B** solo se agregaría función por función, cada una con su propia revisión.
+La confirmación del acceso administrativo **no** autoriza ampliar las atribuciones de los demás roles. Se implementó **A**. **B** solo se agregaría función por función, cada una con su propia revisión y una autorización expresa.
 
 ## Inventario real
 
@@ -170,3 +170,91 @@ Ocultar botones no basta: la protección está en el servidor.
 
 1. El personal de club puede dar de baja membresías de su club por la API (`POST /swimmer-assignments/:id/end`), aunque su interfaz no ofrece ese botón.
 2. Los asistentes `/inscripciones/nueva` y `/inscripciones-relevos/nueva` no tienen enlace: solo se llega por URL.
+
+## Implementación (opción A)
+
+**Estado:** implementada y validada en local el 2026-11-14, sobre `c230000`; **publicada en el repositorio y validada localmente, pendiente de migración, despliegue y actualización del entorno local.** Producción no tiene la migración ni las guardas. *Antecedente:* hasta la publicación decía «No está publicada ni desplegada».
+
+### Catálogo y correspondencia con rutas
+
+El catálogo vive en `backend/src/modules/accesos/catalogo.ts` y es la única fuente de verdad.
+
+**Leyenda de «Aplica a»:**
+- **N** = nadador, **D/E** = delegado y entrenador (configurables);
+- **C/RL** = cuenta de club y representante legal: suman en la evaluación pero **no** se configuran.
+
+Cada guarda de función se agrega **además** del permiso de la ruta.
+
+| Función (id estable) | Menú | Rutas HTTP | Permiso que ya exigía la ruta | Aplica a |
+|---|---|---|---|---|
+| `menu.inscripciones` | — | `GET /competitions/:id/enabled-events`¹, `GET /registrations/club-swimmers`¹, `GET /registrations/club-eligibility-matrix`, `GET /registrations/available-events`, `GET /registrations/eligible-swimmers`, `GET /registrations?status=confirmed` | `registrations:read` | N, D/E, C/RL |
+| `inscripciones.crear` | Inscripciones | `POST /registrations` | `registrations:write` | N, D/E, C/RL |
+| `inscripciones.editar_tiempo` | Inscripciones | `PUT /registrations/:id` | `registrations:write` | N, D/E, C/RL |
+| `inscripciones.cancelar` | Inscripciones | `POST /registrations/:id/cancel` (también «Deshacer») | `registrations:write` | N, D/E, C/RL |
+| `inscripciones.historial` | Inscripciones | `GET /registrations` con `status=cancelled` o sin estado | `registrations:read` | N, D/E, C/RL |
+| `menu.relevos` | — | `GET /competitions/:id/enabled-events`¹, `GET /registrations/club-swimmers`¹, `GET /relay-registrations?status=confirmed` | `registrations:read` | N, D/E, C/RL |
+| `relevos.armar` | Relevos | `POST /relay-registrations` | `registrations:write` | D/E, C/RL (N: no aplica, invariante del alcance) |
+| `relevos.editar` | Relevos | `PUT /relay-registrations/:id` | `registrations:write` | D/E, C/RL |
+| `relevos.cancelar` | Relevos | `POST /relay-registrations/:id/cancel` | `registrations:write` | D/E, C/RL |
+| `relevos.historial` | Relevos | `GET /relay-registrations` con `status=cancelled` o sin estado | `registrations:read` | N, D/E, C/RL |
+| `menu.reportes` | — | sin rutas propias: sus lecturas de apoyo son compartidas por todas las pantallas | — | N, D/E, C/RL |
+| `reportes.generar` | Reportes | `GET /reports/registrations` | `reports:read` | N, D/E, C/RL |
+| `reportes.exportar` | Reportes | `GET /reports/registrations/export` (CSV, XLSX, PDF) | `reports:read` | N, D/E, C/RL |
+| `menu.incorporaciones` | — | sin rutas propias | — | D/E, C/RL |
+| `incorporaciones.postular` | Incorporaciones | `POST /swimmer-assignments`, `GET …/cuota`², `GET …/periodos-cambio/vigente`² | `swimmer-assignment:write` | D/E, C/RL |
+| `incorporaciones.completar_alta` | Incorporaciones | `POST /swimmer-assignments/altas` | `swimmer-assignment:write` | D/E, C/RL |
+| `incorporaciones.listados` | Incorporaciones | `GET /swimmer-assignments`, `GET /swimmer-assignments/:id`, `GET …/altas`, `GET …/altas/:id`, `GET …/cuota`², `GET …/periodos-cambio/vigente`² | `swimmer-assignment:read` / `:write` | D/E, C/RL |
+| `cuenta.cambio_voluntario_contrasena` | — | `POST /auth/change-password`, solo **sin** cambio obligatorio pendiente | sesión propia | N, D/E, C/RL |
+
+**Rutas compartidas.**
+- ¹ La sirven Inscripciones y Relevos.
+- ² La sirven postular y los listados.
+
+Basta que **una** de las funciones esté permitida, de modo que apagar un menú no rompe otro que sigue encendido. Los asistentes `/inscripciones/nueva` y `/inscripciones-relevos/nueva` usan estas mismas rutas, así que quedan cubiertos. En la interfaz, su ruta exige además el menú y la acción de crear o armar.
+
+**Fuera del catálogo:**
+- **Team Manager.** Se muestra en la pantalla como «No configurable: conserva sus permisos actuales». Sus rutas (`/export/team-manager/zip` y `/hy3`) no llevan guarda de función: ocultar Reportes no revoca el acceso directo al exportador.
+- **Lecturas compartidas por todas las pantallas** (competencias, catálogos, capacidad, club vigente) y el **inicio**.
+- `POST /swimmer-assignments/:id/end`, que no es un menú del personal (ver «Observaciones del inventario»).
+
+### Precisiones respecto del diseño
+
+- **«No aplica» en la evaluación.** Si **ningún** rol efectivo de la cuenta tiene la función dentro de su techo, la guarda **no decide**: siguen mandando el permiso, las guardas de rol y el alcance. Así, sin restricciones el comportamiento es exactamente el anterior, y la configuración nunca concede: por ejemplo, un nadador sigue recibiendo 403 `FORBIDDEN` del servicio al armar un relevo.
+- **Sin consulta cuando no hace falta.** Administración y las cuentas sin roles configurables aplicables no leen la configuración.
+- **Persistencia.**
+  - Solo se guardan las celdas **apagadas**; restituir borra la fila.
+  - La migración crea la fila de versión (`id = 1`, versión 0) y **ninguna** restricción.
+  - El guardado envía el estado **completo**, que se valida contra las celdas configurables: rechaza roles, funciones o combinaciones fuera del catálogo y los huecos. Bloquea la fila de versión (`FOR UPDATE`), compara la versión y, si no hay diferencias, no sube la versión ni audita.
+- **Caché por versión.** Cada solicitud protegida lee la fila de versión; si cambió, versión y filas se leen **juntas** en una transacción `REPEATABLE READ`. Una lectura lenta no reemplaza una copia más nueva.
+- **Fallos.** Si no se puede leer, responde 503 `CONFIGURACION_ACCESOS_NO_DISPONIBLE` y nunca concede. Ni ese 503 ni el 403 `FUNCION_DESHABILITADA` cierran la sesión.
+- **Cambio de contraseña.** Con el cambio obligatorio pendiente, la comprobación ni siquiera lee la configuración. La denegación del voluntario ocurre antes del servicio, así que no cuenta como intento fallido (C-04).
+- **Interfaz.**
+  - `AccesosProvider` pide `GET /auth/accesos` al iniciar o restaurar la sesión y en cada renovación (cambia el token), y otra vez al recibir `FUNCION_DESHABILITADA`. Con el cambio obligatorio pendiente no lo pide.
+  - Descarta las respuestas de otra cuenta, de otra sesión o de una versión anterior.
+  - Si la carga falla, no oculta nada adicional (decide el servidor) y conserva lo último sabido de la misma cuenta.
+  - Oculta los menús, el botón «Cambiar contraseña» y los controles de cada acción.
+  - Protege las rutas, incluidas las de URL directa, con un aviso.
+  - Las descargas CSV, XLSX y PDF no se tocaron: Reportes avisa de la denegación desde la propia pantalla.
+- **Pantalla.**
+  - `/administracion/accesos`, con guardia `admin` en la interfaz y `requireRole("admin")` en la API.
+  - Matriz con casillas de nombre accesible («Delegado — Reportes: Exportar CSV, Excel o PDF») y «No aplica».
+  - Un menú apagado desactiva y atenúa sus acciones sin borrar sus casillas.
+  - Restablecer por rol, cancelar y un resumen antes de guardar.
+  - Muestra la última modificación (fecha y autor).
+  - Ante un 409, muestra los cambios de la otra persona y conserva lo marcado.
+
+**Sesiones abiertas.** El servidor aplica la configuración vigente desde la siguiente solicitud, también con tokens ya emitidos y por llamada directa. La interfaz puede mostrar un control apagado hasta la siguiente renovación (programada cada 12 minutos; es el intervalo previsto, no un plazo garantizado), hasta recibir una denegación o hasta recargar la página. Ese retraso es solo de presentación. Las funciones cargadas pertenecen al **contexto de autorización** (cuenta, roles efectivos y club), no solo a la cuenta: si los roles cambian, lo cargado se descarta y una respuesta tardía del contexto anterior se ignora. Administración tiene prioridad también en la interfaz. Un editor abierto cuya acción se apaga se cierra en el mismo dibujo y avisa: si no había enviado nada, que se cerró sin enviar cambios; si el guardado ya estaba en curso, sin afirmar que no se guardó, porque el servidor puede confirmarlo y su respuesta se informa como siempre.
+
+### Validación local
+
+Resultados reales en el README, «Accesos por rol»: unitarias del backend, integración sobre la base desechable (incluida la migración), pruebas de la interfaz con jsdom y revisión visual con capturas a 1280 px y 375 px efectivos, con API simulada y datos sintéticos.
+
+**Validación final conjunta** de la entrega (accesos y correcciones de tiempos), cada suite una vez y por separado:
+- Frontend, suite completa: 76 archivos, 1267 de 1267 pruebas aprobadas.
+- Backend, integración completa sobre la base desechable: 69 archivos, 1487 de 1487 pruebas aprobadas; las 42 migraciones se aplicaron solo en esa base.
+- 13 avisos `DEP0190` de Node, del código de pruebas existente; no afectan el resultado.
+
+**Limitaciones.**
+- No hubo prueba con sesión real contra la API real en un navegador.
+- No se probó en Safari.
+- El retraso de presentación descrito arriba.

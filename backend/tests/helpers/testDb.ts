@@ -156,4 +156,14 @@ export async function truncateAllTables(client: RawClient) {
 
   const list = rows.map((r) => `"public"."${r.tablename}"`).join(", ");
   await client.$executeRawUnsafe(`TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE`);
+
+  /**
+   * La fila de VERSIÓN de los accesos por rol la crea la migración, no el seed: es parte del
+   * esquema. El TRUNCATE de arriba la borra, así que se repone igual que la deja la migración
+   * (versión 0, sin autor y sin restricciones). Sin ella, las rutas con guarda de función
+   * responderían 503: un fallo de configuración nunca concede acceso.
+   */
+  if (rows.some((r) => r.tablename === "configuracion_accesos")) {
+    await client.$executeRawUnsafe(`INSERT INTO "configuracion_accesos" ("id", "version") VALUES (1, 0) ON CONFLICT ("id") DO NOTHING`);
+  }
 }

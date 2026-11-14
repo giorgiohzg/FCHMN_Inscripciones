@@ -3,6 +3,7 @@ import * as reportsService from "./reports.service";
 import * as resumenPorClub from "./resumenPorClub.service";
 import { competenciaDelReporteQuerySchema, registrationsReportQuerySchema, resumenPorClubQuerySchema } from "./reports.schemas";
 import { requireAuth, requirePermission, requireRole } from "../auth/rbac.middleware";
+import { requireFuncion } from "../accesos/accesos.middleware";
 import { ValidationError } from "../../shared/errors";
 import { audit } from "../audit/audit.service";
 import { buildActorContext } from "../../shared/actorContext";
@@ -10,7 +11,7 @@ import { buildActorContext } from "../../shared/actorContext";
 export async function reportsRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireAuth);
 
-  app.get("/reports/registrations", { preHandler: [requirePermission("reports:read")] }, async (req, reply) => {
+  app.get("/reports/registrations", { preHandler: [requirePermission("reports:read"), requireFuncion("reportes.generar")] }, async (req, reply) => {
     const parsed = registrationsReportQuerySchema.safeParse(req.query);
     if (!parsed.success) throw new ValidationError("Parámetros de filtro inválidos", parsed.error.flatten());
     reply.send(await reportsService.getRegistrationsReport(parsed.data, buildActorContext(req)));
@@ -40,7 +41,7 @@ export async function reportsRoutes(app: FastifyInstance) {
     reply.send(await resumenPorClub.obtenerResumenPorClub(parsed.data.competitionId, buildActorContext(req), parsed.data.edadMinima));
   });
 
-  app.get("/reports/registrations/export", { preHandler: [requirePermission("reports:read")] }, async (req, reply) => {
+  app.get("/reports/registrations/export", { preHandler: [requirePermission("reports:read"), requireFuncion("reportes.exportar")] }, async (req, reply) => {
     const query = req.query as Record<string, string>;
     const parsed = registrationsReportQuerySchema.safeParse(query);
     if (!parsed.success) throw new ValidationError("Parámetros de filtro inválidos", parsed.error.flatten());
