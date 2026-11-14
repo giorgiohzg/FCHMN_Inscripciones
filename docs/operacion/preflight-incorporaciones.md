@@ -80,7 +80,30 @@ a C-05 y datos sintéticos, usando la imagen de mantenimiento construida con est
 | Sonda de escritura con la misma envoltura | rechazada por PostgreSQL; datos sin cambios |
 | El mismo SQL sin `READ ONLY` | la guarda interna lo detiene, y el ejecutor lo rechaza por hash |
 
-**Aún no se ha ejecutado en Render.**
+## Ejecución en Render (2026-11-14)
+
+Con la imagen de mantenimiento construida desde `5780336338febd668615d3e4a66219a13f6cc12a`
+(`dep-dbrtgau1egvs73c806t0`; CI del código `43550942111`, aprobada), el comando corto se ejecutó **una sola
+vez**, a las 00:44, hora del panel. La zona horaria del panel no se confirmó, por lo que esa hora no se convierte
+a UTC. La ejecución terminó con **status 0**, y el registro contenía la línea exacta:
+
+```
+PREFLIGHT_OK sha256=1faaf4f4755c7dbd5cc22fbcbc37b03f5935ef9e5f66b9076354c59f30ac21d0
+```
+
+Fue una de las cuatro ejecuciones del mantenimiento, una por paso, contadas por los **eventos** del servicio
+y no por el contador visual:
+
+| Hora (panel) | Paso | Resultado |
+|---|---|---|
+| 00:43 | Estado de las migraciones | status 1, el esperado: listó exactamente las dos pendientes previstas |
+| 00:44 | Este preflight | status 0 y `PREFLIGHT_OK` con el hash completo |
+| 00:46 | `migrate deploy`, sin seed | aplicó exactamente `20261112000000_c05_incorporaciones` y `20261114000000_competencia_predeterminada` |
+| 00:47 | Estado posterior | «Database schema is up to date!» |
+
+Al terminar, el Docker Command quedó vacío, y se conservaron la programación y Auto-Deploy Off. Como las dos
+migraciones ya están aplicadas, en producción y en la base local de trabajo, este preflight no tiene que volver
+a ejecutarse para ellas. El registro completo del despliegue está en `docs/seguridad/PLAN_SEGURIDAD.md`, C-05.
 
 ## Antecedente: intento del 2026-11-13
 

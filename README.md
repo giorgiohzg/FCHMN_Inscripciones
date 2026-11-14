@@ -811,10 +811,10 @@ cuenta `system`.
 |---|---|---|---|
 | GET | `/swimmer-assignments` | Lista solicitudes (filtro por club/nadador/estado, paginado) | `swimmer-assignment:read` |
 | GET | `/swimmer-assignments/:id` | Detalle de una solicitud | `swimmer-assignment:read` |
-| POST | `/swimmer-assignments` | C-05 (fase 2, pendiente de despliegue): postulación **por RUN** (`{ run }`; ya no acepta `personId`). El club y su personal —delegado, entrenador o representante legal— postulan en su club con cabecera `Idempotency-Key` y cuota de 30 intentos diarios por club; administración indica `clubId`. Queda `pending` | `swimmer-assignment:write` |
+| POST | `/swimmer-assignments` | C-05 (fase 2, desplegada en producción desde `5780336`): postulación **por RUN** (`{ run }`; ya no acepta `personId`). El club y su personal —delegado, entrenador o representante legal— postulan en su club con cabecera `Idempotency-Key` y cuota de 30 intentos diarios por club; administración indica `clubId`. Queda `pending` | `swimmer-assignment:write` |
 | POST | `/swimmer-assignments/:id/approve` | Aprueba y activa la MISMA propuesta. Cuerpo opcional: `fechaEfectiva` (`AAAA-MM-DD`, no futura), `confirmarFinDeMembresiaId` (traslado) y `aceptarHistorialIncompleto` | `swimmer-assignment:approve` (solo `admin`) |
 | POST | `/swimmer-assignments/:id/reject` | Rechaza la solicitud | `swimmer-assignment:approve` (solo `admin`) |
-| POST | `/swimmer-assignments/:id/end` | Baja simple de una membresía activa. C-05 (pendiente de despliegue): cuerpo **obligatorio** `fechaTermino` (`AAAA-MM-DD`, último día de pertenencia; no futura ni anterior al inicio; el mismo día del inicio sí). Con inicio desconocido, solo administración puede aceptarlo con `aceptarHistorialIncompleto` | `swimmer-assignment:write` + alcance: el `admin`, o el personal **del mismo club** |
+| POST | `/swimmer-assignments/:id/end` | Baja simple de una membresía activa. C-05 (desplegada en producción desde `5780336`): cuerpo **obligatorio** `fechaTermino` (`AAAA-MM-DD`, último día de pertenencia; no futura ni anterior al inicio; el mismo día del inicio sí). Con inicio desconocido, solo administración puede aceptarlo con `aceptarHistorialIncompleto` | `swimmer-assignment:write` + alcance: el `admin`, o el personal **del mismo club** |
 | GET | `/swimmer-assignments/cuota` | C-05: intentos usados hoy (Santiago) del propio club; administración indica `clubId` | `swimmer-assignment:write` |
 | GET | `/swimmer-assignments/periodos-cambio/vigente` | C-05: si hay un periodo de cambio vigente hoy | `swimmer-assignment:write` |
 | GET | `/swimmer-assignments/periodos-cambio` | C-05: lista los periodos de cambio | `swimmer-assignment:approve` (solo `admin`) |
@@ -842,7 +842,7 @@ cuenta `system`.
   el club del actor con el de la membresía, y está cubierto en
   `tests/authorization.integration.test.ts`.
 
-  C-05 (pendiente de despliegue): la **fecha de término la elige quien registra la baja**
+  C-05 (desplegada en producción desde `5780336`): la **fecha de término la elige quien registra la baja**
   (`fechaTermino`, obligatoria; puede ser una renuncia comunicada después) y se
   guarda en `fecha_termino`. El instante real de la operación queda en `end_date`
   y en la auditoría, sin retroceder. Una baja hasta hoy implica que otra membresía
@@ -914,8 +914,8 @@ cuenta `system`.
 - `getCurrentClubForPerson()` queda expuesto como utilidad reutilizable para módulos futuros (ej. inscripciones, que deben determinar automáticamente el club vigente de un nadador — sección 9 del requerimiento).
 - En el frontend: la ficha de cada club (`ClubFormPage`) es **de administración** e incluye la sección "Plantel de nadadores", donde administración asigna directamente (con fecha) y registra bajas. **No es la pantalla de postulación del club**: el club y su personal postulan por RUN en `/incorporaciones` (C-05). Administración aprueba o rechaza las propuestas en `/asignaciones`, accesible desde el menú lateral.
   > *Antecedente:* esta línea decía que en la ficha del club «el club busca y propone»; esa ficha ya era solo de administración.
-- C-05, fase 3 (pendiente de despliegue): las pantallas de administración piden la fecha expresamente (baja con calendario; activaciones con fecha no futura), revisan y confirman los traslados y la aceptación de un historial incompleto, y agregan `/asignaciones/periodos` (periodos de cambio) y `/asignaciones/altas` (solicitudes de alta). Ver `docs/seguridad/PLAN_SEGURIDAD.md`, C-05.
-- C-05, fase 4 (pendiente de despliegue): la cuenta del club y su personal vigente (delegado, entrenador, representante legal) postulan por RUN en `/incorporaciones` (enlace «Incorporaciones» del menú), con el segundo paso de nombre y apellido declarados, la cuota y el periodo informados por el servidor, y la lista de propuestas y solicitudes de alta del propio club. Administración y nadadores no acceden a esa pantalla. Nada de C-05 está publicado ni desplegado.
+- C-05, fase 3 (desplegada en producción desde `5780336`): las pantallas de administración piden la fecha expresamente (baja con calendario; activaciones con fecha no futura), revisan y confirman los traslados y la aceptación de un historial incompleto, y agregan `/asignaciones/periodos` (periodos de cambio) y `/asignaciones/altas` (solicitudes de alta). Ver `docs/seguridad/PLAN_SEGURIDAD.md`, C-05.
+- C-05, fase 4 (desplegada en producción desde `5780336`): la cuenta del club y su personal vigente (delegado, entrenador, representante legal) postulan por RUN en `/incorporaciones` (enlace «Incorporaciones» del menú), con el segundo paso de nombre y apellido declarados, la cuota y el periodo informados por el servidor, y la lista de propuestas y solicitudes de alta del propio club. Administración y nadadores no acceden a esa pantalla. C-05 está publicada, migrada y desplegada en producción, con el entorno local actualizado, dentro del alcance validado: sin validación funcional autenticada en producción. Estado, despliegue y límites en `docs/seguridad/PLAN_SEGURIDAD.md`, C-05.
 
 ## Endpoints del Módulo 5 — Tipos de Pruebas, Categorías y Pruebas
 
@@ -1005,7 +1005,9 @@ Administración puede marcar en **Competencias** (columna «Por defecto») **una
 
 #### Estado de estas mejoras (competencia por defecto, alta con club, presentación y desplazamiento)
 
-**Publicadas en el repositorio y validadas dentro del alcance descrito; pendientes de despliegue y de la actualización del entorno local de ejecución.** La migración `20261114000000_competencia_predeterminada` solo se aplicó a la base desechable de pruebas. La configuración de accesos por rol está **solo diseñada** (`docs/internas/14_Diseno_Accesos_Por_Rol.md`), pendiente de decidir si podrá conceder atribuciones nuevas. C-05 sigue pendiente de despliegue.
+**Publicadas, migradas y desplegadas en producción; entorno local actualizado, dentro del alcance validado.** Se desplegaron el 2026-11-14 junto con C-05 y el preflight empaquetado, desde `5780336338febd668615d3e4a66219a13f6cc12a` (CI `43550942111`, aprobada para ese SHA). La migración `20261114000000_competencia_predeterminada` se aplicó, sin seed, en producción y en la base local de trabajo, y la API (`dep-dbrtl3mi0phs73bgp91g`) y la web (`dep-dbrtm8rl550s73erpcv0`) quedaron Live en ese SHA. El registro del despliegue (respaldo, ejecuciones del mantenimiento, muestreo HTTP, entorno local y límites) está en `docs/seguridad/PLAN_SEGURIDAD.md`, C-05, «Despliegue en producción y entorno local». No hubo validación funcional autenticada ni escrituras de prueba en producción: lo observado allí acredita disponibilidad y cabeceras, no el funcionamiento con sesión. La configuración de accesos por rol sigue **solo diseñada** (`docs/internas/14_Diseno_Accesos_Por_Rol.md`), pendiente de decidir si podrá conceder atribuciones nuevas.
+
+*Antecedente:* hasta ese despliegue figuraban publicadas en el repositorio y pendientes de despliegue, con la migración aplicada solo a la base desechable de pruebas.
 
 Validación local, con resultados reales:
 
@@ -1020,7 +1022,7 @@ Validación local, con resultados reales:
   - *Edad de inscritos fuera del plantel:* 2 pruebas de frontend, que mostraban el nombre sin edad, y 3 de integración, sin `edadAlCorte`.
   - Después de corregir: frontend 111 de 111, backend unitarias 34 de 34 e integración 6 archivos, 172 de 172.
 - **Pendiente:** comprobar en **Safari de macOS real** el desplazamiento y las barras de ambos paneles. No se validó allí: jsdom y Chromium no la reemplazan.
-- **Team Manager:** no cambió el código de exportación (`team-manager-export/`) ni sus dependencias compartidas. Solo se agregó a `competitions` una columna que el generador no lee. Esto **no** equivale a haber comparado un ZIP generado.
+- **Team Manager:** no cambió el código de exportación (`team-manager-export/`) ni sus dependencias compartidas. Solo se agregó a `competitions` una columna que el generador no lee. Esto **no** equivale a haber comparado un ZIP generado, y tras el despliegue tampoco se probó con exportaciones reales.
 
 ### Sigla del club
 
@@ -1585,7 +1587,7 @@ Estas rutas son del administrador, que no necesita proponerse nada a sí mismo:
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
 | POST | `/swimmer-assignments/direct` | Asigna un nadador a un club sin pasar por `pending` | `swimmer-assignment:approve` |
-| POST | `/swimmer-assignments/bulk-assign` | Asignación masiva. C-05 (pendiente de despliegue): cada fila rechazada trae `codigo` estable (p. ej. `HISTORIAL_INCOMPLETO`) | `swimmer-assignment:approve` |
+| POST | `/swimmer-assignments/bulk-assign` | Asignación masiva. C-05 (desplegada en producción desde `5780336`): cada fila rechazada trae `codigo` estable (p. ej. `HISTORIAL_INCOMPLETO`) | `swimmer-assignment:approve` |
 | POST | `/swimmer-assignments/reassign/:personId` | Traslada un nadador a otro club | `swimmer-assignment:approve` |
 | GET | `/swimmer-assignments/swimmers-by-club` | Plantel agrupado por club | `swimmer-assignment:approve` |
 | GET | `/swimmer-assignments/current-club/:personId` | Club vigente de un nadador | `swimmer-assignment:read` |
