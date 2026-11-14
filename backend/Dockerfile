@@ -261,6 +261,11 @@ COPY --from=cli-migrate /opt/prisma-cli /opt/prisma-cli
 COPY prisma/schema.prisma ./prisma/schema.prisma
 COPY prisma/migrations ./prisma/migrations
 
+# Preflight de solo lectura de C-05 (`docs/operacion/preflight-incorporaciones.md`): el SQL
+# validado y su ejecutor, copiados EXPRESAMENTE (no la carpeta entera). Se invoca con una orden
+# simple, sin shell: `node /app/operacion/preflight-incorporaciones.mjs`. No cambia el CMD.
+COPY operacion/preflight-incorporaciones.sql operacion/preflight-incorporaciones.mjs ./operacion/
+
 # `prisma` se resuelve por PATH. Nunca `npx`, que intentaria descargarlo del
 # registro durante la ejecucion.
 ENV PATH=/opt/prisma-cli/node_modules/.bin:$PATH
