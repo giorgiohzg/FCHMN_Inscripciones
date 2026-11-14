@@ -11,6 +11,12 @@ export interface EnabledCompetitionEvent {
 export interface ClubEligibilityEntry {
   personId: string;
   fullName: string;
+  /** Campos separados; nulos en registros históricos (ver `shared/nombreDeNadador.ts`). */
+  firstName?: string | null;
+  paternalLastName?: string | null;
+  maternalLastName?: string | null;
+  /** Edad a la fecha de corte de la competencia, calculada por el servidor. */
+  edadAlCorte?: number;
   run: string;
   gender: "male" | "female";
   eligibleEvents: { competitionEventId: string; categoryId: string; categoryName: string }[];
@@ -20,6 +26,11 @@ export interface ClubEligibilityEntry {
 export interface EligibleSwimmer {
   id: string;
   fullName: string;
+  firstName?: string | null;
+  paternalLastName?: string | null;
+  maternalLastName?: string | null;
+  /** Solo si se pidió el plantel con `competitionId`: edad a la fecha de corte (servidor). */
+  edadAlCorte?: number;
   run: string;
   gender: "male" | "female";
   birthDate: string;
@@ -40,7 +51,12 @@ export interface RegistrationItem {
   status: "confirmed" | "cancelled";
   isPostCloseException?: boolean;
   seedTimeCentiseconds: number | null;
-  person: { id: string; fullName: string; firstName: string | null; paternalLastName: string | null; run: string };
+  /**
+   * Edad de la persona a la fecha de corte de la competencia de ESTA inscripción, calculada por el
+   * servidor. No depende del plantel activo: se conserva si la membresía terminó.
+   */
+  edadAlCorte?: number;
+  person: { id: string; fullName: string; firstName: string | null; paternalLastName: string | null; maternalLastName?: string | null; run: string };
   club: { id: string; name: string };
   category: { id: string; name: string };
   competitionEvent: {
@@ -61,9 +77,12 @@ export function useRegistrationsApi() {
       return api.get<EligibleSwimmer[]>(`/registrations/eligible-swimmers?${qs}`);
     },
 
-    /** Nadadores activos del club (nuevo orden de inscripción: sin depender todavía de ninguna prueba). */
-    listClubSwimmers: (clubId: string) => {
-      const qs = new URLSearchParams({ clubId });
+    /**
+     * Nadadores activos del club (nuevo orden de inscripción: sin depender todavía de ninguna prueba).
+     * Con `competitionId`, cada uno trae `edadAlCorte` de esa competencia (Panel de Relevos).
+     */
+    listClubSwimmers: (clubId: string, competitionId?: string) => {
+      const qs = new URLSearchParams(competitionId ? { clubId, competitionId } : { clubId });
       return api.get<EligibleSwimmer[]>(`/registrations/club-swimmers?${qs}`);
     },
 

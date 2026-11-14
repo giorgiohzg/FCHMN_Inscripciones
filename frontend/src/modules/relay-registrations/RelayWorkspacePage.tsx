@@ -15,7 +15,10 @@ import { parseSwimTimeInput, formatSwimTimeReadable } from "../../shared/swimTim
 import { useAuth } from "../auth/AuthContext";
 import { useSwimmerAssignmentApi } from "../swimmer-assignment/assignmentApi";
 import { traerTodasLasPaginas } from "../../shared/paginacion";
+import { competenciaPreseleccionada } from "../../shared/competenciaPredeterminada";
+import { compararNadadores, coincideConBusqueda, nombreConEdad } from "../../shared/nombreDeNadador";
 import { PanelDeHistorial } from "../../shared/PanelDeHistorial";
+import { ZonaDesplazable } from "../../shared/ZonaDesplazable";
 import { COLUMNAS_RELEVOS, cargadorDeRelevos } from "../../shared/filasDeHistorial";
 
 const DRAG_ROSTER = "application/x-roster-swimmer";
@@ -43,6 +46,15 @@ export function RelayWorkspacePage() {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [ownClubName, setOwnClubName] = useState<string | null>(null);
   const [competitionId, setCompetitionId] = useState("");
+  /**
+   * La persona ya eligió a mano (también «Seleccionar...»): desde entonces la competencia por
+   * defecto no se vuelve a aplicar, aunque la lista llegue o se recargue después.
+   */
+  const eleccionManualRef = useRef(false);
+  function elegirCompetencia(id: string) {
+    eleccionManualRef.current = true;
+    setCompetitionId(id);
+  }
   const [clubId, setClubId] = useState("");
 
   /**
@@ -79,7 +91,8 @@ export function RelayWorkspacePage() {
   const datos = cargaDeEstaVista?.datos ?? null;
 
   const events = useMemo(() => datos?.events ?? [], [datos]);
-  const swimmers = useMemo(() => datos?.swimmers ?? [], [datos]);
+  // Plantel ordenado por apellido paterno, materno y nombre (`shared/nombreDeNadador.ts`).
+  const swimmers = useMemo(() => (datos?.swimmers ?? []).slice().sort(compararNadadores((s: EligibleSwimmer) => s.id)), [datos]);
   const teams = useMemo(() => datos?.teams ?? [], [datos]);
 
   const cargandoLaVista = cargaDeEstaVista === null || cargaDeEstaVista.fase === "cargando";
@@ -162,7 +175,17 @@ export function RelayWorkspacePage() {
       competitionsApi.list({ ...(veCompetenciasOcultas ? {} : { visibleInRegistrationPanels: true }), page, pageSize })
     )
       .then((todas) => {
-        if (vigente) setCompetitions(todas);
+        if (!vigente) return;
+        setCompetitions(todas);
+        // Competencia por defecto: solo si está en ESTA lista (la que la cuenta puede elegir) y
+        // sin pisar una elección. Una elección que ya no está en la lista se VACÍA y, desde ahí,
+        // cuenta como decidida: una carga posterior no la sustituye por otra (ver
+        // `competenciaPreseleccionada`). Al vaciarse cambia la vista y su contenido deja de verse.
+        setCompetitionId((actual) => {
+          const { competitionId: siguiente, invalidada } = competenciaPreseleccionada(todas, actual, eleccionManualRef.current);
+          if (invalidada) eleccionManualRef.current = true;
+          return siguiente;
+        });
       })
       .catch((err) => {
         if (vigente) setErrorGlobal(err instanceof Error ? err.message : "No se pudieron cargar las competencias");
@@ -228,7 +251,8 @@ export function RelayWorkspacePage() {
 
     Promise.all([
       enabledEventsApi.listEnabledEvents(competitionId),
-      enabledEventsApi.listClubSwimmers(clubId),
+      // Con la competencia: cada nadador trae su edad a la fecha de corte (servidor).
+      enabledEventsApi.listClubSwimmers(clubId, competitionId),
       // TODOS los relevos confirmados: el backend pagina de 50 en 50 y esta lista
       // decide qué se muestra como ya inscrito.
       traerTodasLasPaginas((page, pageSize) => api.list({ competitionId, clubId, status: "confirmed", page, pageSize })),
@@ -292,9 +316,7 @@ export function RelayWorkspacePage() {
   const unplacedSwimmers = swimmers.filter((s) => !placedIds.has(s.id));
   const filteredSwimmers = unplacedSwimmers.filter((s) => {
     if (activeEvent && activeEvent.event.gender !== "mixed" && activeEvent.event.gender !== s.gender) return false;
-    if (!search.trim()) return true;
-    const q = search.trim().toLowerCase();
-    return s.fullName.toLowerCase().includes(q) || s.run.toLowerCase().includes(q);
+    return coincideConBusqueda(s, search);
   });
   const emptyRosterMessage =
     swimmers.length === 0
@@ -388,10 +410,17 @@ export function RelayWorkspacePage() {
   const relevosBloqueados = selectedCompetition?.status === "closed" && !hasRole("admin");
 
   const combinedAgePreview = useMemo(() => {
-    if (!activeEvent || !selectedCompetition?.ageCutoffDate || filledCount !== 4) return null;
+    if (!activeEvent || filledCount !== 4) return null;
     const chosen = slots.map((id) => swimmers.find((s) => s.id === id)).filter((s): s is EligibleSwimmer => Boolean(s));
     if (chosen.length !== 4) return null;
-    const combinedAge = chosen.reduce((sum, s) => sum + computeAgeClientPreview(s.birthDate, selectedCompetition.ageCutoffDate!), 0);
+    // La edad al corte que calculó el SERVIDOR (con su respaldo si la competencia no tiene fecha de
+    // corte). Si faltara para alguno, se conserva la vista previa anterior, que exige la fecha.
+    const conEdadDelServidor = chosen.every((s) => typeof s.edadAlCorte === "number");
+    if (!conEdadDelServidor && !selectedCompetition?.ageCutoffDate) return null;
+    const combinedAge = chosen.reduce(
+      (sum, s) => sum + (conEdadDelServidor ? s.edadAlCorte! : computeAgeClientPreview(s.birthDate, selectedCompetition!.ageCutoffDate!)),
+      0
+    );
     const match = activeEvent.enabledCategories.filter((ec) => combinedAge >= ec.category.minAge && combinedAge <= ec.category.maxAge);
     if (match.length === 0) return { combinedAge, error: `Ninguna categoría cubre esta edad combinada (${combinedAge} años).` };
     if (match.length > 1) return { combinedAge, error: `Hay más de una categoría posible para ${combinedAge} años — revise el catálogo.` };
@@ -445,20 +474,21 @@ export function RelayWorkspacePage() {
     <AppShell>
       <h1 style={{ color: "var(--brand-navy)", marginBottom: "0.75rem" }}>Panel de Relevos</h1>
 
+      {/* Sin anchos mínimos fijos: con poco espacio desbordaban la página (ver `theme.css`, paneles). */}
       <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
-        <div>
+        <div style={{ flex: "1 1 260px", minWidth: 0, maxWidth: 420 }}>
           <label style={{ fontSize: "0.8rem" }}>Competencia</label>
-          <select value={competitionId} onChange={(e) => setCompetitionId(e.target.value)} style={{ minWidth: 260 }}>
+          <select aria-label="Competencia" value={competitionId} onChange={(e) => elegirCompetencia(e.target.value)} style={{ width: "100%", maxWidth: "100%" }}>
             <option value="">Seleccionar...</option>
             {competitions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
-        <div>
+        <div style={{ flex: "1 1 200px", minWidth: 0, maxWidth: 360 }}>
           <label style={{ fontSize: "0.8rem" }}>Club</label>
           {isPureSwimmer || isClubScoped ? (
             <p style={{ fontSize: "0.9rem", padding: "0.45rem 0" }}>{ownClubName ?? "Cargando..."}</p>
           ) : (
-            <select value={clubId} onChange={(e) => setClubId(e.target.value)} style={{ minWidth: 200 }}>
+            <select value={clubId} onChange={(e) => setClubId(e.target.value)} style={{ width: "100%", maxWidth: "100%" }}>
               <option value="">Seleccionar...</option>
               {clubs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -506,9 +536,10 @@ export function RelayWorkspacePage() {
             equipo — arrastre nadadores desde la izquierda hacia los 4 puestos.
           </p>
 
-          <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: "1rem", alignItems: "start" }}>
+          {/* Columnas y desplazamiento con poco espacio: `theme.css` («Panel de Inscripción…») y `ZonaDesplazable`. */}
+          <div className="panel-trabajo">
             {/* -------- Panel izquierdo: nadadores -------- */}
-            <div role="region" aria-label="Nadadores disponibles" style={{ border: "1px solid var(--brand-gray-100)", borderRadius: 8, padding: "0.75rem", maxHeight: "78vh", overflowY: "auto" }}>
+            <ZonaDesplazable etiqueta="Nadadores disponibles" className="panel-nadadores">
               <input ref={searchInputRef} placeholder="🔎 Buscar nadador o RUN... (/)" value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginBottom: "0.5rem" }} />
               {isPureSwimmer && <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)" }}>Solo puede visualizar los relevos en los que participa.</p>}
               {!isPureSwimmer && !activeEventId && <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)" }}>Elija una prueba de relevo a la derecha para empezar a armar el equipo.</p>}
@@ -532,20 +563,20 @@ export function RelayWorkspacePage() {
                     opacity: activeEventId ? 1 : 0.5,
                   }}
                 >
-                  ☰ {s.fullName}
+                  <span className="panel-nombre">☰ {nombreConEdad(s, s.edadAlCorte)}</span>
                 </div>
               ))}
-            </div>
+            </ZonaDesplazable>
 
             {/* -------- Centro: una columna por día -------- */}
-            <div style={{ display: "flex", gap: "0.75rem", overflowX: "auto", maxHeight: "78vh", paddingBottom: "0.5rem" }}>
+            <ZonaDesplazable etiqueta="Pruebas de relevo por día" className="panel-dias panel-dias-relevos" controlesHorizontales textoContenido="días o pruebas">
               {days.length === 0 && (
                 <p style={{ fontSize: "0.85rem", color: "var(--brand-gray-600)" }}>Sin pruebas de relevo configuradas en esta competencia.</p>
               )}
               {days.map((date) => {
                 const dayEvents = eventsForDay(date);
                 return (
-                  <div key={date} style={{ minWidth: 260, flex: "0 0 260px" }}>
+                  <div key={date} className="panel-dia">
                     <h3 style={{ fontSize: "0.9rem", color: "var(--brand-navy)", position: "sticky", top: 0, background: "white", padding: "0.2rem 0" }}>
                       {formatCalendarDate(date, { weekday: "long", day: "2-digit", month: "2-digit" })}
                     </h3>
@@ -654,8 +685,8 @@ export function RelayWorkspacePage() {
                                           >
                                             <span style={{ fontSize: "0.68rem", color: "var(--brand-gray-600)", minWidth: 70 }}>{label}</span>
                                             {swimmer ? (
-                                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flex: 1, fontSize: "0.75rem" }}>
-                                                <span>☰ {swimmer.fullName}</span>
+                                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.3rem", flex: 1, minWidth: 0, fontSize: "0.75rem" }}>
+                                                <span className="panel-nombre">☰ {nombreConEdad(swimmer, swimmer.edadAlCorte)}</span>
                                                 <button className="btn-danger" style={{ padding: "0.05rem 0.3rem", fontSize: "0.68rem" }} onClick={(e) => { e.stopPropagation(); clearSlot(i); }}>×</button>
                                               </div>
                                             ) : (
@@ -706,8 +737,9 @@ export function RelayWorkspacePage() {
                                             </span>
                                           )}
                                         </div>
-                                        <div style={{ color: "var(--brand-gray-600)" }}>
-                                          {t.members.slice().sort((a, b) => a.orderPosition - b.orderPosition).map((m) => m.person.fullName).join(" → ")}
+                                        <div className="panel-nombre" style={{ color: "var(--brand-gray-600)" }}>
+                                          {/* Orden de los puestos; la edad viene con el integrante (servidor), esté o no en el plantel. */}
+                                          {t.members.slice().sort((a, b) => a.orderPosition - b.orderPosition).map((m) => nombreConEdad(m.person, m.edadAlCorte)).join(" → ")}
                                         </div>
                                       </div>
                                     ))}
@@ -722,7 +754,7 @@ export function RelayWorkspacePage() {
                   </div>
                 );
               })}
-            </div>
+            </ZonaDesplazable>
           </div>
         </>
       )}

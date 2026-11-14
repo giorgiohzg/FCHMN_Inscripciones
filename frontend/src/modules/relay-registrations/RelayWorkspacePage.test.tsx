@@ -131,7 +131,7 @@ const elegir = (etiqueta: RegExp, valor: string) => {
   fireEvent.change(select, { target: { value: valor } });
 };
 
-const nadadorEnPlantel = (n: number) => screen.queryByText(new RegExp(`Nadador ${n}$`));
+const nadadorEnPlantel = (n: number) => screen.queryByText(new RegExp(`Nadador ${n}$`, "i"));
 
 /**
  * La tarjeta de la prueba: su texto va partido entre el número en círculo y la
@@ -189,10 +189,10 @@ describe("una respuesta atrasada no puede pintar los nadadores de otro club", ()
 
     elegir(/Competencia/, "comp-A");
     elegir(/Club/, "club-1");
-    await waitFor(() => expect(listClubSwimmers).toHaveBeenCalledWith("club-1"));
+    await waitFor(() => expect(listClubSwimmers).toHaveBeenCalledWith("club-1", expect.any(String)));
 
     elegir(/Club/, "club-2");
-    await waitFor(() => expect(listClubSwimmers).toHaveBeenCalledWith("club-2"));
+    await waitFor(() => expect(listClubSwimmers).toHaveBeenCalledWith("club-2", expect.any(String)));
 
     // El del club 2 llega primero; el del club 1, tarde.
     await act(async () => {
@@ -312,7 +312,7 @@ describe("no se puede guardar un equipo incompleto", () => {
     await abrirArmador();
 
     expect(listEnabledEvents).toHaveBeenCalledWith("comp-A");
-    expect(listClubSwimmers).toHaveBeenCalledWith("club-1");
+    expect(listClubSwimmers).toHaveBeenCalledWith("club-1", expect.any(String));
     expect(relayList.mock.calls[0]![0]).toMatchObject({
       competitionId: "comp-A",
       clubId: "club-1",
@@ -397,7 +397,7 @@ describe("una cancelación que empezó en otra competencia no puede vaciar la ac
 
     await waitFor(() => expect(nadadorEnPlantel(9)).toBeInTheDocument());
     expect(seleccionarPrueba(), "las pruebas de B").toBeInTheDocument();
-    expect(screen.queryByText(/Nadador 1$/), "y nada del plantel de A").not.toBeInTheDocument();
+    expect(screen.queryByText(/Nadador 1$/i), "y nada del plantel de A").not.toBeInTheDocument();
   });
 });
 
@@ -590,7 +590,7 @@ describe("no se opera sobre una fotografía parcial", () => {
 describe("los nadadores colocados salen de la columna izquierda", () => {
   const region = () => screen.getByRole("region", { name: "Nadadores disponibles" });
   const columna = () => within(region());
-  const enColumna = (n: number) => columna().queryByText(new RegExp(`Nadador ${n}$`));
+  const enColumna = (n: number) => columna().queryByText(new RegExp(`Nadador ${n}$`, "i"));
 
   function soltar(personId: string, destino: HTMLElement) {
     fireEvent.drop(destino, {
@@ -600,7 +600,7 @@ describe("los nadadores colocados salen de la columna izquierda", () => {
   const cupoLibre = () => screen.getAllByText("Arrastre aquí")[0]!.parentElement!;
   /** El puesto que contiene a ese nadador, buscado fuera de la columna. */
   const puestoDe = (n: number) => {
-    const fila = screen.getAllByText(new RegExp(`Nadador ${n}$`)).find((el) => !region().contains(el))!;
+    const fila = screen.getAllByText(new RegExp(`Nadador ${n}$`, "i")).find((el) => !region().contains(el))!;
     return fila.closest("[draggable]") as HTMLElement;
   };
   const botonConfirmar = () => screen.getByRole("button", { name: /Confirmar equipo/ });
@@ -668,7 +668,7 @@ describe("los nadadores colocados salen de la columna izquierda", () => {
 
     await waitFor(() => expect(screen.getAllByText("Arrastre aquí")).toHaveLength(3));
     expect(enColumna(1)).not.toBeInTheDocument();
-    expect(screen.getAllByText(/Nadador 1$/)).toHaveLength(1);
+    expect(screen.getAllByText(/Nadador 1$/i)).toHaveLength(1);
   });
 
   it("intercambiar dos puestos ocupados mantiene a ambos fuera de la columna", async () => {
@@ -677,13 +677,13 @@ describe("los nadadores colocados salen de la columna izquierda", () => {
     await waitFor(() => expect(enColumna(1)).not.toBeInTheDocument());
     soltar("p2", cupoLibre());
     await waitFor(() => expect(enColumna(2)).not.toBeInTheDocument());
-    const antes = screen.getAllByText(/Nadador [12]$/).map((el) => el.textContent);
+    const antes = screen.getAllByText(/Nadador [12]$/i).map((el) => el.textContent);
 
     fireEvent.drop(puestoDe(2), {
       dataTransfer: { getData: (tipo: string) => (tipo === "application/x-slot-index" ? "0" : "") },
     });
 
-    await waitFor(() => expect(screen.getAllByText(/Nadador [12]$/).map((el) => el.textContent)).not.toEqual(antes));
+    await waitFor(() => expect(screen.getAllByText(/Nadador [12]$/i).map((el) => el.textContent)).not.toEqual(antes));
     expect(enColumna(1)).not.toBeInTheDocument();
     expect(enColumna(2)).not.toBeInTheDocument();
     expect(screen.getAllByText("Arrastre aquí")).toHaveLength(2);
@@ -780,7 +780,7 @@ describe("los nadadores colocados salen de la columna izquierda", () => {
 
 describe("la columna conserva los filtros de género y de búsqueda", () => {
   const columna = () => within(screen.getByRole("region", { name: "Nadadores disponibles" }));
-  const enColumna = (n: number) => columna().queryByText(new RegExp(`Nadador ${n}$`));
+  const enColumna = (n: number) => columna().queryByText(new RegExp(`Nadador ${n}$`, "i"));
   const cupoLibre = () => screen.getAllByText("Arrastre aquí")[0]!.parentElement!;
   const soltar = (personId: string) =>
     fireEvent.drop(cupoLibre(), {

@@ -68,6 +68,11 @@ export interface PersonFormInput {
   gender: "male" | "female";
   email?: string; // opcional — "" se interpreta como "sin correo"
   phone?: string;
+  /**
+   * Solo en el ALTA: «Asignación a club». Ausente = sin asignación. Con un club, el servidor crea
+   * la persona y su membresía activa desde hoy (America/Santiago) en una sola transacción.
+   */
+  clubId?: string;
   // SIN `roles`: el backend ya no los acepta ni al crear ni al editar. Los
   // cuatro se derivan de relaciones reales —membresía de club para `swimmer`,
   // nombramiento en la ficha del club para los otros tres—, así que enviarlos

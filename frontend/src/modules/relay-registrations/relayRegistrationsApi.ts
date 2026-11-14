@@ -17,7 +17,16 @@ export interface RelayRegistrationItem {
    * nadador sin esas funciones recibe solo el suyo y la propiedad no viene en sus compañeros.
    * La interfaz no lo muestra.
    */
-  members: { orderPosition: number; person: { id: string; fullName: string; run?: string } }[];
+  members: {
+    orderPosition: number;
+    /**
+     * Edad al corte de la competencia, calculada por el servidor para el integrante; no depende del
+     * plantel activo. Un nadador la recibe solo para sí mismo: medida adicional de esta
+     * implementación, no parte de AUD-14 (que regula el RUN).
+     */
+    edadAlCorte?: number;
+    person: { id: string; fullName: string; firstName?: string | null; paternalLastName?: string | null; maternalLastName?: string | null; run?: string };
+  }[];
 }
 
 export function useRelayRegistrationsApi() {

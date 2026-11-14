@@ -517,3 +517,111 @@ label {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Panel de Inscripción y Panel de Relevos: poco espacio y desplazamiento ----------
+   Acotado a estos dos paneles (clases `panel-*` y `zona-desplazable*`, usadas solo allí).
+
+   - Dos columnas solo si caben: la de nadadores se encoge hasta 200px y la de pruebas nunca
+     baja de cero ni empuja la página (`minmax(0, 1fr)` y `min-width: 0`). Antes la columna fija
+     de 260px dejaba la de pruebas en 0px de ancho a 375px: inalcanzable, no solo sin barra.
+   - Con menos de 900px de ventana se apilan: nadadores arriba (con su propio desplazamiento) y
+     pruebas debajo, sin desplazamiento vertical anidado (lo hace la página).
+   - Barras propias declaradas con `::-webkit-scrollbar` (WebKit y Chromium) y finas estándar en
+     los demás. Se observaron visibles en Chromium; en Safari de macOS NO está comprobado que se
+     muestren siempre con «Mostrar barras de desplazamiento: al desplazar» (validación pendiente).
+     Por eso el descubrimiento no depende de ellas: lo dan los controles de `ZonaDesplazable`. */
+.panel-trabajo {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.panel-trabajo > * {
+  min-width: 0;
+}
+.panel-nadadores {
+  border: 1px solid var(--brand-gray-100);
+  border-radius: 8px;
+  padding: 0.75rem;
+  max-height: 78vh;
+  max-height: 78dvh;
+  overflow-y: auto;
+}
+.panel-dias {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  max-height: 78vh;
+  max-height: 78dvh;
+  padding-bottom: 0.5rem;
+}
+.panel-dia {
+  flex: 0 0 250px;
+  min-width: 0;
+}
+.panel-dias-relevos .panel-dia {
+  flex-basis: 260px;
+}
+.panel-nombre {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.zona-desplazable:focus-visible {
+  outline: 3px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+.zona-desplazable::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.zona-desplazable::-webkit-scrollbar-track {
+  background: var(--brand-gray-100);
+  border-radius: 5px;
+}
+.zona-desplazable::-webkit-scrollbar-thumb {
+  background: var(--brand-gray-600);
+  border-radius: 5px;
+  border: 2px solid var(--brand-gray-100);
+}
+@supports not selector(::-webkit-scrollbar) {
+  .zona-desplazable {
+    scrollbar-width: thin;
+    scrollbar-color: var(--brand-gray-600) var(--brand-gray-100);
+  }
+}
+.zona-desplazable-controles {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.8rem;
+}
+.zona-desplazable-controles button {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+}
+.zona-desplazable-controles button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.zona-desplazable-ayuda {
+  flex: 1 1 10rem;
+  color: var(--brand-gray-600);
+}
+@media (max-width: 900px) {
+  .panel-trabajo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .panel-nadadores {
+    max-height: 45vh;
+    max-height: 45dvh;
+  }
+  .panel-dias {
+    max-height: none;
+  }
+  .panel-dia,
+  .panel-dias-relevos .panel-dia {
+    flex-basis: min(260px, 85%);
+  }
+}

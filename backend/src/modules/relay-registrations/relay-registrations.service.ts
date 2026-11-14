@@ -3,6 +3,7 @@ import { prisma } from "../../shared/prisma.client";
 import { audit, withAudit } from "../audit/audit.service";
 import { ValidationError, NotFoundError, ForbiddenError } from "../../shared/errors";
 import { computeAge, getDefaultAgeCutoffDate } from "../../shared/age.util";
+import { edadesAlCorte } from "../../shared/edadAlCorte";
 import { computeEffectiveStatus, isRelayRegistrationOpen, evaluateRegistrationWindow } from "../competitions/competitions.rules";
 import { evaluarElegibilidadDeIntegrantes } from "./relay-membership.rules";
 import { evaluateCapacity } from "../competitions/competition-capacity.rules";
@@ -43,7 +44,10 @@ const include = {
       competitionSession: { include: { sessionType: true, competitionDate: true } },
     },
   },
-  members: { include: { person: { select: { id: true, fullName: true, run: true } } }, orderBy: { orderPosition: "asc" as const } },
+  members: {
+    include: { person: { select: { id: true, fullName: true, firstName: true, paternalLastName: true, maternalLastName: true, run: true } } },
+    orderBy: { orderPosition: "asc" as const },
+  },
 };
 
 /**
@@ -76,14 +80,20 @@ const include = {
  * No modifica el objeto recibido: el del nadador se arma con copias, y la auditoría y
  * cualquier otro uso conservan el original.
  */
-export function presentarRelevoParaActor<R extends { members: Array<{ person: { id: string; fullName: string; run: string } }> }>(relevo: R, actor: ActorContext) {
+export function presentarRelevoParaActor<
+  R extends { members: Array<{ person: { id: string; fullName: string; run: string }; edadAlCorte?: number }> },
+>(relevo: R, actor: ActorContext) {
   const propio = scopedPersonId(actor);
   if (propio === null) return relevo;
   return {
     ...relevo,
     members: relevo.members.map((m) => {
       const { run, ...persona } = m.person;
-      return { ...m, person: m.person.id === propio ? { ...persona, run } : persona };
+      if (m.person.id === propio) return { ...m, person: { ...persona, run } };
+      // Tampoco la edad al corte de sus compañeros (se deriva de su fecha de nacimiento); la propia
+      // sí. Medida ADICIONAL de la edad en los paneles, no parte de AUD-14, que regula el RUN.
+      const { edadAlCorte: _edadAjena, ...miembro } = m;
+      return { ...miembro, person: persona };
     }),
   };
 }
@@ -477,7 +487,14 @@ export async function listRelayRegistrations(query: RelayRegistrationListQuery, 
     prisma.relayRegistration.count({ where }),
   ]);
 
-  return { items: items.map((r) => presentarRelevoParaActor(r, actor)), total, page: query.page, pageSize: query.pageSize };
+  // Edad al corte de cada integrante para SU competencia, aunque ya no esté en el plantel activo
+  // (solo el número; la fecha de nacimiento no sale). El orden de los puestos no cambia.
+  const edad = await edadesAlCorte(items.flatMap((r) => r.members.map((m) => ({ personId: m.personId, competitionId: r.competitionEvent.competitionId }))));
+  const conEdad = items.map((r) => ({
+    ...r,
+    members: r.members.map((m) => ({ ...m, edadAlCorte: edad({ personId: m.personId, competitionId: r.competitionEvent.competitionId }) })),
+  }));
+  return { items: conEdad.map((r) => presentarRelevoParaActor(r, actor)), total, page: query.page, pageSize: query.pageSize };
 }
 
 /**

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { validateRun } from "../../shared/run.util";
 import { usernameOpcionalField } from "../../shared/username.schema";
+import { uuidField } from "../../shared/uuid.schema";
 
 const runField = z.string().superRefine((val, ctx) => {
   const result = validateRun(val);
@@ -29,6 +30,13 @@ export const personCreateSchema = z.object({
   gender: z.enum(["male", "female"], { error: "Debe indicar el género de la persona" }),
   email: z.union([z.string().trim().email("Correo electrónico inválido"), z.literal("")]).optional().transform((v) => (v ? v : undefined)).optional(),
   phone: z.string().trim().optional(),
+  /**
+   * «Asignación a club» del alta: ausente o `null` = sin asignación. Con un club, la persona se
+   * crea con su membresía ACTIVA en ese club desde hoy (America/Santiago), con las reglas de la
+   * asignación directa de C-05 y en la MISMA transacción (`createPersonWithOptionalClub`). Solo
+   * existe en el alta: la edición no es un mecanismo de traslado.
+   */
+  clubId: uuidField("Club inválido").nullable().optional(),
   /**
    * `roles` SE RECHAZA, no se ignora.
    *

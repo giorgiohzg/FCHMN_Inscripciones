@@ -7,6 +7,8 @@ import { SwimmerClubSection } from "./SwimmerClubSection";
 import { useAuth } from "../auth/AuthContext";
 import { CredencialesDeAcceso } from "../../shared/CredencialesDeAcceso";
 import { evaluarUsernameEditado, problemaDeUsername } from "../../shared/usernameFormato";
+import { useClubsApi, type Club } from "../clubs/clubsApi";
+import { traerTodasLasPaginas } from "../../shared/paginacion";
 
 export function PersonFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +26,17 @@ export function PersonFormPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [person, setPerson] = useState<Person | null>(null);
+
+  /**
+   * «ASIGNACIÓN A CLUB», SOLO EN EL ALTA. Vacío = «Sin asignación». La lista es la COMPLETA de
+   * clubes activos (todas las páginas). Al guardar con un club, el servidor crea la persona y su
+   * membresía activa desde hoy en Chile, en una transacción: si el club dejó de estar activo,
+   * no se crea nada. No crea credenciales. La edición no ofrece este campo: no es un traslado.
+   */
+  const clubsApi = useClubsApi();
+  const [clubAsignado, setClubAsignado] = useState("");
+  const [clubesActivos, setClubesActivos] = useState<Club[] | null>(null);
+  const [errorClubes, setErrorClubes] = useState<string | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -117,6 +130,22 @@ export function PersonFormPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  useEffect(() => {
+    if (isEdit) return;
+    let vigente = true;
+    traerTodasLasPaginas((page, pageSize) => clubsApi.list({ status: "active", page, pageSize }))
+      .then((todos) => {
+        if (vigente) setClubesActivos(todos);
+      })
+      .catch((err) => {
+        if (vigente) setErrorClubes(err instanceof Error ? err.message : "No se pudieron cargar los clubes");
+      });
+    return () => {
+      vigente = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit]);
+
   const runValid = isEdit || run.length === 0 || isValidRun(run);
 
   async function handleSubmit(e: FormEvent) {
@@ -181,6 +210,7 @@ export function PersonFormPage() {
           gender,
           email,
           phone: phone || undefined,
+          ...(clubAsignado ? { clubId: clubAsignado } : {}),
         });
       }
       navigate("/personas");
@@ -290,6 +320,31 @@ export function PersonFormPage() {
 
         <label htmlFor="phone">Teléfono de contacto</label>
         <input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+
+        {!isEdit && (
+          <>
+            <label htmlFor="clubAsignado">Asignación a club</label>
+            <select
+              id="clubAsignado"
+              value={clubAsignado}
+              onChange={(e) => setClubAsignado(e.target.value)}
+              aria-describedby="clubAsignadoAyuda"
+            >
+              <option value="">Sin asignación</option>
+              {(clubesActivos ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <p id="clubAsignadoAyuda" style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "-0.4rem" }}>
+              {clubesActivos === null && !errorClubes
+                ? "Cargando clubes activos..."
+                : "Con un club, la persona queda en su plantel como nadadora desde hoy (fecha de Chile). No se crean credenciales."}
+            </p>
+            {errorClubes && <p className="error-message">{errorClubes}. Puede crear la persona sin asignación.</p>}
+          </>
+        )}
 
         <CredencialesDeAcceso
           modo={isEdit ? "edicion" : "alta"}

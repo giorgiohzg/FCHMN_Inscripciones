@@ -193,13 +193,15 @@ afterAll(async () => {
 });
 
 describe("1. aplicación limpia de todas las migraciones, C-05 incluida", () => {
-  it("las 40 migraciones del repositorio constan aplicadas una vez, sin fallos ni reversiones", async () => {
+  it("las 41 migraciones del repositorio constan aplicadas una vez, sin fallos ni reversiones", async () => {
     const enDisco = readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
       .filter((d) => d.isDirectory())
       .map((d) => d.name)
       .sort();
-    expect(enDisco).toHaveLength(40);
-    expect(enDisco.at(-1)).toBe(C05);
+    // 40 hasta C-05 y la de la competencia predeterminada, posterior.
+    expect(enDisco).toHaveLength(41);
+    expect(enDisco).toContain(C05);
+    expect(enDisco.at(-1)).toBe("20261114000000_competencia_predeterminada");
 
     const { rows } = await pg.query(
       `SELECT migration_name, finished_at IS NOT NULL AS terminada, rolled_back_at IS NOT NULL AS revertida FROM _prisma_migrations ORDER BY migration_name`

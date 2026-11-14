@@ -755,6 +755,15 @@ model Competition {
   // confirmados que no cumplen, el sistema solo informa cuántos son.
   requireIndividualForRelay Boolean @default(true) @map("require_individual_for_relay")
 
+  // COMPETENCIA POR DEFECTO de los paneles de Inscripción y de Relevos: global y
+  // persistente, la marca solo la administración. Como MÁXIMO una: lo garantiza el
+  // índice único parcial `competitions_una_predeterminada` (SQL, migración
+  // `20261114000000_competencia_predeterminada`) y el servicio serializa los cambios con
+  // un bloqueo consultivo. Marcarla NO abre inscripciones ni toca su estado ni sus fechas:
+  // solo preselecciona el desplegable cuando la cuenta puede verla. `false` por omisión:
+  // la migración no elige ninguna competencia existente.
+  esPredeterminada Boolean @default(false) @map("es_predeterminada")
+
   // CAUSA DEL CIERRE DE INSCRIPCIONES.
   //
   // `status` por sí solo no distingue un cierre manual de uno por fecha o por

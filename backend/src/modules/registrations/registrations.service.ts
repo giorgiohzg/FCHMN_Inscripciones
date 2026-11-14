@@ -3,6 +3,7 @@ import { audit, withAudit } from "../audit/audit.service";
 import { ValidationError, NotFoundError, ForbiddenError } from "../../shared/errors";
 import { assertClubAccess, resolveClubFilter, scopedPersonId, type ActorContext as SharedActorContext } from "../../shared/actorContext";
 import { computeAge, getDefaultAgeCutoffDate } from "../../shared/age.util";
+import { edadesAlCorte } from "../../shared/edadAlCorte";
 import { computeEffectiveStatus, isRegistrationOpen, evaluateRegistrationWindow } from "../competitions/competitions.rules";
 import { exigirCompetenciaVisible, competenciaVisiblePara } from "../competitions/competitions.visibilidad";
 import { evaluateCapacity, evaluateEventClubLimit } from "../competitions/competition-capacity.rules";
@@ -83,13 +84,24 @@ export async function listEnabledCompetitionEvents(competitionId: string) {
  * recibido: un usuario de club solo puede pedir el suyo (se rechaza si pide
  * otro) y un nadador solo se ve a sí mismo.
  */
-export async function listActiveSwimmersOfClub(clubId: string, actor: ActorContext) {
+export async function listActiveSwimmersOfClub(clubId: string, actor: ActorContext, competitionId?: string) {
   // Un usuario de club solo puede pedir el plantel del suyo. Un nadador sí
   // puede consultar "su" club, pero el filtro por `personId` de abajo hace
   // que solo se vea a sí mismo, así que no necesita (ni debe) pasar por la
   // comprobación de alcance de club.
   if (actor.scope.kind === "club") assertClubAccess(actor, clubId);
   const restrictToPersonId = scopedPersonId(actor);
+
+  // Con `competitionId` (Panel de Relevos) cada nadador trae su edad a la fecha de corte de esa
+  // competencia, con el mismo criterio y respaldo que las reglas de inscripción. La competencia
+  // debe ser visible para el actor (AUD-07), igual que en la matriz de elegibilidad.
+  let ageCutoffDate: Date | null = null;
+  if (competitionId) {
+    const competition = await prisma.competition.findUnique({ where: { id: competitionId } });
+    if (!competition) throw new NotFoundError("Competencia");
+    exigirCompetenciaVisible(competition, actor);
+    ageCutoffDate = competition.ageCutoffDate ?? getDefaultAgeCutoffDate();
+  }
 
   const activeMembers = await prisma.clubSwimmer.findMany({
     where: { clubId, status: "active", ...(restrictToPersonId ? { personId: restrictToPersonId } : {}) },
@@ -100,7 +112,18 @@ export async function listActiveSwimmersOfClub(clubId: string, actor: ActorConte
     .map((m) => m.person)
     .filter((p) => p.status === "active" && p.deletedAt === null)
     .filter((p) => p.roles.some((r) => r.roleType === "swimmer" && r.active))
-    .map((p) => ({ id: p.id, fullName: p.fullName, run: p.run, gender: p.gender, birthDate: p.birthDate }));
+    .map((p) => ({
+      id: p.id,
+      fullName: p.fullName,
+      // Campos separados para presentar «PATERNO MATERNO, NOMBRE» sin partir `fullName`.
+      firstName: p.firstName,
+      paternalLastName: p.paternalLastName,
+      maternalLastName: p.maternalLastName,
+      run: p.run,
+      gender: p.gender,
+      birthDate: p.birthDate,
+      ...(ageCutoffDate ? { edadAlCorte: computeAge(p.birthDate, ageCutoffDate) } : {}),
+    }));
 }
 
 export interface AvailableIndividualEvent {
@@ -182,6 +205,12 @@ export async function listAvailableIndividualEvents(competitionId: string, perso
 export interface ClubEligibilityEntry {
   personId: string;
   fullName: string;
+  /** Campos separados (nulos en registros históricos): la presentación no parte `fullName`. */
+  firstName: string | null;
+  paternalLastName: string | null;
+  maternalLastName: string | null;
+  /** Edad a la fecha de corte de la competencia (`ageCutoffDate` o su respaldo), como las reglas. */
+  edadAlCorte: number;
   run: string;
   gender: "male" | "female";
   eligibleEvents: { competitionEventId: string; categoryId: string; categoryName: string }[];
@@ -248,6 +277,10 @@ export async function listClubEligibilityMatrix(competitionId: string, clubId: s
     return {
       personId: person.id,
       fullName: person.fullName,
+      firstName: person.firstName,
+      paternalLastName: person.paternalLastName,
+      maternalLastName: person.maternalLastName,
+      edadAlCorte: computeAge(person.birthDate, ageCutoffDate),
       run: person.run,
       gender: person.gender as "male" | "female",
       eligibleEvents,
@@ -664,7 +697,7 @@ export async function listRegistrations(query: RegistrationListQuery, actor: Act
     prisma.registration.findMany({
       where,
       include: {
-        person: { select: { id: true, fullName: true, firstName: true, paternalLastName: true, run: true } },
+        person: { select: { id: true, fullName: true, firstName: true, paternalLastName: true, maternalLastName: true, run: true } },
         club: { select: { id: true, name: true } },
         category: { select: { id: true, name: true } },
         competitionEvent: { include: { competition: { select: { id: true, name: true, status: true, registrationStartAt: true, registrationEndAt: true } }, event: { include: { distance: true, stroke: true, testType: true } }, competitionSession: { include: { sessionType: true, competitionDate: true } } } },
@@ -678,8 +711,12 @@ export async function listRegistrations(query: RegistrationListQuery, actor: Act
   ]);
 
   const now = new Date();
+  // Edad al corte de la competencia de cada inscripción, para presentarla aunque la persona ya no
+  // esté en el plantel activo. Solo el número: la fecha de nacimiento no sale.
+  const edad = await edadesAlCorte(items.map((i) => ({ personId: i.personId, competitionId: i.competitionEvent.competitionId })));
   const itemsWithStatus = items.map((item) => ({
     ...item,
+    edadAlCorte: edad({ personId: item.personId, competitionId: item.competitionEvent.competitionId }),
     competitionEvent: {
       ...item.competitionEvent,
       competition: {

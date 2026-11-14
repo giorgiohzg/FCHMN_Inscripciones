@@ -51,7 +51,7 @@ export async function personsRoutes(app: FastifyInstance) {
     const parsed = personCreateSchema.safeParse(req.body);
     if (!parsed.success) throw new ValidationError("Datos de persona inválidos", parsed.error.flatten());
 
-    const person = await personsService.createPerson(parsed.data, { userId: req.authUser!.sub, ipAddress: req.ip });
+    const person = await personsService.createPersonWithOptionalClub(parsed.data, { userId: req.authUser!.sub, ipAddress: req.ip });
     reply.code(201).send(person);
   });
 

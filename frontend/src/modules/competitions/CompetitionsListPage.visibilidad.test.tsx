@@ -100,11 +100,11 @@ describe("la tabla de administración", () => {
     for (const llamada of list.mock.calls) expect(llamada[0]).not.toHaveProperty("visibleInRegistrationPanels");
   });
 
-  it("la fila vacía ocupa las cinco columnas", async () => {
+  it("la fila vacía ocupa las seis columnas (con «Por defecto»)", async () => {
     list.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
     montar();
     const aviso = await screen.findByText("No hay competencias con este filtro.");
-    expect(aviso.closest("td")!.getAttribute("colspan")).toBe("5");
+    expect(aviso.closest("td")!.getAttribute("colspan")).toBe("6");
   });
 });
 

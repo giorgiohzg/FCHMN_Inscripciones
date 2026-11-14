@@ -377,8 +377,14 @@ describe("AUD-14: RUN de los integrantes en GET /relay-registrations", () => {
           expect(m).toEqual(delAdmin.members[j]);
         } else {
           expect("run" in m.person, `compañero ${m.person.fullName}`).toBe(false);
+          // Tampoco recibe la edad al corte de sus compañeros (se deriva de su fecha de
+          // nacimiento); administración sí. Es la única otra diferencia, y es una medida
+          // adicional de la edad en los paneles, no una decisión de AUD-14 (que regula el RUN).
+          expect("edadAlCorte" in m, `edad de ${m.person.fullName}`).toBe(false);
+          expect(typeof (delAdmin.members[j] as { edadAlCorte?: unknown }).edadAlCorte).toBe("number");
           const { run: _r, ...sinRun } = delAdmin.members[j]!.person;
-          expect(m).toEqual({ ...delAdmin.members[j], person: sinRun });
+          const { edadAlCorte: _e, ...miembroSinEdad } = delAdmin.members[j] as typeof delAdmin.members[number] & { edadAlCorte?: number };
+          expect(m).toEqual({ ...miembroSinEdad, person: sinRun });
         }
       }
       expect({ ...item, members: null }).toEqual({ ...delAdmin, members: null });

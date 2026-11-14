@@ -121,6 +121,12 @@ export interface Competition {
    */
   requireIndividualForRelay: boolean;
   /**
+   * Competencia por defecto de los paneles de Inscripción y de Relevos (como máximo una, global).
+   * Solo preselecciona el desplegable si la cuenta puede verla; no abre inscripciones ni cambia
+   * su estado. Opcional en el tipo para tolerar respuestas anteriores a la migración.
+   */
+  esPredeterminada?: boolean;
+  /**
    * Equipos de relevo CONFIRMADOS con algún integrante sin individual confirmada en la
    * competencia (equipos distintos, no integrantes). Lo devuelven el detalle y el guardado;
    * es solo un aviso: nada se modifica por él.
@@ -167,6 +173,11 @@ export interface CompetitionEventItem {
   event: { id: string; testTypeId: string; distance: { meters: number }; stroke: { name: string }; gender: "male" | "female" | "mixed"; testType: { name: string; swimmersCount: number } };
   competitionSession: { id: string; sessionType: { name: string }; competitionDate: { date: string } };
   enabledCategories: { category: { id: string; name: string; categoryGroup: { id: string; name: string } | null } }[];
+}
+
+export interface ResultadoPredeterminada {
+  competenciaPredeterminadaId: string | null;
+  cambio: boolean;
 }
 
 export function useCompetitionsApi() {
@@ -256,6 +267,13 @@ export function useCompetitionsApi() {
      * (la API lo comprueba; ocultar el botón no es la protección).
      */
     uncancel: (id: string) => api.post<Competition>(`/competitions/${id}/uncancel`),
+
+    /** Competencia por defecto de los paneles: solo administración (la API lo comprueba). */
+    marcarPredeterminada: (id: string) =>
+      api.put<ResultadoPredeterminada>(`/competitions/${id}/predeterminada`),
+    /** Quita la marca SOLO si `id` sigue siendo la predeterminada; si no, no cambia nada. */
+    quitarPredeterminada: (id: string) =>
+      api.delete<ResultadoPredeterminada>(`/competitions/${id}/predeterminada`),
 
     addDate: (id: string, date: string) =>
       api.post<CompetitionDate>(`/competitions/${id}/dates`, { date }),

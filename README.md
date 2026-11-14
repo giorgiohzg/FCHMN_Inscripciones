@@ -581,7 +581,7 @@ sesión no viaja.
 |---|---|---|---|
 | GET | `/persons` | Lista personas (búsqueda por RUN/nombre, filtro por rol/estado, paginado) | `persons:read` |
 | GET | `/persons/:id` | Detalle de una persona (incluye roles y credenciales) | `persons:read` |
-| POST | `/persons` | Crea una persona (valida RUN chileno). El nombre de usuario es **opcional** y no se genera ni se crea cuenta. **No acepta `roles`**: son derivados, y enviarlos se rechaza con 400 | `persons:write` |
+| POST | `/persons` | Crea una persona (valida RUN chileno). El nombre de usuario es **opcional** y no se genera ni se crea cuenta. **No acepta `roles`**: son derivados, y enviarlos se rechaza con 400. `clubId` opcional («Asignación a club»): crea además su membresía activa desde hoy en Chile, en la misma transacción (ver «Alta de persona con asignación a club») | `persons:write` |
 | PUT | `/persons/:id` | Actualiza datos (RUN no editable; nombre de usuario editable solo sin cuenta vigente). **Tampoco acepta `roles`** | `persons:write` |
 | DELETE | `/persons/:id` | Eliminación lógica | `persons:write` |
 | POST | `/persons/:id/block` | Bloquea persona y su cuenta de acceso si tiene | `persons:write` |
@@ -946,6 +946,7 @@ cuenta `system`.
 | GET/POST | `/competitions[/:id]` | Listar/crear competencias. El listado admite el filtro explícito `visibleInRegistrationPanels=true\|false` (ver «Visibilidad en los selectores de Inscripción, Relevos y Reportes») | `competitions:read` / `competitions:write` |
 | PUT | `/competitions/:id` | Editar (fechas de inscripción solo en `draft`/`scheduled`); también `visibleInRegistrationPanels` y `requireIndividualForRelay`. La respuesta y `GET /competitions/:id` traen `relayTeamsNotMeetingCondition` (ver «Condición de inscripción individual para relevos») | `competitions:write` |
 | POST | `/competitions/:id/duplicate` | Duplica estructura completa como base de una nueva (hereda la visibilidad en los paneles) | `competitions:write` |
+| PUT/DELETE | `/competitions/:id/predeterminada` | Marca o quita la **competencia por defecto** de los paneles de Inscripción y de Relevos (como máximo una, global; ver «Competencia por defecto»). Solo el rol `admin`, comprobado en la API además del permiso. No cambia estado, fechas ni visibilidad; la copia de una competencia no la hereda | `competitions:write` + rol `admin` |
 | POST | `/competitions/:id/{schedule\|cancel\|closeRegistrations\|start\|finish}` | Transiciones de ciclo de vida | `competitions:write` |
 | POST/DELETE | `/competitions/:id/dates`, `/competition-dates/:dateId` | Fechas de la competencia | `competitions:write` |
 | POST/DELETE | `/competition-dates/:dateId/sessions`, `/competition-sessions/:sessionId` | Jornadas dentro de una fecha | `competitions:write` |
@@ -985,6 +986,42 @@ Cada competencia guarda `visibleInRegistrationPanels` (columna `visible_in_regis
 - **El filtro.** `GET /competitions?visibleInRegistrationPanels=true|false`. **Omitido, el listado se comporta como siempre** (todas las competencias que el rol puede ver). Los tres selectores envían `true` a quienes no son administradores; **administración omite el parámetro** (enviar `false` devolvería únicamente las ocultas). Cada pantalla recorre todas las páginas y conserva sus demás condiciones. Se aceptan exactamente los textos `true` y `false`; cualquier otro valor responde 400 (en particular, `"false"` **no** se interpreta como verdadero, como haría una coerción a booleano). El filtro es una condición propia de la consulta: **se suma** a las restricciones por rol y estado (el personal que no es administrador sigue sin ver Borrador ni Programada) y los resultados, el total y la paginación salen de la misma condición.
 - **Competencias existentes, duplicadas e importadas.** La migración `20261102030000_competencia_visible_en_paneles` es aditiva: las competencias anteriores quedan **visibles**. Duplicar **hereda** la visibilidad del origen. Las nuevas y las importadas (Team Manager / Meet Events) nacen visibles salvo configuración expresa.
 
+#### Competencia por defecto de los paneles
+
+Administración puede marcar en **Competencias** (columna «Por defecto») **una** competencia por defecto, global y persistente (`competitions.es_predeterminada`, migración `20261114000000_competencia_predeterminada`).
+
+- **Como máximo una**, también ante cambios simultáneos: índice único parcial `competitions_una_predeterminada` y un bloqueo consultivo que ordena las marcas (la última confirmada gana). Marcar otra desmarca la anterior; quitarla solo afecta a la competencia pedida (si otra administración ya cambió la marca, no hace nada y la pantalla lo avisa).
+- **Al entrar al Panel de Inscripción y al Panel de Relevos** aparece preseleccionada, **solo si está entre las competencias que esa cuenta puede ver y elegir** en su desplegable. Administración conserva su excepción para las ocultas. Si no hay una accesible, el selector queda sin elección.
+- La elección manual manda: una vez que la persona elige (también «Seleccionar...»), una carga posterior o tardía de la lista no la cambia.
+- **No abre inscripciones** ni cambia estado, fechas, visibilidad ni `updated_at`. La migración no elige ninguna competencia existente, y duplicar no hereda la marca.
+- **Auditoría:** `COMPETITION_DEFAULT_SET` (con la anterior y la nueva) y `COMPETITION_DEFAULT_CLEARED`, en la misma transacción.
+
+#### Presentación y desplazamiento en los paneles
+
+- **Orden y nombres.** Ambos paneles ordenan a los nadadores por apellido paterno, apellido materno y nombre, y los presentan como `PATERNO MATERNO, NOMBRE (EDAD)`. Las mayúsculas son de presentación: los datos no cambian. Se usan los campos separados, sin partir `fullName`. Un registro histórico sin apellido paterno o sin nombre se muestra con su `fullName` en mayúsculas, sin coma, y va al final. La edad es la que calcula el servidor a la fecha de corte (`edadAlCorte`). Búsqueda, selección e identificadores no cambian, y tampoco los reportes ni las exportaciones.
+- **Poco espacio.** Las dos columnas solo se mantienen si caben; con menos de 900 px de ventana se apilan. La zona de pruebas tiene botones visibles «Anterior»/«Siguiente», un aviso de que hay más días a un lado y foco de teclado; esos controles no dependen de las barras del sistema. Además, se declaran barras propias (`::-webkit-scrollbar`), que en Chromium se observaron visibles. **En Safari de macOS no está comprobado que queden siempre visibles**: es una validación pendiente en un Mac real. Antes, a 375 px la zona de pruebas quedaba con 0 px de ancho (inalcanzable) y los selectores desbordaban la página. Los estilos están acotados a estos paneles (`theme.css`, «Panel de Inscripción y Panel de Relevos»).
+- **Edad de quien ya no está en el plantel.** La fila de cada inscripción individual y cada integrante de un relevo muestran la edad al corte que viene con la propia inscripción (`edadAlCorte` en `GET /registrations` y en los integrantes de `GET /relay-registrations`, calculada por el servidor para esa competencia). Se conserva aunque la membresía haya terminado, sin volver a poner a la persona entre los disponibles. Solo viaja el número, nunca la fecha de nacimiento. Un nadador recibe en los relevos su propia edad, pero no la de sus compañeros: es una **medida adicional de esta implementación**, para no ampliar lo que se deriva de la fecha de nacimiento. **No** es una decisión previa de AUD-14, que regulaba el RUN.
+- **Selección que deja de estar disponible.** Si la competencia elegida ya no está en la lista de la cuenta (por ejemplo, la sesión perdió administración y la competencia es oculta), la selección se vacía y el panel deja de mostrar su contenido; no se reemplaza por otra, ni siquiera por la predeterminada. Una elección que sigue disponible se conserva.
+
+#### Estado de estas mejoras (competencia por defecto, alta con club, presentación y desplazamiento)
+
+**Publicadas en el repositorio y validadas dentro del alcance descrito; pendientes de despliegue y de la actualización del entorno local de ejecución.** La migración `20261114000000_competencia_predeterminada` solo se aplicó a la base desechable de pruebas. La configuración de accesos por rol está **solo diseñada** (`docs/internas/14_Diseno_Accesos_Por_Rol.md`), pendiente de decidir si podrá conceder atribuciones nuevas. C-05 sigue pendiente de despliegue.
+
+Validación local, con resultados reales:
+
+- **Primera entrega.**
+  - Frontend de las áreas tocadas (jsdom, API simulada): 268 de 268.
+  - Backend: prueba documental 12 de 12 y contratos 148 de 148.
+  - Integración sobre la base desechable, en una sola ejecución: 12 archivos, 299 de 299.
+  - Tipos sin errores; lint sin errores nuevos.
+  - Revisión visual **observada en Chromium** (navegador integrado, frontend real y API simulada con datos sintéticos) a 375, 768 y 1280 px.
+- **Correcciones previas a la publicación, con reproducciones que fallaron antes de corregir.**
+  - *Selección que deja de estar disponible:* 4 pruebas, 2 por panel. Fallaron porque el panel seguía mostrando el contenido de la competencia descartada.
+  - *Edad de inscritos fuera del plantel:* 2 pruebas de frontend, que mostraban el nombre sin edad, y 3 de integración, sin `edadAlCorte`.
+  - Después de corregir: frontend 111 de 111, backend unitarias 34 de 34 e integración 6 archivos, 172 de 172.
+- **Pendiente:** comprobar en **Safari de macOS real** el desplazamiento y las barras de ambos paneles. No se validó allí: jsdom y Chromium no la reemplazan.
+- **Team Manager:** no cambió el código de exportación (`team-manager-export/`) ni sus dependencias compartidas. Solo se agregó a `competitions` una columna que el generador no lee. Esto **no** equivale a haber comparado un ZIP generado.
+
 ### Sigla del club
 
 La **sigla** (`clubs.code`) es el **identificador único del club**. La garantía es de la base: el índice único parcial `clubs_code_unique_active`, sobre `club_code_normalizado(code)` y `WHERE deleted_at IS NULL` (migración `20261103020000_sigla_club_unica`).
@@ -993,6 +1030,24 @@ La **sigla** (`clubs.code`) es el **identificador único del club**. La garantí
 - **Normalización:** sin blancos a los lados y en mayúsculas, la misma en la aplicación (`shared/clubCode.ts`) y en la función SQL.
 - **Al crear y editar:** se responde con un mensaje que nombra al club que la usa. Frente a dos operaciones simultáneas la garantía final es el índice, y la perdedora recibe un 409 con el mensaje de la sigla.
 - **Datos anteriores:** si hay duplicados, la migración se **detiene** con el detalle (comprobación `club-sigla-duplicada` del preflight) y no modifica ningún club: decidir qué club conserva la sigla es del negocio.
+
+### Alta de persona con asignación a club
+
+**Nueva persona** tiene el selector «Asignación a club». Su opción inicial es «Sin asignación», seguida de la lista completa de clubes activos (todas las páginas).
+
+Al guardar con un club, `POST /persons` con `clubId` crea, en **una** transacción:
+
+- la persona;
+- su membresía **activa** desde **hoy en America/Santiago**;
+- el rol derivado de nadador;
+- las auditorías `PERSON_CREATED` y `SWIMMER_ASSIGNMENT_DIRECT`.
+
+Reglas:
+
+- Reutiliza la asignación directa de C-05: fecha no futura, historial y el orden de bloqueos club → RUN → persona.
+- Si la asignación falla o el club ya no está activo, **no queda nada**, tampoco la persona.
+- No crea credenciales.
+- La edición no ofrece el campo y descarta `clubId`: no es un mecanismo de traslado.
 
 ### Carga masiva por Excel con club y fecha efectiva
 
@@ -1025,7 +1080,7 @@ puede implementar.
 |---|---|---|---|
 | GET | `/competitions/:id/enabled-events` | Pruebas habilitadas de una competencia (paso 3) | `registrations:read` |
 | GET | `/registrations/eligible-swimmers` | Nadadores elegibles para club+prueba+categoría (paso 6) | `registrations:read` |
-| GET | `/registrations` | Lista inscripciones (filtro por competencia/club/nadador/estado) | `registrations:read` |
+| GET | `/registrations` | Lista inscripciones (filtro por competencia/club/nadador/estado). Cada una trae `edadAlCorte` (edad al corte de su competencia, calculada por el servidor; sin fecha de nacimiento) | `registrations:read` |
 | POST | `/registrations` | Confirma una inscripción individual (ejecuta todas las validaciones) | `registrations:write` |
 | POST | `/registrations/:id/cancel` | Cancela una inscripción | `registrations:write` (post-cierre requiere `registrations:write:post-close`) |
 
@@ -1043,7 +1098,7 @@ puede implementar.
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
 | ~~GET~~ | ~~`/relay-registrations/eligible-swimmers`~~ | **Nunca existió.** El asistente de relevos usa los mismos endpoints de elegibilidad que las inscripciones individuales (`/registrations/eligible-swimmers` y `/registrations/club-eligibility-matrix`), porque el criterio es idéntico. Esta fila se publicó por simetría con el Módulo 7 y describía una ruta que no está en el código; la detectó la prueba que compara cada fila con su ruta. | — |
-| GET | `/relay-registrations` | Lista inscripciones de relevo (filtro por competencia/club/estado) | `registrations:read` |
+| GET | `/relay-registrations` | Lista inscripciones de relevo (filtro por competencia/club/estado). Cada integrante trae `edadAlCorte`. Un nadador la recibe solo para sí mismo: es una medida adicional de esta implementación, no parte de AUD-14 (que regula el RUN) | `registrations:read` |
 | POST | `/relay-registrations` | Confirma un equipo de relevo (4 nadadores, valida el equipo completo) | `registrations:write` |
 | POST | `/relay-registrations/:id/cancel` | Cancela un equipo de relevo | `registrations:write` (post-cierre requiere `registrations:write:post-close`) |
 
@@ -1540,8 +1595,8 @@ Estas rutas son del administrador, que no necesita proponerse nada a sí mismo:
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
 | GET | `/registrations/available-events` | Pruebas disponibles para un nadador ya elegido (orden de inscripción alternativo: primero el nadador, después la prueba) | `registrations:read` |
-| GET | `/registrations/club-eligibility-matrix` | Elegibilidad de **todo** el plantel del club en una sola consulta — la usa el panel de arrastrar y soltar | `registrations:read` |
-| GET | `/registrations/club-swimmers` | Plantel del club para el asistente | `registrations:read` |
+| GET | `/registrations/club-eligibility-matrix` | Elegibilidad de **todo** el plantel del club en una sola consulta — la usa el panel de arrastrar y soltar. Cada nadador trae `firstName`, `paternalLastName`, `maternalLastName` y `edadAlCorte` (edad a la fecha de corte de la competencia, con el respaldo del 31 de diciembre) | `registrations:read` |
+| GET | `/registrations/club-swimmers` | Plantel del club para el asistente y el Panel de Relevos, con los campos de nombre separados. Con `competitionId` opcional (competencia visible para el actor; si no, 404) cada nadador trae `edadAlCorte` | `registrations:read` |
 | PUT | `/registrations/:id` | Edita el tiempo de referencia de una inscripción | `registrations:write` |
 | PUT | `/relay-registrations/:id` | Edita un equipo de relevo: tiempo de referencia y, si se entrega, los integrantes y su orden (en Combinado: espalda, pecho, mariposa, libre) | `registrations:write` |
 | PUT | `/competition-events/reorder` | Reordena las pruebas del programa | `competitions:write` |
@@ -1549,7 +1604,7 @@ Estas rutas son del administrador, que no necesita proponerse nada a sí mismo:
 
 ## Inventario completo de endpoints
 
-**130 endpoints**, agrupados por el módulo que los declara. Esta lista no está
+**132 endpoints**, agrupados por el módulo que los declara. Esta lista no está
 escrita a mano: `backend/tests/documentacion.test.ts` la compara con las rutas que
 el código declara y **falla si alguna sobra o falta**. Además comprueba que
 ninguna ruta fuera de las públicas se quede sin guardia, y que el permiso exacto
@@ -1661,6 +1716,8 @@ fuera de producción o con `ENABLE_SWAGGER=true`.
 | GET | `/competitions/:id/events` |
 | POST | `/competitions/:id/events` |
 | POST | `/competitions/:id/finish` |
+| PUT | `/competitions/:id/predeterminada` |
+| DELETE | `/competitions/:id/predeterminada` |
 | POST | `/competitions/:id/reopenRegistrations` |
 | POST | `/competitions/:id/schedule` |
 | POST | `/competitions/:id/start` |

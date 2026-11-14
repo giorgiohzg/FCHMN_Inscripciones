@@ -25,6 +25,8 @@ export type ClubEligibilityQuery = z.infer<typeof clubEligibilityQuerySchema>;
 
 export const clubSwimmersQuerySchema = z.object({
   clubId: uuidField("Club inválido"),
+  /** Opcional: con él, cada nadador trae `edadAlCorte` de esa competencia (Panel de Relevos). */
+  competitionId: uuidField("Competencia inválida").optional(),
 });
 export type ClubSwimmersQuery = z.infer<typeof clubSwimmersQuerySchema>;
 

@@ -149,7 +149,7 @@ const contador = (etiqueta: string) =>
  * en la fila de una inscripción ya confirmada. `queryByText` lanza con varias
  * coincidencias, así que se toma la primera.
  */
-const nadadorEnPlantel = (n: number) => screen.queryAllByText(new RegExp(`Nadador ${n}$`))[0] ?? null;
+const nadadorEnPlantel = (n: number) => screen.queryAllByText(new RegExp(`Nadador ${n}$`, "i"))[0] ?? null;
 
 /**
  * QUIÉN MIRA DECIDE QUÉ SE VE. No es cosmética: si un delegado recibiera el

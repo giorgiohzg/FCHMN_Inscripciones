@@ -3,6 +3,7 @@ import { buildActorContext } from "../../shared/actorContext";
 import * as competitionsService from "./competitions.service";
 import * as structureService from "./competition-structure.service";
 import * as competitionEventsService from "./competition-events.service";
+import * as predeterminadaService from "./competencia-predeterminada.service";
 import {
   competitionCreateSchema,
   competitionUpdateSchema,
@@ -114,6 +115,29 @@ export async function competitionsRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { id } = req.params as { id: string };
       reply.send(await competitionsService.uncancelCompetition(id, { userId: req.authUser!.sub, ipAddress: req.ip }));
+    }
+  );
+
+  /**
+   * Competencia por defecto de los paneles de Inscripción y de Relevos: SOLO administración,
+   * comprobado aquí además del permiso. Marcarla no cambia su estado, sus fechas ni su
+   * visibilidad (`competencia-predeterminada.service.ts`).
+   */
+  app.put(
+    "/competitions/:id/predeterminada",
+    { preHandler: [requirePermission("competitions:write"), requireRole("admin")] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      reply.send(await predeterminadaService.marcarPredeterminada(id, { userId: req.authUser!.sub, ipAddress: req.ip }));
+    }
+  );
+
+  app.delete(
+    "/competitions/:id/predeterminada",
+    { preHandler: [requirePermission("competitions:write"), requireRole("admin")] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      reply.send(await predeterminadaService.quitarPredeterminada(id, { userId: req.authUser!.sub, ipAddress: req.ip }));
     }
   );
 

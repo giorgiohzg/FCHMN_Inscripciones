@@ -17,7 +17,10 @@ import { parseSwimTimeInput, formatSwimTimeReadable } from "../../shared/swimTim
 import { useAuth } from "../auth/AuthContext";
 import { useSwimmerAssignmentApi } from "../swimmer-assignment/assignmentApi";
 import { traerTodasLasPaginas } from "../../shared/paginacion";
+import { competenciaPreseleccionada } from "../../shared/competenciaPredeterminada";
+import { compararNadadores, coincideConBusqueda, nombreConEdad } from "../../shared/nombreDeNadador";
 import { PanelDeHistorial } from "../../shared/PanelDeHistorial";
+import { ZonaDesplazable } from "../../shared/ZonaDesplazable";
 import { COLUMNAS_INSCRIPCIONES, cargadorDeInscripciones } from "../../shared/filasDeHistorial";
 
 const DRAG_ROSTER = "application/x-roster-swimmer";
@@ -58,6 +61,15 @@ export function RegistrationWorkspacePage() {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [ownClubName, setOwnClubName] = useState<string | null>(null);
   const [competitionId, setCompetitionId] = useState("");
+  /**
+   * La persona ya eligió a mano (también «Seleccionar...»): desde entonces la competencia por
+   * defecto no se vuelve a aplicar, aunque la lista llegue o se recargue después.
+   */
+  const eleccionManualRef = useRef(false);
+  function elegirCompetencia(id: string) {
+    eleccionManualRef.current = true;
+    setCompetitionId(id);
+  }
   const [clubId, setClubId] = useState("");
 
   /**
@@ -100,7 +112,11 @@ export function RegistrationWorkspacePage() {
   const datos = cargaDeEstaVista?.datos ?? null;
 
   const events = useMemo(() => datos?.events ?? [], [datos]);
-  const eligibility = useMemo(() => datos?.eligibility ?? [], [datos]);
+  // Plantel ordenado por apellido paterno, materno y nombre (`shared/nombreDeNadador.ts`).
+  const eligibility = useMemo(
+    () => (datos?.eligibility ?? []).slice().sort(compararNadadores((s: ClubEligibilityEntry) => s.personId)),
+    [datos]
+  );
   const registrations = useMemo(() => datos?.registrations ?? [], [datos]);
 
   /** Hay una carga en vuelo para esta vista (primera o recarga). */
@@ -310,7 +326,17 @@ export function RegistrationWorkspacePage() {
       competitionsApi.list({ ...(veCompetenciasOcultas ? {} : { visibleInRegistrationPanels: true }), page, pageSize })
     )
       .then((todas) => {
-        if (vigente) setCompetitions(todas);
+        if (!vigente) return;
+        setCompetitions(todas);
+        // Competencia por defecto: solo si está en ESTA lista (la que la cuenta puede elegir) y
+        // sin pisar una elección. Una elección que ya no está en la lista se VACÍA y, desde ahí,
+        // cuenta como decidida: una carga posterior no la sustituye por otra (ver
+        // `competenciaPreseleccionada`). Al vaciarse cambia la vista y su contenido deja de verse.
+        setCompetitionId((actual) => {
+          const { competitionId: siguiente, invalidada } = competenciaPreseleccionada(todas, actual, eleccionManualRef.current);
+          if (invalidada) eleccionManualRef.current = true;
+          return siguiente;
+        });
       })
       .catch((err) => {
         if (vigente) setErrorGlobal(err instanceof Error ? err.message : "No se pudieron cargar las competencias");
@@ -446,11 +472,7 @@ export function RegistrationWorkspacePage() {
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
   }
 
-  const filteredSwimmers = eligibility.filter((s) => {
-    if (!search.trim()) return true;
-    const q = search.trim().toLowerCase();
-    return s.fullName.toLowerCase().includes(q) || s.run.toLowerCase().includes(q);
-  });
+  const filteredSwimmers = eligibility.filter((s) => coincideConBusqueda(s, search));
 
   const selectedSwimmer = selectedPersonId ? eligibility.find((s) => s.personId === selectedPersonId) : undefined;
 
@@ -465,7 +487,8 @@ export function RegistrationWorkspacePage() {
   }
 
   function eventRegistrations(ce: EnabledCompetitionEvent) {
-    return registrations.filter((r) => matchesEvent(r, ce));
+    const comparar = compararNadadores((p: RegistrationItem["person"]) => p.id);
+    return registrations.filter((r) => matchesEvent(r, ce)).sort((a, b) => comparar(a.person, b.person));
   }
 
   function selectSwimmer(personId: string) {
@@ -717,20 +740,21 @@ export function RegistrationWorkspacePage() {
     <AppShell>
       <h1 style={{ color: "var(--brand-navy)", marginBottom: "0.75rem" }}>Panel de Inscripción</h1>
 
+      {/* Sin anchos mínimos fijos: con poco espacio desbordaban la página (ver `theme.css`, paneles). */}
       <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "0.75rem" }}>
-        <div>
+        <div style={{ flex: "1 1 260px", minWidth: 0, maxWidth: 420 }}>
           <label style={{ fontSize: "0.8rem" }}>Competencia</label>
-          <select value={competitionId} onChange={(e) => setCompetitionId(e.target.value)} style={{ minWidth: 260 }}>
+          <select aria-label="Competencia" value={competitionId} onChange={(e) => elegirCompetencia(e.target.value)} style={{ width: "100%", maxWidth: "100%" }}>
             <option value="">Seleccionar...</option>
             {competitions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
-        <div>
+        <div style={{ flex: "1 1 200px", minWidth: 0, maxWidth: 360 }}>
           <label style={{ fontSize: "0.8rem" }}>Club</label>
           {isPureSwimmer || isClubScoped ? (
             <p style={{ fontSize: "0.9rem", padding: "0.45rem 0" }}>{ownClubName ?? "Cargando..."}</p>
           ) : (
-            <select value={clubId} onChange={(e) => setClubId(e.target.value)} style={{ minWidth: 200 }}>
+            <select value={clubId} onChange={(e) => setClubId(e.target.value)} style={{ width: "100%", maxWidth: "100%" }}>
               <option value="">Seleccionar...</option>
               {clubs.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -794,9 +818,10 @@ export function RegistrationWorkspacePage() {
             </span>
           </p>
 
-          <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: "1rem", alignItems: "start" }}>
+          {/* Columnas y desplazamiento con poco espacio: `theme.css` («Panel de Inscripción…») y `ZonaDesplazable`. */}
+          <div className="panel-trabajo">
             {/* -------- Panel izquierdo: nadadores -------- */}
-            <div style={{ border: "1px solid var(--brand-gray-100)", borderRadius: 8, padding: "0.75rem", maxHeight: "78vh", overflowY: "auto" }}>
+            <ZonaDesplazable etiqueta="Nadadores del plantel" className="panel-nadadores">
               <input ref={searchInputRef} placeholder="🔎 Buscar nadador o RUN... (/)" value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginBottom: "0.5rem" }} />
               {filteredSwimmers.length === 0 && (
                 <p style={{ fontSize: "0.82rem", color: "var(--brand-gray-600)" }}>Sin nadadores para este filtro.</p>
@@ -821,21 +846,21 @@ export function RegistrationWorkspacePage() {
                   }}
                   title={`${s.eligibleEvents.length} prueba(s) disponibles — clic para seleccionar`}
                 >
-                  <span>☰ {s.fullName}</span>
+                  <span className="panel-nombre">☰ {nombreConEdad(s, s.edadAlCorte)}</span>
                   <span style={{ color: "var(--brand-gray-600)", fontSize: "0.78rem" }}>{s.eligibleEvents.length}</span>
                 </div>
               ))}
-            </div>
+            </ZonaDesplazable>
 
             {/* -------- Centro: una columna por día -------- */}
-            <div style={{ display: "flex", gap: "0.75rem", overflowX: "auto", maxHeight: "78vh", paddingBottom: "0.5rem" }}>
+            <ZonaDesplazable etiqueta="Pruebas por día" className="panel-dias" controlesHorizontales textoContenido="días o pruebas">
               {days.length === 0 && (
                 <p style={{ fontSize: "0.85rem", color: "var(--brand-gray-600)" }}>Sin pruebas individuales configuradas en esta competencia.</p>
               )}
               {days.map((date) => {
                 const dayEvents = eventsForDay(date);
                 return (
-                  <div key={date} style={{ minWidth: 250, flex: "0 0 250px" }}>
+                  <div key={date} className="panel-dia">
                     <h3 style={{ fontSize: "0.9rem", color: "var(--brand-navy)", position: "sticky", top: 0, background: "white", padding: "0.2rem 0" }}>
                       {formatCalendarDate(date, { weekday: "long", day: "2-digit", month: "2-digit" })}
                     </h3>
@@ -907,7 +932,8 @@ export function RegistrationWorkspacePage() {
                               <div style={{ marginTop: "0.4rem", borderTop: "1px solid var(--brand-gray-100)", paddingTop: "0.3rem" }} onClick={(e) => e.stopPropagation()}>
                                 {confirmed.map((r) => (
                                   <div key={r.id} style={{ fontSize: "0.72rem", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.15rem" }}>
-                                    <span>{r.person.fullName}</span>
+                                    {/* La edad viene con la inscripción (servidor): se conserva aunque la persona ya no esté en el plantel. */}
+                                    <span className="panel-nombre">{nombreConEdad(r.person, r.edadAlCorte)}</span>
                                     {editingRegistrationId === r.id ? (
                                       <span style={{ display: "flex", gap: "0.2rem" }}>
                                         <input value={editTime} onChange={(e) => setEditTime(e.target.value)} placeholder="mmsscc" maxLength={6} style={{ maxWidth: 65, fontSize: "0.72rem" }} />
@@ -939,7 +965,7 @@ export function RegistrationWorkspacePage() {
                   </div>
                 );
               })}
-            </div>
+            </ZonaDesplazable>
           </div>
         </>
       )}

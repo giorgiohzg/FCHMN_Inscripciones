@@ -4,6 +4,7 @@ import { AppShell } from "../../shared/AppShell";
 import { useCompetitionsApi, type Competition, type CompetitionStatus } from "./competitionsApi";
 import { useSort, sortItems, SortableTh } from "../../shared/sortableTable";
 import { usePoolsApi, type Pool } from "../pools/poolsApi";
+import { useOperacionUnica } from "../../shared/useOperacionUnica";
 
 const STATUS_LABELS: Record<CompetitionStatus, string> = {
   draft: "Borrador",
@@ -69,6 +70,29 @@ export function CompetitionsListPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  /**
+   * COMPETENCIA POR DEFECTO de los paneles (como máximo una, global). Una sola escritura a la
+   * vez; tras cada una se recarga la lista, porque marcar una desmarca la anterior (que puede
+   * estar en otra página) y otra administración pudo cambiarla entretanto.
+   */
+  const operacionPredeterminada = useOperacionUnica();
+  async function cambiarPredeterminada(competition: Competition, marcar: boolean) {
+    const testigo = operacionPredeterminada.iniciar();
+    if (testigo === null) return;
+    // El aviso se muestra DESPUÉS de recargar: una carga correcta borra el error anterior.
+    let aviso: string | null = null;
+    try {
+      const r = marcar ? await api.marcarPredeterminada(competition.id) : await api.quitarPredeterminada(competition.id);
+      if (!marcar && !r.cambio) aviso = "Esta competencia ya no era la predeterminada: otra persona la cambió. Se actualizó la lista.";
+    } catch (err) {
+      aviso = err instanceof Error ? err.message : "No se pudo cambiar la competencia por defecto";
+    } finally {
+      operacionPredeterminada.terminar(testigo);
+    }
+    await load();
+    if (aviso) setError(aviso);
+  }
 
   async function handleDelete(competition: Competition) {
     if (
@@ -248,7 +272,8 @@ export function CompetitionsListPage() {
             <SortableTh label="Período de inscripción" sortKey="registrationStartAt" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
             <SortableTh label="Estado" sortKey="status" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
             <th></th>
-            {/* Título exacto pedido; el `title` aclara QUÉ se muestra (ver README, Módulo 6). */}
+            <th title="Se preselecciona al entrar al Panel de Inscripción y al Panel de Relevos, si la cuenta puede verla. No abre inscripciones.">Por defecto</th>
+            {/* Título exacto pedido y ÚLTIMA columna; el `title` aclara QUÉ se muestra (ver README, Módulo 6). */}
             <th title="Aparece en el selector del Panel de Inscripción y del Panel de Relevos">Mostrar en competencia</th>
           </tr></thead>
           <tbody>
@@ -269,6 +294,30 @@ export function CompetitionsListPage() {
                   <button className="btn-danger" onClick={() => handleDelete(c)}>Eliminar</button>
                 </td>
                 <td>
+                  {c.esPredeterminada ? (
+                    <span style={{ display: "inline-flex", gap: "0.4rem", alignItems: "center" }}>
+                      <span className="badge badge-active">Predeterminada</span>
+                      <button
+                        className="btn-secondary"
+                        onClick={() => void cambiarPredeterminada(c, false)}
+                        disabled={operacionPredeterminada.enCurso}
+                        aria-label={`Quitar «${c.name}» como competencia por defecto`}
+                      >
+                        Quitar
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      className="btn-secondary"
+                      onClick={() => void cambiarPredeterminada(c, true)}
+                      disabled={operacionPredeterminada.enCurso}
+                      aria-label={`Marcar «${c.name}» como competencia por defecto`}
+                    >
+                      Marcar
+                    </button>
+                  )}
+                </td>
+                <td>
                   <span className={`badge ${c.visibleInRegistrationPanels ? "badge-active" : "badge-disabled"}`}>
                     {c.visibleInRegistrationPanels ? "Sí" : "No"}
                   </span>
@@ -276,7 +325,7 @@ export function CompetitionsListPage() {
               </tr>
             ))}
             {data.items.length === 0 && (
-              <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--brand-gray-600)", padding: "1.5rem" }}>No hay competencias con este filtro.</td></tr>
+              <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--brand-gray-600)", padding: "1.5rem" }}>No hay competencias con este filtro.</td></tr>
             )}
           </tbody>
         </table>

@@ -23,6 +23,10 @@ import {
 import { terminarSesionesDelTitular, terminarSesionesDelUsuario } from "../auth/sessions";
 import { anularCuentaEnLimitador } from "../auth/limitadorLogin";
 import type { PersonCreateInput, PersonUpdateInput, PersonListQuery } from "./persons.schemas";
+import { assertClubActive, assignSwimmerDirectly } from "../swimmer-assignment/assignment.service";
+import { bloquear } from "../swimmer-assignment/membresias.protocolo";
+import { CLAVES_DE_BLOQUEO } from "../incorporaciones/incorporaciones.claves";
+import { hoyEnZonaDelNegocio } from "../../shared/fecha.util";
 
 interface ActorContext {
   userId: string;
@@ -133,6 +137,38 @@ export async function createPerson(input: PersonCreateInput, actor: ActorContext
   ));
 
   return person;
+}
+
+/**
+ * ALTA DE PERSONA CON «ASIGNACIÓN A CLUB» (opcional).
+ *
+ * Sin `clubId` es exactamente `createPerson`. Con `clubId`, persona, membresía ACTIVA, rol derivado
+ * de nadador y las dos auditorías (`PERSON_CREATED` y `SWIMMER_ASSIGNMENT_DIRECT`) se escriben en
+ * UNA transacción: si la asignación falla o el club ya no está activo, no queda nada, tampoco la
+ * persona.
+ *
+ * Reutiliza la asignación directa de C-05 (`assignSwimmerDirectly`): fecha efectiva = HOY en
+ * America/Santiago (nunca futura), comprobación del historial y protocolo de bloqueos, en su orden
+ * club → RUN → persona → filas. El club se bloquea además con `FOR SHARE` y se vuelve a leer: una
+ * inhabilitación simultánea espera a esta transacción o, si ya se confirmó, se ve aquí y revierte el
+ * alta. No crea credenciales.
+ */
+export async function createPersonWithOptionalClub(input: PersonCreateInput, actor: ActorContext, opciones?: { ahora?: Date }) {
+  const { clubId, ...datos } = input;
+  if (!clubId) return createPerson(datos, actor);
+
+  const ahora = opciones?.ahora ?? new Date();
+  return prisma.$transaction(async (tx) => {
+    await bloquear(tx, CLAVES_DE_BLOQUEO.club(clubId));
+    await bloquear(tx, CLAVES_DE_BLOQUEO.run(normalizeRun(datos.run)));
+    await tx.$queryRaw`SELECT id FROM clubs WHERE id = ${clubId} FOR SHARE`;
+    await assertClubActive(clubId, tx);
+
+    const creada = await createPerson(datos, actor, { tx });
+    await assignSwimmerDirectly({ clubId, personId: creada.id, fechaEfectiva: hoyEnZonaDelNegocio(ahora) }, actor, { tx, ahora });
+    // Con el rol derivado ya sincronizado.
+    return tx.person.findUniqueOrThrow({ where: { id: creada.id }, include: { roles: true } });
+  });
 }
 
 export async function updatePerson(id: string, input: PersonUpdateInput, actor: ActorContext) {

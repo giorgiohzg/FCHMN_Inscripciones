@@ -29,7 +29,7 @@ export async function registrationsRoutes(app: FastifyInstance) {
   app.get("/registrations/club-swimmers", { preHandler: [requirePermission("registrations:read")] }, async (req, reply) => {
     const parsed = clubSwimmersQuerySchema.safeParse(req.query);
     if (!parsed.success) throw new ValidationError("Parámetros inválidos", parsed.error.flatten());
-    reply.send(await registrationsService.listActiveSwimmersOfClub(parsed.data.clubId, buildActorContext(req)));
+    reply.send(await registrationsService.listActiveSwimmersOfClub(parsed.data.clubId, buildActorContext(req), parsed.data.competitionId));
   });
 
   // Nuevo orden de inscripción — paso "pruebas disponibles" (categoría ya resuelta).
