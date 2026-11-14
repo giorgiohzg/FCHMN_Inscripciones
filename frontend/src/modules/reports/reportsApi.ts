@@ -22,7 +22,7 @@ interface IndividualReportRowComun {
 /**
  * Contrato por rol (AUD-10), decidido en el backend: la administración recibe la fecha de
  * nacimiento completa (dd-mm-yyyy); los demás roles reciben la edad a la fecha de corte de la
- * competencia, sin la fecha. La vista agrupada (`ClubGroupSwimmerRow`) no cambia.
+ * competencia, sin la fecha. La vista agrupada (`ClubGroupSwimmerRow`) no cambia con el rol.
  */
 export type IndividualReportRow =
   | (IndividualReportRowComun & { fechaNacimiento: string; edad?: never })
@@ -55,6 +55,14 @@ export interface ClubGroupSwimmerRow {
    */
   personId?: string;
   nombreCompleto: string;
+  /**
+   * Componentes del nombre, SOLO para presentar la línea en pantalla (`presentacionReporte.ts`).
+   * `null` si la persona no los tiene (registros históricos). Opcionales por la TRANSICIÓN: una API
+   * anterior no los envía y la línea muestra `nombreCompleto` en mayúsculas.
+   */
+  apellidoPaterno?: string | null;
+  apellidoMaterno?: string | null;
+  nombres?: string | null;
   edad: number;
   categoria: string;
   genero: string;

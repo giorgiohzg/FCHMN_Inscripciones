@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppShell } from "../../shared/AppShell";
 import { ApiError } from "../../shared/apiClient";
 import { traerTodasLasPaginas } from "../../shared/paginacion";
+import { competenciaPreseleccionada } from "../../shared/competenciaPredeterminada";
 import { useAuth } from "../auth/AuthContext";
 import { useCompetitionsApi, type Competition } from "../competitions/competitionsApi";
 import { useReportsApi, type ResumenPorClub } from "./reportsApi";
@@ -61,6 +62,13 @@ export function ClubSummaryReportPage() {
   const [competitions, setCompetitions] = useState<Competition[]>([]);
   const [errorCompetencias, setErrorCompetencias] = useState<string | null>(null);
   const [competitionId, setCompetitionId] = useState("");
+  /** Espejo de `competitionId`, para decidir la preselección al llegar la lista. */
+  const competenciaActual = useRef("");
+  /**
+   * La persona ya eligió a mano (también «Seleccionar...»): desde entonces la competencia por
+   * defecto no se vuelve a aplicar, aunque la lista llegue o se recargue después.
+   */
+  const eleccionManual = useRef(false);
   /** Lo que se está escribiendo. No consulta nada hasta «Aplicar» o Enter. */
   const [edadTexto, setEdadTexto] = useState(String(EDAD_MINIMA_INICIAL));
   const edadEscrita = leerEdadMinima(edadTexto);
@@ -84,24 +92,9 @@ export function ClubSummaryReportPage() {
   const operacionPorFila = useRef<Record<string, number>>({});
   const ultimaOperacion = useRef(0);
 
-  useEffect(() => {
-    if (!esAdmin) return;
-    // Administración ve también las competencias ocultas: se omite el filtro de visibilidad.
-    let vigente = true;
-    traerTodasLasPaginas((page, pageSize) => competitionsApi.list({ page, pageSize }))
-      .then((todas) => {
-        if (vigente) setCompetitions(todas);
-      })
-      .catch((err) => {
-        if (vigente) setErrorCompetencias(mensajeDeError(err, "No se pudieron cargar las competencias"));
-      });
-    return () => {
-      vigente = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [esAdmin]);
-
+  /** TODA selección de competencia pasa por aquí: la manual y la preselección. */
   function cambiarCompetencia(id: string) {
+    competenciaActual.current = id;
     generacionSeleccion.current += 1;
     operacionPorFila.current = {};
     setCompetitionId(id);
@@ -112,6 +105,35 @@ export function ClubSummaryReportPage() {
     // La competencia nueva se consulta con la edad YA APLICADA, aunque haya un cambio sin aplicar.
     setCargando(Boolean(id));
   }
+
+  function elegirCompetencia(id: string) {
+    eleccionManual.current = true;
+    cambiarCompetencia(id);
+  }
+
+  useEffect(() => {
+    if (!esAdmin) return;
+    // Administración ve también las competencias ocultas: se omite el filtro de visibilidad.
+    let vigente = true;
+    traerTodasLasPaginas((page, pageSize) => competitionsApi.list({ page, pageSize }))
+      .then((todas) => {
+        if (!vigente) return;
+        setCompetitions(todas);
+        // Competencia por defecto, con el criterio de Inscripción y Relevos (ver
+        // `competenciaPreseleccionada`). Pasa por `cambiarCompetencia`, como una elección normal:
+        // nueva generación de la selección, exportaciones por fila reiniciadas y la misma carga.
+        const { competitionId: siguiente, invalidada } = competenciaPreseleccionada(todas, competenciaActual.current, eleccionManual.current);
+        if (invalidada) eleccionManual.current = true;
+        if (siguiente !== competenciaActual.current) cambiarCompetencia(siguiente);
+      })
+      .catch((err) => {
+        if (vigente) setErrorCompetencias(mensajeDeError(err, "No se pudieron cargar las competencias"));
+      });
+    return () => {
+      vigente = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esAdmin]);
 
   /** Vuelve a pedir el resumen con la competencia y la edad aplicadas (también para reintentar). */
   function pedirDeNuevo() {
@@ -211,7 +233,7 @@ export function ClubSummaryReportPage() {
           <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "flex-start" }}>
             <div style={{ flex: "1 1 260px", maxWidth: 420 }}>
               <label htmlFor="resumen-competencia">Competencia</label>
-              <select id="resumen-competencia" value={competitionId} onChange={(e) => cambiarCompetencia(e.target.value)}>
+              <select id="resumen-competencia" value={competitionId} onChange={(e) => elegirCompetencia(e.target.value)}>
                 <option value="">Seleccionar...</option>
                 {competitions.map((c) => (
                   <option key={c.id} value={c.id}>

@@ -8,6 +8,8 @@ import { ReportesNav } from "./ReportesNav";
 import { useSwimmerAssignmentApi } from "../swimmer-assignment/assignmentApi";
 import { CircledNumber } from "../../shared/CircledNumber";
 import { traerTodasLasPaginas } from "../../shared/paginacion";
+import { competenciaPreseleccionada } from "../../shared/competenciaPredeterminada";
+import { partesDeLineaDelReporte } from "./presentacionReporte";
 
 export function ReportsPage() {
   const { user, hasRole, hasPermission } = useAuth();
@@ -40,6 +42,16 @@ export function ReportsPage() {
   const [ownClubName, setOwnClubName] = useState<string | null>(null);
 
   const [competitionId, setCompetitionId] = useState("");
+  /**
+   * Espejo de `competitionId`, para decidir la preselección cuando llega la lista sin hacerlo
+   * dentro de un actualizador de estado (la preselección pasa por `cambiarCompetencia`).
+   */
+  const competenciaActual = useRef("");
+  /**
+   * La persona ya eligió a mano (también «Seleccionar...»): desde entonces la competencia por
+   * defecto no se vuelve a aplicar, aunque la lista llegue o se recargue después.
+   */
+  const eleccionManual = useRef(false);
   const [clubId, setClubId] = useState("");
 
   const [result, setResult] = useState<RegistrationsReportResult | null>(null);
@@ -58,7 +70,13 @@ export function ReportsPage() {
     setLoading(false);
   }
 
+  /**
+   * TODA selección de competencia pasa por aquí, la manual y la preselección: invalida el reporte
+   * a la vista y, para administración, deja pendientes las opciones de club hasta que respondan
+   * (con eso no se puede generar con un club aún no validado para la competencia).
+   */
   function cambiarCompetencia(id: string) {
+    competenciaActual.current = id;
     setCompetitionId(id);
     setError(null);
     invalidarResultado();
@@ -67,6 +85,11 @@ export function ReportsPage() {
       setOpcionesDeClub(id ? null : []);
       if (!id) setClubId("");
     }
+  }
+
+  function elegirCompetencia(id: string) {
+    eleccionManual.current = true;
+    cambiarCompetencia(id);
   }
 
   function cambiarClub(id: string) {
@@ -85,7 +108,14 @@ export function ReportsPage() {
       competitionsApi.list({ ...(veCompetenciasOcultas ? {} : { visibleInRegistrationPanels: true }), page, pageSize })
     )
       .then((todas) => {
-        if (vigente) setCompetitions(todas);
+        if (!vigente) return;
+        setCompetitions(todas);
+        // Competencia por defecto, con el criterio de Inscripción y Relevos: solo si está en ESTA
+        // lista y sin pisar una elección. Una elección que ya no está se VACÍA (y retira su
+        // reporte) y desde ahí cuenta como decidida. No genera el reporte: eso sigue siendo el botón.
+        const { competitionId: siguiente, invalidada } = competenciaPreseleccionada(todas, competenciaActual.current, eleccionManual.current);
+        if (invalidada) eleccionManual.current = true;
+        if (siguiente !== competenciaActual.current) cambiarCompetencia(siguiente);
       })
       .catch((err) => {
         if (vigente) setError(err instanceof Error ? err.message : "No se pudieron cargar las competencias");
@@ -220,7 +250,7 @@ export function ReportsPage() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "0.75rem", maxWidth: 900 }}>
         <div>
           <label>Competencia</label>
-          <select value={competitionId} onChange={(e) => cambiarCompetencia(e.target.value)}>
+          <select value={competitionId} onChange={(e) => elegirCompetencia(e.target.value)}>
             <option value="">Seleccionar...</option>
             {competitions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
@@ -290,14 +320,16 @@ export function ReportsPage() {
                   ({club.totalNadadores} nadadores, {club.totalPruebasIndividuales} pruebas individuales, {club.totalRelevos} relevos)
                 </span>
               </h2>
-              {club.swimmers.map((s, index) => (
+              {club.swimmers.map((s, index) => {
+                const linea = partesDeLineaDelReporte(s);
+                return (
                 // Clave: el identificador interno de la persona; nunca el nombre (puede repetirse) ni el RUN.
                 // TRANSICIÓN: con una API anterior, que aún no envía `personId`, se usa la posición dentro del club;
-                // la lista no se reordena en pantalla, así que esa clave es estable mientras se muestra.
+                // la lista no se reordena en pantalla (el orden es el del servidor), así que esa clave es estable.
                 <div key={s.personId ?? `posicion-${index}`} style={{ padding: "0.5rem 0", borderBottom: "1px solid var(--brand-gray-100)" }}>
-                  {/* Una línea: número, nadador, edad, categoría, género. Sin RUN. */}
+                  {/* Una línea: número, `PATERNO MATERNO, NOMBRE (EDAD) - Categoría - Género`. Sin RUN. */}
                   <div style={{ fontSize: "0.9rem" }}>
-                    {index + 1}. <strong>{s.nombreCompleto}</strong> — {s.edad} años — {s.categoria} — {s.genero}
+                    {index + 1}. <strong>{linea.nombre}</strong>{linea.detalle}
                   </div>
                   {/* Pruebas individuales y relevos en los que está inscrito — con sangría hacia la derecha */}
                   <div style={{ fontSize: "0.82rem", color: "var(--brand-gray-600)", marginTop: "0.15rem", paddingLeft: "1.5rem" }}>
@@ -324,7 +356,8 @@ export function ReportsPage() {
                     {s.pruebas.length === 0 && s.relevos.length === 0 && <div>Sin pruebas ni relevos.</div>}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           ))}
         </div>

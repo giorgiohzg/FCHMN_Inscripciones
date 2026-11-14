@@ -1242,6 +1242,42 @@ Filtros soportados (sección 16): `competitionId` (obligatorio), `clubId`, `comp
   - Se descarta cualquier respuesta tardía de otra combinación de competencia y edad. Aplicar otra edad no altera el estado de las exportaciones en curso.
 - **Privacidad y acceso.** La fecha de nacimiento solo se compara dentro de la base: la respuesta sigue sin RUN, nombres de personas ni fechas de nacimiento. El acceso sigue siendo exclusivo de administración.
 
+### Competencia por defecto y presentación del listado (estado: publicada en el repositorio y validada dentro del alcance descrito; pendiente de despliegue y actualización local)
+
+> **Estado:** **publicada en el repositorio y validada dentro del alcance descrito; pendiente de despliegue y de la actualización del entorno local de ejecución.** Producción sigue con el comportamiento anterior. Los cierres anteriores de Reportes se conservan como antecedentes, más arriba.
+
+- **Competencia por defecto en Reportes.** «Listado de inscritos» (el de «Generar reporte») y «Resumen por club» preseleccionan la competencia por defecto con el **mismo criterio** de los paneles de Inscripción y de Relevos (`competenciaPreseleccionada`; ver «Competencia por defecto de los paneles»):
+  - Solo si está entre las competencias que esa cuenta puede elegir. Administración conserva su excepción para las ocultas. Si no hay una accesible, el selector queda vacío.
+  - Una elección manual, incluido volver a «Seleccionar...», no se pisa.
+  - Si la selección deja de estar disponible, se vacía, se retiran sus resultados y no se sustituye por otra.
+  - La preselección pasa por la **misma preparación que una elección manual**. En el listado de inscritos invalida el informe a la vista y, para administración, deja pendientes las opciones de club hasta que respondan, así que no se puede generar ni exportar con un club aún no validado. En el resumen reinicia la generación de la selección, que protege las exportaciones por fila, también tras A → B → A.
+  - **No genera el informe**: «Generar reporte» sigue siendo el botón. El resumen carga como siempre al tener competencia.
+  - Se conservan la paginación completa, el filtro de clubes con inscripciones y el descarte de respuestas tardías de listas, clubes, informes y resúmenes.
+- **Línea de cada nadador en «Generar reporte».** El formato pasa a ser `PATERNO MATERNO, NOMBRE (EDAD) - Categoría - Género`, con nombre y apellidos en mayúsculas y la edad sin «años». Se conservan la numeración por club, la agrupación, los totales y las listas de pruebas y relevos.
+  - **Nombre.** Se arma con los campos separados y el mismo criterio de los paneles (`nombreEnPanel`): sin materno queda `PATERNO, NOMBRE`. Un registro histórico sin apellido paterno o sin nombre muestra el nombre almacenado en mayúsculas, sin coma ni apellidos inventados.
+  - **Edad.** Es la que calcula el servidor a la fecha de corte.
+  - **Orden.** No cambia: es el del servidor (`compararNadadores`, ver «Orden del reporte» más abajo). La pantalla no reordena.
+- **Contrato.** La vista agrupada (`groupedByClub[].swimmers[]`) agrega `apellidoPaterno`, `apellidoMaterno` y `nombres`, tal como están guardados y con `null` si faltan, **solo para la presentación**. Es un cambio compatible: con una API anterior, la pantalla muestra `nombreCompleto` en mayúsculas.
+  - `nombreCompleto`, `fullName` y las demás salidas no cambian.
+  - No se agrega RUN ni fecha de nacimiento, y no cambian los alcances por rol, club o persona. El nadador sigue recibiendo solo su propia línea.
+- **Exportaciones sin cambios.** CSV, XLSX y PDF usan las filas planas (`individualRows`, `relayRows`), no la vista agrupada, así que su contenido y formato no cambian. Los botones conservan sus llamadas. La exportación a Team Manager (`team-manager-export/`) no se tocó y no importa nada de Reportes. Esto **no** equivale a haber comparado un ZIP generado.
+- **Validación local, con resultados reales:**
+  - Frontend de Reportes y de la competencia por defecto de los paneles (jsdom, API simulada): 114 de 114 en 9 archivos.
+  - Backend: unitarias de Reportes y prueba documental, 70 de 70 en 4 archivos.
+  - Integración sobre la base desechable, solo los archivos de Reportes afectados: 2 archivos, 122 de 122.
+  - Tipos sin errores. Lint sin errores nuevos.
+  - **Revisión visual con capturas**, en Chromium (navegador integrado visible), con el frontend real y una API simulada con datos sintéticos. Ancho efectivo medido en la página: 1280 px en escritorio y 375 px de documento en pantalla angosta.
+    - Como administración, en los dos anchos:
+      - preselección con «Cargando clubes...» y luego los clubes, sin informe hasta pulsar el botón;
+      - formato, apellidos compuestos, registro histórico y ajuste de líneas: a 375 px todas las líneas caben, con el borde derecho más lejano a 359 px;
+      - totales y listas de pruebas conservados;
+      - resumen por club preseleccionado, con sus controles.
+    - Como delegado, en una revisión anterior **sin capturas** (navegador oculto, lectura del DOM): selector vacío con la predeterminada oculta, y preselección sin generar con la visible.
+    - No se pulsó ninguna exportación.
+  - **Problemas preexistentes observados, ajenos a esta entrega** (no se modificaron):
+    - A 375 px, la fila de botones del listado de inscritos no se ajusta y llega a unos 700 px, con desplazamiento horizontal de la página.
+    - La tabla del resumen es más ancha que su contenedor también a 1280 px (1063 frente a 981 px): la columna de Team Manager se alcanza desplazando la tabla.
+
 ### Reglas aplicadas en el Módulo 10
 
 - **Una sola fuente de verdad para el formato de fila**: `mapIndividualRegistrationToRow` y `mapRelayRegistrationToRow` (`reports.rules.ts`) son funciones puras que definen el "shape" exacto de cada fila una sola vez; JSON, CSV, XLSX y PDF consumen la misma salida — no hay 4 implementaciones distintas del mismo formato que puedan desincronizarse. **20 pruebas unitarias** verifican el formateo exacto de columnas (incluida la traducción de género) y el escapado CSV (RFC 4180: comillas, comas, saltos de línea).

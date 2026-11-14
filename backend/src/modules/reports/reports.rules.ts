@@ -263,6 +263,15 @@ export interface ClubGroupSwimmerRow {
    */
   personId: string;
   nombreCompleto: string;
+  /**
+   * Componentes del nombre tal como están guardados (`null` si faltan, como en las personas
+   * históricas), SOLO para que la pantalla presente la línea como `PATERNO MATERNO, NOMBRE`. No
+   * cambian `nombreCompleto` ni el orden, que sigue siendo el de `compararNadadores`. No se usan
+   * en CSV, XLSX, PDF ni Team Manager, que no leen la vista agrupada.
+   */
+  apellidoPaterno: string | null;
+  apellidoMaterno: string | null;
+  nombres: string | null;
   edad: number;
   categoria: string;
   genero: string;
@@ -520,6 +529,9 @@ export function groupReportByClubAndSwimmer(
       fila: {
         personId: s.persona.personId,
         nombreCompleto: s.persona.fullName,
+        apellidoPaterno: s.persona.paternalLastName ?? null,
+        apellidoMaterno: s.persona.maternalLastName ?? null,
+        nombres: s.persona.firstName ?? null,
         edad: computeAge(s.birthDate, ageCutoffDate),
         categoria: s.categoria,
         genero: REPORT_GENDER_LABELS[s.gender],

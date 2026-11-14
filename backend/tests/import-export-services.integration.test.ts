@@ -2639,7 +2639,7 @@ describe("SEC-02: los reportes no entregan el RUN y Team Manager sí", () => {
       expect(informe.individualRows.length, rol).toBeGreaterThan(0);
       sinRunEnJson(informe);
       for (const fila of informe.groupedByClub.flatMap((g) => g.swimmers)) {
-        expect(Object.keys(fila).sort(), rol).toEqual(["categoria", "edad", "genero", "nombreCompleto", "personId", "pruebas", "relevos"]);
+        expect(Object.keys(fila).sort(), rol).toEqual(["apellidoMaterno", "apellidoPaterno", "categoria", "edad", "genero", "nombreCompleto", "nombres", "personId", "pruebas", "relevos"]);
       }
       // AUD-10: la administración recibe la fecha completa; los demás roles, la edad en su lugar.
       const nacimiento = rol === "admin" ? "fechaNacimiento" : "edad";

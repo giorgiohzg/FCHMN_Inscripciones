@@ -89,7 +89,7 @@ async function generar() {
   await waitFor(() => expect(screen.getByRole("button", { name: "Generar reporte" })).toBeEnabled());
   fireEvent.click(screen.getByRole("button", { name: "Generar reporte" }));
   await waitFor(() => expect(informe).toHaveBeenCalled());
-  await screen.findAllByText(/Ana Homónima/);
+  await screen.findAllByText(/ANA HOMÓNIMA/);
   return container;
 }
 
@@ -109,9 +109,9 @@ describe("Reportes: sin RUN, con los dos contratos de la API", () => {
     informe.mockResolvedValue(informeCon([nadador({ personId: "persona-1" }), nadador({ personId: "persona-2" })]));
     const contenedor = await generar();
 
-    expect(screen.getAllByText(/Ana Homónima/)).toHaveLength(2);
-    expect(contenedor.textContent).toContain("1. Ana Homónima — 35 años — Master Uno — Damas");
-    expect(contenedor.textContent).toContain("2. Ana Homónima — 35 años — Master Uno — Damas");
+    expect(screen.getAllByText(/ANA HOMÓNIMA/)).toHaveLength(2);
+    expect(contenedor.textContent).toContain("1. ANA HOMÓNIMA (35) - Master Uno - Damas");
+    expect(contenedor.textContent).toContain("2. ANA HOMÓNIMA (35) - Master Uno - Damas");
     expect(contenedor.textContent).not.toMatch(/\(\s*\)/); // sin paréntesis vacíos donde estaba el RUN
     expect(avisos.filter((a) => /key/i.test(a)), "claves de React repetidas o ausentes").toEqual([]);
   });
@@ -125,8 +125,8 @@ describe("Reportes: sin RUN, con los dos contratos de la API", () => {
     expect(contenedor.innerHTML).not.toContain(RUN_CENTINELA_A);
     expect(contenedor.innerHTML).not.toContain(RUN_CENTINELA_B);
     expect(document.body.innerHTML).not.toContain("CENTINELA");
-    expect(contenedor.textContent).toContain("1. Ana Homónima — 35 años — Master Uno — Damas");
-    expect(contenedor.textContent).toContain("2. Bea Otra — 35 años — Master Uno — Damas");
+    expect(contenedor.textContent).toContain("1. ANA HOMÓNIMA (35) - Master Uno - Damas");
+    expect(contenedor.textContent).toContain("2. BEA OTRA (35) - Master Uno - Damas");
     expect(avisos.filter((a) => /key/i.test(a))).toEqual([]);
   });
 
@@ -134,7 +134,7 @@ describe("Reportes: sin RUN, con los dos contratos de la API", () => {
     informe.mockResolvedValue(informeCon([nadador({ run: RUN_CENTINELA_A }), nadador({ run: RUN_CENTINELA_B })]));
     await generar();
 
-    expect(screen.getAllByText(/Ana Homónima/)).toHaveLength(2);
+    expect(screen.getAllByText(/ANA HOMÓNIMA/)).toHaveLength(2);
     expect(avisos.filter((a) => /key/i.test(a))).toEqual([]);
   });
 
@@ -143,7 +143,7 @@ describe("Reportes: sin RUN, con los dos contratos de la API", () => {
     const contenedor = await generar();
 
     expect(contenedor.innerHTML).not.toContain("CENTINELA");
-    expect(screen.getAllByText(/Ana Homónima/)).toHaveLength(2);
+    expect(screen.getAllByText(/ANA HOMÓNIMA/)).toHaveLength(2);
   });
 
   it("el nadador sin pruebas ni relevos y los totales se conservan", async () => {

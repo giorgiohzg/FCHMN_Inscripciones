@@ -1,5 +1,7 @@
 /**
- * PRESENTACIÓN Y ORDEN DE NADADORES en el Panel de Inscripción y en el Panel de Relevos.
+ * PRESENTACIÓN Y ORDEN DE NADADORES en el Panel de Inscripción y en el Panel de Relevos. Reportes
+ * reutiliza solo la presentación (`nombreEnPanel`, en `reports/presentacionReporte.ts`); su orden
+ * es el del servidor.
  *
  * Formato: `PATERNO MATERNO, NOMBRE (EDAD)`, p. ej. `SINTÉTICO EJEMPLO, ANA MARÍA (54)`.
  *
