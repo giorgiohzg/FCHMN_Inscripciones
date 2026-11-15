@@ -999,7 +999,7 @@ Administración puede marcar en **Competencias** (columna «Por defecto») **una
 #### Presentación y desplazamiento en los paneles
 
 - **Orden y nombres.** Ambos paneles ordenan a los nadadores por apellido paterno, apellido materno y nombre, y los presentan como `PATERNO MATERNO, NOMBRE (EDAD)`. Las mayúsculas son de presentación: los datos no cambian. Se usan los campos separados, sin partir `fullName`. Un registro histórico sin apellido paterno o sin nombre se muestra con su `fullName` en mayúsculas, sin coma, y va al final. La edad es la que calcula el servidor a la fecha de corte (`edadAlCorte`). Búsqueda, selección e identificadores no cambian, y tampoco los reportes ni las exportaciones.
-- **Poco espacio.** Las dos columnas solo se mantienen si caben; con menos de 900 px de ventana se apilan. La zona de pruebas tiene botones visibles «Anterior»/«Siguiente», un aviso de que hay más días a un lado y foco de teclado; esos controles no dependen de las barras del sistema. Además, se declaran barras propias (`::-webkit-scrollbar`), que en Chromium se observaron visibles. **En Safari de macOS no está comprobado que queden siempre visibles**: es una validación pendiente en un Mac real. Antes, a 375 px la zona de pruebas quedaba con 0 px de ancho (inalcanzable) y los selectores desbordaban la página. Los estilos están acotados a estos paneles (`theme.css`, «Panel de Inscripción y Panel de Relevos»).
+- **Poco espacio.** Las dos columnas solo se mantienen si caben; con menos de 900 px de ventana se apilan. La zona de pruebas tiene botones visibles «Anterior»/«Siguiente», un aviso de que hay más días a un lado y foco de teclado; esos controles no dependen de las barras del sistema. Además, se declaran barras propias (`::-webkit-scrollbar`), que en Chromium se observaron visibles. *Antecedente:* al publicar, quedaba pendiente comprobar en un Mac real si en Safari de macOS quedaban visibles. Después, el usuario informó que revisó en Safari en Mac y que funciona bien. Es su revisión manual: **no garantiza que las barras queden siempre visibles en cualquier configuración de macOS**. Antes, a 375 px la zona de pruebas quedaba con 0 px de ancho (inalcanzable) y los selectores desbordaban la página. Los estilos están acotados a estos paneles (`theme.css`, «Panel de Inscripción y Panel de Relevos»).
 - **Edad de quien ya no está en el plantel.** La fila de cada inscripción individual y cada integrante de un relevo muestran la edad al corte que viene con la propia inscripción (`edadAlCorte` en `GET /registrations` y en los integrantes de `GET /relay-registrations`, calculada por el servidor para esa competencia). Se conserva aunque la membresía haya terminado, sin volver a poner a la persona entre los disponibles. Solo viaja el número, nunca la fecha de nacimiento. Un nadador recibe en los relevos su propia edad, pero no la de sus compañeros: es una **medida adicional de esta implementación**, para no ampliar lo que se deriva de la fecha de nacimiento. **No** es una decisión previa de AUD-14, que regulaba el RUN.
 - **Selección que deja de estar disponible.** Si la competencia elegida ya no está en la lista de la cuenta (por ejemplo, la sesión perdió administración y la competencia es oculta), la selección se vacía y el panel deja de mostrar su contenido; no se reemplaza por otra, ni siquiera por la predeterminada. Una elección que sigue disponible se conserva.
 
@@ -1021,7 +1021,7 @@ Validación local, con resultados reales:
   - *Selección que deja de estar disponible:* 4 pruebas, 2 por panel. Fallaron porque el panel seguía mostrando el contenido de la competencia descartada.
   - *Edad de inscritos fuera del plantel:* 2 pruebas de frontend, que mostraban el nombre sin edad, y 3 de integración, sin `edadAlCorte`.
   - Después de corregir: frontend 111 de 111, backend unitarias 34 de 34 e integración 6 archivos, 172 de 172.
-- **Pendiente:** comprobar en **Safari de macOS real** el desplazamiento y las barras de ambos paneles. No se validó allí: jsdom y Chromium no la reemplazan.
+- **Safari de macOS real.** *Antecedente:* esta validación no incluyó Safari y quedó pendiente comprobar allí el desplazamiento y las barras de ambos paneles, porque jsdom y Chromium no la reemplazan. Después, el usuario informó que revisó en Safari en Mac y que funciona bien. Es su revisión manual, no una prueba automatizada: no indicó versión ni configuración, y no garantiza barras siempre visibles en cualquier configuración de macOS.
 - **Team Manager:** no cambió el código de exportación (`team-manager-export/`) ni sus dependencias compartidas. Solo se agregó a `competitions` una columna que el generador no lee. Esto **no** equivale a haber comparado un ZIP generado, y tras el despliegue tampoco se probó con exportaciones reales.
 
 ### Sigla del club
@@ -1282,7 +1282,7 @@ Filtros soportados (sección 16): `competitionId` (obligatorio), `clubId`, `comp
 > - No hubo validación funcional autenticada ni escrituras de prueba en producción.
 > - Team Manager no se modificó, y no se ejecutaron exportaciones reales ni comparaciones de ZIP. CSV, XLSX y PDF no cambian.
 > - Siguen pendientes:
->   - la comprobación en Safari de macOS real;
+>   - la comprobación en Safari de macOS real (al cierre de este despliegue; después, el usuario informó que revisó en Safari en Mac y que funciona bien: ver «Presentación y desplazamiento en los paneles»);
 >   - la configuración de accesos por rol, que está solo diseñada (al cierre de este despliegue; después quedó publicada en el repositorio y más tarde migrada y desplegada en API y web desde `430c4cb`, con el entorno local actualizado: ver «Accesos por rol»);
 >   - los dos problemas preexistentes de anchura, descritos al final de esta sección.
 
@@ -1742,12 +1742,12 @@ Al **editar**, el campo se precarga con el tiempo guardado convertido al formato
 >
 > **Qué no se comprobó y qué queda pendiente.**
 > - No hubo validación funcional autenticada ni escrituras de prueba en producción: no se cambiaron accesos de usuarios reales ni se guardaron tiempos. La revisión visual con una cuenta real queda a cargo del responsable.
-> - No se probó en Safari.
+> - No se probó en Safari durante el despliegue (*antecedente*). Después, el usuario informó que revisó en Safari en Mac y que funciona bien: ver la revisión manual, más abajo.
 > - Al cierre del despliegue, ningún respaldo de esta entrega tenía restauración probada (*antecedente*). Después, el respaldo local se restauró en el ensayo del 15-11-2026, descrito más abajo. La exportación de Render sigue sin restauración probada.
 > - Team Manager no se modificó, y no se ejecutaron exportaciones reales.
 > - Siguen las limitaciones de «Entrada del tiempo estimado» y de esta sección, más abajo.
 >
-> **Revisión manual posterior, informada por el usuario.** Después del despliegue, el usuario informó que revisó las funciones solicitadas y que quedaron correctamente implementadas. Se registra como su informe: no es una prueba automatizada, y no indicó cuenta, rol ni navegador. No consta que incluyera Safari.
+> **Revisión manual posterior, informada por el usuario.** Después del despliegue, el usuario informó que revisó las funciones solicitadas y que quedaron correctamente implementadas. Se registra como su informe: no es una prueba automatizada, y no indicó cuenta, rol ni navegador. En ese informe no constaba Safari (*antecedente*). Más tarde, el usuario confirmó que revisó en Safari en Mac y que funciona bien; también es su revisión manual, sin versión, configuración ni cuentas indicadas.
 >
 > **Ensayo de recuperación posterior** (15-11-2026, local y aislado):
 >
@@ -1827,7 +1827,7 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
   - **Correcciones posteriores a la primera validación**, cada una reproducida antes con pruebas que fallaban por el motivo esperado: el **contexto de autorización** (lo cargado pertenece a la cuenta con sus roles efectivos y su club; administración tiene prioridad), los **editores abiertos** cuya acción se apaga (incluido el aviso con un guardado ya en curso) y la entrada y precarga de **tiempos** (ver «Entrada del tiempo estimado»).
 - **Limitaciones.**
   - No se probó con sesión real en un navegador contra la API real (la revisión visual usa una API simulada), ni hubo validación funcional autenticada en producción.
-  - No se probó en Safari.
+  - Esta validación no incluyó Safari (*antecedente*). Después, el usuario informó que revisó en Safari en Mac y que funciona bien: es su revisión manual, no una prueba automatizada.
   - Un menú puede seguir a la vista hasta la siguiente renovación de la sesión.
   - La migración usa el nombre `20261115000000_accesos_por_rol`, que ordena después de las anteriores.
 

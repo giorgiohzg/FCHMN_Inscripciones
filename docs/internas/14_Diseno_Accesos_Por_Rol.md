@@ -263,6 +263,6 @@ Resultados reales en el README, «Accesos por rol»: unitarias del backend, inte
 
 **Limitaciones.**
 - No hubo prueba con sesión real contra la API real en un navegador, ni validación funcional autenticada en producción.
-- No se probó en Safari.
-- Los respaldos de esta entrega no tienen restauración probada.
+- La validación local y el despliegue no incluyeron Safari (*antecedente*). Después, el usuario informó que revisó en Safari en Mac y que funciona bien: es su revisión manual, no una prueba automatizada, y no indicó versión, configuración ni cuentas.
+- Al cierre del despliegue, los respaldos de esta entrega no tenían restauración probada (*antecedente*). Después, en el ensayo del 15 de noviembre de 2026, el respaldo local previo a la migración se restauró, se actualizó a 42 migraciones y permitió arrancar la API con el `AUTH_LIMITER_SECRET` original (`Instructivo_Instalacion_Nube.md`, «El ensayo de recuperación — 15 de noviembre de 2026»). Ese ensayo no incluyó el inicio de sesión ni las funciones del negocio. Siguen sin comprobar la restauración de la exportación de Render, el PITR y un respaldo posterior a la migración.
 - El retraso de presentación descrito arriba.
