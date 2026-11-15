@@ -1005,7 +1005,7 @@ Administración puede marcar en **Competencias** (columna «Por defecto») **una
 
 #### Estado de estas mejoras (competencia por defecto, alta con club, presentación y desplazamiento)
 
-**Publicadas, migradas y desplegadas en producción; entorno local actualizado, dentro del alcance validado.** Se desplegaron el 2026-11-14 junto con C-05 y el preflight empaquetado, desde `5780336338febd668615d3e4a66219a13f6cc12a` (CI `43550942111`, aprobada para ese SHA). La migración `20261114000000_competencia_predeterminada` se aplicó, sin seed, en producción y en la base local de trabajo, y la API (`dep-dbrtl3mi0phs73bgp91g`) y la web (`dep-dbrtm8rl550s73erpcv0`) quedaron Live en ese SHA. El registro del despliegue (respaldo, ejecuciones del mantenimiento, muestreo HTTP, entorno local y límites) está en `docs/seguridad/PLAN_SEGURIDAD.md`, C-05, «Despliegue en producción y entorno local». No hubo validación funcional autenticada ni escrituras de prueba en producción: lo observado allí acredita disponibilidad y cabeceras, no el funcionamiento con sesión. La configuración de accesos por rol sigue **solo diseñada** (`docs/internas/14_Diseno_Accesos_Por_Rol.md`), pendiente de decidir si podrá conceder atribuciones nuevas. *Estado posterior:* se decidió la opción A (solo restringir y restituir) y quedó publicada en el repositorio, pendiente de migración y despliegue; ver «Accesos por rol».
+**Publicadas, migradas y desplegadas en producción; entorno local actualizado, dentro del alcance validado.** Se desplegaron el 2026-11-14 junto con C-05 y el preflight empaquetado, desde `5780336338febd668615d3e4a66219a13f6cc12a` (CI `43550942111`, aprobada para ese SHA). La migración `20261114000000_competencia_predeterminada` se aplicó, sin seed, en producción y en la base local de trabajo, y la API (`dep-dbrtl3mi0phs73bgp91g`) y la web (`dep-dbrtm8rl550s73erpcv0`) quedaron Live en ese SHA. El registro del despliegue (respaldo, ejecuciones del mantenimiento, muestreo HTTP, entorno local y límites) está en `docs/seguridad/PLAN_SEGURIDAD.md`, C-05, «Despliegue en producción y entorno local». No hubo validación funcional autenticada ni escrituras de prueba en producción: lo observado allí acredita disponibilidad y cabeceras, no el funcionamiento con sesión. La configuración de accesos por rol sigue **solo diseñada** (`docs/internas/14_Diseno_Accesos_Por_Rol.md`), pendiente de decidir si podrá conceder atribuciones nuevas. *Estado posterior:* se decidió la opción A (solo restringir y restituir) y quedó publicada en el repositorio, pendiente de migración y despliegue; más tarde se migró y desplegó en API y web desde `430c4cb`, con el entorno local actualizado. Ver «Accesos por rol».
 
 *Antecedente:* hasta ese despliegue figuraban publicadas en el repositorio y pendientes de despliegue, con la migración aplicada solo a la base desechable de pruebas.
 
@@ -1283,7 +1283,7 @@ Filtros soportados (sección 16): `competitionId` (obligatorio), `clubId`, `comp
 > - Team Manager no se modificó, y no se ejecutaron exportaciones reales ni comparaciones de ZIP. CSV, XLSX y PDF no cambian.
 > - Siguen pendientes:
 >   - la comprobación en Safari de macOS real;
->   - la configuración de accesos por rol, que está solo diseñada (al cierre de este despliegue; después quedó publicada en el repositorio, pendiente de migración y despliegue: ver «Accesos por rol»);
+>   - la configuración de accesos por rol, que está solo diseñada (al cierre de este despliegue; después quedó publicada en el repositorio y más tarde migrada y desplegada en API y web desde `430c4cb`, con el entorno local actualizado: ver «Accesos por rol»);
 >   - los dos problemas preexistentes de anchura, descritos al final de esta sección.
 
 - **Competencia por defecto en Reportes.** «Listado de inscritos» (el de «Generar reporte») y «Resumen por club» preseleccionan la competencia por defecto con el **mismo criterio** de los paneles de Inscripción y de Relevos (`competenciaPreseleccionada`; ver «Competencia por defecto de los paneles»):
@@ -1680,9 +1680,9 @@ Estas rutas son del administrador, que no necesita proponerse nada a sí mismo:
 | PUT | `/competition-events/reorder` | Reordena las pruebas del programa | `competitions:write` |
 | PUT | `/catalogs/distances/:id`, `/catalogs/strokes/:id` | Edición de los catálogos base | `catalogs:write` |
 
-### Entrada del tiempo estimado (estado: publicada en el repositorio y validada localmente; pendiente de migración, despliegue y actualización del entorno local)
+### Entrada del tiempo estimado (estado: publicada, migrada y desplegada en API y web; entorno local actualizado, dentro del alcance validado)
 
-> **Estado:** publicada en el repositorio y validada localmente; pendiente de migración, despliegue y actualización del entorno local. Forma parte de la misma entrega que «Accesos por rol»; su validación final conjunta está allí. *Antecedente:* hasta esta publicación, el estado decía «cambio local: sin publicar ni desplegar».
+> **Estado:** **publicada, migrada y desplegada en API y web; entorno local actualizado, dentro del alcance validado.** Forma parte de la misma entrega que «Accesos por rol» (`430c4cb`): su validación final conjunta y el registro del despliegue están allí. No hubo validación funcional autenticada en producción. *Antecedentes:* antes de la publicación, el estado decía «cambio local: sin publicar ni desplegar»; entre la publicación y el despliegue, «publicada en el repositorio y validada localmente; pendiente de migración, despliegue y actualización del entorno local».
 
 En los paneles de Inscripción y de Relevos y en sus asistentes, el tiempo estimado se escribe con **1 a 6 dígitos, sin separadores, leídos de derecha a izquierda**: los dos últimos son centésimas, los dos anteriores segundos y los restantes minutos (hasta 99); lo que falta a la izquierda vale cero. No hace falta completar seis dígitos ni escribir ceros iniciales: `13236` = 1:32,36; `2356` = 0:23,56; `023600` = 2:36,00; `10000` = 1:00,00; `1` = 0:00,01. Se mantienen las demás reglas: segundos entre 00 y 59 (no se convierten en minutos), el tiempo cero se rechaza, no se admiten signos, decimales, exponentes ni separadores, y se ignoran los espacios exteriores. El campo vacío conserva su significado en cada operación. La interfaz envía **centésimas totales** al backend, que no cambia (`frontend/src/shared/swimTime.ts`).
 
@@ -1690,9 +1690,64 @@ Al **editar**, el campo se precarga con el tiempo guardado convertido al formato
 
 **Limitaciones.** El backend conserva su propio `swimTime.util.ts` con 6 dígitos fijos (ninguna ruta lo usa para leer entradas: recibe centésimas). Un tiempo guardado igual a 0 conserva el comportamiento anterior (en Relevos se precarga vacío; en Inscripción, `000000`, que se rechaza). Los tiempos de 100 minutos o más y el ancho del campo de edición de Inscripción (65 px) no cambiaron. Los asistentes no se revisaron en pantalla: sus ayudas se comprobaron por código y tipos.
 
-### Accesos por rol (estado: publicada en el repositorio y validada localmente; pendiente de migración, despliegue y actualización del entorno local)
+### Accesos por rol (estado: publicada, migrada y desplegada en API y web; entorno local actualizado, dentro del alcance validado)
 
-> **Estado:** **publicada en el repositorio y validada localmente**, dentro del alcance descrito abajo; **pendiente de migración, despliegue y actualización del entorno local**. Producción sigue sin esta pantalla, sin las guardas de función y sin la migración `20261115000000_accesos_por_rol`. Diseño completo, catálogo y correspondencia con rutas en `docs/internas/14_Diseno_Accesos_Por_Rol.md`. *Antecedente:* hasta esta publicación, el estado decía «implementada y validada en local; sin publicar ni desplegar».
+> **Estado:** **publicada, migrada y desplegada en API y web; entorno local actualizado, dentro del alcance validado.** El código es el commit `430c4cbb1099b8b3e73713cb404a2603b03c8db2`; la migración `20261115000000_accesos_por_rol` se aplicó, sin seed, en producción y en la base local de trabajo. No hubo validación funcional autenticada en producción (ver «Qué no se comprobó»). Diseño completo, catálogo y correspondencia con rutas en `docs/internas/14_Diseno_Accesos_Por_Rol.md`. *Antecedentes:* antes de la publicación, el estado decía «implementada y validada en local; sin publicar ni desplegar»; entre la publicación y el despliegue, «publicada en el repositorio y validada localmente; pendiente de migración, despliegue y actualización del entorno local», con producción sin la pantalla, sin las guardas y sin la migración.
+>
+> **Despliegue de la entrega** (accesos por rol y entrada del tiempo estimado), desde `430c4cbb1099b8b3e73713cb404a2603b03c8db2`. Las horas «del panel» son las que muestra Render (GMT-3) y corresponden a la noche del **14-11-2026**; las horas con `Z` son UTC y corresponden al **15-11-2026**, porque a esa hora ya se había cruzado la medianoche UTC.
+>
+> **Qué se validó y cómo** (cada capa por separado):
+>
+> - **Pruebas funcionales locales y CI.** Las de «Validación local», más abajo. La CI del código (`43630543032`, push a `main`, primer intento, SHA exacto) terminó en éxito con tipos, lint, pruebas y build del frontend, y tipos, lint, unitarias, migraciones sobre su base desechable e **integración** del backend.
+> - **Revisión visual con API simulada.** Ver «Validación local». Verifica presentación e interacción, no el backend integrado.
+> - **Estado observado en Render** y **disponibilidad HTTP**: ver abajo. Son lecturas del panel y comprobaciones sin credenciales.
+>
+> **Respaldo previo.** Se creó una exportación lógica nueva de la base en Render (página Recovery) y se esperó a que la tabla la mostrara completada con su archivo `.dir.tar.gz`: la fila apareció a las 21:35 del panel y quedó con su archivo a las 21:36 (00:35–00:36Z). **No se descargó** ni se obtuvieron sus enlaces, y **no se probó su restauración**. Render la conserva al menos 7 días.
+>
+> **Migración** (servicio `fchmn-mantenimiento`):
+>
+> - **Construcción.** Con `origin/main` revalidado justo antes, el control **Manual Build** construyó [`dep-dbsfufc9v7es73cjvdug`](https://dashboard.render.com/cron/crn-dbh500bl550s73c5n2o0/deploys/dep-dbsfufc9v7es73cjvdug), iniciado a las 21:39:25 del panel (00:39:25Z). El registro hizo checkout de `430c4cbb1099b8b3e73713cb404a2603b03c8db2` y el panel mostró Deploy succeeded (46 s) y la cabecera en `430c4cb`. Construir no lanzó ninguna ejecución. *Observación:* el botón inició la construcción con un solo clic, sin menú intermedio.
+> - **Ejecuciones.** Antes de cada **Trigger Run** se comprobó que no hubiera una ejecución activa y que guardar el comando no hubiera iniciado otra; se lanzó una sola vez cada una y se leyó su registro:
+>   1. `prisma migrate status`: 42 migraciones encontradas y, como **única** pendiente, `20261115000000_accesos_por_rol`; sin fallidas, divergencias ni errores de conexión. Terminó con código 1, el esperado con una pendiente.
+>   2. `prisma migrate deploy`: aplicó **únicamente** `20261115000000_accesos_por_rol` y terminó con `All migrations have been successfully applied.`
+>   3. `prisma migrate status`: `Database schema is up to date!`
+>
+>   **Sin seed.** El contador «RUN 30» de la pestaña Runs **no aumentó** con estas ejecuciones; por eso se identificaron por sus filas: aparecieron **tres filas nuevas** (9,8 s, 10 s y 9,4 s), en ese orden, y ninguna otra. No se determinó qué cuenta ese contador.
+> - **Al terminar.** *Docker Command* vacío, comprobado tras recargar la página; programación conservada (`0 6 1 1 *`); Auto-Deploy en `Off`. La variable de la base se comprobó solo por su nombre en la API y en el mantenimiento, sin mostrar valores, apoyada en la confirmación manual anterior de su destino.
+>
+> **Producción** (Auto-Deploy Off en los tres servicios: leído antes del despliegue en API y web, y comprobado al cerrar en el mantenimiento; despliegue manual eligiendo el SHA completo, cada uno confirmado una sola vez; la API antes que la web, y la web solo después de comprobar la API):
+>
+> | Servicio | Versión | Despliegue | Inicio (panel / UTC) | Resultado |
+> |---|---|---|---|---|
+> | `fchmn-mantenimiento` | `5780336` → `430c4cb` | [`dep-dbsfufc9v7es73cjvdug`](https://dashboard.render.com/cron/crn-dbh500bl550s73c5n2o0/deploys/dep-dbsfufc9v7es73cjvdug) | 21:39:25 / 00:39:25Z | Deploy succeeded (construcción) |
+> | `fchmn-api` | `e02ba94` → `430c4cb` | [`dep-dbsg2k56e07s739olmvg`](https://dashboard.render.com/pserv/srv-dbh4ih4ipgvc73dore80/deploys/dep-dbsg2k56e07s739olmvg) | 21:48:17 / 00:48:17Z | Deploy succeeded y Live (29 s según el panel) |
+> | `fchmn-web` | `e02ba94` → `430c4cb` | [`dep-dbsg49uc6qcc73931610`](https://dashboard.render.com/web/srv-dbh48scs728c73arlf8g/deploys/dep-dbsg49uc6qcc73931610) | 21:51:51 / 00:51:51Z | Deploy succeeded y Live (32,8 s según el panel) |
+>
+> No se registró la hora exacta en que cada servicio pasó a Live: solo el inicio, la duración que muestra el panel y el estado final observado.
+>
+> **Disponibilidad** (sin credenciales; acredita disponibilidad, no funcionamiento con sesión):
+>
+> - Con la API ya Live y **antes** de desplegar la web: `/api/health` y `/api/ready` respondieron 200 (`/api/ready` con la base disponible), y `/api/auth/accesos` y `/api/accesos-por-rol` respondieron **401** sin credenciales, cuando antes del despliegue respondían 404. Eso muestra que las rutas existen, no que funcionen.
+> - Después de la web: `/` respondió 200 y el paquete servido cambió de `index-B5bgaq62.js` a `index-BIIjQRsM.js`, que contiene los textos y rutas nuevos. Eso acredita la entrega del paquete, no una prueba funcional.
+> - Muestreo único de `/api/health` por la web, de 00:46:49Z a 01:06:41Z (antes de la API hasta después de la web): **112 de 112 respuestas con 200**, con un máximo de 0,88 s. Los intervalos entre muestras no se observaron, así que no acredita disponibilidad continua.
+>
+> **Entorno local**, con el mismo código y la misma migración:
+>
+> - **Antes de intervenir producción** se construyeron las candidatas desde la copia de `430c4cb` (configuración local propia, sin cambiar valores ni TLS): backend `285cf187b915`, frontend `ff2796c5ff92` y migrate `40630fbd87c5` (con las 42 migraciones). Las imágenes anteriores se conservan como reserva (backend `7ae3e21a5a54`, frontend `7d1fe37ef07b`, migrate `d70849e66516`); mientras se intervenía producción, `latest` siguió apuntando a ellas.
+> - Respaldo lógico local previo, generado como archivo dentro del contenedor y copiado como archivo, con la misma huella SHA-256 en origen y copia. Se guarda fuera del repositorio.
+> - Migración con comando explícito y **sin seed**: `status` (solo pendiente `20261115000000_accesos_por_rol`) → `deploy` (aplicó solo esa) → `status` (al día). La configuración inicial quedó en **versión 0 y sin restricciones** (cero filas en `accesos_por_rol`), comprobado con una consulta de solo lectura.
+> - **PostgreSQL y su volumen se conservaron**, sin recrear el contenedor. **Backend y frontend se reemplazaron** deliberadamente por las candidatas, y los contenedores usan esas imágenes. Los contenedores efímeros de migración e inspección se retiraron al terminar.
+> - `/health`, `/ready` y la web respondieron 200, y las rutas nuevas 401 sin credenciales. Al terminar, los tres servicios quedaron **detenidos**, como al inicio.
+> - **No se afirma identidad binaria con Render.** El paquete web local (`index-CGkpyWAZ.js`) tiene otro nombre que el de producción; la causa no se comprobó.
+>
+> **Qué no se comprobó y qué queda pendiente.**
+> - No hubo validación funcional autenticada ni escrituras de prueba en producción: no se cambiaron accesos de usuarios reales ni se guardaron tiempos. La revisión visual con una cuenta real queda a cargo del responsable.
+> - No se probó en Safari.
+> - Ningún respaldo de esta entrega tiene restauración probada.
+> - Team Manager no se modificó, y no se ejecutaron exportaciones reales.
+> - Siguen las limitaciones de «Entrada del tiempo estimado» y de esta sección, más abajo.
+>
+> **Reversión de código.** Desplegar `e02ba94` en la web y la API. La migración **no** se deshace y no se borran tablas, restricciones guardadas ni auditorías. Con el código anterior las restricciones configurables **dejan de aplicarse**, pero se conservan los permisos y controles originales; y la web anterior reintroduce el defecto de precarga del tiempo (no solo la entrada fija de 6 dígitos).
 
 Pantalla exclusiva de administración (`/administracion/accesos`, menú «Accesos por rol») para **restringir y restituir** los menús y acciones que hoy tienen el **nadador**, el **delegado** y el **entrenador** (opción A, confirmada): la configuración **nunca concede** funciones nuevas.
 
@@ -1758,7 +1813,7 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
     - Una huella SHA-256 de los archivos de la entrega, tomada antes y comprobada después, confirmó que no cambiaron durante la validación.
   - **Correcciones posteriores a la primera validación**, cada una reproducida antes con pruebas que fallaban por el motivo esperado: el **contexto de autorización** (lo cargado pertenece a la cuenta con sus roles efectivos y su club; administración tiene prioridad), los **editores abiertos** cuya acción se apaga (incluido el aviso con un guardado ya en curso) y la entrada y precarga de **tiempos** (ver «Entrada del tiempo estimado»).
 - **Limitaciones.**
-  - No se probó con sesión real en un navegador contra la API real (la revisión visual usa una API simulada).
+  - No se probó con sesión real en un navegador contra la API real (la revisión visual usa una API simulada), ni hubo validación funcional autenticada en producción.
   - No se probó en Safari.
   - Un menú puede seguir a la vista hasta la siguiente renovación de la sesión.
   - La migración usa el nombre `20261115000000_accesos_por_rol`, que ordena después de las anteriores.

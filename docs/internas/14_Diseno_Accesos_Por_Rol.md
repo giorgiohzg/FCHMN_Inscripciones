@@ -1,6 +1,6 @@
 # Diseño: configuración administrativa de accesos por rol
 
-**Estado: opción A, publicada en el repositorio y validada localmente; pendiente de migración, despliegue y actualización del entorno local.** El responsable confirmó la opción A: solo restringir y restituir los accesos actuales. La implementación y sus precisiones están en «Implementación (opción A)», al final. Las secciones de diseño se conservan como base; donde difieran, rige la implementación.
+**Estado: opción A, publicada, migrada y desplegada en API y web; entorno local actualizado, dentro del alcance validado** (desde `430c4cb`; registro del despliegue en el README, «Accesos por rol»). *Antecedente:* entre la publicación y el despliegue decía «publicada en el repositorio y validada localmente; pendiente de migración, despliegue y actualización del entorno local». El responsable confirmó la opción A: solo restringir y restituir los accesos actuales. La implementación y sus precisiones están en «Implementación (opción A)», al final. Las secciones de diseño se conservan como base; donde difieran, rige la implementación.
 
 **Alcance.** Una pantalla exclusiva de administración para elegir qué menús y qué acciones de cada menú tienen disponibles tres roles: **Nadador** (`swimmer`), **Delegado** (`delegate`) y **Entrenador** (`coach`). Cada acción se configura por separado de su menú, y el cambio voluntario de contraseña es una función configurable más.
 
@@ -173,7 +173,7 @@ Ocultar botones no basta: la protección está en el servidor.
 
 ## Implementación (opción A)
 
-**Estado:** implementada y validada en local el 2026-11-14, sobre `c230000`; **publicada en el repositorio y validada localmente, pendiente de migración, despliegue y actualización del entorno local.** Producción no tiene la migración ni las guardas. *Antecedente:* hasta la publicación decía «No está publicada ni desplegada».
+**Estado:** implementada y validada en local el 2026-11-14, sobre `c230000`; publicada en `430c4cb`; **publicada, migrada y desplegada en API y web; entorno local actualizado, dentro del alcance validado.** La migración `20261115000000_accesos_por_rol` se aplicó sin seed en producción y en la base local de trabajo; la configuración inicial quedó sin restricciones. No hubo validación funcional autenticada en producción. *Antecedentes:* hasta la publicación decía «No está publicada ni desplegada»; entre la publicación y el despliegue, «publicada en el repositorio y validada localmente, pendiente de migración, despliegue y actualización del entorno local», con producción sin la migración ni las guardas.
 
 ### Catálogo y correspondencia con rutas
 
@@ -254,7 +254,15 @@ Resultados reales en el README, «Accesos por rol»: unitarias del backend, inte
 - Backend, integración completa sobre la base desechable: 69 archivos, 1487 de 1487 pruebas aprobadas; las 42 migraciones se aplicaron solo en esa base.
 - 13 avisos `DEP0190` de Node, del código de pruebas existente; no afectan el resultado.
 
+**Despliegue** (detalle en el README, «Accesos por rol»):
+- CI del código `43630543032` en éxito, con integración.
+- Exportación previa de la base en Render, completada; sin descarga ni restauración probada.
+- Mantenimiento construido en `430c4cb`; tres ejecuciones identificadas por sus filas (`status`, `deploy`, `status`) aplicaron únicamente `20261115000000_accesos_por_rol`, sin seed. *Docker Command* vacío al terminar, programación conservada y Auto-Deploy Off.
+- API y web Live en `430c4cb`. Sin credenciales: `/api/health` y `/api/ready` con 200, las rutas nuevas con 401 y un muestreo de 112 respuestas 200 de 112 (máximo 0,88 s; intervalos entre muestras no observados).
+- Entorno local con imágenes candidatas del mismo SHA, la migración aplicada sin seed, configuración inicial en versión 0 y sin restricciones, PostgreSQL y su volumen conservados, y servicios detenidos al terminar.
+
 **Limitaciones.**
-- No hubo prueba con sesión real contra la API real en un navegador.
+- No hubo prueba con sesión real contra la API real en un navegador, ni validación funcional autenticada en producción.
 - No se probó en Safari.
+- Los respaldos de esta entrega no tienen restauración probada.
 - El retraso de presentación descrito arriba.
