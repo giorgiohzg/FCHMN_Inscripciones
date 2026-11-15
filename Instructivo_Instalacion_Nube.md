@@ -1474,6 +1474,42 @@ Busca estas dos líneas y compáralas con `pg_restore --version`:
 > día Render sube de versión mayor, usa la imagen que corresponda
 > (`postgres:17-alpine`) — descargarla no cuesta nada.
 
+#### Sin el secreto del limitador, la API no arranca sobre la base restaurada
+
+**Recuperar la base exige conservar el `AUTH_LIMITER_SECRET` del entorno que
+generó el respaldo.** La base guarda la huella de ese secreto (tabla
+`lim_configuracion`) y la API **se niega a arrancar** si el suyo no coincide
+(ver la fila de `AUTH_LIMITER_SECRET` en el Paso 6). **Generar uno nuevo no
+sirve**: la base se restaura y se migra igual, pero la API se detiene al
+arrancar. Está comprobado en el ensayo del 15 de noviembre (ver «Qué se comprobó
+y qué no»). En una restauración sobre Render vale lo mismo, aunque allí no se ha
+comprobado: la API debe usar el secreto del entorno de origen.
+
+- **Custódialo aparte del respaldo, en un gestor de contraseñas.** Sin el
+  secreto, el respaldo no basta para levantar el sistema; y guardarlos juntos
+  hace que quien obtenga el archivo obtenga también el secreto. **No está
+  comprobado** que esa custodia exista hoy para todos los entornos: verifícalo
+  antes de necesitarlo.
+- **No borres `lim_configuracion` ni los contadores del limitador para forzar el
+  arranque.** La rotación del secreto **sigue sin implementar**, y vaciar esas
+  tablas no la reemplaza. Un arranque rechazado no borra ni reinicia nada: si
+  falla por el secreto, detente y consigue el original.
+- **Pásale el secreto al proceso sin mostrarlo.** Cárgalo, solo esa variable,
+  en el entorno del proceso que lanza el contenedor, desde su fuente, y nómbralo
+  en `docker run` **sin valor**: con `-e AUTH_LIMITER_SECRET`, Docker toma el
+  valor del entorno, así que no aparece en el comando ni en el historial.
+
+  ```bash
+  # El valor llega por el entorno del proceso: el comando solo nombra la variable.
+  docker run ... -e AUTH_LIMITER_SECRET ... IMAGEN_DEL_BACKEND
+  ```
+
+  No lo escribas en el comando, en un archivo nuevo ni en un chat, y no lo
+  muestres, ni a él ni a su huella. **No cargues el archivo de configuración
+  completo**: traería otra `DATABASE_URL`, y la del ensayo debe apuntar solo a la
+  base desechable. Tampoco ejecutes un `docker inspect` completo del contenedor,
+  porque muestra sus variables.
+
 #### El ensayo seguro: una base desechable, sin costo y sin riesgo
 
 **Así se practica sin acercarse a la base operativa.** Es la forma recomendada, y
@@ -1538,6 +1574,10 @@ es la que está comprobada de principio a fin.
    - se puede **iniciar sesión** y **consultar los catálogos**, y los valores son
      los que esperabas;
    - `refresh` renueva la sesión y `logout` la termina.
+
+   La API necesita el **`AUTH_LIMITER_SECRET` del entorno de origen**, pasado
+   como se explica en «Sin el secreto del limitador, la API no arranca sobre la
+   base restaurada». Con otro valor no arranca.
 
    > **Para probar el inicio de sesión, crea una cuenta aparte en la base
    > desechable** con `seed-admin.js` y una contraseña de un solo uso. **No uses
@@ -2171,6 +2211,82 @@ segunda base desechable y se levantaron la API y la web **construidas desde
   no la importación de competencias, la carga masiva de personas ni los
   informes.
 
+### El ensayo de recuperación — 15 de noviembre de 2026
+
+Un ensayo aislado en el equipo local, distinto del anterior: usó el **respaldo
+lógico de la base local de trabajo** tomado durante el despliegue de `430c4cb`,
+**antes** de aplicar `20261115000000_accesos_por_rol`. No usó ninguna
+exportación de Render y no tocó producción ni la base local de trabajo.
+
+**Aislamiento.** Todos los recursos eran exclusivos del ensayo, con nombres
+propios:
+
+- una red Docker creada como **interna** (`--internal`);
+- **ningún puerto publicado** en ningún contenedor;
+- PostgreSQL con la imagen local existente (`postgres:16-alpine`), los datos en
+  **tmpfs** y ningún volumen;
+- credenciales de PostgreSQL y secreto JWT generados para el ensayo.
+
+El respaldo se copió como archivo al contenedor. La copia coincidía por SHA-256
+con el original, que no cambió.
+
+| Etapa | Resultado |
+|---|---|
+| Versiones | respaldo generado con `pg_dump` 16.15 desde PostgreSQL 16.15; `pg_restore` 16.15 |
+| Destino | base **nueva y vacía** (0 relaciones), verificada antes de restaurar |
+| `pg_restore --exit-on-error --no-owner --no-privileges`, sin `--clean` ni `--create` | código **0**, sin salida |
+| Estado restaurado | **40 tablas** y **41 migraciones** aplicadas, ninguna fallida ni revertida; la última, `20261114000000_competencia_predeterminada` |
+| `prisma migrate status` | **única** pendiente: `20261115000000_accesos_por_rol`, sin divergencias |
+| `prisma migrate deploy`, comando explícito y **sin seed** (imagen de migración de `430c4cb`) | aplicó **solo** esa migración; el `status` siguiente: al día |
+| Resultado | **42 tablas** y **42 migraciones** |
+| Configuración inicial de accesos | **versión 0, sin restricciones** |
+| API: imagen existente del backend de `430c4cb`, `NODE_ENV=production`, con el `AUTH_LIMITER_SECRET` original del entorno local | **arrancó**, y su HEALTHCHECK la dejó sana |
+| `/health` y `/ready`, dos rondas desde un contenedor de la misma red | **200** en las cuatro; `/ready` con `"database":"ok"` |
+
+**Se aplicó la migración antes de arrancar** la API. El secreto se pasó como
+única variable por el entorno del proceso, como indica el Paso 9B: sin
+mostrarlo, sin ponerlo en los argumentos y sin cargar la configuración completa.
+
+**El primer intento se bloqueó por el secreto, no por la restauración.** Ese
+intento restauró y migró con el mismo resultado, pero usó un
+`AUTH_LIMITER_SECRET` generado para el ensayo. La API se negó a arrancar en la
+verificación del secreto, porque la base restaurada guarda la huella del
+original. No se borró `lim_configuracion` ni se reinició ningún contador: se
+eliminaron los recursos de ese intento y se repitió todo con el secreto
+original.
+
+**Mediciones**, de un solo ensayo local:
+
+- la restauración, 873 ms medidos desde el equipo;
+- la migración, 22 ms según `_prisma_migrations`, y 1,8 s el contenedor completo;
+- la API escuchaba unos 4 s después de crearse el contenedor.
+
+No equivalen a un tiempo garantizado de recuperación.
+
+**Efectos del arranque.** El recuento de filas de las 42 tablas fue el mismo
+antes y después de arrancar la API. **No se comprobó que todos sus valores
+permanecieran intactos.**
+
+**Limpieza de los dos intentos.** Los contenedores y las redes del ensayo se
+eliminaron por su ID, tras verificar cada uno. La copia del respaldo se borró
+en el primer intento y se eliminó con su contenedor en el segundo, y los datos
+en tmpfs se descartaron. El respaldo original conservó su tamaño, su
+fecha y su SHA-256. Los contenedores preexistentes conservaron sus IDs, los
+volúmenes siguieron siendo los mismos y las imágenes no cambiaron.
+
+**Limitaciones de este ensayo:**
+
+- **Fue un solo ensayo local**, y sus mediciones son de esa única vez.
+- **Sobre el aislamiento**, lo que consta es la configuración: red interna y
+  ningún puerto publicado. Un intento de conexión al exterior agotó su tiempo,
+  pero eso, por sí solo, no demuestra un aislamiento general.
+- **No se probaron el inicio de sesión, las sesiones ni las funciones del
+  negocio**, y no hubo escrituras funcionales.
+- **No valida** una restauración de Render, el PITR ni un respaldo tomado
+  después de la migración.
+- **No se probó** cómo se comporta la API de `430c4cb` sobre la base sin migrar:
+  la migración se aplicó antes de arrancar.
+
 ### No comprobado
 
 - **La rutina de respaldo como rutina.** El **procedimiento** está ensayado de
@@ -2178,7 +2294,12 @@ segunda base desechable y se levantaron la API y la web **construidas desde
   aplicación encima—, pero **se ha ejecutado una sola vez, a mano, el 29 de
   octubre**. No hay todavía una rutina que se repita, ni responsable asignado,
   ni ninguna copia conservada bajo la retención de 30 días. **Saber restaurar no
-  es lo mismo que tener respaldos.**
+  es lo mismo que tener respaldos.** El ensayo del 15 de noviembre usó un
+  respaldo local, no una exportación de Render, así que no cuenta como una
+  repetición de esta rutina.
+- **La custodia del `AUTH_LIMITER_SECRET` de cada entorno**, aparte del
+  respaldo. Sin ese secreto la API no arranca sobre la base restaurada (Paso
+  9B), y no está comprobado que esté custodiado hoy en todos los entornos.
 - **La restauración sobre una base de Render.** El **ensayo sí está hecho** (ver
   más arriba): el archivo descargado se restauró completo en una base desechable
   y se verificó. Lo que no se ha hecho es apuntar `pg_restore` a una base de

@@ -1743,9 +1743,22 @@ Al **editar**, el campo se precarga con el tiempo guardado convertido al formato
 > **Qué no se comprobó y qué queda pendiente.**
 > - No hubo validación funcional autenticada ni escrituras de prueba en producción: no se cambiaron accesos de usuarios reales ni se guardaron tiempos. La revisión visual con una cuenta real queda a cargo del responsable.
 > - No se probó en Safari.
-> - Ningún respaldo de esta entrega tiene restauración probada.
+> - Al cierre del despliegue, ningún respaldo de esta entrega tenía restauración probada (*antecedente*). Después, el respaldo local se restauró en el ensayo del 15-11-2026, descrito más abajo. La exportación de Render sigue sin restauración probada.
 > - Team Manager no se modificó, y no se ejecutaron exportaciones reales.
 > - Siguen las limitaciones de «Entrada del tiempo estimado» y de esta sección, más abajo.
+>
+> **Revisión manual posterior, informada por el usuario.** Después del despliegue, el usuario informó que revisó las funciones solicitadas y que quedaron correctamente implementadas. Se registra como su informe: no es una prueba automatizada, y no indicó cuenta, rol ni navegador. No consta que incluyera Safari.
+>
+> **Ensayo de recuperación posterior** (15-11-2026, local y aislado):
+>
+> - **Restauración.** El respaldo lógico local tomado en este despliegue, previo a `accesos_por_rol`, se restauró en un PostgreSQL desechable: 40 tablas y 41 migraciones.
+> - **Migración.** Se aplicó solo `20261115000000_accesos_por_rol`, sin seed, y quedaron 42 tablas y 42 migraciones, al día.
+> - **Arranque.** La API de `430c4cb`, con `NODE_ENV=production`, arrancó con el `AUTH_LIMITER_SECRET` original del entorno local y respondió 200 en `/health` y `/ready`.
+> - **Primer intento.** Usó otro secreto y la API no arrancó. Fue la protección del limitador, no un fallo de la restauración.
+> - **Qué exige recuperar.** Hay que conservar ese secreto, custodiado aparte del respaldo.
+> - **Qué no valida.** Una restauración de Render, el PITR ni un respaldo posterior a la migración. Tampoco se probaron el inicio de sesión ni las funciones del negocio.
+>
+> Detalle y procedimiento en `Instructivo_Instalacion_Nube.md`: el Paso 9B y «El ensayo de recuperación — 15 de noviembre de 2026».
 >
 > **Reversión de código.** Desplegar `e02ba94` en la web y la API. La migración **no** se deshace y no se borran tablas, restricciones guardadas ni auditorías. Con el código anterior las restricciones configurables **dejan de aplicarse**, pero se conservan los permisos y controles originales; y la web anterior reintroduce el defecto de precarga del tiempo (no solo la entrada fija de 6 dígitos).
 
