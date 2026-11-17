@@ -27,7 +27,7 @@ async function preparar() {
       <BulkSwimmerAssignmentPage />
     </MemoryRouter>
   );
-  await screen.findByText("Uno Sintético");
+  await screen.findByText("UNO SINTÉTICO"); // presentación en mayúsculas
   await screen.findAllByRole("option", { name: "Club Destino" }); // figura en el filtro y en el destino
   fireEvent.click(screen.getByRole("button", { name: "Seleccionar todos" }));
   fireEvent.change(screen.getByLabelText("Club de destino"), { target: { value: "club-d" } });

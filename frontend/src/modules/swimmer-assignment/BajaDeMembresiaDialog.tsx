@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Dialogo } from "../../shared/Dialogo";
 import { esFechaCalendarioExistente, formatearFechaCalendario } from "../../shared/fechaCalendario";
 import type { ClubSwimmerAssignment, DatosDeBaja } from "./assignmentApi";
@@ -19,8 +19,11 @@ export function BajaDeMembresiaDialog({
   error,
   onCancelar,
   onConfirmar,
+  nadador,
 }: {
   membresia: Pick<ClubSwimmerAssignment, "id" | "startDate" | "person" | "club">;
+  /** Cómo mostrar al nadador. Sin indicarlo, `nombre completo (RUN)` tal como está guardado. */
+  nadador?: ReactNode;
   /** Hoy en America/Santiago (`AAAA-MM-DD`). */
   hoy: string;
   enviando: boolean;
@@ -51,7 +54,11 @@ export function BajaDeMembresiaDialog({
       <dl className="ficha-datos">
         <dt>Nadador</dt>
         <dd>
-          {membresia.person.fullName} ({membresia.person.run})
+          {nadador ?? (
+            <>
+              {membresia.person.fullName} ({membresia.person.run})
+            </>
+          )}
         </dd>
         <dt>Club</dt>
         <dd>{membresia.club.name}</dd>

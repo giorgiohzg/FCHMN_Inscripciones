@@ -132,11 +132,14 @@ export const assignmentListQuerySchema = z.object({
   personId: uuidField().optional(),
   status: z.enum(["pending", "active", "rejected", "ended"]).optional(),
   /**
-   * Orden del listado. Sin indicar: el de siempre (más recientes primero). `apellidos`: apellido
-   * paterno, apellido materno y nombre (`compararNadadores` de Reportes), aplicado ANTES de
-   * paginar. Lo usa el plantel de Editar Club.
+   * Orden del listado. Sin indicar: el de siempre (más recientes primero). Los demás ordenan por
+   * apellido paterno, apellido materno y nombre (`compararNadadores` de Reportes), ANTES de paginar:
+   *  - `apellidos`: PLANTEL VIGENTE, sin personas eliminadas. Lo usa el plantel de Editar Club.
+   *  - `nadador` / `nadador_desc`: TODAS las membresías que cumplen el filtro, también las de personas
+   *    eliminadas (el mismo conjunto que sin `orden`), ascendente o con el orden completo invertido.
+   *    Lo usa Asignación de Nadadores a Clubes.
    */
-  orden: z.enum(["apellidos"]).optional(),
+  orden: z.enum(["apellidos", "nadador", "nadador_desc"]).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });

@@ -10,6 +10,8 @@ import { PanelDeActivacion } from "./PanelDeActivacion";
 import { useOperacionUnica } from "../../shared/useOperacionUnica";
 import { useTieneRol } from "../auth/AuthContext";
 import { EdicionDeFechasDialog } from "./EdicionDeFechasDialog";
+import { NadadorConRun } from "./NadadorConRun";
+import { textoNadadorConRun } from "./textoNadadorConRun";
 
 const STATUS_LABELS: Record<AssignmentStatus, string> = { pending: "Pendiente", active: "Activo", rejected: "Rechazado", ended: "Finalizado" };
 const STATUS_BADGE: Record<AssignmentStatus, string> = { pending: "badge-locked", active: "badge-active", rejected: "badge-disabled", ended: "badge-disabled" };
@@ -40,7 +42,19 @@ export function SwimmerAssignmentsPage() {
   /** Aviso de que otra operación cambió el estado. Lo pinta la acción; la recarga no lo borra. */
   const [avisoDeCambio, setAvisoDeCambio] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const { sortKey, sortDir, onSort } = useSort<"person" | "club" | "status">();
+  /**
+   * «Nadador» se ordena en el SERVIDOR (apellido paterno, materno y nombres, sobre todas las
+   * membresías del filtro, antes de paginar), y es el orden inicial; invertirlo también es global.
+   * Club y Estado siguen ordenando la página visible, como antes, sobre ese orden de base.
+   */
+  const { sortKey, sortDir, onSort } = useSort<"person" | "club" | "status">("person", "asc");
+  const orden: "nadador" | "nadador_desc" = sortKey === "person" && sortDir === "desc" ? "nadador_desc" : "nadador";
+  /** Cambiar el sentido del orden por nadador vuelve a la primera página del nuevo orden. */
+  const [ordenAnterior, setOrdenAnterior] = useState(orden);
+  if (orden !== ordenAnterior) {
+    setOrdenAnterior(orden);
+    setPage(1);
+  }
   const [accion, setAccion] = useState<Accion | null>(null);
   const [motivo, setMotivo] = useState("");
   const [errorDeAccion, setErrorDeAccion] = useState<string | null>(null);
@@ -58,13 +72,13 @@ export function SwimmerAssignmentsPage() {
     const n = ++cargaVigente.current;
     setError(null);
     try {
-      const res = await api.list({ status: (status || undefined) as AssignmentStatus | undefined, page });
+      const res = await api.list({ status: (status || undefined) as AssignmentStatus | undefined, orden, page });
       if (n === cargaVigente.current) setData(res);
     } catch (err) {
       if (n === cargaVigente.current) setError(err instanceof Error ? err.message : "Error al cargar solicitudes");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, page]);
+  }, [status, orden, page]);
 
   useEffect(() => {
     void load();
@@ -173,10 +187,8 @@ export function SwimmerAssignmentsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortItems(data.items, sortKey, sortDir, (a, key) => {
+                  {sortItems(data.items, sortKey === "person" ? null : sortKey, sortDir, (a, key) => {
                     switch (key) {
-                      case "person":
-                        return a.person.fullName;
                       case "club":
                         return a.club.name;
                       case "status":
@@ -185,7 +197,7 @@ export function SwimmerAssignmentsPage() {
                   }).map((a) => (
                     <tr key={a.id}>
                       <td>
-                        {a.person.fullName} ({a.person.run})
+                        <NadadorConRun p={a.person} />
                       </td>
                       <td>{a.club.name}</td>
                       <td>
@@ -250,7 +262,7 @@ export function SwimmerAssignmentsPage() {
           <dl className="ficha-datos">
             <dt>Nadador</dt>
             <dd>
-              {accion.a.person.fullName} ({accion.a.person.run})
+              <NadadorConRun p={accion.a.person} />
             </dd>
             <dt>Club de destino</dt>
             <dd>{accion.a.club.name}</dd>
@@ -266,7 +278,7 @@ export function SwimmerAssignmentsPage() {
             enviar={(opciones) => api.approve(accion.a.id, opciones)}
             onExito={() => {
               setAccion(null);
-              setMensaje(`Propuesta aprobada: ${accion.a.person.fullName} queda activo en ${accion.a.club.name}.`);
+              setMensaje(`Propuesta aprobada: ${textoNadadorConRun(accion.a.person)} queda activo en ${accion.a.club.name}.`);
               void load();
             }}
             onErrorNoManejado={(err) => {
@@ -284,7 +296,7 @@ export function SwimmerAssignmentsPage() {
       {accion?.tipo === "rechazar" && (
         <Dialogo titulo="Rechazar propuesta" onCerrar={cerrar} bloqueado={enviando}>
           <p style={{ fontSize: "0.9rem" }}>
-            {accion.a.person.fullName} ({accion.a.person.run}) en {accion.a.club.name}.
+            <NadadorConRun p={accion.a.person} /> en {accion.a.club.name}.
           </p>
           <label htmlFor="motivo-rechazo">Motivo (opcional)</label>
           <textarea id="motivo-rechazo" value={motivo} maxLength={500} onChange={(e) => setMotivo(e.target.value)} disabled={enviando} />
@@ -312,22 +324,24 @@ export function SwimmerAssignmentsPage() {
       {accion?.tipo === "baja" && (
         <BajaDeMembresiaDialog
           membresia={accion.a}
+          nadador={<NadadorConRun p={accion.a.person} />}
           hoy={hoy}
           enviando={enviando}
           error={errorDeAccion}
           onCancelar={cerrar}
-          onConfirmar={(datos) => void ejecutar(() => api.end(accion.a.id, datos), `Baja registrada: ${accion.a.person.fullName} deja ${accion.a.club.name}.`)}
+          onConfirmar={(datos) => void ejecutar(() => api.end(accion.a.id, datos), `Baja registrada: ${textoNadadorConRun(accion.a.person)} deja ${accion.a.club.name}.`)}
         />
       )}
 
       {accion?.tipo === "fechas" && (
         <EdicionDeFechasDialog
           membresia={accion.a}
+          nadador={<NadadorConRun p={accion.a.person} />}
           hoy={hoy}
           onCancelar={() => setAccion(null)}
           onGuardado={() => {
             setAccion(null);
-            setMensaje(`Fechas corregidas: ${accion.a.person.fullName} en ${accion.a.club.name}.`);
+            setMensaje(`Fechas corregidas: ${textoNadadorConRun(accion.a.person)} en ${accion.a.club.name}.`);
             void load();
           }}
         />

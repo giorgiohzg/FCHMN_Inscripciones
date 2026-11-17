@@ -809,7 +809,7 @@ cuenta `system`.
 
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
-| GET | `/swimmer-assignments` | Lista solicitudes (filtro por club/nadador/estado, paginado). Con `orden=apellidos` (plantel de Editar Club) ordena por apellido paterno, materno y nombre antes de paginar y excluye a las personas eliminadas | `swimmer-assignment:read` |
+| GET | `/swimmer-assignments` | Lista solicitudes (filtro por club/nadador/estado, paginado). Con `orden=apellidos` (plantel de Editar Club) ordena por apellido paterno, materno y nombre antes de paginar y excluye a las personas eliminadas. Con `orden=nadador` o `nadador_desc` (Asignación de Nadadores) aplica el mismo orden, ascendente o invertido, antes de paginar y sobre el mismo conjunto que sin `orden`, sin excluir personas eliminadas; sin `orden`, el de siempre | `swimmer-assignment:read` |
 | GET | `/swimmer-assignments/:id` | Detalle de una solicitud | `swimmer-assignment:read` |
 | POST | `/swimmer-assignments` | C-05 (fase 2, desplegada en producción desde `5780336`): postulación **por RUN** (`{ run }`; ya no acepta `personId`). El club y su personal —delegado, entrenador o representante legal— postulan en su club con cabecera `Idempotency-Key` y cuota de 30 intentos diarios por club; administración indica `clubId`. Queda `pending` | `swimmer-assignment:write` |
 | POST | `/swimmer-assignments/:id/approve` | Aprueba y activa la MISMA propuesta. Cuerpo opcional: `fechaEfectiva` (`AAAA-MM-DD`, no futura), `confirmarFinDeMembresiaId` (traslado) y `aceptarHistorialIncompleto` | `swimmer-assignment:approve` (solo `admin`) |
@@ -1667,7 +1667,7 @@ Estas rutas son del administrador, que no necesita proponerse nada a sí mismo:
 | POST | `/swimmer-assignments/direct` | Asigna un nadador a un club sin pasar por `pending` | `swimmer-assignment:approve` |
 | POST | `/swimmer-assignments/bulk-assign` | Asignación masiva. C-05 (desplegada en producción desde `5780336`): cada fila rechazada trae `codigo` estable (p. ej. `HISTORIAL_INCOMPLETO`) | `swimmer-assignment:approve` |
 | POST | `/swimmer-assignments/reassign/:personId` | Traslada un nadador a otro club | `swimmer-assignment:approve` |
-| GET | `/swimmer-assignments/swimmers-by-club` | Plantel agrupado por club | `swimmer-assignment:approve` |
+| GET | `/swimmer-assignments/swimmers-by-club` | Personas asignables por club actual (o `none`, sin club) para la asignación masiva: lista completa, ordenada por apellido paterno, materno y nombre | `swimmer-assignment:approve` |
 | GET | `/swimmer-assignments/current-club/:personId` | Club vigente de un nadador | `swimmer-assignment:read` |
 | PUT | `/swimmer-assignments/:id/fechas` | Corrige DESDE (`startDate`) y, en una finalizada, HASTA (`fechaTermino`) de una membresía. No cambia el estado (ver «Clubes y nadadores, orden del plantel y edición de fechas») | `swimmer-assignment:approve` (además, rol `admin`) |
 
@@ -1974,6 +1974,40 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
 - No hubo validación funcional autenticada en producción; queda pendiente la revisión del usuario. Las respuestas 401 solo acreditan el rechazo sin credenciales: no comprueban los nombres, el orden, los permisos de usuarios autenticados ni las exportaciones.
 - No se afirma identidad binaria entre las imágenes de Render y las locales. El paquete web local y el de producción tienen nombres distintos; la URL de API compilada es distinta y puede explicarlo, pero no se comprobó que sea la única causa.
 - No se afirma la ausencia de escrituras en la base durante el despliegue: no se revisó la actividad de los usuarios.
+
+### Nombres por apellidos y RUN con guion en Asignación de Nadadores a Clubes (estado: publicada en el repositorio y validada localmente; pendiente de despliegue y actualización del entorno local)
+
+> **Estado:** **publicada en el repositorio y validada localmente; pendiente de despliegue y actualización del entorno local.** Producción y el entorno local de ejecución todavía no tienen estos cambios. Sin cambios de esquema, migraciones, seed ni variables. No hubo validación en producción.
+>
+> *Antecedente:* el usuario informó que revisó manualmente en producción los cambios de la entrega anterior en Personas y en el plantel de Editar Club, y que funcionan correctamente. Esa confirmación corresponde solo a aquella entrega; no se extiende a esta.
+
+**Qué incluye**
+
+- **Formato.** En el listado de Asignación de Nadadores a Clubes cada nadador se muestra como `PATERNO MATERNO, NOMBRES (12345678-9)`, con el mismo componente que el plantel de Editar Club: nombres en mayúsculas, con tildes y Ñ; RUN sin puntos, con guion antes del dígito verificador y K en mayúscula, sin convertirlo a número (conserva ceros iniciales) y sin cortarse en el guion. Sin segundo apellido, `PATERNO, NOMBRES`; los registros antiguos incompletos muestran el nombre completo almacenado, sin coma ni apellidos inventados, y sin RUN no se agrega el paréntesis. Es solo presentación: no se modifican los datos guardados.
+- **Orden global antes de paginar.** El listado empieza ordenado por apellido paterno, materno y nombres, ascendente, con el comparador de Reportes y desempate estable (RUN, persona y membresía). Pulsar «Nadador» invierte el orden completo y vuelve a la página 1; cambiar el filtro de estado conserva el orden. Ambos sentidos se resuelven en el servidor sobre el conjunto filtrado completo (`GET /swimmer-assignments?orden=nadador|nadador_desc`).
+- **`nadador` frente a `apellidos`.** `orden=apellidos` sigue siendo el del plantel vigente de Editar Club y excluye a las personas eliminadas. `nadador` y `nadador_desc` no excluyen a nadie: el listado administrativo conserva **el mismo conjunto de membresías que antes** (sin `orden`), incluidas las de personas eliminadas, que se siguen revisando ahí. No se reparan, finalizan ni eliminan registros. Sin `orden`, la ruta conserva el orden de siempre (más recientes primero) para sus demás consumidores.
+- **Diálogos y mensajes** de la misma pantalla: Aprobar, Rechazar, Finalizar membresía y Corregir fechas muestran al nadador con el mismo formato, y también los mensajes de confirmación. Los diálogos de baja y de fechas, compartidos con Editar Club y Editar Persona, solo cambian cuando la pantalla de Asignación les pasa el nombre; en esas otras pantallas siguen como estaban.
+- **Asignación masiva.** La lista de selección se entrega completa (sin paginar) ordenada por apellidos; la columna «Nadador» muestra `PATERNO MATERNO, NOMBRES` y la columna RUN, el RUN con guion. Pulsar «Nadador» invierte la lista completa; «RUN» ordena por RUN. La tabla de resultado de cada tanda usa el mismo formato con el RUN, también después de recargarse la lista. Filtro por club, búsqueda, selección, fecha efectiva, reintento con aceptación y permisos no cambian.
+
+**Pruebas y revisión** (rondas separadas; no son una única ejecución de suites completas). Datos sintéticos; la integración, solo contra la base desechable de `docker-compose.test.yml`.
+
+- **Ronda 1 — implementación.**
+  - Frontend: en los 12 archivos de prueba existentes del módulo de asignaciones fallaron primero 4 casos que buscaban el nombre en su forma anterior (ahora en mayúsculas); se ajustaron esas 3 expectativas y quedaron 167/167. Archivos nuevos de presentación y orden de la pantalla y de la asignación masiva: 11/11 (orden pedido al servidor, inversión con vuelta a la página 1, filtro, orden local de «Club», diálogos, búsqueda y resultado de la tanda). Otro consumidor del diálogo de fechas (Editar Persona) y los helpers de nombre y RUN: 18/18.
+  - Backend unitarias relacionadas (esquemas, listas, rutas, orden determinista y documentación): 308/308.
+  - Integración: el archivo nuevo, 11/11 (31 membresías, más que una página: orden ascendente y descendente entre páginas, mismo conjunto que sin `orden` en cada estado, desempate de dos membresías de una misma persona, tildes y Ñ, homónimos, registros históricos al final, componentes del nombre, `apellidos` sin eliminadas, alcance de la cuenta de club, orden desconocido rechazado, lista de la asignación masiva por apellidos con filtro y búsqueda, acceso exclusivo de administración y datos guardados intactos). Regresión del plantel de Editar Club y de Personas: 29/29.
+  - Tipos sin errores en ambas capas; lint sin errores ni advertencias nuevas en los archivos tocados.
+- **Ronda 2 — revisión visual y corrección.**
+  - Revisión con la API real del repositorio contra la base desechable y datos sintéticos (el archivo de integración de esta entrega volvió a ejecutarse, 11/11, solo para preparar esos datos), en escritorio (1280 px) y a 375 px: formato del listado, orden inicial e inversión global con vuelta a la página 1, diálogos de aprobar, rechazar, baja y corrección de fechas (abiertos y cancelados sin guardar), lista de la asignación masiva con filtro por club e inversión, y ausencia de desplazamiento horizontal de la página a 375 px (la tabla del listado se desplaza dentro de su contenedor, como antes).
+  - Para ver la tabla de resultado se hicieron **dos asignaciones masivas, solo en la base desechable**, de dos personas sintéticas cada una a un club sintético. La primera mostró un defecto a 375 px: en esa tabla el RUN se cortaba en el guion. Se corrigió con el mismo componente que el listado, se amplió la prueba del resultado y la segunda asignación lo confirmó.
+  - Tras la corrección, una ejecución de las pruebas del área con los servidores de la revisión abiertos terminó en 194/196: dos pruebas existentes, no modificadas («navega a la SEGUNDA página y muestra sus filas» del plantel y «muestra origen, destino y fechas, y exige confirmar EXPRESAMENTE la vigente» de Asignación), superaron el límite de 5 s. Esos dos archivos, solos, pasaron 53/53, y el área completa, con los servidores ya detenidos, 196/196. La relación con los servidores abiertos es una hipótesis, no una causa demostrada. Tipos sin errores.
+
+**Limitaciones**
+
+- Las columnas «Club» y «Estado» del listado principal ordenan solo la página visible; no es un ordenamiento global.
+- No se midió el rendimiento con datos reales (cada página lee las claves de orden de todas las membresías que cumplen el filtro).
+- Solicitudes de alta, Periodos de cambio y la pantalla de incorporaciones del club quedaron expresamente fuera de esta entrega, sin cambios.
+- Se mantiene el criterio de `compararNadadores`: quien no tiene apellido materno queda después de quien sí lo tiene con el mismo paterno.
+- No hubo validación en producción.
 
 ## Inventario completo de endpoints
 

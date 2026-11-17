@@ -37,8 +37,8 @@ export interface ClubSwimmerAssignment {
   endDate: string | null;
   club: { id: string; name: string };
   /**
-   * Los componentes del nombre los envía el plantel ordenado (`orden=apellidos`), para presentarlo
-   * como «PATERNO MATERNO, NOMBRES»; otros listados pueden no traerlos.
+   * Los componentes del nombre los envían los listados ordenados (`orden=apellidos`, `nadador` o
+   * `nadador_desc`), para presentarlo como «PATERNO MATERNO, NOMBRES»; sin `orden` pueden no venir.
    */
   person: { id: string; fullName: string; run: string; firstName?: string | null; paternalLastName?: string | null; maternalLastName?: string | null };
 }
@@ -54,6 +54,10 @@ export interface SwimmerForBulkAssign {
   id: string;
   fullName: string;
   run: string;
+  /** Componentes del nombre, para presentarlo como «PATERNO MATERNO, NOMBRES». */
+  firstName?: string | null;
+  paternalLastName?: string | null;
+  maternalLastName?: string | null;
   gender: "male" | "female";
   birthDate: string;
 }
@@ -137,8 +141,21 @@ export const codigoDelError = (err: unknown): string | undefined => (err instanc
 
 export function useSwimmerAssignmentApi() {
   return {
-    /** `orden: "apellidos"`: paterno, materno y nombre, ordenado en el servidor ANTES de paginar. */
-    list: (params: { clubId?: string; personId?: string; status?: AssignmentStatus; orden?: "apellidos"; page?: number; pageSize?: number } = {}) => {
+    /**
+     * Orden por apellido paterno, materno y nombre, resuelto en el servidor ANTES de paginar.
+     * `apellidos`: plantel vigente (sin personas eliminadas). `nadador` / `nadador_desc`: todas las
+     * membresías del filtro, ascendente o invertido (Asignación de Nadadores). Sin `orden`, el de siempre.
+     */
+    list: (
+      params: {
+        clubId?: string;
+        personId?: string;
+        status?: AssignmentStatus;
+        orden?: "apellidos" | "nadador" | "nadador_desc";
+        page?: number;
+        pageSize?: number;
+      } = {}
+    ) => {
       const qs = new URLSearchParams();
       if (params.clubId) qs.set("clubId", params.clubId);
       if (params.personId) qs.set("personId", params.personId);
@@ -168,7 +185,7 @@ export function useSwimmerAssignmentApi() {
 
     // ---------- Asignación masiva ----------
 
-    /** `clubFilter`: ID de un club, o "none" para nadadores sin club asignado. */
+    /** `clubFilter`: ID de un club, o "none" para nadadores sin club asignado. Lista completa, por apellidos. */
     listSwimmersByClub: (clubFilter: string, search?: string) => {
       const qs = new URLSearchParams({ clubFilter });
       if (search) qs.set("search", search);

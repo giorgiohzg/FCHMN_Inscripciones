@@ -232,9 +232,9 @@ describe("respuestas obsoletas", () => {
     list.mockImplementation(async () => pagina([fila({ id: "act-1", status: "active", startDate: "2026-02-02T00:00:00.000Z", person: { ...PERSONA, fullName: "Activa Actual" } })]));
     montar();
     fireEvent.change(screen.getByLabelText("Estado"), { target: { value: "active" } });
-    expect(await screen.findByText(/Activa Actual/)).toBeInTheDocument();
+    expect(await screen.findByText(/ACTIVA ACTUAL/)).toBeInTheDocument();
     await act(async () => resolverVieja(pagina([fila({ id: "vieja", person: { ...PERSONA, fullName: "Pendiente Vieja" } })])));
-    expect(screen.queryByText(/Pendiente Vieja/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/PENDIENTE VIEJA/i)).not.toBeInTheDocument();
   });
 });
 

@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Dialogo } from "../../shared/Dialogo";
 import { esFechaCalendarioExistente, formatearFechaCalendario } from "../../shared/fechaCalendario";
 import { useOperacionUnica } from "../../shared/useOperacionUnica";
@@ -30,6 +30,7 @@ export function EdicionDeFechasDialog({
   hoy,
   onCancelar,
   onGuardado,
+  nadador,
 }: {
   membresia: Pick<ClubSwimmerAssignment, "id" | "status" | "startDate" | "fechaTermino"> & {
     person: { fullName: string };
@@ -39,6 +40,8 @@ export function EdicionDeFechasDialog({
   hoy: string;
   onCancelar: () => void;
   onGuardado: (actualizada: ClubSwimmerAssignment) => void;
+  /** Cómo mostrar al nadador. Sin indicarlo, su nombre completo tal como está guardado. */
+  nadador?: ReactNode;
 }) {
   const api = useSwimmerAssignmentApi();
   const operacion = useOperacionUnica();
@@ -113,7 +116,7 @@ export function EdicionDeFechasDialog({
     <Dialogo titulo="Corregir fechas de pertenencia" onCerrar={onCancelar} bloqueado={enviando}>
       <dl className="ficha-datos">
         <dt>Nadador</dt>
-        <dd>{membresia.person.fullName}</dd>
+        <dd>{nadador ?? membresia.person.fullName}</dd>
         <dt>Club</dt>
         <dd>{membresia.club.name}</dd>
         <dt>Estado</dt>

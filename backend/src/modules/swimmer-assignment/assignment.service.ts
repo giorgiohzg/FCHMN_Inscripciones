@@ -154,7 +154,12 @@ export async function listAssignments(query: AssignmentListQuery, restrictToClub
   if (query.status) where.status = query.status;
   if (restrictToClubId !== undefined) where.clubId = restrictToClubId ?? "__sin_club_real__";
 
-  if (query.orden === "apellidos") return listarPorApellidos(where, query.page, query.pageSize);
+  if (query.orden) {
+    return listarPorApellidos(where, query.page, query.pageSize, {
+      soloPersonasVigentes: query.orden === "apellidos",
+      descendente: query.orden === "nadador_desc",
+    });
+  }
 
   const [items, total] = await Promise.all([
     prisma.clubSwimmer.findMany({
@@ -182,17 +187,20 @@ const INCLUDE_DEL_LISTADO = {
 } as const;
 
 /**
- * Orden por APELLIDOS, aplicado ANTES de paginar (plantel de Editar Club).
+ * Orden por APELLIDOS, aplicado ANTES de paginar (plantel de Editar Club y Asignación de Nadadores).
  *
  * Reutiliza `compararNadadores` de Reportes —apellido paterno, materno y nombre con colación en
  * español sin distinguir mayúsculas ni tildes; los registros históricos sin apellido paterno van
  * al final por su nombre completo almacenado, sin inventar apellidos; desempatan el RUN y el id
  * de la persona—, y como último desempate el id de la membresía. Hacerlo en SQL exigiría otra
- * colación que no es la misma que la de Reportes.
+ * colación que no es la misma que la de Reportes. `descendente` invierte el orden COMPLETO, también
+ * el de los registros históricos y el desempate, así que sigue siendo estable (como en Personas).
  *
- * PLANTEL VIGENTE: excluye a las personas ELIMINADAS antes de ordenar y paginar, igual que la
- * columna «Nadadores» de Clubes (`contarNadadoresActivos`), para que total y conteo coincidan. No
- * toca sus membresías: siguen como estén en el historial administrativo.
+ * `soloPersonasVigentes` (PLANTEL VIGENTE, `orden=apellidos`): excluye a las personas ELIMINADAS
+ * antes de ordenar y paginar, igual que la columna «Nadadores» de Clubes (`contarNadadoresActivos`),
+ * para que total y conteo coincidan. No toca sus membresías: siguen como estén en el historial
+ * administrativo. Sin esa opción (`nadador`, Asignación de Nadadores) el conjunto es EXACTAMENTE el
+ * del listado sin `orden`: las membresías de personas eliminadas se siguen viendo y revisando ahí.
  *
  * DOS LECTURAS, UNA INSTANTÁNEA: primero los campos de orden de todas las filas que cumplen el
  * filtro; luego las filas completas de la página, con el MISMO filtro y alcance más los ids de la
@@ -200,8 +208,13 @@ const INCLUDE_DEL_LISTADO = {
  * momento: un cambio confirmado entre medias no las descuadra. Si aun así faltara una fila, se
  * rechaza la respuesta en vez de entregar una página corta en silencio.
  */
-async function listarPorApellidos(where: Prisma.ClubSwimmerWhereInput, page: number, pageSize: number) {
-  const vigentes: Prisma.ClubSwimmerWhereInput = { AND: [where, { person: { deletedAt: null } }] };
+async function listarPorApellidos(
+  where: Prisma.ClubSwimmerWhereInput,
+  page: number,
+  pageSize: number,
+  opciones: { soloPersonasVigentes: boolean; descendente: boolean }
+) {
+  const vigentes: Prisma.ClubSwimmerWhereInput = opciones.soloPersonasVigentes ? { AND: [where, { person: { deletedAt: null } }] } : where;
   return prisma.$transaction(
     async (tx) => {
       await tx.$executeRaw`SET TRANSACTION READ ONLY`;
@@ -215,6 +228,7 @@ async function listarPorApellidos(where: Prisma.ClubSwimmerWhereInput, page: num
       const ordenadas = claves
         .map((c) => ({ id: c.id, persona: { ...c.person, personId: c.person.id } }))
         .sort((a, b) => compararNadadores(a.persona, b.persona) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      if (opciones.descendente) ordenadas.reverse();
       const idsDeLaPagina = ordenadas.slice((page - 1) * pageSize, page * pageSize).map((c) => c.id);
       const filas =
         idsDeLaPagina.length > 0
@@ -367,11 +381,13 @@ export async function listSwimmersByClubFilter(query: { clubFilter: string; sear
 
   const persons = await prisma.person.findMany({
     where,
-    orderBy: { fullName: "asc" },
-    select: { id: true, fullName: true, run: true, gender: true, birthDate: true },
+    // Los componentes del nombre son para PRESENTAR «PATERNO MATERNO, NOMBRES»; no filtran.
+    select: { id: true, fullName: true, run: true, gender: true, birthDate: true, firstName: true, paternalLastName: true, maternalLastName: true },
   });
 
-  return persons;
+  // Lista completa (sin paginar), por apellido paterno, materno y nombre con el comparador de
+  // Reportes; desempatan el RUN y el id, así que el orden es estable.
+  return persons.sort((a, b) => compararNadadores({ ...a, personId: a.id }, { ...b, personId: b.id }));
 }
 
 export interface BulkAssignRowResult {

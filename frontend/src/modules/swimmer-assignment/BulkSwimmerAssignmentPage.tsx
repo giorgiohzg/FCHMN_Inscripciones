@@ -6,6 +6,10 @@ import { useSwimmerAssignmentApi, CODIGOS, type SwimmerForBulkAssign, type BulkA
 import { useSort, sortItems, SortableTh } from "../../shared/sortableTable";
 import { traerTodasLasPaginas } from "../../shared/paginacion";
 import { esFechaCalendarioExistente, formatearFechaCalendario, hoyEnSantiago } from "../../shared/fechaCalendario";
+import { nombreApellidosPrimero } from "../../shared/nombreDeNadador";
+import { formatRunConGuion } from "../persons/runValidator";
+import { textoNadadorConRun } from "./textoNadadorConRun";
+import { NadadorConRun } from "./NadadorConRun";
 
 const NONE_FILTER = "none";
 
@@ -14,6 +18,8 @@ interface Tanda {
   targetClubId: string;
   fechaEfectiva: string;
   resumen: BulkAssignSummary;
+  /** Nombre y RUN de cada enviado, tomados al enviar (la lista se recarga después). */
+  nombres: Record<string, SwimmerForBulkAssign>;
 }
 
 export function BulkSwimmerAssignmentPage() {
@@ -26,7 +32,12 @@ export function BulkSwimmerAssignmentPage() {
   const [sourceClubFilter, setSourceClubFilter] = useState(NONE_FILTER);
   const [search, setSearch] = useState("");
   const [swimmers, setSwimmers] = useState<SwimmerForBulkAssign[]>([]);
-  const { sortKey, sortDir, onSort } = useSort<"fullName" | "run">();
+  /**
+   * El servidor entrega la lista COMPLETA (sin paginar) ordenada por apellido paterno, materno y
+   * nombres; es el orden inicial de «Nadador», y su inverso es la misma lista invertida. «RUN»
+   * ordena la lista completa por RUN.
+   */
+  const { sortKey, sortDir, onSort } = useSort<"fullName" | "run">("fullName", "asc");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [targetClubId, setTargetClubId] = useState("");
   const [fechaEfectiva, setFechaEfectiva] = useState(hoy);
@@ -87,9 +98,15 @@ export function BulkSwimmerAssignmentPage() {
     enviando.current = true;
     setError(null);
     setAssigning(true);
+    // Presentación de cada enviado: de la lista visible o, en un reintento, de la tanda anterior.
+    const nombres: Record<string, SwimmerForBulkAssign> = {};
+    for (const id of ids) {
+      const conocido = swimmers.find((s) => s.id === id) ?? tanda?.nombres[id];
+      if (conocido) nombres[id] = conocido;
+    }
     try {
       const resumen = await api.bulkAssign(club, ids, aceptar ? { fechaEfectiva: fecha, aceptarHistorialIncompleto: true } : { fechaEfectiva: fecha });
-      setTanda({ targetClubId: club, fechaEfectiva: fecha, resumen });
+      setTanda({ targetClubId: club, fechaEfectiva: fecha, resumen, nombres });
       setAceptaIncompleto(false);
       setSelectedIds([]);
       // Recarga la lista con el mismo filtro: los recién asignados ya no deberían aparecer si el filtro de origen es distinto al destino.
@@ -165,19 +182,24 @@ export function BulkSwimmerAssignmentPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortItems(swimmers, sortKey, sortDir, (s, key) => s[key]).map((s) => (
+                    {(sortKey === "fullName"
+                      ? sortDir === "desc"
+                        ? [...swimmers].reverse()
+                        : swimmers
+                      : sortItems(swimmers, sortKey, sortDir, (s, key) => s[key])
+                    ).map((s) => (
                       <tr key={s.id}>
                         <td>
                           <input
                             type="checkbox"
-                            aria-label={`Seleccionar a ${s.fullName}`}
+                            aria-label={`Seleccionar a ${textoNadadorConRun(s)}`}
                             style={{ width: "auto" }}
                             checked={selectedIds.includes(s.id)}
                             onChange={() => toggleSwimmer(s.id)}
                           />
                         </td>
-                        <td>{s.fullName}</td>
-                        <td>{s.run}</td>
+                        <td>{nombreApellidosPrimero(s) || "—"}</td>
+                        <td style={{ whiteSpace: "nowrap" }}>{formatRunConGuion(s.run) || "—"}</td>
                       </tr>
                     ))}
                     {swimmers.length === 0 && (
@@ -242,7 +264,9 @@ export function BulkSwimmerAssignmentPage() {
                 <tbody>
                   {tanda.resumen.results.map((r) => (
                     <tr key={r.personId}>
-                      <td>{r.fullName}</td>
+                      <td>
+                        <NadadorConRun p={tanda.nombres[r.personId] ?? { fullName: r.fullName }} />
+                      </td>
                       <td>
                         <span className={`badge ${r.status === "assigned" ? "badge-active" : "badge-disabled"}`}>
                           {r.status === "assigned" ? "Asignado" : r.codigo === CODIGOS.historialIncompleto ? "Historial incompleto" : "Error"}
