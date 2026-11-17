@@ -1971,13 +1971,13 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
 - No se midió el rendimiento con datos reales (cada página lee las claves de orden de todas las filas que cumplen el filtro).
 - A 375 px se observaron desbordes horizontales: en Personas, la tabla (unos 1.016 px) y el botón «+ Nueva persona» parcialmente fuera de la pantalla; en el plantel, unos 40 px. La adaptación móvil no está resuelta. Quitar el `nowrap` del RUN reducía el plantel solo 3 px, pero esa medición no demuestra por sí sola que todo el desborde fuera previo.
 - Quien no tiene apellido materno queda después de quien sí lo tiene con el mismo paterno (criterio previo de `compararNadadores`); quien tiene apellido pero no nombre de pila se muestra con su nombre completo almacenado.
-- No hubo validación funcional autenticada en producción; queda pendiente la revisión del usuario. Las respuestas 401 solo acreditan el rechazo sin credenciales: no comprueban los nombres, el orden, los permisos de usuarios autenticados ni las exportaciones.
+- No hubo validación funcional autenticada en producción durante el despliegue. *Antecedente:* aquí constaba que quedaba pendiente la revisión del usuario. Después, el usuario confirmó que revisó manualmente en producción estos cambios de Personas y del plantel de Editar Club y que funcionan correctamente. Es su revisión manual, no una prueba automatizada. Las respuestas 401 solo acreditan el rechazo sin credenciales: no comprueban los nombres, el orden, los permisos de usuarios autenticados ni las exportaciones.
 - No se afirma identidad binaria entre las imágenes de Render y las locales. El paquete web local y el de producción tienen nombres distintos; la URL de API compilada es distinta y puede explicarlo, pero no se comprobó que sea la única causa.
 - No se afirma la ausencia de escrituras en la base durante el despliegue: no se revisó la actividad de los usuarios.
 
-### Nombres por apellidos y RUN con guion en Asignación de Nadadores a Clubes (estado: publicada en el repositorio y validada localmente; pendiente de despliegue y actualización del entorno local)
+### Nombres por apellidos y RUN con guion en Asignación de Nadadores a Clubes (estado: publicada y desplegada en API y web; entorno local actualizado, dentro del alcance validado)
 
-> **Estado:** **publicada en el repositorio y validada localmente; pendiente de despliegue y actualización del entorno local.** Producción y el entorno local de ejecución todavía no tienen estos cambios. Sin cambios de esquema, migraciones, seed ni variables. No hubo validación en producción.
+> **Estado:** **publicada y desplegada en API y web; entorno local actualizado, dentro del alcance validado.** El código desplegado es el commit `0b1cf37471333108740500affac96bd1fd89c693`. **Sin cambios de esquema, migraciones, seed ni variables nuevas.** No hubo validación funcional autenticada en producción (ver «Limitaciones»). *Antecedente:* entre la publicación y el despliegue, este estado decía «publicada en el repositorio y validada localmente; pendiente de despliegue y actualización del entorno local».
 >
 > *Antecedente:* el usuario informó que revisó manualmente en producción los cambios de la entrega anterior en Personas y en el plantel de Editar Club, y que funcionan correctamente. Esa confirmación corresponde solo a aquella entrega; no se extiende a esta.
 
@@ -2001,13 +2001,52 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
   - Para ver la tabla de resultado se hicieron **dos asignaciones masivas, solo en la base desechable**, de dos personas sintéticas cada una a un club sintético. La primera mostró un defecto a 375 px: en esa tabla el RUN se cortaba en el guion. Se corrigió con el mismo componente que el listado, se amplió la prueba del resultado y la segunda asignación lo confirmó.
   - Tras la corrección, una ejecución de las pruebas del área con los servidores de la revisión abiertos terminó en 194/196: dos pruebas existentes, no modificadas («navega a la SEGUNDA página y muestra sus filas» del plantel y «muestra origen, destino y fechas, y exige confirmar EXPRESAMENTE la vigente» de Asignación), superaron el límite de 5 s. Esos dos archivos, solos, pasaron 53/53, y el área completa, con los servidores ya detenidos, 196/196. La relación con los servidores abiertos es una hipótesis, no una causa demostrada. Tipos sin errores.
 
+**CI.** La ejecución `44158781151` corresponde al SHA exacto `0b1cf37` (push en `main`) y se aprobó en el intento 1: Frontend (tipos, lint, pruebas y build de producción), Derivados (avisos y Dockerfile de mantenimiento) y Backend (tipos, lint y pruebas).
+
+**Despliegue y comprobaciones operativas** (17-11-2026; Render en GMT-3, horas con `Z` en UTC). Son comprobaciones de disponibilidad y cabeceras sin credenciales, distintas de las pruebas funcionales de arriba.
+
+- **Antes de operar:** API y web estaban en `787490e`, Live y sin operaciones en curso; el mantenimiento, en `430c4cb`.
+- **Respaldo previo:** se creó una exportación lógica nueva en la página Recovery; el clic quedó registrado una sola vez, sin exportaciones duplicadas, y su fila muestra la hora de panel 17:01 (20:01Z). Se descargó al destino privado establecido, sin sobrescribir copias anteriores; se comprobó la integridad del gzip y se listaron sus entradas (46, con la misma estructura que el respaldo anterior). **No se probó su restauración.**
+- **Producción** (despliegue manual del commit exacto; primero la API y, tras comprobarla, la web):
+
+  | Servicio | Versión | Despliegue | Inicio (panel) | Duración mostrada | Observado |
+  |---|---|---|---|---|---|
+  | `fchmn-api` | `787490e` → `0b1cf37` | `dep-dbub868jo6nc739ifn9g` | 17:07:53 (20:07:53Z) | 36,5 s | Live con `0b1cf37` a las 20:08:37Z |
+  | `fchmn-web` | `787490e` → `0b1cf37` | `dep-dbub964ipgvc738d9nk0` | 17:10:00 (20:10:00Z) | 36 s | Live con `0b1cf37` a las 20:11:04Z |
+
+  Las horas «observado» son las de la lectura del panel registradas en la sesión, no el instante en que cada servicio pasó a Live.
+- **Mantenimiento:** sin operaciones (sin construcción ni ejecución, sin cambios de comando, programación ni Auto-Deploy, que sigue `Off`). Sigue en `430c4cb`, con 30 ejecuciones. No se ejecutaron migraciones ni seed, ni se cambiaron variables.
+- **Comprobaciones puntuales:**
+  - API (20:08:41Z): `/api/health` y `/api/ready` 200, con una instancia recién iniciada; `/api/auth/me` y `/api/swimmer-assignments?orden=nadador` y `?orden=nadador_desc` respondieron 401 sin credenciales; `Cache-Control: no-store`.
+  - Web (20:11:12Z): `/login` 200 con `Cache-Control: no-store`, CSP con `connect-src 'self'` y `frame-ancestors 'none'`, `Strict-Transport-Security: max-age=31536000; includeSubDomains`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` y `Referrer-Policy: no-referrer`. `/login` referencia un paquete nuevo, que respondió 200 como JavaScript con caché inmutable, contiene el orden `nadador_desc` y no contiene `localhost`; el paquete anterior respondió 404 (se registró, no era condición).
+- **Entorno local, en el mismo procedimiento:**
+  - Las imágenes candidatas se construyeron desde una **copia limpia** del SHA exacto (exportación del commit, verificada contra él), no desde el árbol del checkout principal: backend `ec3e8e3d04ad` y frontend `f6b4312e4b12`, con `VITE_API_URL=http://localhost:3000`. No hizo falta el certificado corporativo como secreto de construcción.
+  - Las imágenes anteriores se conservan para reversión como `prev-20261117-787490e` (backend `3524c9ba58d6`, frontend `63538cc69fdc`); las candidatas pasaron a `latest`.
+  - Se recrearon solo backend y frontend sin construir (`docker compose up -d --no-build backend frontend`), y usan exactamente las imágenes candidatas. PostgreSQL arrancó con el mismo contenedor y el mismo volumen de datos; no se activó el perfil de mantenimiento ni se ejecutaron migraciones o seed.
+  - Los tres servicios quedaron sanos; la API respondió 200 en `/health` y `/ready` y 401 en `/swimmer-assignments?orden=nadador`; la web respondió 200 con un paquete que contiene `nadador_desc`. Al terminar, los tres servicios quedaron **detenidos**, como estaban.
+- **Team Manager:** su corrección pendiente quedó excluida de esta entrega y preservada en el checkout principal, sin cambios. Durante este procedimiento no hubo exportaciones reales ni validación en Meet Manager.
+- **Reversión del código:** en Render, volver a los despliegues anteriores de `787490e`, primero la web y luego la API; en local, volver a etiquetar `prev-20261117-787490e` como `latest` y recrear backend y frontend sin construir. Como no hubo cambios de esquema, no hace falta revertir la base. La reversión del código **no deshace** las operaciones que los usuarios hayan guardado entretanto.
+
+**Disponibilidad: muestreo original durante el despliegue.** 20 rondas sin credenciales cada ~32 s, de 20:07:17Z a 20:17:48Z, contra la web pública; cada ronda pidió `/login`, `/api/health`, `/api/ready` y `/api/swimmer-assignments?orden=nadador`.
+
+- **19 rondas completamente satisfactorias:** `/login`, `/api/health` y `/api/ready` respondieron 200 y la ruta protegida, 401. Esa ruta responde 401 sin credenciales con la API anterior y con la nueva, así que las rondas no distinguen la versión de la API.
+- **Una petición sin respuesta HTTP:** en la ronda iniciada a las 20:12:07Z, `/api/ready` registró `000`, que no es un estado HTTP del servidor: el cliente no recibió respuesta. En esa misma ronda, `/login` y `/api/health` respondieron 200 y la ruta protegida, 401. **No es un tiempo agotado confirmado:** el registro de esa ronda no guardó la duración de cada petición, el código de salida ni el mensaje de error del cliente. Indirectamente, esa ronda tardó 47 s hasta la siguiente, frente a 32–35 s en los demás intervalos; esos ~15 s adicionales son compatibles con el límite de espera de 15 s por petición, pero no lo demuestran.
+- **Registros consultados (solo lectura, ventana de 20:12:00Z a 20:12:56Z):** en el registro de acceso de la web (la instancia nueva y la anterior, que seguía activa) y en el de la API (la instancia nueva) **no se encontró una petición correspondiente**. Las demás peticiones de esa ronda aparecen, con tiempos de milisegundos; tampoco hay errores del proxy (499, 502 o 504), advertencias, errores, reinicios ni eventos de despliegue posteriores a Live. La cobertura es limitada: el panel muestra un número acotado de líneas por consulta, el canal de errores de Nginx usa UDP y puede perder mensajes, y no hay registros del borde de Render delante de la web. Por eso **no se afirma que la petición no llegara a la API**.
+- **Causa sin determinar.** La instancia anterior de la web terminó un cierre ordenado unos 29 s después (20:12:36Z); esa coincidencia no demuestra causalidad. No se atribuye el fallo al proxy, al cliente ni a la red.
+- El paquete de la web fue el anterior hasta la ronda de 20:10:30Z y el nuevo desde la de 20:11:02Z; el cambio ocurrió en esa ventana, sin instante exacto. Después de la lectura de la API Live (20:08:37Z) hubo 17 rondas; después de la lectura de la web Live (20:11:04Z), 12, de 20:11:35Z a 20:17:48Z, unos 6 min 44 s entre esa lectura y la última ronda.
+
+**Disponibilidad: seguimiento adicional posterior** (una ejecución aparte, no se suma al muestreo original). 10 rondas sin credenciales cada ~30 s, de 20 peticiones en total a `/api/health` y `/api/ready` por el mismo acceso público, con espera máxima de 15 s por petición, entre 21:38:33Z y 21:43:04Z (unos cuatro minutos y medio): las 20 respondieron 200 con salida 0 del cliente. Este seguimiento **no elimina ni explica** el fallo original, no declara resuelto ningún incidente y, como el muestreo original, no acredita disponibilidad en los intervalos entre peticiones ni fuera de las ventanas observadas.
+
 **Limitaciones**
 
 - Las columnas «Club» y «Estado» del listado principal ordenan solo la página visible; no es un ordenamiento global.
 - No se midió el rendimiento con datos reales (cada página lee las claves de orden de todas las membresías que cumplen el filtro).
 - Solicitudes de alta, Periodos de cambio y la pantalla de incorporaciones del club quedaron expresamente fuera de esta entrega, sin cambios.
 - Se mantiene el criterio de `compararNadadores`: quien no tiene apellido materno queda después de quien sí lo tiene con el mismo paterno.
-- No hubo validación en producción.
+- No hubo validación funcional autenticada en producción; queda pendiente la revisión del usuario de esta entrega de Asignación. Las respuestas 401 solo acreditan el rechazo sin credenciales: no comprueban los nombres, el orden, los diálogos, la asignación masiva ni los permisos de usuarios autenticados.
+- Una petición a `/api/ready` del muestreo original quedó sin respuesta HTTP y su causa sigue sin determinar (ver «Disponibilidad»).
+- No se afirma identidad binaria entre las imágenes de Render y las locales. El paquete web local y el de producción tienen nombres distintos; la URL de API compilada es distinta y puede explicarlo, pero no se comprobó que sea la única causa.
+- No se afirma la ausencia de escrituras en la base durante el despliegue: no se revisó la actividad de los usuarios.
 
 ## Inventario completo de endpoints
 
