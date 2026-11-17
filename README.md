@@ -1915,9 +1915,9 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
 - Eliminar una persona no finaliza sus membresías: el listado general de asignaciones sin `orden` puede seguir mostrándola; el plantel ordenado, la columna «Nadadores» y el reporte la excluyen.
 - El comparador de Reportes que se reutiliza pone a quien no tiene apellido materno después de quien sí lo tiene; el de los paneles de inscripción, antes. Es una diferencia anterior a esta entrega.
 
-### Nombres por apellidos y RUN con guion en el plantel y en Personas (estado: publicada en el repositorio y validada localmente; pendiente de despliegue y actualización del entorno local)
+### Nombres por apellidos y RUN con guion en el plantel y en Personas (estado: publicada y desplegada en API y web; entorno local actualizado, dentro del alcance validado)
 
-> **Estado:** **publicada en el repositorio y validada localmente; pendiente de despliegue y actualización del entorno local.** Producción y el entorno local de ejecución todavía no tienen estos cambios. *Antecedente:* antes de publicarse, el estado decía «implementada y validada localmente; pendiente de publicación y despliegue». Sin cambios de esquema, migraciones, seed ni variables. No hubo validación en producción.
+> **Estado:** **publicada y desplegada en API y web; entorno local actualizado, dentro del alcance validado.** El código desplegado es el commit `787490e9919b367f0af9c921b1f6c207142864d5`. **Sin cambios de esquema, migraciones, seed ni variables nuevas.** No hubo validación funcional autenticada en producción (ver «Limitaciones»). *Antecedentes:* entre la publicación y el despliegue, este estado decía «publicada en el repositorio y validada localmente; pendiente de despliegue y actualización del entorno local»; antes de publicarse, «implementada y validada localmente; pendiente de publicación y despliegue».
 
 **Qué incluye**
 
@@ -1938,13 +1938,42 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
   - Archivos afectados de Personas, plantel y helpers: 89/89; tras mantener el RUN sin cortes, los 5 archivos del plantel y de Personas, 53/53. Tipos y lint sin errores.
   - Revisión visual con la API real contra la base desechable y datos sintéticos (el archivo de integración de esta entrega volvió a ejecutarse, 7/7, solo para preparar esos datos), en escritorio (1280 px) y a 375 px: formato del plantel y de Personas, segundo apellido ausente, compuestos, tildes y Ñ, registros incompletos al final, orden inicial y cambio ascendente/descendente entre páginas con vuelta a la página 1, y RUN sin cortes.
 
+**CI.** La ejecución `44132620280` corresponde al SHA exacto `787490e` (push en `main`). Frontend (tipos, lint, pruebas y build de producción) y Derivados (avisos y Dockerfile de mantenimiento) se aprobaron en el intento 1 y sus resultados se conservaron. Backend falló en el intento 1 por un tiempo agotado (más de 5.000 ms) en una prueba de `backend/tests/resumen-por-club.rules.test.ts` que esta entrega no modifica; con autorización se repitieron solo los trabajos fallidos y Backend se aprobó en el intento 2. La causa del tiempo agotado inicial sigue sin confirmarse.
+
+**Despliegue y comprobaciones operativas** (17-11-2026; Render en GMT-3, horas con `Z` en UTC). Son comprobaciones de disponibilidad y cabeceras sin credenciales, distintas de las pruebas funcionales de arriba.
+
+- **Antes de operar:** API y web estaban en `d516c7f`, Live, sin operaciones en curso y con Auto-Deploy `Off`; el mantenimiento, en `430c4cb`.
+- **Respaldo previo:** se creó una exportación lógica nueva en la página Recovery. Un primer intento no llegó a registrarla (la tabla seguía igual tras recargar); el segundo creó una sola exportación nueva, cuya fila apareció a las 17:53Z (hora de panel 14:53) y cuyo archivo se observó disponible a las 17:56Z. Se descargó al destino privado establecido, sin sobrescribir copias anteriores; se comprobó la integridad del gzip y se listaron sus entradas (46). **No se probó su restauración.**
+- **Producción** (despliegue manual del commit exacto, Auto-Deploy `Off`; primero la API y, tras comprobarla, la web):
+
+  | Servicio | Versión | Despliegue | Inicio (panel) | Duración mostrada | Observado |
+  |---|---|---|---|---|---|
+  | `fchmn-api` | `d516c7f` → `787490e` | `dep-dbu9c1ek1f9s739ris7g` | 14:59:33 (17:59:33Z) | 32,1 s | Deploy succeeded y Live a las 18:00:24Z |
+  | `fchmn-web` | `d516c7f` → `787490e` | `dep-dbu9cph5efls739lvpt0` | 15:01:10 (18:01:10Z) | 1 min 18 s | Deploy succeeded y Live a las 18:02:36Z |
+
+  Las horas «observado» son las de la lectura del panel registradas en la sesión, no el instante en que cada servicio pasó a Live.
+- **Mantenimiento:** sin operaciones (sin construcción ni ejecución, sin cambios de comando, programación ni Auto-Deploy). Sigue en `430c4cb`, con 30 ejecuciones antes y después.
+- **Disponibilidad, muestras registradas.** 22 muestras sin credenciales cada ~32 s, de 17:58:26Z a 18:09:55Z, contra la web pública: en todas, `/login`, `/api/health` y `/api/ready` respondieron 200 y `/api/persons?orden=apellidos` respondió 401. Esa ruta responde 401 sin credenciales con la API anterior y con la nueva, así que las muestras no distinguen la versión de la API. El paquete de la web fue el anterior hasta la muestra de 18:02:20Z y el nuevo desde la de 18:02:52Z; el cambio ocurrió en esa ventana, sin instante exacto. Después de la lectura de la web Live (18:02:36Z) hubo 14 muestras, de 18:02:52Z a 18:09:55Z, unos 7 min 19 s entre esa lectura y la última muestra. Fuera de las muestras no hay observaciones: no acreditan disponibilidad en los intervalos entre ellas ni después de 18:09:55Z.
+- **Comprobaciones puntuales:**
+  - API (18:00:31Z): `/api/health` y `/api/ready` 200, con una instancia recién iniciada; `/api/auth/me` y `/api/persons?orden=apellidos` y `?orden=apellidos_desc` respondieron 401 sin credenciales; `Cache-Control: no-store`.
+  - Web (18:02:44Z): `/login` 200 con `Cache-Control: no-store`, CSP con `connect-src 'self'` y `frame-ancestors 'none'`, `Strict-Transport-Security: max-age=31536000; includeSubDomains`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` y `Referrer-Policy: no-referrer`. `/login` referencia un paquete nuevo, que respondió 200 como JavaScript y contiene el orden `apellidos_desc`; el paquete anterior respondió 404 (se registró, no era condición).
+- **Entorno local, en el mismo procedimiento:**
+  - Las imágenes candidatas se construyeron desde una **copia limpia** del SHA exacto (exportación del commit, verificada contra él), no desde el árbol del checkout principal: backend `3524c9ba58d6` y frontend `63538cc69fdc`, con `VITE_API_URL=http://localhost:3000`. No hizo falta el certificado corporativo como secreto de construcción.
+  - Las imágenes anteriores se conservan para reversión como `prev-20261117-d516c7f` (backend `5286b6fe5d0b`, frontend `84a51a22a14f`); las candidatas pasaron a `latest`.
+  - Se recrearon solo backend y frontend sin construir (`docker compose up -d --no-build backend frontend`), y usan exactamente las imágenes candidatas. PostgreSQL arrancó con el mismo contenedor y el mismo volumen de datos; no se activó el perfil de mantenimiento ni se ejecutaron migraciones o seed.
+  - Los tres servicios quedaron sanos; la API respondió 200 en `/health` y `/ready` y 401 en `/persons?orden=apellidos`; la web respondió 200 con un paquete que contiene `apellidos_desc`. Al terminar, los tres servicios quedaron **detenidos**, como estaban.
+- **Team Manager:** su corrección pendiente quedó excluida de esta entrega y preservada en el checkout principal, sin cambios. Durante este procedimiento no hubo exportaciones reales ni validación en Meet Manager.
+- **Reversión del código:** en Render, volver a los despliegues anteriores de `d516c7f`, primero la web y luego la API; en local, volver a etiquetar `prev-20261117-d516c7f` como `latest` y recrear backend y frontend sin construir. Como no hubo cambios de esquema, no hace falta revertir la base. La reversión del código **no deshace** las operaciones que los usuarios hayan guardado entretanto.
+
 **Limitaciones**
 
 - Las demás columnas de Personas y la cabecera «Nadador» del plantel ordenan solo la página visible; no es un ordenamiento global.
 - No se midió el rendimiento con datos reales (cada página lee las claves de orden de todas las filas que cumplen el filtro).
 - A 375 px se observaron desbordes horizontales: en Personas, la tabla (unos 1.016 px) y el botón «+ Nueva persona» parcialmente fuera de la pantalla; en el plantel, unos 40 px. La adaptación móvil no está resuelta. Quitar el `nowrap` del RUN reducía el plantel solo 3 px, pero esa medición no demuestra por sí sola que todo el desborde fuera previo.
 - Quien no tiene apellido materno queda después de quien sí lo tiene con el mismo paterno (criterio previo de `compararNadadores`); quien tiene apellido pero no nombre de pila se muestra con su nombre completo almacenado.
-- No hubo validación en producción.
+- No hubo validación funcional autenticada en producción; queda pendiente la revisión del usuario. Las respuestas 401 solo acreditan el rechazo sin credenciales: no comprueban los nombres, el orden, los permisos de usuarios autenticados ni las exportaciones.
+- No se afirma identidad binaria entre las imágenes de Render y las locales. El paquete web local y el de producción tienen nombres distintos; la URL de API compilada es distinta y puede explicarlo, pero no se comprobó que sea la única causa.
+- No se afirma la ausencia de escrituras en la base durante el despliegue: no se revisó la actividad de los usuarios.
 
 ## Inventario completo de endpoints
 
