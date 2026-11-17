@@ -36,7 +36,11 @@ export interface ClubSwimmerAssignment {
    */
   endDate: string | null;
   club: { id: string; name: string };
-  person: { id: string; fullName: string; run: string };
+  /**
+   * Los componentes del nombre los envía el plantel ordenado (`orden=apellidos`), para presentarlo
+   * como «PATERNO MATERNO, NOMBRES»; otros listados pueden no traerlos.
+   */
+  person: { id: string; fullName: string; run: string; firstName?: string | null; paternalLastName?: string | null; maternalLastName?: string | null };
 }
 
 export interface AssignmentListResult {

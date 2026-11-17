@@ -84,6 +84,13 @@ export const personListQuerySchema = z.object({
   search: z.string().trim().optional(), // busca por RUN o nombre
   role: roleTypeEnum.optional(),
   status: z.enum(["active", "locked", "disabled"]).optional(),
+  /**
+   * Orden del listado. Sin indicar: el de siempre (`fullName`), que usan los buscadores y
+   * selectores de personas. `apellidos` / `apellidos_desc`: apellido paterno, materno y nombres
+   * (`compararNadadores` de Reportes), ascendente o invertido, aplicado al conjunto completo ANTES
+   * de paginar. Lo usa el listado de Personas.
+   */
+  orden: z.enum(["apellidos", "apellidos_desc"]).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });

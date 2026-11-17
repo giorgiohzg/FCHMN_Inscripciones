@@ -579,7 +579,7 @@ sesión no viaja.
 
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
-| GET | `/persons` | Lista personas (búsqueda por RUN/nombre, filtro por rol/estado, paginado) | `persons:read` |
+| GET | `/persons` | Lista personas (búsqueda por RUN/nombre, filtro por rol/estado, paginado). Con `orden=apellidos` o `apellidos_desc` (listado de Personas) ordena por apellido paterno, materno y nombres en el servidor, antes de paginar; sin `orden`, el orden de siempre | `persons:read` |
 | GET | `/persons/:id` | Detalle de una persona (incluye roles y credenciales) | `persons:read` |
 | POST | `/persons` | Crea una persona (valida RUN chileno). El nombre de usuario es **opcional** y no se genera ni se crea cuenta. **No acepta `roles`**: son derivados, y enviarlos se rechaza con 400. `clubId` opcional («Asignación a club»): crea además su membresía activa desde hoy en Chile, en la misma transacción (ver «Alta de persona con asignación a club») | `persons:write` |
 | PUT | `/persons/:id` | Actualiza datos (RUN no editable; nombre de usuario editable solo sin cuenta vigente). **Tampoco acepta `roles`** | `persons:write` |
@@ -1914,6 +1914,37 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
 - La tabla de Clubes ya desbordaba a 1280 px antes de esta entrega; la columna «Nadadores» la ensancha.
 - Eliminar una persona no finaliza sus membresías: el listado general de asignaciones sin `orden` puede seguir mostrándola; el plantel ordenado, la columna «Nadadores» y el reporte la excluyen.
 - El comparador de Reportes que se reutiliza pone a quien no tiene apellido materno después de quien sí lo tiene; el de los paneles de inscripción, antes. Es una diferencia anterior a esta entrega.
+
+### Nombres por apellidos y RUN con guion en el plantel y en Personas (estado: publicada en el repositorio y validada localmente; pendiente de despliegue y actualización del entorno local)
+
+> **Estado:** **publicada en el repositorio y validada localmente; pendiente de despliegue y actualización del entorno local.** Producción y el entorno local de ejecución todavía no tienen estos cambios. *Antecedente:* antes de publicarse, el estado decía «implementada y validada localmente; pendiente de publicación y despliegue». Sin cambios de esquema, migraciones, seed ni variables. No hubo validación en producción.
+
+**Qué incluye**
+
+- **Formato.** En el plantel de Editar Club cada nadador se muestra como `PATERNO MATERNO, NOMBRES (12345678-9)`; en Personas, la columna «Nombre completo» como `PATERNO MATERNO, NOMBRES` y la columna RUN como `12345678-9`. Nombres en mayúsculas, con tildes y Ñ; RUN sin puntos, con guion antes del dígito verificador y K en mayúscula. El RUN no se convierte a número (conserva ceros iniciales), no duplica un guion ya presente, no se corta en el guion en columnas estrechas y, si falta, no se inventa (sin paréntesis en el plantel, «—» en Personas).
+- **Registros incompletos.** Se usan los campos separados (`paternalLastName`, `maternalLastName`, `firstName`); sin segundo apellido, `PATERNO, NOMBRES`. Si falta el apellido paterno o el nombre, se muestra el nombre completo almacenado en mayúsculas, sin coma y sin partirlo para inventar apellidos. Los espacios repetidos se reducen a uno. Es solo presentación: no se modifican los nombres ni los RUN guardados. Los paneles de inscripción y relevos y Reportes conservan su presentación (`nombreEnPanel` no cambia).
+- **Orden de Personas en el servidor.** El listado empieza ordenado por apellido paterno, materno y nombres, ascendente; pulsar «Nombre completo» lo invierte. Ambos sentidos se resuelven en el servidor sobre el conjunto completo, antes de paginar (`GET /persons?orden=apellidos|apellidos_desc`, con el comparador de Reportes y desempate estable), y cambiar el sentido vuelve a la página 1. Sin `orden`, la ruta conserva el orden de siempre para los buscadores y selectores que la usan. Búsqueda, filtros, paginación y permisos no cambian. El plantel ya se ordenaba por apellidos antes de paginar; ahora además recibe los componentes del nombre.
+- **Respuestas atrasadas en Personas.** Solo la carga vigente puede actualizar los datos, el error y el indicador de carga (el mismo patrón que Asignación de Nadadores); una respuesta de otro orden, página o filtro, o posterior al desmontaje, se descarta. Las recargas tras las acciones sobre personas se conservan.
+
+**Pruebas y revisión** (rondas separadas; no son una única ejecución de suites completas). Datos sintéticos; la integración, solo contra la base desechable de `docker-compose.test.yml`.
+
+- **Ronda 1 — formato y orden.**
+  - Frontend: los 16 archivos de prueba que usan estos módulos, incluidos 3 nuevos, 262/262 (jsdom, API simulada).
+  - Backend unitarias (documentación, esquemas, listas y orden determinista): 298/298.
+  - Integración: el archivo nuevo de orden por apellidos, 7/7 (orden ascendente y descendente entre páginas, homónimos, tildes y Ñ, exclusión de eliminadas, búsqueda y filtros, comportamiento sin `orden`, rechazo de un orden desconocido, acceso denegado a la cuenta de club y datos guardados intactos).
+  - Tipos y lint sin errores.
+- **Ronda 2 — cargas atrasadas y revisión visual.**
+  - Una prueba nueva con promesas controladas reprodujo primero, con el código anterior, **cuatro casos** que fallaban: un orden ascendente atrasado que reemplazaba al descendente, el error de una petición atrasada mostrado sobre el resultado vigente, el indicador de carga apagado por una petición atrasada y una respuesta sin filtro que reemplazaba a la filtrada. Tras la corrección, 5/5. El quinto caso (desmontaje) ya pasaba antes: comprueba que no aparecen avisos, no demuestra por sí solo que se impidan las actualizaciones.
+  - Archivos afectados de Personas, plantel y helpers: 89/89; tras mantener el RUN sin cortes, los 5 archivos del plantel y de Personas, 53/53. Tipos y lint sin errores.
+  - Revisión visual con la API real contra la base desechable y datos sintéticos (el archivo de integración de esta entrega volvió a ejecutarse, 7/7, solo para preparar esos datos), en escritorio (1280 px) y a 375 px: formato del plantel y de Personas, segundo apellido ausente, compuestos, tildes y Ñ, registros incompletos al final, orden inicial y cambio ascendente/descendente entre páginas con vuelta a la página 1, y RUN sin cortes.
+
+**Limitaciones**
+
+- Las demás columnas de Personas y la cabecera «Nadador» del plantel ordenan solo la página visible; no es un ordenamiento global.
+- No se midió el rendimiento con datos reales (cada página lee las claves de orden de todas las filas que cumplen el filtro).
+- A 375 px se observaron desbordes horizontales: en Personas, la tabla (unos 1.016 px) y el botón «+ Nueva persona» parcialmente fuera de la pantalla; en el plantel, unos 40 px. La adaptación móvil no está resuelta. Quitar el `nowrap` del RUN reducía el plantel solo 3 px, pero esa medición no demuestra por sí sola que todo el desborde fuera previo.
+- Quien no tiene apellido materno queda después de quien sí lo tiene con el mismo paterno (criterio previo de `compararNadadores`); quien tiene apellido pero no nombre de pila se muestra con su nombre completo almacenado.
+- No hubo validación en producción.
 
 ## Inventario completo de endpoints
 

@@ -8,6 +8,29 @@ import { BajaDeMembresiaDialog } from "./BajaDeMembresiaDialog";
 import { PanelDeActivacion } from "./PanelDeActivacion";
 import { useBusquedaDePersonas } from "../../shared/useBusquedaDePersonas";
 import { useTieneRol } from "../auth/AuthContext";
+import { nombreApellidosPrimero } from "../../shared/nombreDeNadador";
+import { formatRunConGuion } from "../persons/runValidator";
+
+/**
+ * Presentación de cada nadador del plantel: «PATERNO MATERNO, NOMBRES (13579246-2)». El orden lo
+ * decide el servidor (`orden=apellidos`, antes de paginar). Sin RUN no se inventa uno: se omite el
+ * paréntesis. El RUN no se corta en el guion cuando la columna es estrecha.
+ */
+function NadadorDelPlantel({ p }: { p: ClubSwimmerAssignment["person"] }) {
+  const nombre = nombreApellidosPrimero(p) || "—";
+  const run = formatRunConGuion(p.run);
+  return (
+    <>
+      {nombre}
+      {run && (
+        <>
+          {" "}
+          <span style={{ whiteSpace: "nowrap" }}>({run})</span>
+        </>
+      )}
+    </>
+  );
+}
 import { EdicionDeFechasDialog } from "./EdicionDeFechasDialog";
 
 /** Filas por página de la tabla. El pie de página usa este mismo número. */
@@ -609,13 +632,15 @@ export function ClubSwimmersSection({ clubId, clubName }: ClubSwimmersSectionPro
         <tbody>
           {sortItems(assignments, sortKey, sortDir, (a, key) => {
             switch (key) {
-              case "person": return a.person.fullName;
+              case "person": return nombreApellidosPrimero(a.person);
               case "status": return STATUS_LABELS[a.status];
               case "startDate": return a.startDate ? claveOrdenFechaCalendario(a.startDate) : null;
             }
           }).map((a) => (
             <tr key={a.id}>
-              <td>{a.person.fullName} ({a.person.run})</td>
+              <td>
+                <NadadorDelPlantel p={a.person} />
+              </td>
               <td>
                 <span className={`badge ${STATUS_BADGE[a.status]}`}>{STATUS_LABELS[a.status]}</span>
               </td>

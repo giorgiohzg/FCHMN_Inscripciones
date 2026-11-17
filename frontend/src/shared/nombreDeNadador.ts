@@ -84,3 +84,14 @@ export function coincideConBusqueda(p: NombreDeNadador & { run: string }, consul
     p.run.toLowerCase().includes(q)
   );
 }
+
+/**
+ * Nombre para los LISTADOS de Personas y del plantel de Editar Club: `PATERNO MATERNO, NOMBRES`,
+ * igual que `nombreEnPanel` (mismos campos separados, misma alternativa sin coma para registros
+ * antiguos incompletos, mayúsculas solo de presentación), y además sin espacios repetidos dentro de
+ * un componente. Función aparte a propósito: `nombreEnPanel` la usan los paneles de inscripción y
+ * relevos y Reportes, que no cambian. Vacío si no hay ningún dato de nombre.
+ */
+export function nombreApellidosPrimero(p: NombreDeNadador): string {
+  return nombreEnPanel(p).replace(/\s+/g, " ").trim();
+}

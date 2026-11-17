@@ -14,6 +14,10 @@ import { render, screen, fireEvent, waitFor, act, within } from "@testing-librar
 import { ClubSwimmersSection } from "./ClubSwimmersSection";
 import { ApiError } from "../../shared/apiClient";
 
+/** La celda del nadador cuyo texto completo es `texto`: el RUN va en su propio elemento, para no cortarse en el guion. */
+const celdaDeNadador = (texto: string) => (_: string, el: Element | null) => el?.tagName === "TD" && el.textContent === texto;
+
+
 const POR_PAGINA = 20;
 
 /** Cuántas membresías tiene cada club en el servidor simulado. */
@@ -121,9 +125,9 @@ describe("ClubSwimmersSection: paginación de la tabla", () => {
   it("muestra la página 1 y pide el tamaño que enseña", async () => {
     render(<ClubSwimmersSection clubId="club-grande" />);
 
-    expect(await screen.findByText("Nadador club-grande 1 (R1)")).toBeInTheDocument();
-    expect(screen.getByText("Nadador club-grande 20 (R20)")).toBeInTheDocument();
-    expect(screen.queryByText("Nadador club-grande 21 (R21)"), "la 21 está en la página 2").not.toBeInTheDocument();
+    expect(await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"))).toBeInTheDocument();
+    expect(screen.getByText(celdaDeNadador("NADADOR CLUB-GRANDE 20 (R20)"))).toBeInTheDocument();
+    expect(screen.queryByText(celdaDeNadador("NADADOR CLUB-GRANDE 21 (R21)")), "la 21 está en la página 2").not.toBeInTheDocument();
 
     /**
      * El `pageSize` pedido tiene que ser el mismo con el que el pie calcula
@@ -136,19 +140,19 @@ describe("ClubSwimmersSection: paginación de la tabla", () => {
 
   it("navega a la SEGUNDA página y muestra sus filas", async () => {
     render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
 
     fireEvent.click(siguiente());
 
-    expect(await screen.findByText("Nadador club-grande 21 (R21)")).toBeInTheDocument();
-    expect(screen.getByText("Nadador club-grande 40 (R40)")).toBeInTheDocument();
-    expect(screen.queryByText("Nadador club-grande 1 (R1)")).not.toBeInTheDocument();
+    expect(await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 21 (R21)"))).toBeInTheDocument();
+    expect(screen.getByText(celdaDeNadador("NADADOR CLUB-GRANDE 40 (R40)"))).toBeInTheDocument();
+    expect(screen.queryByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"))).not.toBeInTheDocument();
     expect(anterior(), "ahora sí se puede volver").toBeEnabled();
     expect(siguiente(), "y aún queda una tercera").toBeEnabled();
 
     // Tercera y última: 45 = 20 + 20 + 5.
     fireEvent.click(siguiente());
-    expect(await screen.findByText("Nadador club-grande 45 (R45)")).toBeInTheDocument();
+    expect(await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 45 (R45)"))).toBeInTheDocument();
     expect(siguiente(), "en la última no hay siguiente").toBeDisabled();
 
     expect(assignmentsList.mock.calls.map((c) => c[0]?.page)).toEqual([1, 2, 3]);
@@ -156,10 +160,10 @@ describe("ClubSwimmersSection: paginación de la tabla", () => {
 
   it("al CAMBIAR DE CLUB vuelve a la página 1", async () => {
     const { rerender } = render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
 
     fireEvent.click(siguiente());
-    await screen.findByText("Nadador club-grande 21 (R21)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 21 (R21)"));
 
     /**
      * `club-chico` tiene 3 membresías: su página 2 está vacía. Sin reiniciar, la
@@ -168,7 +172,7 @@ describe("ClubSwimmersSection: paginación de la tabla", () => {
      */
     rerender(<ClubSwimmersSection clubId="club-chico" />);
 
-    expect(await screen.findByText("Nadador club-chico 1 (R1)")).toBeInTheDocument();
+    expect(await screen.findByText(celdaDeNadador("NADADOR CLUB-CHICO 1 (R1)"))).toBeInTheDocument();
     const ultima = assignmentsList.mock.calls[assignmentsList.mock.calls.length - 1]![0];
     expect(ultima).toMatchObject({ clubId: "club-chico", page: 1 });
   });
@@ -223,7 +227,7 @@ describe("respuestas antiguas no pueden pisar a las nuevas", () => {
     await act(async () => {
       deB.resolver(respuesta("club-chico", 1, 3, 3));
     });
-    expect(await screen.findByText("Nadador club-chico 1 (R1)")).toBeInTheDocument();
+    expect(await screen.findByText(celdaDeNadador("NADADOR CLUB-CHICO 1 (R1)"))).toBeInTheDocument();
 
     // (d) y AHORA responde A, tarde.
     await act(async () => {
@@ -231,8 +235,8 @@ describe("respuestas antiguas no pueden pisar a las nuevas", () => {
     });
 
     // (e) la interfaz sigue mostrando exclusivamente B.
-    expect(screen.getByText("Nadador club-chico 1 (R1)")).toBeInTheDocument();
-    expect(screen.queryByText("Nadador club-grande 1 (R1)"), "la respuesta atrasada se descarta").not.toBeInTheDocument();
+    expect(screen.getByText(celdaDeNadador("NADADOR CLUB-CHICO 1 (R1)"))).toBeInTheDocument();
+    expect(screen.queryByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)")), "la respuesta atrasada se descarta").not.toBeInTheDocument();
     expect(screen.getByText(/3 registro\(s\)/), "ni su total").toBeInTheDocument();
 
     // Y nunca se pidió una página distinta de la 1 para el club nuevo.
@@ -247,7 +251,7 @@ describe("respuestas antiguas no pueden pisar a las nuevas", () => {
     );
 
     const { rerender } = render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
 
     rerender(<ClubSwimmersSection clubId="club-chico" />);
 
@@ -256,14 +260,14 @@ describe("respuestas antiguas no pueden pisar a las nuevas", () => {
      * deshabilitar el botón, porque una tabla que muestra el plantel de otro club
      * ya es información falsa.
      */
-    expect(screen.queryByText("Nadador club-grande 1 (R1)")).not.toBeInTheDocument();
+    expect(screen.queryByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"))).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Finalizar membresía/ })).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent(/Cargando plantel/);
 
     await act(async () => {
       deB.resolver(respuesta("club-chico", 1, 3, 3));
     });
-    expect(await screen.findByText("Nadador club-chico 1 (R1)")).toBeInTheDocument();
+    expect(await screen.findByText(celdaDeNadador("NADADOR CLUB-CHICO 1 (R1)"))).toBeInTheDocument();
   });
 
   it("navegación superpuesta BLOQUEADA: no se puede pedir la 3 con la 2 en vuelo", async () => {
@@ -276,7 +280,7 @@ describe("respuestas antiguas no pueden pisar a las nuevas", () => {
     });
 
     render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
 
     fireEvent.click(siguiente()); // -> página 2, queda pendiente
     await waitFor(() => expect(assignmentsList.mock.calls.some((c) => c[0]?.page === 2)).toBe(true));
@@ -291,15 +295,15 @@ describe("respuestas antiguas no pueden pisar a las nuevas", () => {
     await act(async () => {
       de2.resolver(respuesta("club-grande", 2, 20, 45));
     });
-    await screen.findByText("Nadador club-grande 21 (R21)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 21 (R21)"));
 
     fireEvent.click(siguiente());
     await act(async () => {
       de3.resolver(respuesta("club-grande", 3, 5, 45));
     });
 
-    expect(await screen.findByText("Nadador club-grande 45 (R45)")).toBeInTheDocument();
-    expect(screen.queryByText("Nadador club-grande 21 (R21)")).not.toBeInTheDocument();
+    expect(await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 45 (R45)"))).toBeInTheDocument();
+    expect(screen.queryByText(celdaDeNadador("NADADOR CLUB-GRANDE 21 (R21)"))).not.toBeInTheDocument();
   });
 
   it("un ERROR se muestra, y un reintento correcto lo borra", async () => {
@@ -320,10 +324,10 @@ describe("respuestas antiguas no pueden pisar a las nuevas", () => {
 
     // El reintento llega por la vía normal: ir a otro club y volver.
     rerender(<ClubSwimmersSection clubId="club-chico" />);
-    await screen.findByText("Nadador club-chico 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-CHICO 1 (R1)"));
     rerender(<ClubSwimmersSection clubId="club-grande" />);
 
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     expect(screen.queryByText(/500 al cargar el plantel/), "el error viejo no sobrevive").not.toBeInTheDocument();
   });
 });
@@ -359,7 +363,7 @@ describe("mutaciones que se resuelven después de cambiar de club", () => {
     assignDirectly.mockReturnValue(asignacion.promesa as never);
 
     const { rerender } = render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
 
     // (b) se inicia la asignación en A (revisada y confirmada) y queda pendiente.
     fireEvent.click(await buscarYObtenerSugerencia());
@@ -368,7 +372,7 @@ describe("mutaciones que se resuelven después de cambiar de club", () => {
 
     // (c) se cambia a B y carga bien.
     rerender(<ClubSwimmersSection clubId="club-chico" />);
-    await screen.findByText("Nadador club-chico 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-CHICO 1 (R1)"));
     const llamadasAntes = assignmentsList.mock.calls.length;
 
     // (d) ahora resuelve la mutación de A.
@@ -379,8 +383,8 @@ describe("mutaciones que se resuelven después de cambiar de club", () => {
     // (e) nada de A se proyecta sobre B.
     expect(assignmentsList.mock.calls.length, "no se recarga ninguna lista").toBe(llamadasAntes);
     expect(screen.queryByText(/Nadador asignado directamente/), "ni su mensaje de éxito").not.toBeInTheDocument();
-    expect(screen.getByText("Nadador club-chico 1 (R1)"), "B sigue visible").toBeInTheDocument();
-    expect(screen.queryByText("Nadador club-grande 1 (R1)")).not.toBeInTheDocument();
+    expect(screen.getByText(celdaDeNadador("NADADOR CLUB-CHICO 1 (R1)")), "B sigue visible").toBeInTheDocument();
+    expect(screen.queryByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"))).not.toBeInTheDocument();
     // El buscador de B conserva lo que el usuario tuviera escrito.
     expect((screen.getAllByRole("textbox")[0] as HTMLInputElement).value).toBe("persona");
   });
@@ -390,13 +394,13 @@ describe("mutaciones que se resuelven después de cambiar de club", () => {
     assignDirectly.mockReturnValue(asignacion.promesa as never);
 
     const { rerender } = render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     fireEvent.click(await buscarYObtenerSugerencia());
     await confirmarAsignacion();
     await waitFor(() => expect(assignDirectly).toHaveBeenCalled());
 
     rerender(<ClubSwimmersSection clubId="club-chico" />);
-    await screen.findByText("Nadador club-chico 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-CHICO 1 (R1)"));
 
     await act(async () => {
       asignacion.rechazar(new Error("el nadador ya pertenece a otro club"));
@@ -410,13 +414,13 @@ describe("mutaciones que se resuelven después de cambiar de club", () => {
     end.mockReturnValue(finalizacion.promesa as never);
 
     const { rerender } = render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
 
     await darDeBaja(screen.getAllByRole("button", { name: /Finalizar membresía/ })[0]!);
     await waitFor(() => expect(end).toHaveBeenCalledWith("club-grande-m1", { fechaTermino: TERMINO }));
 
     rerender(<ClubSwimmersSection clubId="club-chico" />);
-    await screen.findByText("Nadador club-chico 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-CHICO 1 (R1)"));
     const llamadasAntes = assignmentsList.mock.calls.length;
 
     await act(async () => {
@@ -425,7 +429,7 @@ describe("mutaciones que se resuelven después de cambiar de club", () => {
 
     expect(assignmentsList.mock.calls.length).toBe(llamadasAntes);
     expect(screen.queryByText(/Membresía finalizada/)).not.toBeInTheDocument();
-    expect(screen.getByText("Nadador club-chico 1 (R1)")).toBeInTheDocument();
+    expect(screen.getByText(celdaDeNadador("NADADOR CLUB-CHICO 1 (R1)"))).toBeInTheDocument();
   });
 
   it("la carga de A resuelta JUSTO DESPUÉS del cambio a B no se aplica", async () => {
@@ -449,13 +453,13 @@ describe("mutaciones que se resuelven después de cambiar de club", () => {
       deA.resolver({ items: [membresia("club-grande", 1)], total: 1, page: 1, pageSize: POR_PAGINA });
     });
 
-    expect(screen.queryByText("Nadador club-grande 1 (R1)"), "no puede pintarse").not.toBeInTheDocument();
+    expect(screen.queryByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)")), "no puede pintarse").not.toBeInTheDocument();
     expect(screen.queryByText(/1 registro\(s\) — página 1/), "ni su total").not.toBeInTheDocument();
 
     await act(async () => {
       deB.resolver({ items: [membresia("club-chico", 1)], total: 1, page: 1, pageSize: POR_PAGINA });
     });
-    expect(await screen.findByText("Nadador club-chico 1 (R1)")).toBeInTheDocument();
+    expect(await screen.findByText(celdaDeNadador("NADADOR CLUB-CHICO 1 (R1)"))).toBeInTheDocument();
   });
 });
 
@@ -503,7 +507,7 @@ describe("estados y recuperación de la tabla", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Reintentar/ }));
 
-    expect(await screen.findByText("Nadador club-grande 1 (R1)")).toBeInTheDocument();
+    expect(await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"))).toBeInTheDocument();
     expect(screen.queryByText(/500 al cargar/), "el error desaparece tras la carga correcta").not.toBeInTheDocument();
   });
 
@@ -512,7 +516,7 @@ describe("estados y recuperación de la tabla", () => {
     end.mockReturnValue(finalizacion.promesa as never);
 
     render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
 
     const confirmar = await darDeBaja(screen.getAllByRole("button", { name: /Finalizar membresía/ })[0]!);
     await waitFor(() => expect(confirmar).toBeDisabled());
@@ -543,18 +547,18 @@ describe("estados y recuperación de la tabla", () => {
     });
 
     render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     fireEvent.click(siguiente());
-    await screen.findByText("Nadador club-grande 21 (R21)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 21 (R21)"));
     fireEvent.click(siguiente());
-    await screen.findByText("Nadador club-grande 41 (R41)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 41 (R41)"));
 
     // Se finaliza la única fila de la página 3: el total baja a 40.
     total = 40;
     await darDeBaja(screen.getAllByRole("button", { name: /Finalizar membresía/ })[0]!);
 
     await waitFor(() => expect(screen.getByText(/40 registro\(s\) — página 2/)).toBeInTheDocument());
-    expect(screen.getByText("Nadador club-grande 21 (R21)"), "se ve la última página válida").toBeInTheDocument();
+    expect(screen.getByText(celdaDeNadador("NADADOR CLUB-GRANDE 21 (R21)")), "se ve la última página válida").toBeInTheDocument();
   });
 });
 
@@ -605,13 +609,13 @@ describe("ventana entre el commit y los efectos pasivos", () => {
       await resolucionEncolada;
     });
 
-    expect(screen.queryByText("Nadador club-grande 1 (R1)"), "la respuesta de A no puede pintarse").not.toBeInTheDocument();
-    expect(screen.queryByText(/Nadador club-grande/)).not.toBeInTheDocument();
+    expect(screen.queryByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)")), "la respuesta de A no puede pintarse").not.toBeInTheDocument();
+    expect(screen.queryByText(/NADADOR CLUB-GRANDE/)).not.toBeInTheDocument();
 
     await act(async () => {
       deB.resolver({ items: [membresia("club-chico", 1)], total: 1, page: 1, pageSize: POR_PAGINA });
     });
-    expect(await screen.findByText("Nadador club-chico 1 (R1)")).toBeInTheDocument();
+    expect(await screen.findByText(celdaDeNadador("NADADOR CLUB-CHICO 1 (R1)"))).toBeInTheDocument();
   });
 });
 
@@ -639,14 +643,14 @@ describe("acción en curso: identidad por operación y por club", () => {
 
     // (a) se inicia en A y queda pendiente.
     const { rerender } = render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     await darDeBaja(botonFinalizar());
     await waitFor(() => expect(end).toHaveBeenCalledTimes(1));
     expect(botonFinalizar(), "en A sí está bloqueado").toBeDisabled();
 
     // (b) se cambia a B.
     rerender(<ClubSwimmersSection clubId="club-chico" />);
-    await screen.findByText("Nadador club-chico 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-CHICO 1 (R1)"));
 
     // (c) B puede iniciar SU operación: la de A no le afecta.
     expect(botonFinalizar(), "la operación de A no bloquea B").toBeEnabled();
@@ -682,13 +686,13 @@ describe("acción en curso: identidad por operación y por club", () => {
     }
 
     const { rerender } = render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     fireEvent.click(await sugerir());
     await confirmarAsignacion();
     await waitFor(() => expect(assignDirectly).toHaveBeenCalledTimes(1));
 
     rerender(<ClubSwimmersSection clubId="club-chico" />);
-    await screen.findByText("Nadador club-chico 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-CHICO 1 (R1)"));
 
     // B puede asignar aunque la de A siga en vuelo.
     fireEvent.click(await sugerir());
@@ -732,12 +736,12 @@ describe("la tabla valida la respuesta antes de aplicarla", () => {
     }));
 
     render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
 
     fireEvent.click(siguiente());
 
     expect(await screen.findByText(/Se pidió la página 2 del plantel y llegó la 1/)).toBeInTheDocument();
-    expect(screen.queryByText("Nadador club-grande 1 (R1)"), "las filas se retiran").not.toBeInTheDocument();
+    expect(screen.queryByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)")), "las filas se retiran").not.toBeInTheDocument();
     expect(reintentar()).toBeInTheDocument();
   });
 
@@ -751,7 +755,7 @@ describe("la tabla valida la respuesta antes de aplicarla", () => {
 
     render(<ClubSwimmersSection clubId="club-grande" />);
     expect(await screen.findByText(/total inválido/)).toBeInTheDocument();
-    expect(screen.queryByText("Nadador club-grande 1 (R1)")).not.toBeInTheDocument();
+    expect(screen.queryByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"))).not.toBeInTheDocument();
   });
 
   it("TAMAÑO de página inválido", async () => {
@@ -814,20 +818,20 @@ describe("registro de operaciones POR CLUB", () => {
 
     // A1 pendiente.
     const { rerender } = render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     await darDeBaja(botonFinalizar());
     await waitFor(() => expect(end).toHaveBeenCalledTimes(1));
 
     // Cambiar a B e iniciar B1: la de A no le afecta.
     rerender(<ClubSwimmersSection clubId="club-chico" />);
-    await screen.findByText("Nadador club-chico 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-CHICO 1 (R1)"));
     expect(botonFinalizar()).toBeEnabled();
     await darDeBaja(botonFinalizar());
     await waitFor(() => expect(end).toHaveBeenCalledTimes(2));
 
     // Volver a A: A1 SIGUE en vuelo, así que A tiene que estar bloqueado.
     rerender(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     expect(botonFinalizar(), "A1 sigue pendiente: A está bloqueado").toBeDisabled();
 
     // Intentar A2 igualmente: ni siquiera con un clic forzado sale la petición.
@@ -860,20 +864,20 @@ describe("registro de operaciones POR CLUB", () => {
     }
 
     const { rerender } = render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     fireEvent.click(await sugerir());
     await confirmarAsignacion();
     await waitFor(() => expect(assignDirectly).toHaveBeenCalledTimes(1));
 
     rerender(<ClubSwimmersSection clubId="club-chico" />);
-    await screen.findByText("Nadador club-chico 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-CHICO 1 (R1)"));
     fireEvent.click(await sugerir());
     await confirmarAsignacion();
     await waitFor(() => expect(assignDirectly).toHaveBeenCalledTimes(2));
 
     // De vuelta en A, con A1 aún en vuelo: no sale una segunda.
     rerender(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     fireEvent.click(await sugerir());
     expect(assignDirectly, "A2 no puede enviarse").toHaveBeenCalledTimes(2);
 
@@ -920,7 +924,7 @@ describe("validación estricta de la página del plantel", () => {
     render(<ClubSwimmersSection clubId="club-grande" />);
 
     expect(await screen.findByText(/Se pidieron 20 membresías por página y el servidor informa 100/)).toBeInTheDocument();
-    expect(screen.queryByText("Nadador club-grande 1 (R1)"), "no se pinta una tabla truncada").not.toBeInTheDocument();
+    expect(screen.queryByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)")), "no se pinta una tabla truncada").not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Reintentar/ })).toBeInTheDocument();
   });
 
@@ -969,7 +973,7 @@ describe("validación estricta de la página del plantel", () => {
     });
 
     render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     fireEvent.click(siguiente());
 
     expect(await screen.findByText(/llegó incompleta \(5 de 20\)/)).toBeInTheDocument();
@@ -1051,11 +1055,11 @@ describe("la página se corrige también cuando el total pasa a CERO", () => {
     });
 
     render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     fireEvent.click(siguiente());
-    await screen.findByText("Nadador club-grande 21 (R21)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 21 (R21)"));
     fireEvent.click(siguiente());
-    await screen.findByText("Nadador club-grande 41 (R41)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 41 (R41)"));
 
     // El club se queda sin membresías activas mientras se está en la página 3.
     total = 0;
@@ -1076,7 +1080,7 @@ describe("C-05: baja y asignación directa revisadas", () => {
 
   it("CANCELAR la baja no envía nada; confirmar envía la fecha elegida", async () => {
     render(<ClubSwimmersSection clubId="club-grande" clubName="Club Grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     fireEvent.click(botonFinalizar());
     const dialogo = await screen.findByRole("dialog", { name: "Baja de membresía" });
     expect(within(dialogo).getByText("club-grande"), "el club de la fila").toBeInTheDocument();
@@ -1091,20 +1095,20 @@ describe("C-05: baja y asignación directa revisadas", () => {
 
   it("MEMBRESIA_NO_ACTIVA: cierra el diálogo, avisa y recarga; el aviso sobrevive a la recarga", async () => {
     render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     end.mockRejectedValueOnce(new ApiError("La membresía ya no está activa: otra operación la cambió.", 409, "MEMBRESIA_NO_ACTIVA"));
     const cargas = assignmentsList.mock.calls.length;
     await darDeBaja(botonFinalizar());
     expect(await screen.findByText(/ya no está activa/)).toBeInTheDocument();
     await waitFor(() => expect(assignmentsList.mock.calls.length).toBeGreaterThan(cargas));
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     expect(screen.getByText(/ya no está activa/)).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("un error de fecha queda DENTRO del diálogo, que sigue abierto para corregir", async () => {
     render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     end.mockRejectedValueOnce(new ApiError("La fecha de término no puede ser anterior al inicio.", 409, "CONFLICTO_DE_FECHAS"));
     await darDeBaja(botonFinalizar());
     const dialogo = await screen.findByRole("dialog", { name: "Baja de membresía" });
@@ -1113,7 +1117,7 @@ describe("C-05: baja y asignación directa revisadas", () => {
 
   it("asignación directa: HISTORIAL_INCOMPLETO pide aceptación sin marcar y reenvía solo al aceptarla", async () => {
     render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     fireEvent.change(screen.getAllByRole("textbox")[0]!, { target: { value: "persona" } });
     fireEvent.click((await screen.findAllByText("Persona 1 (RP1)")).find((e) => e.tagName === "LI")!);
     assignDirectly.mockRejectedValueOnce(new ApiError("incompleto", 409, "HISTORIAL_INCOMPLETO", { membresias: ["m-x"] }));
@@ -1135,7 +1139,7 @@ describe("C-05: baja y asignación directa revisadas", () => {
         : listaNormal(params)
     );
     render(<ClubSwimmersSection clubId="club-grande" />);
-    await screen.findByText("Nadador club-grande 1 (R1)");
+    await screen.findByText(celdaDeNadador("NADADOR CLUB-GRANDE 1 (R1)"));
     fireEvent.change(screen.getAllByRole("textbox")[0]!, { target: { value: "persona" } });
     fireEvent.click((await screen.findAllByText("Persona 1 (RP1)")).find((e) => e.tagName === "LI")!);
     expect(await screen.findByText(/no trasladan/)).toBeInTheDocument();

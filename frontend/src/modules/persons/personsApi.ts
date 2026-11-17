@@ -81,11 +81,13 @@ export interface PersonFormInput {
 
 export function usePersonsApi() {
   return {
-    list: (params: { search?: string; role?: PersonRoleType; status?: AccountStatus; page?: number } = {}) => {
+    /** `orden`: apellido paterno, materno y nombres en el servidor, antes de paginar (listado de Personas). */
+    list: (params: { search?: string; role?: PersonRoleType; status?: AccountStatus; orden?: "apellidos" | "apellidos_desc"; page?: number } = {}) => {
       const qs = new URLSearchParams();
       if (params.search) qs.set("search", params.search);
       if (params.role) qs.set("role", params.role);
       if (params.status) qs.set("status", params.status);
+      if (params.orden) qs.set("orden", params.orden);
       if (params.page) qs.set("page", String(params.page));
       return api.get<PersonListResult>(`/persons?${qs}`);
     },

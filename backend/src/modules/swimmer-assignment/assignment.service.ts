@@ -176,7 +176,9 @@ export async function listAssignments(query: AssignmentListQuery, restrictToClub
 
 const INCLUDE_DEL_LISTADO = {
   club: { select: { id: true, name: true } },
-  person: { select: { id: true, fullName: true, run: true } },
+  // Los componentes del nombre son para PRESENTAR al nadador como «PATERNO MATERNO, NOMBRES» en el
+  // plantel; no cambian el orden ni el filtro.
+  person: { select: { id: true, fullName: true, run: true, firstName: true, paternalLastName: true, maternalLastName: true } },
 } as const;
 
 /**

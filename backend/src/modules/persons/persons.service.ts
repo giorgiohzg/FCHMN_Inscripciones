@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../shared/prisma.client";
 import { audit, withAudit } from "../audit/audit.service";
 import {
@@ -27,6 +27,7 @@ import { assertClubActive, assignSwimmerDirectly } from "../swimmer-assignment/a
 import { bloquear } from "../swimmer-assignment/membresias.protocolo";
 import { CLAVES_DE_BLOQUEO } from "../incorporaciones/incorporaciones.claves";
 import { hoyEnZonaDelNegocio } from "../../shared/fecha.util";
+import { compararNadadores } from "../reports/reports.rules";
 
 interface ActorContext {
   userId: string;
@@ -64,6 +65,8 @@ export async function listPersons(query: PersonListQuery) {
   if (query.status) where.status = query.status;
   if (query.role) where.roles = { some: { roleType: query.role, active: true } };
 
+  if (query.orden) return listarPersonasPorApellidos(where, query.page, query.pageSize, query.orden === "apellidos_desc");
+
   const [items, total] = await Promise.all([
     prisma.person.findMany({
       where,
@@ -77,6 +80,44 @@ export async function listPersons(query: PersonListQuery) {
   ]);
 
   return { items, total, page: query.page, pageSize: query.pageSize };
+}
+
+/**
+ * Listado de Personas por APELLIDOS (paterno, materno y nombres), aplicado al conjunto completo
+ * ANTES de paginar, con el comparador de Reportes (`compararNadadores`): sin distinguir mayúsculas
+ * ni tildes; los registros antiguos sin apellido paterno van al final por su nombre completo
+ * almacenado, sin inventar apellidos; desempatan el RUN y el id. `descendente` invierte el orden
+ * completo, también el de esos registros y el desempate, de modo que sigue siendo estable.
+ *
+ * Mismo esquema que el plantel ordenado (`swimmer-assignment`): se leen solo los campos de orden de
+ * todas las filas que cumplen el filtro, se ordena, se toma la página y se cargan sus filas
+ * completas con el MISMO filtro, todo en una instantánea `REPEATABLE READ` de solo lectura. Si
+ * faltara una fila entre ambas lecturas, se rechaza en vez de entregar una página corta.
+ */
+async function listarPersonasPorApellidos(where: Prisma.PersonWhereInput, page: number, pageSize: number, descendente: boolean) {
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SET TRANSACTION READ ONLY`;
+      const claves = await tx.person.findMany({
+        where,
+        select: { id: true, run: true, fullName: true, firstName: true, paternalLastName: true, maternalLastName: true },
+      });
+      const ordenadas = claves.map((p) => ({ ...p, personId: p.id })).sort(compararNadadores);
+      if (descendente) ordenadas.reverse();
+      const idsDeLaPagina = ordenadas.slice((page - 1) * pageSize, page * pageSize).map((p) => p.id);
+      const filas =
+        idsDeLaPagina.length > 0
+          ? await tx.person.findMany({ where: { AND: [where, { id: { in: idsDeLaPagina } }] }, include: { roles: { where: { active: true } } } })
+          : [];
+      const porId = new Map(filas.map((f) => [f.id, f]));
+      const items = idsDeLaPagina.map((id) => porId.get(id));
+      if (items.some((f) => f === undefined)) {
+        throw new Error("El listado de personas cambió entre las dos lecturas de una misma instantánea: lectura incoherente.");
+      }
+      return { items: items as (typeof filas)[number][], total: ordenadas.length, page, pageSize };
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30_000 }
+  );
 }
 
 export async function getPersonById(id: string) {

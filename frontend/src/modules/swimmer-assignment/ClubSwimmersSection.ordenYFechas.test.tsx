@@ -38,6 +38,10 @@ vi.mock("../auth/AuthContext", async (importOriginal) => ({
 
 import { ClubSwimmersSection } from "./ClubSwimmersSection";
 
+/** La celda del nadador cuyo texto completo es `texto`: el RUN va en su propio elemento, para no cortarse en el guion. */
+const celdaDeNadador = (texto: string) => (_: string, el: Element | null) => el?.tagName === "TD" && el.textContent === texto;
+
+
 beforeEach(() => {
   list.mockClear();
 });
@@ -46,21 +50,21 @@ describe("ClubSwimmersSection", () => {
   it("pide el plantel activo ordenado por apellidos, con la página visible", async () => {
     esAdmin.valor = false;
     render(<ClubSwimmersSection clubId="c1" clubName="Club Prueba" />);
-    await screen.findByText(/Ana Sintética/);
+    await screen.findByText(celdaDeNadador("ANA SINTÉTICA (R1)"));
     expect(list).toHaveBeenCalledWith({ clubId: "c1", status: "active", orden: "apellidos", page: 1, pageSize: 20 });
   });
 
   it("sin administración no ofrece corregir fechas (aunque vea el plantel)", async () => {
     esAdmin.valor = false;
     render(<ClubSwimmersSection clubId="c1" clubName="Club Prueba" />);
-    await screen.findByText(/Ana Sintética/);
+    await screen.findByText(celdaDeNadador("ANA SINTÉTICA (R1)"));
     expect(screen.queryByRole("button", { name: "Corregir fechas" })).not.toBeInTheDocument();
   });
 
   it("administración abre el diálogo de la membresía activa (solo DESDE)", async () => {
     esAdmin.valor = true;
     render(<ClubSwimmersSection clubId="c1" clubName="Club Prueba" />);
-    const fila = (await screen.findByText(/Ana Sintética/)).closest("tr")!;
+    const fila = (await screen.findByText(celdaDeNadador("ANA SINTÉTICA (R1)"))).closest("tr")!;
     fireEvent.click(within(fila).getByRole("button", { name: "Corregir fechas" }));
     const dialogo = screen.getByRole("dialog", { name: "Corregir fechas de pertenencia" });
     expect(within(dialogo).getByLabelText(/DESDE/)).toHaveValue("2025-02-01");

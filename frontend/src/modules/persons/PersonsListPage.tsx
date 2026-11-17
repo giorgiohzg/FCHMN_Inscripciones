@@ -1,9 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../../shared/AppShell";
 import { usePersonsApi, type Person, type PersonRoleType, type AccountStatus } from "./personsApi";
 import { InlineEditableCell } from "../../shared/InlineEditableCell";
 import { useSort, sortItems, SortableTh } from "../../shared/sortableTable";
+import { nombreApellidosPrimero } from "../../shared/nombreDeNadador";
+import { formatRunConGuion } from "./runValidator";
 
 const ROLE_LABELS: Record<PersonRoleType, string> = {
   swimmer: "Nadador",
@@ -32,9 +34,35 @@ export function PersonsListPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const { sortKey, sortDir, onSort } = useSort<"run" | "fullName" | "roles" | "email" | "phone" | "status">();
+  /**
+   * «Nombre completo» se ordena en el SERVIDOR (apellido paterno, materno y nombres, antes de
+   * paginar), y es el orden inicial. Las demás columnas siguen ordenando la página visible, como
+   * antes, sobre ese orden de base.
+   */
+  const { sortKey, sortDir, onSort } = useSort<"run" | "fullName" | "roles" | "email" | "phone" | "status">("fullName", "asc");
+  const orden: "apellidos" | "apellidos_desc" = sortKey === "fullName" && sortDir === "desc" ? "apellidos_desc" : "apellidos";
+  /** Cambiar el sentido del orden por nombre vuelve a la primera página del nuevo orden. */
+  const [ordenAnterior, setOrdenAnterior] = useState(orden);
+  if (orden !== ordenAnterior) {
+    setOrdenAnterior(orden);
+    setPage(1);
+  }
+
+  /**
+   * SOLO LA CARGA VIGENTE ACTUALIZA LA PANTALLA (mismo patrón que Asignación de Nadadores).
+   * Cada carga toma un número; si al terminar ya hay otra más reciente —otro orden, otra página u
+   * otro filtro— o la pantalla se desmontó, su respuesta, su error y su fin de carga se descartan.
+   */
+  const cargaVigente = useRef(0);
+  useEffect(
+    () => () => {
+      cargaVigente.current++;
+    },
+    []
+  );
 
   const load = useCallback(async () => {
+    const n = ++cargaVigente.current;
     setLoading(true);
     setError(null);
     try {
@@ -42,16 +70,17 @@ export function PersonsListPage() {
         search: search || undefined,
         role: (role || undefined) as PersonRoleType | undefined,
         status: (status || undefined) as AccountStatus | undefined,
+        orden,
         page,
       });
-      setData(result);
+      if (n === cargaVigente.current) setData(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar personas");
+      if (n === cargaVigente.current) setError(err instanceof Error ? err.message : "Error al cargar personas");
     } finally {
-      setLoading(false);
+      if (n === cargaVigente.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, role, status, page]);
+  }, [search, role, status, orden, page]);
 
   useEffect(() => {
     load();
@@ -134,10 +163,9 @@ export function PersonsListPage() {
               </tr>
             </thead>
             <tbody>
-              {sortItems(data.items, sortKey, sortDir, (p, key) => {
+              {sortItems(data.items, sortKey === "fullName" ? null : sortKey, sortDir, (p, key) => {
                 switch (key) {
                   case "run": return p.run;
-                  case "fullName": return p.fullName;
                   case "roles": return p.roles.filter((r) => r.active).map((r) => ROLE_LABELS[r.roleType]).join(", ");
                   case "email": return p.email;
                   case "phone": return p.phone ?? null;
@@ -145,9 +173,9 @@ export function PersonsListPage() {
                 }
               }).map((p) => (
                 <tr key={p.id}>
-                  <td>{p.run}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>{formatRunConGuion(p.run) || "—"}</td>
                   <td>
-                    <Link to={`/personas/${p.id}`}>{p.fullName}</Link>
+                    <Link to={`/personas/${p.id}`}>{nombreApellidosPrimero(p) || "—"}</Link>
                   </td>
                   <td>{p.roles.filter((r) => r.active).map((r) => ROLE_LABELS[r.roleType]).join(", ")}</td>
                   <td>
