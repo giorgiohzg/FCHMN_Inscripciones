@@ -29,6 +29,12 @@ export interface Club {
   isFchmnMember: boolean;
   isFchmnCollaborator: boolean;
   status: AccountStatus;
+  /**
+   * Nadadores ACTUALES del club (personas distintas con membresía activa, sin eliminadas; sin
+   * pendientes, historial ni personal del club). Lo calcula el servidor sobre el plantel completo.
+   * Solo lo trae el LISTADO de clubes; opcional para una API anterior que no lo envía.
+   */
+  nadadores?: number;
   user?: { id: string; username: string; status: AccountStatus; mustChangePassword: boolean; lastLoginAt: string | null } | null;
 }
 

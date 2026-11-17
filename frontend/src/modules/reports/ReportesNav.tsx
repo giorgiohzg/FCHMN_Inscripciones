@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 
 export const RUTA_RESUMEN_POR_CLUB = "/reportes/resumen-por-club";
+export const RUTA_CLUBES_Y_NADADORES = "/reportes/clubes-y-nadadores";
 
 /**
  * Pestañas de Reportes. Solo administración las ve: los demás roles tienen un único reporte
@@ -30,6 +31,9 @@ export function ReportesNav() {
       </NavLink>
       <NavLink to={RUTA_RESUMEN_POR_CLUB} end style={estilo}>
         Resumen por club
+      </NavLink>
+      <NavLink to={RUTA_CLUBES_Y_NADADORES} end style={estilo}>
+        Clubes y nadadores
       </NavLink>
     </nav>
   );

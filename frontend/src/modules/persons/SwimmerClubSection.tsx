@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useClubsApi, type Club } from "../clubs/clubsApi";
 import { useSwimmerAssignmentApi, type ClubSwimmerAssignment } from "../swimmer-assignment/assignmentApi";
 import { PanelDeActivacion } from "../swimmer-assignment/PanelDeActivacion";
 import { traerTodasLasPaginas } from "../../shared/paginacion";
 import { formatearFechaCalendario, hoyEnSantiago } from "../../shared/fechaCalendario";
 import { useOperacionUnica } from "../../shared/useOperacionUnica";
+import { useTieneRol } from "../auth/AuthContext";
+import { EdicionDeFechasDialog } from "../swimmer-assignment/EdicionDeFechasDialog";
 
 const ESTADOS: Record<ClubSwimmerAssignment["status"], string> = { pending: "Pendiente", active: "Activa", rejected: "Rechazada", ended: "Finalizada" };
 
@@ -33,6 +35,14 @@ export function SwimmerClubSection({ personId }: { personId: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const cargaVigente = useRef(0);
   const operacion = useOperacionUnica();
+  /** Corregir DESDE/HASTA: solo administración, aunque otro rol pueda abrir la ficha. */
+  const esAdministracion = useTieneRol("admin");
+  const [corrigiendo, setCorrigiendo] = useState<ClubSwimmerAssignment | null>(null);
+  /** Persona en pantalla, para que un guardado que llega tarde no recargue otra ficha. */
+  const personaVigente = useRef(personId);
+  useLayoutEffect(() => {
+    personaVigente.current = personId;
+  }, [personId]);
 
   /** Otra persona = otra ficha: nada de la revisión anterior sobrevive. */
   const [personaAnterior, setPersonaAnterior] = useState(personId);
@@ -44,6 +54,7 @@ export function SwimmerClubSection({ personId }: { personId: string }) {
     setSelectedClubId("");
     setError(null);
     setMessage(null);
+    setCorrigiendo(null);
   }
 
   const load = useCallback(() => {
@@ -184,6 +195,7 @@ export function SwimmerClubSection({ personId }: { personId: string }) {
                   <th>Estado</th>
                   <th>Desde</th>
                   <th>Hasta (último día)</th>
+                  {esAdministracion && <th>Acciones</th>}
                 </tr>
               </thead>
               <tbody>
@@ -193,12 +205,42 @@ export function SwimmerClubSection({ personId }: { personId: string }) {
                     <td>{ESTADOS[m.status]}</td>
                     <td>{m.startDate ? formatearFechaCalendario(m.startDate) : "Desconocido"}</td>
                     <td>{m.status === "active" ? "—" : m.fechaTermino ? formatearFechaCalendario(m.fechaTermino) : "Desconocido"}</td>
+                    {esAdministracion && (
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ padding: "0.15rem 0.5rem", fontSize: "0.8rem" }}
+                          onClick={() => {
+                            setMessage(null);
+                            setCorrigiendo(m);
+                          }}
+                          disabled={operacion.enCurso || changing}
+                        >
+                          Corregir fechas
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </>
+      )}
+
+      {corrigiendo && (
+        <EdicionDeFechasDialog
+          membresia={corrigiendo}
+          hoy={hoyEnSantiago()}
+          onCancelar={() => setCorrigiendo(null)}
+          onGuardado={(actualizada) => {
+            if (actualizada.personId !== personaVigente.current) return;
+            setCorrigiendo(null);
+            setMessage("Fechas de pertenencia corregidas.");
+            load();
+          }}
+        />
       )}
     </div>
   );

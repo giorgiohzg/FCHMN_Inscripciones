@@ -11,8 +11,9 @@ import {
   reassignSwimmerSchema,
   directAssignmentSchema,
   approveAssignmentSchema,
+  editarFechasSchema,
 } from "./assignment.schemas";
-import { requireAuth, requirePermission } from "../auth/rbac.middleware";
+import { requireAuth, requirePermission, requireRole } from "../auth/rbac.middleware";
 import { requireFuncion } from "../accesos/accesos.middleware";
 import { ValidationError, ForbiddenError } from "../../shared/errors";
 import { buildActorContext, scopedClubId } from "../../shared/actorContext";
@@ -168,6 +169,19 @@ export async function swimmerAssignmentRoutes(app: FastifyInstance) {
     if (!parsed.success) throw new ValidationError("Datos inválidos", parsed.error.flatten());
 
     reply.send(await assignmentService.rejectAssignment(id, parsed.data.reason, { userId: req.authUser!.sub, ipAddress: req.ip }));
+  });
+
+  /**
+   * Corrección de DESDE y HASTA de una membresía activa o finalizada: EXCLUSIVA de
+   * administración. Exige `swimmer-assignment:approve` (solo `admin` en el seed) y además el rol
+   * `admin` vigente: poder abrir una ficha de club o de persona no la concede. No cambia el
+   * estado; ver `editarFechasDeMembresia`.
+   */
+  app.put("/swimmer-assignments/:id/fechas", { preHandler: [requirePermission("swimmer-assignment:approve"), requireRole("admin")] }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const parsed = editarFechasSchema.safeParse(req.body ?? {});
+    if (!parsed.success) throw new ValidationError("Datos inválidos", parsed.error.flatten());
+    reply.send(await assignmentService.editarFechasDeMembresia(id, parsed.data, { userId: req.authUser!.sub, ipAddress: req.ip }));
   });
 
   /**

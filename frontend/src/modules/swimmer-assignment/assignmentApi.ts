@@ -88,6 +88,16 @@ export interface DatosDeBaja {
   aceptarHistorialIncompleto?: boolean;
 }
 
+/**
+ * Corrección administrativa de DESDE/HASTA. Solo se envía lo que cambia; `fechaTermino` solo en
+ * una membresía finalizada. Ninguna fecha se borra.
+ */
+export interface DatosDeFechas {
+  startDate?: string;
+  fechaTermino?: string;
+  aceptarHistorialIncompleto?: boolean;
+}
+
 /** Códigos estables de C-05 con los que la interfaz decide (nunca por el texto). */
 export const CODIGOS = {
   confirmacionRequerida: "CONFIRMACION_REQUERIDA",
@@ -123,11 +133,13 @@ export const codigoDelError = (err: unknown): string | undefined => (err instanc
 
 export function useSwimmerAssignmentApi() {
   return {
-    list: (params: { clubId?: string; personId?: string; status?: AssignmentStatus; page?: number; pageSize?: number } = {}) => {
+    /** `orden: "apellidos"`: paterno, materno y nombre, ordenado en el servidor ANTES de paginar. */
+    list: (params: { clubId?: string; personId?: string; status?: AssignmentStatus; orden?: "apellidos"; page?: number; pageSize?: number } = {}) => {
       const qs = new URLSearchParams();
       if (params.clubId) qs.set("clubId", params.clubId);
       if (params.personId) qs.set("personId", params.personId);
       if (params.status) qs.set("status", params.status);
+      if (params.orden) qs.set("orden", params.orden);
       if (params.page) qs.set("page", String(params.page));
       if (params.pageSize) qs.set("pageSize", String(params.pageSize));
       return api.get<AssignmentListResult>(`/swimmer-assignments?${qs}`);
@@ -146,6 +158,9 @@ export function useSwimmerAssignmentApi() {
 
     /** Baja simple con la fecha de término ELEGIDA (obligatoria). */
     end: (id: string, datos: DatosDeBaja) => api.post<ClubSwimmerAssignment>(`/swimmer-assignments/${id}/end`, datos),
+
+    /** Corrige DESDE/HASTA (solo administración). No cambia el estado de la membresía. */
+    editarFechas: (id: string, datos: DatosDeFechas) => api.put<ClubSwimmerAssignment>(`/swimmer-assignments/${id}/fechas`, datos),
 
     // ---------- Asignación masiva ----------
 

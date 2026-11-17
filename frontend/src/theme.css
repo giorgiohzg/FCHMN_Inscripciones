@@ -744,3 +744,64 @@ label {
     margin-left: 0.35rem;
   }
 }
+
+/* ------------------------------------------------------------------ Reporte «Clubes y nadadores» */
+.grupo-reporte {
+  margin: 0 0 1rem;
+  border: 1px solid var(--brand-gray-300);
+  border-radius: var(--radius-md);
+  background: var(--brand-white);
+  overflow: hidden;
+}
+.grupo-reporte-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+  color: var(--brand-navy);
+  background: var(--brand-gray-100);
+  border-bottom: 1px solid var(--brand-gray-300);
+}
+.grupo-reporte-sigla,
+.grupo-reporte-cuenta {
+  font-weight: 400;
+  color: var(--brand-gray-600);
+}
+.grupo-reporte-lista {
+  margin: 0;
+  padding: 0.5rem 0.75rem 0.6rem 2.5rem;
+  columns: 2 18rem;
+  column-gap: 2rem;
+  font-size: 0.88rem;
+}
+.grupo-reporte-lista li {
+  break-inside: avoid;
+  padding: 0.1rem 0;
+  overflow-wrap: anywhere;
+}
+.grupo-reporte-vacio {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--brand-gray-600);
+}
+@media (max-width: 600px) {
+  .grupo-reporte-lista {
+    columns: 1;
+    padding-left: 2.25rem;
+  }
+}
+.grupo-reporte-revision .grupo-reporte-titulo {
+  background: #f6e3c8;
+}
+.grupo-reporte-subtitulo {
+  margin: 0;
+  padding: 0.4rem 0.75rem 0;
+  font-size: 0.9rem;
+  color: var(--brand-navy);
+  overflow-wrap: anywhere;
+}

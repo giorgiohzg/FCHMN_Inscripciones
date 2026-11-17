@@ -215,7 +215,29 @@ export async function listClubs(query: ClubListQuery, actor: ScopedActor) {
     prisma.club.count({ where }),
   ]);
 
-  return { items, total, page: query.page, pageSize: query.pageSize };
+  const nadadores = await contarNadadoresActivos(items.map((c) => c.id));
+  return { items: items.map((c) => ({ ...c, nadadores: nadadores.get(c.id) ?? 0 })), total, page: query.page, pageSize: query.pageSize };
+}
+
+/**
+ * Cantidad de NADADORES ACTUALES de cada club: personas distintas con membresía `active` en él,
+ * sin contar a las personas eliminadas. No cuentan las propuestas pendientes, las rechazadas ni
+ * las membresías finalizadas (historial), ni el personal del club (delegados, entrenadores,
+ * representante legal), que no es una membresía.
+ *
+ * Es el TOTAL del plantel vigente, no el de una página: se cuenta en la base, con UNA consulta
+ * agrupada para todos los clubes pedidos (nunca una por fila). Contar filas equivale a contar
+ * personas distintas porque una persona tiene a lo sumo una membresía activa
+ * (`club_swimmers_unique_active_person`).
+ */
+export async function contarNadadoresActivos(clubIds: readonly string[], db: Db = prisma): Promise<Map<string, number>> {
+  if (clubIds.length === 0) return new Map();
+  const grupos = await db.clubSwimmer.groupBy({
+    by: ["clubId"],
+    where: { clubId: { in: [...clubIds] }, status: "active", person: { deletedAt: null } },
+    _count: { _all: true },
+  });
+  return new Map(grupos.map((g) => [g.clubId, g._count._all]));
 }
 
 export async function getClubById(id: string, db: Db = prisma) {

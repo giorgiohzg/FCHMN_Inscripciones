@@ -28,6 +28,7 @@ import { RelayRegistrationWizardPage } from "./modules/relay-registrations/Relay
 import { RelayWorkspacePage } from "./modules/relay-registrations/RelayWorkspacePage";
 import { ReportsPage } from "./modules/reports/ReportsPage";
 import { ClubSummaryReportPage } from "./modules/reports/ClubSummaryReportPage";
+import { ClubesYNadadoresReportPage } from "./modules/reports/ClubesYNadadoresReportPage";
 import { AuditLogPage } from "./modules/audit/AuditLogPage";
 import { AdminDashboardPage } from "./modules/dashboard/AdminDashboardPage";
 import { useAuth } from "./modules/auth/AuthContext";
@@ -114,6 +115,8 @@ export function App() {
             <Route path="/administracion/accesos" element={<AccesosPorRolPage />} />
             {/* Resumen por club: exclusivo de administración (la API también lo exige). */}
             <Route path="/reportes/resumen-por-club" element={<ClubSummaryReportPage />} />
+            {/* Clubes y nadadores: exclusivo de administración (la API también lo exige). */}
+            <Route path="/reportes/clubes-y-nadadores" element={<ClubesYNadadoresReportPage />} />
             <Route path="/personas" element={<PersonsListPage />} />
             <Route path="/personas/carga-masiva" element={<PersonsBulkImportPage />} />
             <Route path="/personas/nueva" element={<PersonFormPage />} />

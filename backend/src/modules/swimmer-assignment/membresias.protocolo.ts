@@ -199,6 +199,66 @@ export function decidirActivacion(
   return { fechaEfectiva: opciones.fechaEfectiva, vigente, historialIncompletoAceptado: incompletas };
 }
 
+/**
+ * Corrección de fechas: pasos 1 y 2 del protocolo sobre TODO el historial de la persona.
+ *
+ * Mismo bloqueo consultivo de la persona que las demás vías (y antes de cualquier fila), y luego
+ * `FOR UPDATE` de TODAS sus membresías —también las finalizadas, que son justamente las que se
+ * corrigen— en orden de id. Como todas las vías toman primero el bloqueo de la persona, ampliar
+ * el conjunto de filas no introduce un orden de bloqueo distinto.
+ */
+export async function bloquearHistorialDePersona(tx: Tx, personId: string): Promise<FilaMembresia[]> {
+  await bloquear(tx, CLAVES_DE_BLOQUEO.persona(personId));
+  return tx.$queryRaw<FilaMembresia[]>`
+    SELECT id, club_id, status::text AS status, start_date::text AS start_date, end_date, fecha_termino::text AS fecha_termino
+      FROM club_swimmers
+     WHERE person_id = ${personId}
+     ORDER BY id
+       FOR UPDATE`;
+}
+
+/**
+ * Evaluación PURA de una corrección de fechas frente al resto del historial.
+ *
+ * Cada membresía activa o finalizada es un intervalo de calendario con extremos INCLUSIVOS:
+ * DESDE = `start_date`; HASTA = `fecha_termino` si está finalizada, o abierto (sin término) si
+ * está activa. Una fecha nula es DESCONOCIDA. Pendientes y rechazadas no son pertenencia.
+ *
+ * Con otra membresía `o`, la corregida `e` es:
+ *  - compatible si una termina ANTES de que empiece la otra (`HASTA < DESDE`, estricto: el día
+ *    siguiente al último día es el primero posible de la siguiente);
+ *  - un CONFLICTO si todas las fechas que deciden se conocen y no son compatibles;
+ *  - INCOMPLETA si alguna fecha desconocida impide descartar la superposición. No se infiere
+ *    nada de `end_date`, que es el instante de la operación de baja.
+ */
+export function evaluarFechasCorregidas(
+  corregida: Pick<FilaMembresia, "id" | "status" | "start_date" | "fecha_termino">,
+  historial: readonly FilaMembresia[]
+): EvaluacionDeHistorial {
+  const conflictos: EvaluacionDeHistorial["conflictos"] = [];
+  const incompletas: string[] = [];
+  const ABIERTO = "9999-12-31";
+  const terminoDe = (m: Pick<FilaMembresia, "status" | "fecha_termino">) => (m.status === "active" ? ABIERTO : m.fecha_termino);
+  const eInicio = corregida.start_date;
+  const eFin = terminoDe(corregida);
+
+  for (const o of historial) {
+    if (o.id === corregida.id || (o.status !== "active" && o.status !== "ended")) continue;
+    const oInicio = o.start_date;
+    const oFin = terminoDe(o);
+    const eAntes = eFin !== null && oInicio !== null && eFin < oInicio;
+    const oAntes = oFin !== null && eInicio !== null && oFin < eInicio;
+    if (eAntes || oAntes) continue;
+    if (eInicio !== null && eFin !== null && oInicio !== null && oFin !== null) {
+      const hasta = oFin === ABIERTO ? "sin término (vigente)" : `hasta el ${oFin}`;
+      conflictos.push({ membresiaId: o.id, motivo: `se superpone con otra membresía (desde el ${oInicio}, ${hasta})` });
+    } else {
+      incompletas.push(o.id);
+    }
+  }
+  return { conflictos, incompletas };
+}
+
 /** Finaliza la membresía vigente por traslado: término = día calendario ANTERIOR al nuevo inicio. */
 export async function finalizarPorTraslado(tx: Tx, vigente: FilaMembresia, fechaEfectiva: string, ahora: Date) {
   return tx.clubSwimmer.update({

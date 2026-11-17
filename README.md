@@ -649,7 +649,7 @@ cuenta `system`.
 
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
-| GET | `/clubs` | Lista clubes (búsqueda por nombre/razón social/RUT, filtro por estado y por **personalidad jurídica** —`si` / `no`—, paginado) | `clubs:read` |
+| GET | `/clubs` | Lista clubes (búsqueda por nombre/razón social/RUT, filtro por estado y por **personalidad jurídica** —`si` / `no`—, paginado). Cada club trae `nadadores`: personas distintas con membresía activa en él, sin eliminadas, pendientes, historial ni personal (ver «Clubes y nadadores, orden del plantel y edición de fechas») | `clubs:read` |
 | GET | `/clubs/:id` | Detalle de un club (incluye su personal —delegados, entrenadores y representante legal— y las credenciales) | `clubs:read` |
 | POST | `/clubs` | Crea un club (RB-02: RUT obligatorio solo si tiene personalidad jurídica; `hasLegalStatus` es obligatorio y solo admite `true` o `false`). El correo y el nombre de usuario son opcionales | `clubs:write` |
 | PUT | `/clubs/:id` | Actualiza datos del club. Omitir `email` lo conserva; `null`, vacío o solo espacios lo elimina. `username`, igual, solo sin cuenta vigente | `clubs:write` |
@@ -809,7 +809,7 @@ cuenta `system`.
 
 | Método | Ruta | Descripción | Permiso |
 |---|---|---|---|
-| GET | `/swimmer-assignments` | Lista solicitudes (filtro por club/nadador/estado, paginado) | `swimmer-assignment:read` |
+| GET | `/swimmer-assignments` | Lista solicitudes (filtro por club/nadador/estado, paginado). Con `orden=apellidos` (plantel de Editar Club) ordena por apellido paterno, materno y nombre antes de paginar y excluye a las personas eliminadas | `swimmer-assignment:read` |
 | GET | `/swimmer-assignments/:id` | Detalle de una solicitud | `swimmer-assignment:read` |
 | POST | `/swimmer-assignments` | C-05 (fase 2, desplegada en producción desde `5780336`): postulación **por RUN** (`{ run }`; ya no acepta `personId`). El club y su personal —delegado, entrenador o representante legal— postulan en su club con cabecera `Idempotency-Key` y cuota de 30 intentos diarios por club; administración indica `clubId`. Queda `pending` | `swimmer-assignment:write` |
 | POST | `/swimmer-assignments/:id/approve` | Aprueba y activa la MISMA propuesta. Cuerpo opcional: `fechaEfectiva` (`AAAA-MM-DD`, no futura), `confirmarFinDeMembresiaId` (traslado) y `aceptarHistorialIncompleto` | `swimmer-assignment:approve` (solo `admin`) |
@@ -1146,6 +1146,8 @@ en dos capas los permisos de usuario (RBAC + alcance por club).
 | GET | `/reports/registrations/export?format=csv\|xlsx\|pdf` | Descarga el mismo reporte en el formato solicitado | `reports:read` |
 | GET | `/reports/registrations/clubs?competitionId=` | Clubes con al menos una inscripción confirmada (individual o de relevo) en la competencia: opciones del selector de club | `reports:read` (además, rol `admin`) |
 | GET | `/reports/clubs-summary?competitionId=` | Resumen de inscripciones por club, con cifras agregadas y sin datos personales | `reports:read` (además, rol `admin`) |
+| GET | `/reports/clubes-y-nadadores` | Reporte general «Clubes y nadadores» (pertenencia vigente, sin competencia): clubes con sus nadadores, revisión de membresías activas en clubes eliminados y «Sin club asignado». Solo nombres | `reports:read` (además, rol `admin`) |
+| GET | `/reports/clubes-y-nadadores/export?format=csv\|xlsx\|pdf` | Exporta el mismo reporte completo, generado en el servidor | `reports:read` (además, rol `admin`) |
 
 Filtros soportados (sección 16): `competitionId` (obligatorio), `clubId`, `competitionDateId`, `sessionTypeId`, `competitionEventId`, `categoryId`, `gender`.
 
@@ -1667,6 +1669,7 @@ Estas rutas son del administrador, que no necesita proponerse nada a sí mismo:
 | POST | `/swimmer-assignments/reassign/:personId` | Traslada un nadador a otro club | `swimmer-assignment:approve` |
 | GET | `/swimmer-assignments/swimmers-by-club` | Plantel agrupado por club | `swimmer-assignment:approve` |
 | GET | `/swimmer-assignments/current-club/:personId` | Club vigente de un nadador | `swimmer-assignment:read` |
+| PUT | `/swimmer-assignments/:id/fechas` | Corrige DESDE (`startDate`) y, en una finalizada, HASTA (`fechaTermino`) de una membresía. No cambia el estado (ver «Clubes y nadadores, orden del plantel y edición de fechas») | `swimmer-assignment:approve` (además, rol `admin`) |
 
 ### Apoyo al asistente de inscripción y al programa
 
@@ -1837,9 +1840,53 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
 | GET | `/accesos-por-rol` | Configuración vigente, versión, última modificación y catálogo para la pantalla | Rol `admin` |
 | PUT | `/accesos-por-rol` | Guarda el estado completo con la versión leída; 409 si cambió | Rol `admin` |
 
+### Clubes y nadadores, orden del plantel y edición de fechas (estado: publicada en el repositorio y validada localmente; pendiente de despliegue y actualización del entorno local)
+
+> **Estado:** **publicada en el repositorio y validada localmente; pendiente de despliegue y actualización del entorno local.** Producción y el entorno local de ejecución todavía no tienen estos cambios. **No hubo cambios de esquema ni migraciones.**
+
+**Qué incluye**
+
+- **Columna «Nadadores» en Clubes.** `GET /clubs` añade a cada club la cantidad de personas distintas con membresía **activa** en él, sin personas eliminadas, propuestas pendientes, historial ni personal del club. Es el total del plantel, no el de una página, y se obtiene con una sola consulta agrupada por página del listado. Conserva el alcance por club de quien no es administrador.
+- **Orden del plantel en Editar Club.** Por omisión, apellido paterno, apellido materno y nombre, con el comparador de Reportes (`compararNadadores`): sin distinguir mayúsculas ni tildes; los registros históricos sin apellido paterno van al final por su nombre completo almacenado, sin inventar apellidos; desempatan el RUN y los identificadores. Se ordena en el servidor **antes de paginar** y excluye a las personas eliminadas, para que el total coincida con la columna «Nadadores»; sus membresías no se modifican. Las dos lecturas (orden y filas de la página) comparten una instantánea `REPEATABLE READ` de solo lectura; si aun así faltara una fila, la respuesta es un error, no una página corta.
+- **Reporte general «Clubes y nadadores»** (pestaña de Reportes), **exclusivo de administración** en la pantalla y en sus dos rutas (`reports:read` y rol `admin`, más la comprobación de alcance en el servicio). No pide ni consulta ninguna competencia. Orden de las secciones, el mismo en pantalla, CSV, Excel y PDF:
+  1. **clubes no eliminados**, por nombre, también los que no tienen nadadores, cada uno con sus nadadores actuales (membresía activa de una persona no eliminada) por apellido paterno, materno y nombre;
+  2. **revisión de membresías activas en clubes eliminados**, cuando exista: esas personas tienen una membresía activa, así que no se reclasifican como «sin club»; no se recupera el club ni se finaliza ni repara nada;
+  3. **«Sin club asignado», siempre al final:** todas las personas no eliminadas, con cuenta activa y sin membresía activa, con el mismo criterio que la asignación masiva. No exige el rol `swimmer` (es derivado) ni un historial previo, así que incluye a delegados, entrenadores o representantes legales sin membresía activa: el personal no figura en su club por ser personal, pero sí aquí si cumple el criterio.
+
+  Solo se muestran nombres (`PATERNO MATERNO, NOMBRE`, o el nombre completo almacenado si el registro está incompleto): sin RUN, nacimiento ni correo. Los totales separan clubes, nadadores con club, sin club y revisión. Las tres consultas se leen en una transacción `REPEATABLE READ` de solo lectura, con una única instantánea; una lectura incoherente (una persona dos veces o en dos grupos) se rechaza. CSV y Excel tienen las mismas filas (con la columna «Sección») y conservan la neutralización de fórmulas; el PDF mide cada línea con su fuente y ancho reales, repite el encabezado del grupo con «(continuación)» al cambiar de página y no deja encabezados solos al pie. Los reportes por competencia no cambian.
+- **Edición administrativa de DESDE y HASTA** desde Asignación de Nadadores a Clubes, Editar Club y Editar Persona, con un mismo diálogo y la misma validación (`PUT /swimmer-assignments/:id/fechas`). Solo administración: el botón se muestra solo con el rol `admin` y la ruta exige `swimmer-assignment:approve` y el rol `admin`, así que poder abrir la ficha no la concede. Reglas:
+  - fechas de calendario sin hora; DESDE y HASTA iguales o anteriores a **hoy en America/Santiago**;
+  - HASTA, cuando tenga valor, igual o posterior a DESDE (el mismo día es válido);
+  - **sin superposiciones** con ninguna otra membresía activa o finalizada de la persona, con extremos inclusivos: una nueva pertenencia empieza después del último día de la anterior. Si una fecha desconocida impide descartarla, se exige una aceptación administrativa explícita y auditada; no se completa ninguna fecha por inferencia;
+  - en una membresía **activa** solo se corrige DESDE; HASTA lo pone la baja existente. En una finalizada se corrigen ambas. Pendientes y rechazadas no se editan;
+  - **sin cambios automáticos de estado:** corregir fechas no asigna ni da de baja, no retrocede `endDate` (el instante real de la baja), no cambia las marcas de solicitud, aprobación y creación ni toca inscripciones o competencias;
+  - protocolo de C-05: bloqueo de la persona y de todas sus membresías, reevaluación con las filas bloqueadas, actualización y auditoría (`SWIMMER_ASSIGNMENT_DATES_CORRECTED`) en la misma transacción.
+
+**Validación** (rondas separadas; ninguna fue una ejecución completa de todas las suites). Todo con datos sintéticos; la integración, solo contra la base desechable de `docker-compose.test.yml`.
+
+- **Ronda 1 — implementación.**
+  - Backend, unitarias del área (12 archivos, 2 nuevos): 447/447. Integración: el archivo nuevo y 5 existentes del área, 222/222.
+  - Frontend: 9 archivos existentes de las pantallas tocadas, 243/243, y 5 archivos nuevos, 19/19 (jsdom, API simulada en las pruebas).
+  - Concurrencia de la edición de fechas: dos correcciones válidas por separado pero superpuestas juntas, con el bloqueo de la persona retenido desde otra conexión: se guarda una y la otra recibe 409. Contraprueba leyendo el historial antes del bloqueo: ambas se guardaban (la prueba la detecta).
+  - Tipos y lint sin errores en ambas capas.
+- **Ronda 2 — consistencia y PDF.**
+  - Reglas del reporte y de fechas: 17/17. Archivo de integración: 22/22, con intercalados deterministas (una asignación confirmada durante la lectura del reporte; una baja entre las dos lecturas del plantel). Contraprueba con `READ COMMITTED`: la persona quedaba omitida y el plantel respondía 500; ambos fallos detectados. Frontend del reporte: 11/11.
+  - PDF: se reprodujo primero el defecto (nombres y encabezados largos se partían y se superponían con la línea siguiente) y luego se corrigió con la paginación por altura real.
+- **Ronda 3 — orden de las secciones.** Una prueba nueva con los tres tipos de grupo reprodujo el orden anterior (revisión después de «Sin club asignado»): 3 casos fallaban. Tras la corrección: reglas 14/14, pantalla 5/5 y, en integración, solo la prueba de CSV y Excel cuya expectativa cambió, 1/1. Tipos y lint sin errores.
+- **Revisión visual de la pantalla** con la API real contra la base desechable y datos sintéticos (incluidos nombres largos), en escritorio (1280 px) y a 375 px: columna «Nadadores», plantel ordenado, diálogo de fechas (rechazo por superposición, guardado válido, fechas futuras y HASTA anterior a DESDE), reporte con la revisión diferenciada, «Sin club asignado» como última sección, totales separados, botones de exportación accesibles y sin desplazamiento horizontal.
+- **Revisión visual del PDF** sintético con un visor que renderiza las páginas como imagen: antes de la corrección, superposiciones; después, sin recortes, con tildes y Ñ, encabezados de continuación y el orden definitivo de las secciones.
+
+**Limitaciones**
+
+- Si un único texto (un nombre o un encabezado) midiera más que una página útil del PDF, se colocaría solo en una página nueva sin encabezado de continuación y podría exceder el área útil. No se comprobó si ocurre con datos reales.
+- La validación es local: no hubo validación en producción, que no tiene estos cambios.
+- La tabla de Clubes ya desbordaba a 1280 px antes de esta entrega; la columna «Nadadores» la ensancha.
+- Eliminar una persona no finaliza sus membresías: el listado general de asignaciones sin `orden` puede seguir mostrándola; el plantel ordenado, la columna «Nadadores» y el reporte la excluyen.
+- El comparador de Reportes que se reutiliza pone a quien no tiene apellido materno después de quien sí lo tiene; el de los paneles de inscripción, antes. Es una diferencia anterior a esta entrega.
+
 ## Inventario completo de endpoints
 
-**135 endpoints**, agrupados por el módulo que los declara. Esta lista no está
+**138 endpoints**, agrupados por el módulo que los declara. Esta lista no está
 escrita a mano: `backend/tests/documentacion.test.ts` la compara con las rutas que
 el código declara y **falla si alguna sobra o falta**. Además comprueba que
 ninguna ruta fuera de las públicas se quede sin guardia, y que el permiso exacto
@@ -2053,6 +2100,8 @@ fuera de producción o con `ENABLE_SWAGGER=true`.
 | GET | `/reports/registrations/export` |
 | GET | `/reports/registrations/clubs` |
 | GET | `/reports/clubs-summary` |
+| GET | `/reports/clubes-y-nadadores` |
+| GET | `/reports/clubes-y-nadadores/export` |
 
 ### `swimmer-assignment`
 
@@ -2063,6 +2112,7 @@ fuera de producción o con `ENABLE_SWAGGER=true`.
 | GET | `/swimmer-assignments/:id` |
 | POST | `/swimmer-assignments/:id/approve` |
 | POST | `/swimmer-assignments/:id/end` |
+| PUT | `/swimmer-assignments/:id/fechas` |
 | POST | `/swimmer-assignments/:id/reject` |
 | POST | `/swimmer-assignments/bulk-assign` |
 | GET | `/swimmer-assignments/current-club/:personId` |

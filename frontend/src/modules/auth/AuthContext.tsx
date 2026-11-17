@@ -782,3 +782,12 @@ export function useAuth(): AuthContextValue {
   if (!ctx) throw new Error("useAuth debe usarse dentro de <AuthProvider>");
   return ctx;
 }
+
+/**
+ * ¿La sesión vigente tiene este rol? Para mostrar u ocultar un control dentro de una sección que
+ * también se monta suelta. FALLA CERRADO: fuera de `<AuthProvider>` responde `false`, nunca
+ * concede. Ocultar el control no es la protección: el servidor exige el rol.
+ */
+export function useTieneRol(role: string): boolean {
+  return useContext(AuthContext)?.hasRole(role) ?? false;
+}

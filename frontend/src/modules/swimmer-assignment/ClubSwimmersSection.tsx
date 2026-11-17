@@ -7,6 +7,8 @@ import { Dialogo } from "../../shared/Dialogo";
 import { BajaDeMembresiaDialog } from "./BajaDeMembresiaDialog";
 import { PanelDeActivacion } from "./PanelDeActivacion";
 import { useBusquedaDePersonas } from "../../shared/useBusquedaDePersonas";
+import { useTieneRol } from "../auth/AuthContext";
+import { EdicionDeFechasDialog } from "./EdicionDeFechasDialog";
 
 /** Filas por página de la tabla. El pie de página usa este mismo número. */
 const TAMANO_DE_PAGINA = 20;
@@ -136,11 +138,15 @@ interface ClubSwimmersSectionProps {
  */
 type DialogoDelPlantel =
   | { tipo: "asignar"; persona: { id: string; fullName: string; run: string } }
-  | { tipo: "baja"; membresia: ClubSwimmerAssignment };
+  | { tipo: "baja"; membresia: ClubSwimmerAssignment }
+  /** Corrección de DESDE (solo administración). `clubId`: el club de la vista donde se abrió. */
+  | { tipo: "fechas"; membresia: ClubSwimmerAssignment; clubId: string };
 
 export function ClubSwimmersSection({ clubId, clubName }: ClubSwimmersSectionProps) {
   const api = useSwimmerAssignmentApi();
   const personsApi = usePersonsApi();
+  /** Corregir fechas es exclusivo de administración: poder abrir la ficha del club no basta. */
+  const esAdministracion = useTieneRol("admin");
   const [assignments, setAssignments] = useState<ClubSwimmerAssignment[]>([]);
   const [total, setTotal] = useState(0);
   const [pageSize, setPageSize] = useState(TAMANO_DE_PAGINA);
@@ -333,7 +339,9 @@ export function ClubSwimmersSection({ clubId, clubName }: ClubSwimmersSectionPro
     setCargando(true);
 
     api
-      .list({ clubId, status: "active", page, pageSize: TAMANO_DE_PAGINA })
+      // Orden predeterminado: apellido paterno, materno y nombre, resuelto en el servidor sobre
+      // TODO el plantel antes de paginar (una página no se reordena sola contra las demás).
+      .list({ clubId, status: "active", orden: "apellidos", page, pageSize: TAMANO_DE_PAGINA })
       .then((crudo) => {
         if (!aplicable(vigente, claveDeEstaPeticion)) return;
 
@@ -450,6 +458,13 @@ export function ClubSwimmersSection({ clubId, clubName }: ClubSwimmersSectionPro
     setMessage(null);
     setErrorDeDialogo(null);
     setDialogo({ tipo: "baja", membresia: a });
+  }
+
+  function abrirFechas(a: ClubSwimmerAssignment) {
+    if (accionEnCurso) return;
+    setError(null);
+    setMessage(null);
+    setDialogo({ tipo: "fechas", membresia: a, clubId });
   }
 
   /** Baja con la fecha ELEGIDA en el diálogo. Atada al club donde empezó. */
@@ -619,6 +634,16 @@ export function ClubSwimmersSection({ clubId, clubName }: ClubSwimmersSectionPro
                 >
                   Finalizar membresía
                 </button>
+                {esAdministracion && (
+                  <button
+                    className="btn-secondary"
+                    style={{ padding: "0.2rem 0.6rem", fontSize: "0.8rem", marginLeft: "0.4rem" }}
+                    onClick={() => abrirFechas(a)}
+                    disabled={cargando || accionEnCurso}
+                  >
+                    Corregir fechas
+                  </button>
+                )}
               </td>
             </tr>
           ))}
@@ -691,6 +716,21 @@ export function ClubSwimmersSection({ clubId, clubName }: ClubSwimmersSectionPro
           error={errorDeDialogo}
           onCancelar={() => setDialogo(null)}
           onConfirmar={(datos) => void confirmarBaja(dialogo.membresia, datos)}
+        />
+      )}
+
+      {dialogo?.tipo === "fechas" && (
+        <EdicionDeFechasDialog
+          membresia={{ ...dialogo.membresia, club: dialogo.membresia.club ?? { id: clubId, name: nombreDelClub } }}
+          hoy={hoyEnSantiago()}
+          onCancelar={() => setDialogo(null)}
+          onGuardado={() => {
+            // Una respuesta que llega con otro club en pantalla no escribe sobre él.
+            if (clubVigenteRef.current !== dialogo.clubId) return;
+            setDialogo(null);
+            setMessage("Fechas de pertenencia corregidas.");
+            recargar();
+          }}
         />
       )}
     </div>

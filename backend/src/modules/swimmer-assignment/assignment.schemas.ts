@@ -97,6 +97,31 @@ export const endAssignmentSchema = z
   .strict();
 export type EndAssignmentInput = z.infer<typeof endAssignmentSchema>;
 
+const fechaDePertenenciaField = (campo: string) =>
+  z
+    .string({ error: `${campo}: use el formato AAAA-MM-DD` })
+    .trim()
+    .regex(FORMATO_FECHA_CALENDARIO, `${campo}: use el formato AAAA-MM-DD (fecha de calendario, sin hora)`)
+    .refine(esFechaCalendarioValida, `${campo}: esa fecha no existe`);
+
+/**
+ * Corrección administrativa de las fechas de PERTENENCIA de una membresía (DESDE y HASTA).
+ *
+ * Un campo OMITIDO no cambia. No se admite `null`: corregir no borra una fecha conocida, y una
+ * fecha desconocida solo deja de serlo cuando administración la indica. `fechaTermino` solo se
+ * acepta en una membresía finalizada (lo comprueba el servicio): en una activa la pone la baja.
+ * Al menos uno de los dos campos es obligatorio.
+ */
+export const editarFechasSchema = z
+  .object({
+    startDate: fechaDePertenenciaField("DESDE").optional(),
+    fechaTermino: fechaDePertenenciaField("HASTA").optional(),
+    aceptarHistorialIncompleto: z.boolean().optional(),
+  })
+  .strict()
+  .refine((v) => v.startDate !== undefined || v.fechaTermino !== undefined, { message: "Indique DESDE o HASTA" });
+export type EditarFechasInput = z.infer<typeof editarFechasSchema>;
+
 export const rejectAssignmentSchema = z.object({
   reason: z.string().trim().max(500).optional(),
 });
@@ -106,6 +131,12 @@ export const assignmentListQuerySchema = z.object({
   clubId: uuidField().optional(),
   personId: uuidField().optional(),
   status: z.enum(["pending", "active", "rejected", "ended"]).optional(),
+  /**
+   * Orden del listado. Sin indicar: el de siempre (más recientes primero). `apellidos`: apellido
+   * paterno, apellido materno y nombre (`compararNadadores` de Reportes), aplicado ANTES de
+   * paginar. Lo usa el plantel de Editar Club.
+   */
+  orden: z.enum(["apellidos"]).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });

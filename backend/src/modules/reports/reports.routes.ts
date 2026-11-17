@@ -1,7 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import * as reportsService from "./reports.service";
 import * as resumenPorClub from "./resumenPorClub.service";
-import { competenciaDelReporteQuerySchema, registrationsReportQuerySchema, resumenPorClubQuerySchema } from "./reports.schemas";
+import * as clubesYNadadores from "./clubesYNadadores.service";
+import * as clubesYNadadoresReglas from "./clubesYNadadores.rules";
+import { competenciaDelReporteQuerySchema, exportFormatSchema, registrationsReportQuerySchema, resumenPorClubQuerySchema } from "./reports.schemas";
 import { requireAuth, requirePermission, requireRole } from "../auth/rbac.middleware";
 import { requireFuncion } from "../accesos/accesos.middleware";
 import { ValidationError } from "../../shared/errors";
@@ -39,6 +41,42 @@ export async function reportsRoutes(app: FastifyInstance) {
     const parsed = resumenPorClubQuerySchema.safeParse(req.query);
     if (!parsed.success) throw new ValidationError("Parámetros de filtro inválidos", parsed.error.flatten());
     reply.send(await resumenPorClub.obtenerResumenPorClub(parsed.data.competitionId, buildActorContext(req), parsed.data.edadMinima));
+  });
+
+  /**
+   * Reporte GENERAL «Clubes y nadadores»: pertenencia vigente, independiente de las competencias
+   * (no recibe ni consulta ninguna). Exclusivo de administración en ambas rutas, con el mismo
+   * doble control que el resumen por club. La exportación genera el archivo completo antes de
+   * auditar.
+   */
+  app.get("/reports/clubes-y-nadadores", { preHandler: [requirePermission("reports:read"), requireRole("admin")] }, async (req, reply) => {
+    reply.send(await clubesYNadadores.obtenerClubesYNadadores(buildActorContext(req)));
+  });
+
+  app.get("/reports/clubes-y-nadadores/export", { preHandler: [requirePermission("reports:read"), requireRole("admin")] }, async (req, reply) => {
+    const parsed = exportFormatSchema.safeParse(req.query);
+    if (!parsed.success) throw new ValidationError("Formato de exportación inválido (use csv, xlsx o pdf)", parsed.error.flatten());
+    const { format } = parsed.data;
+    const reporte = await clubesYNadadores.obtenerClubesYNadadores(buildActorContext(req));
+    const body =
+      format === "csv"
+        ? clubesYNadadoresReglas.csvDelReporte(reporte)
+        : format === "xlsx"
+          ? await clubesYNadadores.xlsxDelReporte(reporte)
+          : await clubesYNadadores.pdfDelReporte(reporte);
+    await audit({
+      userId: req.authUser!.sub,
+      action: "REPORT_EXPORTED",
+      entityType: "Report",
+      entityId: "clubes-y-nadadores",
+      ipAddress: req.ip,
+      after: { format, reporte: "clubes-y-nadadores", ...reporte.totales },
+    });
+    const CONTENT_TYPES = { csv: "text/csv; charset=utf-8", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", pdf: "application/pdf" } as const;
+    reply
+      .header("Content-Type", CONTENT_TYPES[format])
+      .header("Content-Disposition", `attachment; filename="${clubesYNadadores.NOMBRE_DE_ARCHIVO}.${format}"`)
+      .send(body);
   });
 
   app.get("/reports/registrations/export", { preHandler: [requirePermission("reports:read"), requireFuncion("reportes.exportar")] }, async (req, reply) => {

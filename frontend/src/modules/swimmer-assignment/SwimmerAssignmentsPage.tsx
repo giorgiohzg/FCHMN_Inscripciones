@@ -8,6 +8,8 @@ import { formatearFechaCalendario, hoyEnSantiago } from "../../shared/fechaCalen
 import { BajaDeMembresiaDialog } from "./BajaDeMembresiaDialog";
 import { PanelDeActivacion } from "./PanelDeActivacion";
 import { useOperacionUnica } from "../../shared/useOperacionUnica";
+import { useTieneRol } from "../auth/AuthContext";
+import { EdicionDeFechasDialog } from "./EdicionDeFechasDialog";
 
 const STATUS_LABELS: Record<AssignmentStatus, string> = { pending: "Pendiente", active: "Activo", rejected: "Rechazado", ended: "Finalizado" };
 const STATUS_BADGE: Record<AssignmentStatus, string> = { pending: "badge-locked", active: "badge-active", rejected: "badge-disabled", ended: "badge-disabled" };
@@ -24,10 +26,13 @@ function terminoDePertenencia(a: Pick<ClubSwimmerAssignment, "status" | "fechaTe
 type Accion =
   | { tipo: "aprobar"; a: ClubSwimmerAssignment }
   | { tipo: "rechazar"; a: ClubSwimmerAssignment }
-  | { tipo: "baja"; a: ClubSwimmerAssignment };
+  | { tipo: "baja"; a: ClubSwimmerAssignment }
+  | { tipo: "fechas"; a: ClubSwimmerAssignment };
 
 export function SwimmerAssignmentsPage() {
   const api = useSwimmerAssignmentApi();
+  /** Corregir DESDE/HASTA es exclusivo de administración, aunque otros roles vean esta lista. */
+  const esAdministracion = useTieneRol("admin");
   const [status, setStatus] = useState<AssignmentStatus | "">("pending");
   const [data, setData] = useState<{ items: ClubSwimmerAssignment[]; total: number; page: number; pageSize: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -204,6 +209,11 @@ export function SwimmerAssignmentsPage() {
                             Finalizar membresía
                           </button>
                         )}
+                        {esAdministracion && (a.status === "active" || a.status === "ended") && (
+                          <button className="btn-secondary" onClick={() => abrir({ tipo: "fechas", a })} disabled={enviando}>
+                            Corregir fechas
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -307,6 +317,19 @@ export function SwimmerAssignmentsPage() {
           error={errorDeAccion}
           onCancelar={cerrar}
           onConfirmar={(datos) => void ejecutar(() => api.end(accion.a.id, datos), `Baja registrada: ${accion.a.person.fullName} deja ${accion.a.club.name}.`)}
+        />
+      )}
+
+      {accion?.tipo === "fechas" && (
+        <EdicionDeFechasDialog
+          membresia={accion.a}
+          hoy={hoy}
+          onCancelar={() => setAccion(null)}
+          onGuardado={() => {
+            setAccion(null);
+            setMensaje(`Fechas corregidas: ${accion.a.person.fullName} en ${accion.a.club.name}.`);
+            void load();
+          }}
         />
       )}
     </AppShell>

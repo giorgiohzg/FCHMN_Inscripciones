@@ -131,6 +131,37 @@ export interface ResumenPorClub {
   totales: TotalesResumen;
 }
 
+/**
+ * Reporte GENERAL «Clubes y nadadores» (exclusivo de administración), independiente de las
+ * competencias. Solo nombres: sin RUN, nacimiento ni correo. `nombre` ya viene presentado por el
+ * servidor (el mismo texto que las exportaciones).
+ */
+export interface NadadorDelReporteGeneral {
+  personId: string;
+  nombre: string;
+}
+export interface GrupoDeClubGeneral {
+  clubId: string;
+  clubName: string;
+  sigla: string;
+  estado: "active" | "locked" | "disabled";
+  nadadores: NadadorDelReporteGeneral[];
+}
+/** Club ELIMINADO con personas que aún tienen en él su membresía activa (sección de revisión). */
+export interface GrupoDeRevisionGeneral {
+  clubId: string;
+  clubName: string;
+  sigla: string;
+  personas: NadadorDelReporteGeneral[];
+}
+export interface ReporteClubesYNadadores {
+  clubes: GrupoDeClubGeneral[];
+  sinClub: NadadorDelReporteGeneral[];
+  /** Vacía si no hay ninguna. Esas personas no se cuentan con club ni como sin club. */
+  revision: GrupoDeRevisionGeneral[];
+  totales: { clubes: number; nadadoresConClub: number; sinClub: number; enClubesEliminados: number };
+}
+
 function buildQs(filters: ReportFilters, extra: Record<string, string> = {}) {
   const qs = new URLSearchParams();
   qs.set("competitionId", filters.competitionId);
@@ -161,6 +192,13 @@ export function useReportsApi() {
     /** Descarga el archivo exportado directamente en el navegador. */
     downloadExport: (filters: ReportFilters, format: "csv" | "xlsx" | "pdf") =>
       descargarArchivo(`/reports/registrations/export?${buildQs(filters, { format })}`, `reporte.${format}`),
+
+    /** Clubes y nadadores (pertenencia vigente). Solo administración (el servidor lo exige). */
+    getClubesYNadadores: () => api.get<ReporteClubesYNadadores>("/reports/clubes-y-nadadores"),
+
+    /** Exportación COMPLETA de Clubes y nadadores, generada en el servidor. */
+    downloadClubesYNadadores: (format: "csv" | "xlsx" | "pdf") =>
+      descargarArchivo(`/reports/clubes-y-nadadores/export?${new URLSearchParams({ format })}`, `Clubes_y_nadadores.${format}`),
 
     /** Descarga el ZIP para Team Manager, con un .CL2 y un .HY3 (Módulo 11). */
     downloadTeamManagerExport: (competitionId: string, clubId: string) =>

@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../shared/prisma.client";
 import { audit } from "../audit/audit.service";
 import { AppError, ForbiddenError, ValidationError, NotFoundError } from "../../shared/errors";
@@ -8,14 +8,17 @@ import type { Db, TxOption } from "../../shared/transaction";
 import type { DirectAssignmentInput, AssignmentListQuery } from "./assignment.schemas";
 import { fechaCalendarioAUtc, hoyEnZonaDelNegocio } from "../../shared/fecha.util";
 import {
+  bloquearHistorialDePersona,
   bloquearMembresiasDePersona,
   decidirActivacion,
   ErrorDeMembresia,
+  evaluarFechasCorregidas,
   fechaEfectivaValida,
   finalizarPorTraslado,
   historialDePersona,
   type OpcionesDeActivacion,
 } from "./membresias.protocolo";
+import { compararNadadores } from "../reports/reports.rules";
 
 
 /**
@@ -151,6 +154,8 @@ export async function listAssignments(query: AssignmentListQuery, restrictToClub
   if (query.status) where.status = query.status;
   if (restrictToClubId !== undefined) where.clubId = restrictToClubId ?? "__sin_club_real__";
 
+  if (query.orden === "apellidos") return listarPorApellidos(where, query.page, query.pageSize);
+
   const [items, total] = await Promise.all([
     prisma.clubSwimmer.findMany({
       where,
@@ -167,6 +172,61 @@ export async function listAssignments(query: AssignmentListQuery, restrictToClub
   ]);
 
   return { items, total, page: query.page, pageSize: query.pageSize };
+}
+
+const INCLUDE_DEL_LISTADO = {
+  club: { select: { id: true, name: true } },
+  person: { select: { id: true, fullName: true, run: true } },
+} as const;
+
+/**
+ * Orden por APELLIDOS, aplicado ANTES de paginar (plantel de Editar Club).
+ *
+ * Reutiliza `compararNadadores` de Reportes —apellido paterno, materno y nombre con colación en
+ * español sin distinguir mayúsculas ni tildes; los registros históricos sin apellido paterno van
+ * al final por su nombre completo almacenado, sin inventar apellidos; desempatan el RUN y el id
+ * de la persona—, y como último desempate el id de la membresía. Hacerlo en SQL exigiría otra
+ * colación que no es la misma que la de Reportes.
+ *
+ * PLANTEL VIGENTE: excluye a las personas ELIMINADAS antes de ordenar y paginar, igual que la
+ * columna «Nadadores» de Clubes (`contarNadadoresActivos`), para que total y conteo coincidan. No
+ * toca sus membresías: siguen como estén en el historial administrativo.
+ *
+ * DOS LECTURAS, UNA INSTANTÁNEA: primero los campos de orden de todas las filas que cumplen el
+ * filtro; luego las filas completas de la página, con el MISMO filtro y alcance más los ids de la
+ * página. Ambas van en una transacción `REPEATABLE READ` de solo lectura, así que ven el mismo
+ * momento: un cambio confirmado entre medias no las descuadra. Si aun así faltara una fila, se
+ * rechaza la respuesta en vez de entregar una página corta en silencio.
+ */
+async function listarPorApellidos(where: Prisma.ClubSwimmerWhereInput, page: number, pageSize: number) {
+  const vigentes: Prisma.ClubSwimmerWhereInput = { AND: [where, { person: { deletedAt: null } }] };
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SET TRANSACTION READ ONLY`;
+      const claves = await tx.clubSwimmer.findMany({
+        where: vigentes,
+        select: {
+          id: true,
+          person: { select: { id: true, run: true, fullName: true, firstName: true, paternalLastName: true, maternalLastName: true } },
+        },
+      });
+      const ordenadas = claves
+        .map((c) => ({ id: c.id, persona: { ...c.person, personId: c.person.id } }))
+        .sort((a, b) => compararNadadores(a.persona, b.persona) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      const idsDeLaPagina = ordenadas.slice((page - 1) * pageSize, page * pageSize).map((c) => c.id);
+      const filas =
+        idsDeLaPagina.length > 0
+          ? await tx.clubSwimmer.findMany({ where: { AND: [vigentes, { id: { in: idsDeLaPagina } }] }, include: INCLUDE_DEL_LISTADO })
+          : [];
+      const porId = new Map(filas.map((f) => [f.id, f]));
+      const items = idsDeLaPagina.map((id) => porId.get(id));
+      if (items.some((f) => f === undefined)) {
+        throw new Error("El plantel cambió entre las dos lecturas de una misma instantánea: lectura incoherente.");
+      }
+      return { items: items as (typeof filas)[number][], total: ordenadas.length, page, pageSize };
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30_000 }
+  );
 }
 
 export async function getAssignmentById(id: string) {
@@ -256,6 +316,20 @@ export async function assignSwimmerDirectly(
  * `"none"` (muestra los que no tienen ningún club activo asignado) — es
  * el filtro que alimenta la pantalla de asignación masiva.
  */
+/**
+ * Personas ASIGNABLES SIN CLUB: TODAS las no eliminadas, con cuenta activa y sin ninguna membresía
+ * activa. Sin exigir el rol `swimmer`, que es derivado (ver `listSwimmersByClubFilter`), ni un
+ * historial previo. Es el ÚNICO criterio de «Sin club»: lo usan la asignación masiva y el reporte
+ * «Clubes y nadadores» (decisión del usuario).
+ *
+ * El personal de un club (delegado, entrenador, representante legal) no se incluye por ese
+ * vínculo, que no es una membresía; pero si no tiene membresía activa, cumple este criterio y
+ * aparece aquí como cualquier otra persona.
+ */
+export function whereSinClubAsignable(): Prisma.PersonWhereInput {
+  return { deletedAt: null, status: "active", clubAssignments: { none: { status: "active" } } };
+}
+
 export async function listSwimmersByClubFilter(query: { clubFilter: string; search?: string }) {
   const searchWhere = query.search
     ? {
@@ -286,7 +360,7 @@ export async function listSwimmersByClubFilter(query: { clubFilter: string; sear
 
   const where =
     query.clubFilter === "none"
-      ? { ...baseWhere, clubAssignments: { none: { status: "active" as const } } }
+      ? { ...searchWhere, ...whereSinClubAsignable() }
       : { ...baseWhere, clubAssignments: { some: { status: "active" as const, clubId: query.clubFilter } } };
 
   const persons = await prisma.person.findMany({
@@ -602,6 +676,102 @@ export async function endAssignment(
         ipAddress: actor.ipAddress,
         before,
         after: { ...updated, historialIncompletoAceptado },
+      },
+      { tx }
+    );
+    return updated;
+  });
+}
+
+/**
+ * CORRECCIÓN ADMINISTRATIVA DE DESDE Y HASTA (fechas de PERTENENCIA de una membresía).
+ *
+ * Solo corrige fechas: NO cambia el estado (asignar y dar de baja siguen siendo acciones
+ * separadas), ni `end_date` —el instante real de la baja, que no retrocede al corregir HASTA—, ni
+ * las marcas de solicitud, aprobación y creación (`requestedByUserId`, `reviewedByUserId`,
+ * `reviewedAt`, `createdAt`). No toca inscripciones ni competencias.
+ *
+ *  - Activa: solo DESDE. HASTA no existe mientras está activa; lo pone la baja (400).
+ *  - Finalizada: DESDE y HASTA (`fecha_termino`).
+ *  - Pendiente o rechazada: no tiene pertenencia que corregir (409 `MEMBRESIA_NO_EDITABLE`).
+ *  - Ambas fechas, hoy o antes en America/Santiago (400 `FECHA_FUTURA`); HASTA igual o posterior
+ *    a DESDE, el mismo día es válido (400 `HASTA_ANTERIOR_A_DESDE`).
+ *  - Sin superposición con ninguna otra membresía activa o finalizada de la persona, con extremos
+ *    inclusivos (409 `CONFLICTO_DE_FECHAS`). Si una fecha desconocida impide descartarla, 409
+ *    `HISTORIAL_INCOMPLETO`, que solo se supera con `aceptarHistorialIncompleto` (auditado). Una
+ *    fecha desconocida no se completa por inferencia.
+ *
+ * Protocolo común: bloqueo de la persona y de TODAS sus membresías, relectura y evaluación con
+ * las filas bloqueadas, actualización y auditoría en la misma transacción. El permiso
+ * (`swimmer-assignment:approve` + rol `admin`) lo exige la ruta.
+ */
+export async function editarFechasDeMembresia(
+  id: string,
+  input: { startDate?: string; fechaTermino?: string; aceptarHistorialIncompleto?: boolean },
+  actor: ContextoDeAuditoria,
+  opciones?: { ahora?: Date }
+) {
+  const ahora = opciones?.ahora ?? new Date();
+  const hoy = hoyEnZonaDelNegocio(ahora);
+  for (const [campo, valor] of [
+    ["DESDE", input.startDate],
+    ["HASTA", input.fechaTermino],
+  ] as const) {
+    if (valor !== undefined && valor > hoy) {
+      throw new ErrorDeMembresia(400, "FECHA_FUTURA", `${campo} no puede ser posterior a hoy (${hoy}, America/Santiago).`, { hoy });
+    }
+  }
+  const before = await getAssignmentById(id);
+
+  return prisma.$transaction(async (tx) => {
+    const historial = await bloquearHistorialDePersona(tx, before.personId);
+    const actual = historial.find((m) => m.id === id);
+    if (!actual) throw new NotFoundError("Membresía");
+    if (actual.status !== "active" && actual.status !== "ended") {
+      throw new ErrorDeMembresia(409, "MEMBRESIA_NO_EDITABLE", "Solo se corrigen las fechas de membresías activas o finalizadas.");
+    }
+    if (actual.status === "active" && input.fechaTermino !== undefined) {
+      throw new ErrorDeMembresia(400, "TERMINO_EN_ACTIVA", "Una membresía activa no tiene HASTA: su término se registra con la baja de membresía.");
+    }
+
+    const nuevoInicio = input.startDate ?? actual.start_date;
+    const nuevoTermino = input.fechaTermino ?? actual.fecha_termino;
+    if (nuevoInicio === actual.start_date && nuevoTermino === actual.fecha_termino) {
+      throw new ErrorDeMembresia(400, "SIN_CAMBIOS", "Las fechas indicadas son las que ya tiene la membresía.");
+    }
+    if (nuevoInicio !== null && nuevoTermino !== null && nuevoTermino < nuevoInicio) {
+      throw new ErrorDeMembresia(400, "HASTA_ANTERIOR_A_DESDE", `HASTA (${nuevoTermino}) no puede ser anterior a DESDE (${nuevoInicio}).`);
+    }
+
+    const { conflictos, incompletas } = evaluarFechasCorregidas({ ...actual, start_date: nuevoInicio, fecha_termino: nuevoTermino }, historial);
+    if (conflictos.length > 0) {
+      throw new ErrorDeMembresia(409, "CONFLICTO_DE_FECHAS", "Las fechas se superponen con otra membresía del nadador.", { conflictos });
+    }
+    if (incompletas.length > 0 && input.aceptarHistorialIncompleto !== true) {
+      throw new ErrorDeMembresia(
+        409,
+        "HISTORIAL_INCOMPLETO",
+        "El historial del nadador tiene fechas desconocidas y no se puede descartar una superposición. Requiere aceptación administrativa explícita.",
+        { membresias: incompletas }
+      );
+    }
+
+    const updated = await tx.clubSwimmer.update({
+      where: { id },
+      data: {
+        ...(input.startDate !== undefined ? { startDate: fechaCalendarioAUtc(input.startDate) } : {}),
+        ...(input.fechaTermino !== undefined ? { fechaTermino: fechaCalendarioAUtc(input.fechaTermino) } : {}),
+      },
+    });
+    await audit(
+      {
+        userId: actor.userId,
+        action: "SWIMMER_ASSIGNMENT_DATES_CORRECTED",
+        entityType: "ClubSwimmer",
+        entityId: id,
+        ipAddress: actor.ipAddress,
+        before: { startDate: actual.start_date, fechaTermino: actual.fecha_termino, status: actual.status },
+        after: { startDate: nuevoInicio, fechaTermino: nuevoTermino, status: actual.status, historialIncompletoAceptado: incompletas },
       },
       { tx }
     );

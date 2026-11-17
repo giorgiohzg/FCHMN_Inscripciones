@@ -21,7 +21,7 @@ export function ClubsListPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const { sortKey, sortDir, onSort } = useSort<"name" | "code" | "rut" | "pj" | "delegate" | "coach" | "status">();
+  const { sortKey, sortDir, onSort } = useSort<"name" | "code" | "rut" | "pj" | "delegate" | "coach" | "nadadores" | "status">();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,6 +114,7 @@ export function ClubsListPage() {
                 <SortableTh label="Pers. jurídica" sortKey="pj" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
                 <SortableTh label="Delegado(a)" sortKey="delegate" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
                 <SortableTh label="Entrenador(a)" sortKey="coach" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
+                <SortableTh label="Nadadores" sortKey="nadadores" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
                 <SortableTh label="Estado" sortKey="status" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
                 <th>Acciones</th>
               </tr>
@@ -127,6 +128,7 @@ export function ClubsListPage() {
                   case "pj": return PJ_ETIQUETA(c.hasLegalStatus);
                   case "delegate": return c.staff.filter((s) => s.roleType === "delegate").map((s) => s.person.fullName).join(", ") || null;
                   case "coach": return c.staff.filter((s) => s.roleType === "coach").map((s) => s.person.fullName).join(", ") || null;
+                  case "nadadores": return c.nadadores;
                   case "status": return STATUS_LABELS[c.status];
                 }
               }).map((c) => (
@@ -158,6 +160,7 @@ export function ClubsListPage() {
                   </td>
                   <td>{c.staff.filter((s) => s.roleType === "delegate").map((s) => s.person.fullName).join(", ") || "—"}</td>
                   <td>{c.staff.filter((s) => s.roleType === "coach").map((s) => s.person.fullName).join(", ") || "—"}</td>
+                  <td style={{ textAlign: "right" }}>{typeof c.nadadores === "number" ? c.nadadores.toLocaleString("es-CL") : "—"}</td>
                   <td>
                     <span className={`badge ${STATUS_BADGE[c.status]}`}>{STATUS_LABELS[c.status]}</span>
                   </td>
@@ -177,7 +180,7 @@ export function ClubsListPage() {
               ))}
               {data.items.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", color: "var(--brand-gray-600)", padding: "1.5rem" }}>
+                  <td colSpan={9} style={{ textAlign: "center", color: "var(--brand-gray-600)", padding: "1.5rem" }}>
                     No se encontraron clubes con los filtros aplicados.
                   </td>
                 </tr>
