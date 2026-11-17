@@ -1840,9 +1840,9 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
 | GET | `/accesos-por-rol` | Configuración vigente, versión, última modificación y catálogo para la pantalla | Rol `admin` |
 | PUT | `/accesos-por-rol` | Guarda el estado completo con la versión leída; 409 si cambió | Rol `admin` |
 
-### Clubes y nadadores, orden del plantel y edición de fechas (estado: publicada en el repositorio y validada localmente; pendiente de despliegue y actualización del entorno local)
+### Clubes y nadadores, orden del plantel y edición de fechas (estado: publicada y desplegada en API y web; entorno local actualizado, dentro del alcance validado)
 
-> **Estado:** **publicada en el repositorio y validada localmente; pendiente de despliegue y actualización del entorno local.** Producción y el entorno local de ejecución todavía no tienen estos cambios. **No hubo cambios de esquema ni migraciones.**
+> **Estado:** **publicada y desplegada en API y web; entorno local actualizado, dentro del alcance validado.** El código desplegado es el commit `d516c7fb832f866e1887984ec78f5c0150c88dab`; la CI del código (`44103518434`) terminó en éxito. **No hubo cambios de esquema, migraciones, seed ni variables nuevas.** No hubo validación funcional autenticada de estas mejoras en producción (ver «Limitaciones»). *Antecedente:* entre la publicación y el despliegue, este estado decía «publicada en el repositorio y validada localmente; pendiente de despliegue y actualización del entorno local».
 
 **Qué incluye**
 
@@ -1862,7 +1862,7 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
   - **sin cambios automáticos de estado:** corregir fechas no asigna ni da de baja, no retrocede `endDate` (el instante real de la baja), no cambia las marcas de solicitud, aprobación y creación ni toca inscripciones o competencias;
   - protocolo de C-05: bloqueo de la persona y de todas sus membresías, reevaluación con las filas bloqueadas, actualización y auditoría (`SWIMMER_ASSIGNMENT_DATES_CORRECTED`) en la misma transacción.
 
-**Validación** (rondas separadas; ninguna fue una ejecución completa de todas las suites). Todo con datos sintéticos; la integración, solo contra la base desechable de `docker-compose.test.yml`.
+**Pruebas funcionales locales previas al despliegue** (rondas separadas; ninguna fue una ejecución completa de todas las suites). Todo con datos sintéticos; la integración, solo contra la base desechable de `docker-compose.test.yml`.
 
 - **Ronda 1 — implementación.**
   - Backend, unitarias del área (12 archivos, 2 nuevos): 447/447. Integración: el archivo nuevo y 5 existentes del área, 222/222.
@@ -1873,13 +1873,44 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
   - Reglas del reporte y de fechas: 17/17. Archivo de integración: 22/22, con intercalados deterministas (una asignación confirmada durante la lectura del reporte; una baja entre las dos lecturas del plantel). Contraprueba con `READ COMMITTED`: la persona quedaba omitida y el plantel respondía 500; ambos fallos detectados. Frontend del reporte: 11/11.
   - PDF: se reprodujo primero el defecto (nombres y encabezados largos se partían y se superponían con la línea siguiente) y luego se corrigió con la paginación por altura real.
 - **Ronda 3 — orden de las secciones.** Una prueba nueva con los tres tipos de grupo reprodujo el orden anterior (revisión después de «Sin club asignado»): 3 casos fallaban. Tras la corrección: reglas 14/14, pantalla 5/5 y, en integración, solo la prueba de CSV y Excel cuya expectativa cambió, 1/1. Tipos y lint sin errores.
+**Revisión visual previa** (local, datos sintéticos):
+
 - **Revisión visual de la pantalla** con la API real contra la base desechable y datos sintéticos (incluidos nombres largos), en escritorio (1280 px) y a 375 px: columna «Nadadores», plantel ordenado, diálogo de fechas (rechazo por superposición, guardado válido, fechas futuras y HASTA anterior a DESDE), reporte con la revisión diferenciada, «Sin club asignado» como última sección, totales separados, botones de exportación accesibles y sin desplazamiento horizontal.
 - **Revisión visual del PDF** sintético con un visor que renderiza las páginas como imagen: antes de la corrección, superposiciones; después, sin recortes, con tildes y Ñ, encabezados de continuación y el orden definitivo de las secciones.
+
+**CI.** La ejecución `44103518434` corresponde al SHA exacto `d516c7f` (push en `main`, primer intento) y terminó en éxito: backend (tipos, lint, unitarias, migraciones sobre la base desechable e integración), frontend (tipos, lint, pruebas y build de producción) y la comprobación de derivados (avisos y Dockerfile de mantenimiento).
+
+**Despliegue y comprobaciones operativas** (17-11-2026; Render en GMT-3, horas con `Z` en UTC). Son comprobaciones de disponibilidad y cabeceras sin credenciales, distintas de las pruebas funcionales de arriba.
+
+- **Antes de operar:** API, web y mantenimiento estaban en `430c4cb`, Live (API y web), sin operaciones en curso y con Auto-Deploy `Off` en los tres.
+- **Respaldo previo:** se creó una exportación lógica nueva en la página Recovery (la fila apareció con hora de panel 12:25, 15:25Z; su archivo se observó disponible a las 15:27Z) y se descargó al destino privado establecido, sin sobrescribir copias anteriores. Se comprobó la integridad del gzip y se listaron sus entradas (46). **No se probó su restauración.**
+- **Producción** (despliegue manual del commit exacto, Auto-Deploy `Off`; primero la API y, tras comprobarla, la web):
+
+  | Servicio | Versión | Despliegue | Inicio (panel) | Duración mostrada | Observado |
+  |---|---|---|---|---|---|
+  | `fchmn-api` | `430c4cb` → `d516c7f` | `dep-dbu75l3l550s73a4tf2g` | 12:29:24 (15:29:24Z) | 45,1 s | Deploy succeeded y Live a las 15:30:43Z |
+  | `fchmn-web` | `430c4cb` → `d516c7f` | `dep-dbu76nm7bikc738gdca0` | 12:31:42 (15:31:42Z) | 40,3 s | Deploy succeeded y Live a las 15:32:51Z |
+
+  Las horas «observado» son las de la lectura del panel, no el instante en que cada servicio pasó a Live.
+- **Mantenimiento:** sin operaciones (sin construcción ni ejecución). Sigue en `430c4cb`, con Docker Command vacío, la misma programación y Auto-Deploy `Off`; su historial seguía en 30 ejecuciones antes y después. Su imagen solo contiene esquema, migraciones y seeds, que no cambiaron.
+- **Disponibilidad, muestras registradas.** 13 muestras sin credenciales cada ~30 s, de 15:28:36Z a 15:35:06Z, contra la web pública: en todas, `/login`, `/api/health` y `/api/ready` respondieron 200. La ruta nueva `/api/reports/clubes-y-nadadores` respondió 404 (API anterior) hasta la muestra de 15:29:42Z y 401 desde la de 15:30:15Z; el paquete de la web fue el anterior hasta la muestra de 15:32:23Z y el nuevo desde la de 15:32:55Z. Cada cambio ocurrió dentro de esa ventana entre muestras, sin instante exacto; fuera de las muestras no hay observaciones, y estas no acreditan disponibilidad en los intervalos entre ellas ni después de 15:35:06Z.
+- **Comprobaciones puntuales:**
+  - API (15:30:51Z): `/api/health` y `/api/ready` 200; `/api/reports/clubes-y-nadadores`, su exportación y `PUT /swimmer-assignments/:id/fechas` respondieron 401 sin credenciales, con `Cache-Control: no-store`.
+  - Web (15:33:00Z): `/login` 200 con `Cache-Control: no-store`, CSP con `connect-src 'self'` y sin `localhost`, `Strict-Transport-Security: max-age=31536000; includeSubDomains`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` y `Referrer-Policy: no-referrer`. El paquete nuevo respondió 200 con caché inmutable y contiene la ruta del reporte; el paquete anterior respondió 404; `/api/auth/me` sin credenciales, 401.
+- **Entorno local, en el mismo procedimiento:**
+  - Las imágenes candidatas se construyeron desde una **copia limpia** del SHA exacto (exportación del commit, verificada contra él), no desde el árbol del checkout principal: backend `5286b6fe5d0b` y frontend `84a51a22a14f`, con `VITE_API_URL=http://localhost:3000`. No hizo falta el certificado corporativo como secreto de construcción.
+  - Las imágenes anteriores se conservan para reversión como `prev-20261117-430c4cb` (backend `285cf187b915`, frontend `ff2796c5ff92`); las candidatas pasaron a `latest`.
+  - Se recrearon solo backend y frontend sin construir (`docker compose up -d --no-build backend frontend`). PostgreSQL arrancó con el mismo contenedor y el mismo volumen de datos; no se activó el perfil de mantenimiento ni se ejecutaron migraciones o seed.
+  - Los tres servicios quedaron sanos; la API respondió 200 en `/health` y `/ready` y 401 en la ruta nueva; la web respondió 200 con un paquete que incluye la ruta. Al terminar, los tres servicios quedaron **detenidos**, como estaban.
+- **Team Manager:** su corrección pendiente quedó excluida de esta entrega y preservada en el checkout principal, sin cambios. Durante este procedimiento no hubo exportaciones reales ni validación en Meet Manager.
+- **Reversión del código:** en Render, volver a los despliegues anteriores de `430c4cb`, primero la web y luego la API; en local, volver a etiquetar `prev-20261117-430c4cb` como `latest` y recrear backend y frontend sin construir. Como no hubo cambios de esquema, no hace falta revertir la base. La reversión del código **no deshace** las operaciones que los usuarios hayan guardado entretanto (por ejemplo, fechas de pertenencia corregidas).
 
 **Limitaciones**
 
 - Si un único texto (un nombre o un encabezado) midiera más que una página útil del PDF, se colocaría solo en una página nueva sin encabezado de continuación y podría exceder el área útil. No se comprobó si ocurre con datos reales.
-- La validación es local: no hubo validación en producción, que no tiene estos cambios.
+- No hubo validación funcional autenticada de estas mejoras en producción; queda pendiente la revisión del usuario. Las respuestas 401 solo acreditan el rechazo sin credenciales: no validan los permisos de usuarios autenticados, los cálculos ni las exportaciones.
+- No se afirma identidad binaria entre las imágenes de Render y las locales. El paquete web local y el de producción tienen nombres distintos; la URL de API compilada es distinta y puede explicarlo, pero no se comprobó que sea la única causa.
+- No se afirma la ausencia de escrituras en la base durante el despliegue: no se revisó la actividad de los usuarios.
 - La tabla de Clubes ya desbordaba a 1280 px antes de esta entrega; la columna «Nadadores» la ensancha.
 - Eliminar una persona no finaliza sus membresías: el listado general de asignaciones sin `orden` puede seguir mostrándola; el plantel ordenado, la columna «Nadadores» y el reporte la excluyen.
 - El comparador de Reportes que se reutiliza pone a quien no tiene apellido materno después de quien sí lo tiene; el de los paneles de inscripción, antes. Es una diferencia anterior a esta entrega.
