@@ -45,6 +45,8 @@ const NAV_ITEMS: ItemDeMenu[] = [
   { to: "/auditoria", label: "Auditoría", icon: AuditIcon, roles: ["admin"] },
   // Accesos por rol: exclusiva de administración.
   { to: "/administracion/accesos", label: "Accesos por rol", icon: AuditIcon, roles: ["admin"] },
+  // Mensaje bajo «Ingresar» en el login: exclusiva de administración.
+  { to: "/administracion/mensaje-de-acceso", label: "Mensaje del login", icon: AuditIcon, roles: ["admin"] },
 ];
 
 /**

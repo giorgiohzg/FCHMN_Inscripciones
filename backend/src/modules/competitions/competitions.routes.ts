@@ -83,8 +83,8 @@ export async function competitionsRoutes(app: FastifyInstance) {
 
   app.delete("/competitions/:id", { preHandler: [requirePermission("competitions:write")] }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    await competitionsService.deleteCompetition(id, { userId: req.authUser!.sub, ipAddress: req.ip });
-    reply.code(204).send();
+    // 200 con lo eliminado (antes 204 sin cuerpo): la interfaz informa los recuentos reales.
+    reply.code(200).send(await competitionsService.deleteCompetition(id, { userId: req.authUser!.sub, ipAddress: req.ip }));
   });
 
   app.post("/competitions/:id/duplicate", { preHandler: [requirePermission("competitions:write")] }, async (req, reply) => {

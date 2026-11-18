@@ -18,6 +18,8 @@ import { sortBySessionTypeName } from "../../shared/sessionOrder";
 import { CircledNumber } from "../../shared/CircledNumber";
 import { usePoolsApi, type Pool } from "../pools/poolsApi";
 import { useAuth } from "../auth/AuthContext";
+import { advertenciaDeEliminacion, comprobarEstadoDeCompetencia, eliminarYConfirmar, mensajeDeEliminacion, type MensajeDeEliminacion } from "./eliminacionDeCompetencia";
+import { useOperacionUnica } from "../../shared/useOperacionUnica";
 
 const COURSE_LENGTH_LABELS: Record<"short_25m" | "long_50m", string> = { short_25m: "25 metros", long_50m: "50 metros" };
 
@@ -50,6 +52,9 @@ export function CompetitionDetailPage() {
   const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([]);
   const [competitionEvents, setCompetitionEvents] = useState<CompetitionEventItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Desenlace de una eliminación que no terminó aquí con éxito (rechazo o resultado sin confirmar).
+  const [avisoEliminacion, setAvisoEliminacion] = useState<MensajeDeEliminacion | null>(null);
+  const operacionEliminar = useOperacionUnica();
   const [newDate, setNewDate] = useState("");
 
   // ---------- Edición de datos generales de la competencia ----------
@@ -232,20 +237,42 @@ export function CompetitionDetailPage() {
     }
   }
 
+  /**
+   * Un solo DELETE y, si la respuesta no es concluyente, una comprobación por lectura (ver
+   * `eliminacionDeCompetencia.ts`). Si la competencia ya no existe se vuelve al listado con el
+   * mensaje; si no, se queda aquí con él.
+   */
   async function handleDeleteCompetition() {
-    if (
-      !window.confirm(
-        "¿Eliminar esta competencia por completo? Esta acción NO se puede deshacer y también elimina TODAS sus inscripciones ya confirmadas (individuales y de relevo)."
-      )
-    )
-      return;
+    if (operacionEliminar.ocupada()) return;
+    const nombre = competition?.name ?? "la competencia";
+    if (!window.confirm(advertenciaDeEliminacion(competition?.name))) return;
+    const testigo = operacionEliminar.iniciar();
+    if (testigo === null) return;
     setError(null);
+    setAvisoEliminacion(null);
     try {
-      await api.remove(id!);
-      navigate("/competencias");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo eliminar la competencia");
+      const desenlace = await eliminarYConfirmar({ eliminar: api.remove, leer: api.get }, id!);
+      mostrarDesenlace(mensajeDeEliminacion(desenlace, nombre), desenlace.tipo === "eliminada" || desenlace.tipo === "no-existe");
+    } finally {
+      operacionEliminar.terminar(testigo);
     }
+  }
+
+  /** Solo LEE: nunca repite el DELETE. */
+  async function comprobarEliminacion() {
+    const testigo = operacionEliminar.iniciar();
+    if (testigo === null) return;
+    try {
+      const desenlace = await comprobarEstadoDeCompetencia(api.get, id!);
+      mostrarDesenlace(mensajeDeEliminacion(desenlace, competition?.name ?? "la competencia"), desenlace.tipo === "no-existe");
+    } finally {
+      operacionEliminar.terminar(testigo);
+    }
+  }
+
+  function mostrarDesenlace(mensaje: MensajeDeEliminacion, yaNoExiste: boolean) {
+    if (yaNoExiste) navigate("/competencias", { state: { eliminacion: mensaje.texto, tono: mensaje.tono } });
+    else setAvisoEliminacion(mensaje);
   }
 
   async function handleAddSession(dateId: string, sessionTypeId: string) {
@@ -308,11 +335,21 @@ export function CompetitionDetailPage() {
           {!editing && (
             <button className="btn-secondary" onClick={() => setEditing(true)}>Editar</button>
           )}
-          <button className="btn-danger" onClick={handleDeleteCompetition}>Eliminar</button>
+          <button className="btn-danger" onClick={() => void handleDeleteCompetition()} disabled={operacionEliminar.enCurso}>Eliminar</button>
         </div>
       </div>
 
       {error && <p className="error-message">{error}</p>}
+      {avisoEliminacion && (
+        <div role="alert" style={{ background: "var(--brand-bg)", padding: "0.75rem", borderRadius: 6, marginBottom: "0.75rem" }}>
+          <p style={{ margin: 0 }}>{avisoEliminacion.texto}</p>
+          {avisoEliminacion.comprobarDeNuevo && (
+            <button type="button" className="btn-secondary" style={{ marginTop: "0.5rem" }} onClick={() => void comprobarEliminacion()} disabled={operacionEliminar.enCurso}>
+              Comprobar de nuevo
+            </button>
+          )}
+        </div>
+      )}
 
       {!editing ? (
         <>

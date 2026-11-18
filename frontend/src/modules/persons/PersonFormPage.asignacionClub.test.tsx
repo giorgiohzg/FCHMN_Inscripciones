@@ -112,6 +112,37 @@ describe("Asignación a club en Nueva persona", () => {
     expect(create.mock.calls[0]![0]).not.toHaveProperty("clubId");
   });
 
+  it("sin texto explicativo bajo el selector: solo el indicador de carga, referido por aria-describedby mientras dura", async () => {
+    let soltar: () => void = () => undefined;
+    const pendiente = new Promise<void>((r) => (soltar = r));
+    const real = clubsList.getMockImplementation()!;
+    clubsList.mockImplementation(async (q: Parameters<typeof real>[0]) => {
+      await pendiente;
+      return real(q);
+    });
+    montar();
+    const selector = screen.getByLabelText("Asignación a club") as HTMLSelectElement;
+    const carga = screen.getByText("Cargando clubes activos...");
+    expect(selector.getAttribute("aria-describedby")).toBe(carga.id);
+    expect(selector.getAttribute("aria-busy")).toBe("true");
+
+    soltar();
+    await waitFor(() => expect(selector.options).toHaveLength(131));
+    expect(screen.queryByText("Cargando clubes activos...")).toBeNull();
+    expect(screen.queryByText(/queda en su plantel como nadadora desde hoy/)).toBeNull();
+    expect(selector.hasAttribute("aria-describedby")).toBe(false);
+    expect(selector.hasAttribute("aria-busy")).toBe(false);
+  });
+
+  it("si la lista falla, el selector queda descrito por el mensaje de error", async () => {
+    clubsList.mockRejectedValue(new Error("Sin conexión sintética"));
+    montar();
+    const error = await screen.findByText(/Sin conexión sintética. Puede crear la persona sin asignación./);
+    const selector = screen.getByLabelText("Asignación a club");
+    expect(selector.getAttribute("aria-describedby")).toBe(error.id);
+    expect(document.getElementById(error.id)).toBe(error);
+  });
+
   it("la edición no ofrece el campo ni pide la lista de clubes (no es un traslado)", async () => {
     get.mockResolvedValue({
       id: "p-1", run: "11.111.111-1", username: null, firstName: "Ada", paternalLastName: "Prueba", maternalLastName: "", fullName: "Ada Prueba",

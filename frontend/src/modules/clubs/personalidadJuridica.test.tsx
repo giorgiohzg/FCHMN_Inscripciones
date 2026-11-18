@@ -92,7 +92,8 @@ describe("formulario de club", () => {
     expect(si!.checked).toBe(false);
     expect(screen.queryByLabelText(/^RUT$/)).not.toBeInTheDocument();
     expect(screen.queryByText(/PICKER representante legal/)).not.toBeInTheDocument();
-    expect(screen.getByText(/Solo los clubes con personalidad jurídica pueden tener representante legal/)).toBeInTheDocument();
+    // El alta ya no muestra la frase; la regla sigue: sin personalidad jurídica no hay selector.
+    expect(screen.queryByText(/Solo los clubes con personalidad jurídica pueden tener representante legal/)).not.toBeInTheDocument();
   });
 
   it("un alta sin tocar la opción envía hasLegalStatus: false (booleano, nunca null)", async () => {
@@ -137,6 +138,13 @@ describe("formulario de club", () => {
     await waitFor(() => expect(screen.getByDisplayValue("Club Sintético")).toBeInTheDocument());
     expect(radios()[0]!.checked).toBe(true);
     expect(radios()[1]!.checked).toBe(false);
+  });
+
+  it("al EDITAR un club sin personalidad jurídica conserva la frase sobre el representante legal", async () => {
+    get.mockResolvedValue(club({ hasLegalStatus: false }));
+    montarFicha("/clubes/c-1");
+    await waitFor(() => expect(screen.getByDisplayValue("Club Sintético")).toBeInTheDocument());
+    expect(screen.getByText(/Solo los clubes con personalidad jurídica pueden tener representante legal/)).toBeInTheDocument();
   });
 
   it("un club que llega con null residual (columna aún anulable) se presenta como «No tiene»", async () => {

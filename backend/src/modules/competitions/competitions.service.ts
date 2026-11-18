@@ -4,6 +4,7 @@ import { ValidationError, NotFoundError } from "../../shared/errors";
 import { computeEffectiveStatus, recomputeStatusAfterEdit, evaluateCompetitionAction, evaluateReopenRegistrations, evaluateUncancel, type CompetitionAction } from "./competitions.rules";
 import { shouldCloseRegistrations } from "./competition-capacity.rules";
 import { readCapacityUsage } from "./competition-capacity.service";
+import { eliminarCompetenciaCompleta } from "./competition-deletion.service";
 import { exigirCompetenciaVisible } from "./competitions.visibilidad";
 import { contarEquiposDeRelevoIncumplidores } from "./relay-condition.service";
 import { scopedClubId, type ActorContext as SharedActorContext } from "../../shared/actorContext";
@@ -795,35 +796,16 @@ export async function duplicateCompetition(sourceId: string, input: DuplicateCom
 }
 
 /**
- * Elimina una competencia por completo, junto con su estructura interna
- * (fechas, jornadas, límites, pruebas asignadas — todas con `onDelete:
- * Cascade` en el schema). Se BLOQUEA si ya existen inscripciones
- * (individuales o de relevo) confirmadas o canceladas — borrar esos
- * registros destruiría el historial/auditoría de inscripciones reales;
- * en ese caso corresponde `Cancelar` la competencia, no eliminarla.
+ * Elimina una competencia por completo: su estructura, sus pruebas asignadas y TODAS sus
+ * inscripciones individuales y de relevo, confirmadas o canceladas, en una transacción con su
+ * auditoría. Conserva Catálogos, personas, clubes y las demás competencias. Ver
+ * `competition-deletion.service.ts`.
+ *
+ * *Antecedente:* aquí se borraba solo la fila de la competencia y se confiaba en la cascada;
+ * como inscripciones y relevos referencian las pruebas con `RESTRICT`, la eliminación fallaba
+ * en cuanto existía una sola inscripción, y los recuentos auditados se leían fuera de la
+ * transacción.
  */
 export async function deleteCompetition(id: string, actor: ActorContext) {
-  const before = await getCompetitionById(id);
-
-  // A pedido explícito: eliminar una competencia ahora borra también, en
-  // cascada, TODAS sus inscripciones (individuales y de relevo) — antes
-  // esto estaba bloqueado si ya había inscripciones (había que cancelarlas
-  // primero). Se deja registro en la auditoría de cuántas se destruyeron,
-  // ya que esta acción es irreversible.
-  const [individualCount, relayCount] = await Promise.all([
-    prisma.registration.count({ where: { competitionEvent: { competitionId: id } } }),
-    prisma.relayRegistration.count({ where: { competitionEvent: { competitionId: id } } }),
-  ]);
-
-  await withAudit(
-    (tx) => tx.competition.delete({ where: { id } }),
-    () => ({
-      userId: actor.userId,
-      action: "COMPETITION_DELETED",
-      entityType: "Competition",
-      entityId: id,
-      ipAddress: actor.ipAddress,
-      before: { ...before, deletedIndividualRegistrations: individualCount, deletedRelayRegistrations: relayCount },
-    })
-  );
+  return eliminarCompetenciaCompleta(id, actor);
 }

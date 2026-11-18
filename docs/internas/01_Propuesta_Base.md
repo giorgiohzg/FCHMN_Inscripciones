@@ -94,7 +94,7 @@ Arquitectura de 3 capas desacopladas, contenedorizada, con separación estricta 
 frontend/
 ├── src/
 │   ├── modules/
-│   │   ├── accesos/            (pantalla de accesos por rol, solo administración)
+│   │   ├── accesos/            (accesos por rol y mensaje del login, solo administración)
 │   │   ├── audit/
 │   │   ├── auth/
 │   │   ├── catalogs/           (tipos de prueba, categorías, distancias, estilos, pruebas)
@@ -123,6 +123,7 @@ backend/
 │   │   ├── dashboard/
 │   │   ├── incorporaciones/    # C-05: postulación por RUN, cuota, periodos y solicitudes de alta
 │   │   ├── meet-import/        # importa el programa desde un .ev3 de Meet Manager
+│   │   ├── parametros/         # parámetros editables por administración (mensaje del login)
 │   │   ├── persons/
 │   │   ├── pools/
 │   │   ├── registrations/      # dominio central + máquina de validaciones

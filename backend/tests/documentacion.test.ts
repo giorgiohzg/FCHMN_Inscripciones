@@ -385,6 +385,7 @@ describe("Hallazgo 32 — la documentación describe el sistema que existe", () 
       "POST /auth/refresh", // se autentica con la cookie, no con el token
       "POST /auth/logout", // ídem; su ausencia no es error
       "GET /auth/csrf", // emite el token que las demás exigen
+      "GET /mensaje-de-acceso", // el login lo muestra antes de que haya sesión; solo devuelve el texto
     ]);
 
     const desprotegidas = rutasDeclaradas()

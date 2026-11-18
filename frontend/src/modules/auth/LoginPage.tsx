@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { descartarAvisoDeAcceso, leerAvisoDeAcceso } from "./avisoDeAcceso";
 import { AvisosTerceros } from "../../shared/AvisosTerceros";
+import { MENSAJE_DE_ACCESO_POR_DEFECTO, leerMensajeDeAcceso } from "./mensajeDeAcceso";
 import logo from "../../assets/logo-fchmn.png";
 
 export function LoginPage() {
@@ -14,6 +15,17 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   // Motivo por el que el servidor terminó la sesión anterior (C-04), si lo hubo.
   const [aviso, setAviso] = useState<string | null>(() => leerAvisoDeAcceso());
+  // Mensaje bajo «Ingresar», editable por administración. Empieza con el texto por defecto y lo
+  // conserva si la lectura pública falla: el formulario no espera ni depende de ella.
+  const [mensaje, setMensaje] = useState(MENSAJE_DE_ACCESO_POR_DEFECTO);
+
+  useEffect(() => {
+    const control = new AbortController();
+    void leerMensajeDeAcceso(control.signal).then((texto) => {
+      if (texto !== null && !control.signal.aborted) setMensaje(texto);
+    });
+    return () => control.abort();
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -83,11 +95,11 @@ export function LoginPage() {
             Antes había aquí un enlace a `/olvide-password`, una ruta que
             nunca existió. La recuperación es administrativa: no hay
             auto-servicio por correo, así que se explica qué hacer en vez de
-            ofrecer un enlace roto.
+            ofrecer un enlace roto. El texto lo edita administración
+            (`mensajeDeAcceso.ts`); es texto plano y conserva sus saltos de línea.
           */}
-          <p className="auth-help">
-            <strong>¿Olvidó su contraseña?</strong> Solicite a un administrador de la Federación que restablezca su acceso: recibirá
-            una contraseña temporal y el sistema le pedirá definir una nueva al ingresar.
+          <p className="auth-help" data-testid="mensaje-de-acceso" style={{ whiteSpace: "pre-line" }}>
+            {mensaje}
           </p>
         </form>
 

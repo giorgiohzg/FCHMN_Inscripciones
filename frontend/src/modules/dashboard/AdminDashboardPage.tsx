@@ -28,7 +28,7 @@ function KpiCard({ label, value, accent }: { label: string; value: number; accen
         borderRadius: 8,
         padding: "1rem 1.25rem",
         flex: 1,
-        minWidth: 160,
+        minWidth: 140,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -47,7 +47,9 @@ function KpiCard({ label, value, accent }: { label: string; value: number; accen
 export function AdminDashboardPage() {
   const api = useDashboardApi();
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const { sortKey, sortDir, onSort } = useSort<"competitionName" | "status" | "individualCount" | "relayTeamsCount">();
+  const { sortKey, sortDir, onSort } = useSort<
+    "competitionName" | "status" | "maleSwimmersCount" | "femaleSwimmersCount" | "swimmersCount" | "individualCount" | "relayTeamsCount"
+  >();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,16 +69,26 @@ export function AdminDashboardPage() {
           <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginTop: "1rem" }}>
             <KpiCard label="Clubes activos" value={stats.clubCount} accent="var(--brand-navy)" />
             <KpiCard label="Nadadores registrados" value={stats.swimmerCount} accent="var(--brand-blue-dark)" />
+            <KpiCard label="Varones registrados" value={stats.maleSwimmerCount} accent="var(--brand-blue-dark)" />
+            <KpiCard label="Damas registradas" value={stats.femaleSwimmerCount} accent="var(--brand-blue-dark)" />
             <KpiCard label="Competencias activas" value={stats.activeCompetitionsCount} accent="var(--state-success)" />
             <KpiCard label="Con inscripciones abiertas" value={stats.openRegistrationsCount} accent="var(--state-warning)" />
           </div>
 
           <h2 style={{ fontSize: "1.05rem", color: "var(--brand-navy)", marginTop: "2rem" }}>Nadadores inscritos por competencia</h2>
-          <table className="data-table" style={{ marginTop: "0.5rem" }}>
+          <p style={{ color: "var(--brand-gray-600)", fontSize: "0.85rem", margin: "0.25rem 0 0" }}>
+            Varones, damas y total cuentan <strong>personas distintas</strong> con al menos una inscripción individual confirmada o en un
+            relevo confirmado, según el sexo de la persona. Inscripciones individuales y equipos de relevo cuentan inscripciones.
+          </p>
+          <div style={{ overflowX: "auto", marginTop: "0.5rem" }}>
+            <table className="data-table tabla-panel">
             <thead>
               <tr>
                 <SortableTh label="Competencia" sortKey="competitionName" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
                 <SortableTh label="Estado" sortKey="status" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
+                <SortableTh label="Varones" sortKey="maleSwimmersCount" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
+                <SortableTh label="Damas" sortKey="femaleSwimmersCount" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
+                <SortableTh label="Total nadadores" sortKey="swimmersCount" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
                 <SortableTh label="Inscripciones individuales" sortKey="individualCount" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
                 <SortableTh label="Equipos de relevo" sortKey="relayTeamsCount" activeKey={sortKey} activeDir={sortDir} onSort={onSort} />
               </tr>
@@ -86,6 +98,9 @@ export function AdminDashboardPage() {
                 switch (key) {
                   case "competitionName": return c.competitionName;
                   case "status": return STATUS_LABELS[c.status] ?? c.status;
+                  case "maleSwimmersCount": return c.maleSwimmersCount;
+                  case "femaleSwimmersCount": return c.femaleSwimmersCount;
+                  case "swimmersCount": return c.swimmersCount;
                   case "individualCount": return c.individualCount;
                   case "relayTeamsCount": return c.relayTeamsCount;
                 }
@@ -93,15 +108,19 @@ export function AdminDashboardPage() {
                 <tr key={c.competitionId}>
                   <td>{c.competitionName}</td>
                   <td><span className="badge badge-active">{STATUS_LABELS[c.status] ?? c.status}</span></td>
+                  <td>{c.maleSwimmersCount}</td>
+                  <td>{c.femaleSwimmersCount}</td>
+                  <td><strong>{c.swimmersCount}</strong></td>
                   <td>{c.individualCount}</td>
                   <td>{c.relayTeamsCount}</td>
                 </tr>
               ))}
               {stats.registrationsByCompetition.length === 0 && (
-                <tr><td colSpan={4} style={{ textAlign: "center", color: "var(--brand-gray-600)", padding: "1.5rem" }}>No hay competencias activas en este momento.</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: "center", color: "var(--brand-gray-600)", padding: "1.5rem" }}>No hay competencias activas en este momento.</td></tr>
               )}
             </tbody>
-          </table>
+            </table>
+          </div>
         </>
       )}
     </AppShell>

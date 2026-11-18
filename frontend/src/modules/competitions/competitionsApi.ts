@@ -1,3 +1,4 @@
+import type { ResultadoDeEliminacion } from "./eliminacionDeCompetencia";
 import { api } from "../../shared/apiClient";
 
 // individual_closed — «Inscripciones individuales cerradas»: se alcanzó el
@@ -243,8 +244,9 @@ export function useCompetitionsApi() {
       }>
     ) => api.put<Competition>(`/competitions/${id}`, input),
 
+    /** Elimina la competencia con TODAS sus inscripciones y relevos; devuelve lo eliminado. */
     remove: (id: string) =>
-      api.delete<void>(`/competitions/${id}`),
+      api.delete<ResultadoDeEliminacion>(`/competitions/${id}`),
 
     duplicate: (id: string, input: { name: string; registrationStartAt: string; registrationEndAt: string; ageCutoffDate?: string }) =>
       api.post<Competition>(`/competitions/${id}/duplicate`, input),

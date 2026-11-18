@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AppShell } from "../../shared/AppShell";
 import { useCompetitionsApi, type Competition, type CompetitionStatus } from "./competitionsApi";
 import { useSort, sortItems, SortableTh } from "../../shared/sortableTable";
 import { usePoolsApi, type Pool } from "../pools/poolsApi";
 import { useOperacionUnica } from "../../shared/useOperacionUnica";
+import { advertenciaDeEliminacion, comprobarEstadoDeCompetencia, eliminarYConfirmar, mensajeDeEliminacion, type MensajeDeEliminacion } from "./eliminacionDeCompetencia";
 
 const STATUS_LABELS: Record<CompetitionStatus, string> = {
   draft: "Borrador",
@@ -36,6 +37,16 @@ export function CompetitionsListPage() {
   const poolsApi = usePoolsApi();
   const [pools, setPools] = useState<Pool[]>([]);
   const navigate = useNavigate();
+  const location = useLocation();
+  // Resultado real de la última eliminación (desde aquí o desde la propia competencia).
+  // Resultado de la última eliminación (desde aquí o desde la propia competencia), con la
+  // competencia que queda por comprobar si el resultado no se pudo confirmar.
+  const [eliminacion, setEliminacion] = useState<(MensajeDeEliminacion & { pendiente?: { id: string; nombre: string } }) | null>(() => {
+    const estado = location.state as { eliminacion?: string; tono?: MensajeDeEliminacion["tono"] } | null;
+    return estado?.eliminacion ? { texto: estado.eliminacion, tono: estado.tono ?? "exito", comprobarDeNuevo: false } : null;
+  });
+  // Una eliminación (o comprobación) a la vez: evita dos envíos desde el mismo control.
+  const operacionEliminar = useOperacionUnica();
   const [status, setStatus] = useState<CompetitionStatus | "">("");
   const { sortKey, sortDir, onSort } = useSort<"name" | "registrationStartAt" | "status">();
   /**
@@ -95,18 +106,33 @@ export function CompetitionsListPage() {
   }
 
   async function handleDelete(competition: Competition) {
-    if (
-      !window.confirm(
-        `¿Eliminar la competencia "${competition.name}"? Esta acción NO se puede deshacer y también elimina TODAS sus inscripciones ya confirmadas (individuales y de relevo).`
-      )
-    )
-      return;
+    if (operacionEliminar.ocupada()) return;
+    if (!window.confirm(advertenciaDeEliminacion(competition.name))) return;
+    const testigo = operacionEliminar.iniciar();
+    if (testigo === null) return;
+    setEliminacion(null);
     try {
-      await api.remove(competition.id);
-      load();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "No se pudo eliminar la competencia");
+      // Un solo DELETE; si la respuesta no es concluyente, se comprueba por lectura.
+      const desenlace = await eliminarYConfirmar({ eliminar: api.remove, leer: api.get }, competition.id);
+      const mensaje = mensajeDeEliminacion(desenlace, competition.name);
+      setEliminacion({ ...mensaje, pendiente: mensaje.comprobarDeNuevo ? { id: competition.id, nombre: competition.name } : undefined });
+    } finally {
+      operacionEliminar.terminar(testigo);
     }
+    load();
+  }
+
+  /** Solo LEE: nunca repite el DELETE. */
+  async function comprobarDeNuevo(pendiente: { id: string; nombre: string }) {
+    const testigo = operacionEliminar.iniciar();
+    if (testigo === null) return;
+    try {
+      const mensaje = mensajeDeEliminacion(await comprobarEstadoDeCompetencia(api.get, pendiente.id), pendiente.nombre);
+      setEliminacion({ ...mensaje, pendiente: mensaje.comprobarDeNuevo ? pendiente : undefined });
+    } finally {
+      operacionEliminar.terminar(testigo);
+    }
+    load();
   }
 
   async function handleCreate() {
@@ -264,6 +290,25 @@ export function CompetitionsListPage() {
       </div>
 
       {error && <p className="error-message">{error}</p>}
+      {eliminacion && (
+        <div
+          role={eliminacion.tono === "exito" ? "status" : "alert"}
+          style={{ background: "var(--brand-bg)", padding: "0.75rem", borderRadius: 6, marginBottom: "0.75rem" }}
+        >
+          <p style={{ margin: 0 }}>{eliminacion.texto}</p>
+          {eliminacion.pendiente && (
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ marginTop: "0.5rem" }}
+              onClick={() => void comprobarDeNuevo(eliminacion.pendiente!)}
+              disabled={operacionEliminar.enCurso}
+            >
+              Comprobar de nuevo
+            </button>
+          )}
+        </div>
+      )}
 
       {data && (
         <table className="data-table">
@@ -291,7 +336,7 @@ export function CompetitionsListPage() {
                 </td>
                 <td><span className={`badge ${STATUS_BADGE[c.status]}`}>{STATUS_LABELS[c.status]}</span></td>
                 <td>
-                  <button className="btn-danger" onClick={() => handleDelete(c)}>Eliminar</button>
+                  <button className="btn-danger" onClick={() => void handleDelete(c)} disabled={operacionEliminar.enCurso}>Eliminar</button>
                 </td>
                 <td>
                   {c.esPredeterminada ? (

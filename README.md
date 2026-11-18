@@ -2143,9 +2143,87 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
 - No se afirma identidad binaria entre las imágenes de Render y las locales. El paquete web local y el de producción tienen nombres distintos; la URL de API compilada es distinta y puede explicarlo, pero no se comprobó que sea la única causa.
 - No se afirma la ausencia de escrituras en la base durante el despliegue: no se revisó la actividad de los usuarios.
 
+### Mensaje del login, eliminación completa de competencias, textos de alta y totales por género (estado: publicada en el repositorio y validada localmente; pendiente de migración, despliegue y actualización del entorno local)
+
+> **Estado:** **publicada en el repositorio y validada localmente; pendiente de migración, despliegue y actualización del entorno local.** Incluye una **migración aditiva**, `20261118000000_parametros_sistema`, todavía **no aplicada** ni en la base de trabajo local ni en producción. El servicio desplegado no contiene estos cambios.
+
+**1. Mensaje del login editable por administración.**
+
+- El texto bajo «Ingresar» deja de estar escrito en `LoginPage.tsx` y pasa a la tabla `parametros_sistema` (clave `login.mensaje`). **Migración:** crea la tabla sin filas, con clave primaria `clave`, `valor` de texto y `actualizado_en`, y dos restricciones propias de la base: texto no vacío (`length(btrim(valor)) > 0`) y como máximo 4000 caracteres. Mientras no haya fila rige el **texto por defecto**, que es el mensaje vigente completo, incluida la pregunta inicial.
+- **Lectura pública** `GET /mensaje-de-acceso`, sin sesión: responde solo `{ texto }`, sin fecha ni autor.
+- **Edición** `GET` y `PUT /administracion/mensaje-de-acceso`: exige el rol `admin` en la API, además de la interfaz (pantalla «Mensaje del login», en `/administracion/mensaje-de-acceso`, con vista previa).
+- **Texto plano**: se conservan los saltos de línea y no se interpreta HTML; la pregunta inicial ya no aparece en negrita. La API rechaza un texto vacío, de más de 1000 caracteres, que no sea texto o con caracteres de control.
+- **Auditoría** `LOGIN_MESSAGE_UPDATED` en la misma transacción, con el texto anterior y el nuevo; guardar el mismo texto no escribe ni audita. Dos guardados simultáneos se ordenan con un bloqueo consultivo por clave.
+- El login muestra el texto por defecto desde el primer momento y lo conserva si la lectura pública falla: iniciar sesión no depende de ella. Un cambio guardado se ve al volver a cargar el login, sin reconstruir ni desplegar la web.
+
+**2. Eliminación completa y transaccional de competencias** (`competition-deletion.service.ts`; botones del listado y de la competencia seleccionada; no existe eliminación de varias a la vez).
+
+- *Antecedente:* el código anterior borraba solo la fila de la competencia y confiaba en la cascada. Como inscripciones y relevos referencian las pruebas con `ON DELETE RESTRICT`, fallaba en cuanto existía una sola inscripción, y los recuentos auditados se leían fuera de la transacción.
+- Ahora, en una sola transacción con su auditoría, se eliminan: inscripciones individuales y equipos de relevo, confirmados o cancelados, con sus integrantes; pruebas asignadas y sus categorías habilitadas; límites, jornadas y fechas; y la competencia.
+- **Se conservan** las pruebas y demás definiciones de Catálogos, las personas, los clubes, las membresías, las cuentas, las demás competencias (también las que comparten pruebas de Catálogos) y el registro de auditoría anterior.
+- **Orden de bloqueos** (`FOR UPDATE`, READ COMMITTED): bloqueo consultivo de la predeterminada → pruebas de la competencia → competencia → otra vez sus pruebas → integrantes → relevos → inscripciones. Las pruebas van antes que la competencia porque un alta que llena el cupo inserta y después actualiza la competencia. Los integrantes van antes que los relevos porque así escribe la edición de integrantes.
+- El bloqueo de las pruebas impide inscripciones o relevos **nuevos**, pero no detiene un **cambio de estado** de una fila existente: de eso se encarga el bloqueo de integrantes, relevos e inscripciones.
+- `DELETE /competitions/:id` responde ahora **200 con los recuentos** (antes, 204 sin cuerpo), con los mismos permisos (`competitions:write`, que solo tiene administración). La auditoría `COMPETITION_DELETED` guarda los mismos recuentos.
+- **Competencia predeterminada:** la marca desaparece con su fila, se audita `COMPETITION_DEFAULT_CLEARED` y después se puede marcar otra. Los paneles ya invalidan una selección que deja de estar en su lista.
+- Ambas pantallas usan la misma advertencia, que dice expresamente que también se eliminan las inscripciones y los relevos, y muestran el resultado real.
+
+**3. Textos retirados solo en las altas.**
+
+- Nueva persona: el texto explicativo bajo «Asignación a club» y el de «Nombre de usuario». Se conservan «Sin asignación» por defecto, la carga de clubes activos, la asignación al guardar, el indicador de carga y el error; `aria-describedby` apunta solo al indicador o al error visibles.
+- Nuevo club: la frase «Solo los clubes con personalidad jurídica pueden tener representante legal.» y el texto bajo «Nombre de usuario». La regla y su validación no cambian.
+- Las ediciones de persona y de club conservan sus textos (`CredencialesDeAcceso` solo los omite en modo alta).
+
+**4. Totales por género en el panel de administración** (exclusivo de administración).
+
+- **Resumen general:** junto a «Nadadores registrados», «Varones registrados» y «Damas registradas», con el mismo universo: personas no eliminadas con rol de nadador activo.
+- **Por competencia:** columnas Varones, Damas y Total nadadores. Cuentan **personas distintas** con al menos una inscripción individual confirmada o que integran un relevo confirmado, también quienes solo nadan relevos, sin duplicar a quien tiene varias pruebas o nada individuales y relevos. El sexo es el de la persona, no el de la prueba: una prueba mixta no crea una tercera categoría. Es el mismo conjunto que usan los cupos, en una sola consulta (`UNION`), y los subtotales suman el total. Se conservan las columnas de inscripciones individuales y de equipos de relevo, que cuentan inscripciones.
+
+**5. Correcciones posteriores a la revisión del código.**
+
+- **Resultado incierto de la eliminación.** Solo un 4xx del servidor es un rechazo conocido («No se eliminó»), y un 404 dice que la competencia ya no existe, sin recuentos. Ante un error de red, un 5xx o una respuesta ilegible, la interfaz dice que no pudo confirmar el resultado y lo comprueba leyendo la competencia («ya no existe» o «todavía existe», sin atribuirse el borrado ni inventar recuentos). Si tampoco puede comprobarlo, conserva la incertidumbre y ofrece «Comprobar de nuevo», que solo lee. **Nunca repite el DELETE**, y el botón queda deshabilitado mientras dura la operación. Los recuentos solo se muestran si vienen de una respuesta válida del servidor.
+- **Recuentos desde las filas eliminadas.** Inscripciones y relevos se borran con `DELETE … RETURNING status`, con las filas ya bloqueadas. *Antecedente:* se contaban antes de borrar, y una cancelación intercalada quedaba informada y auditada como confirmada.
+- **Mensaje del login durante el guardado.** El campo queda bloqueado mientras espera la respuesta, para que esta no borre sin aviso una edición posterior; si el guardado falla, se conserva lo escrito y se puede reintentar.
+
+**Pruebas — ronda 1 (implementación).** Datos sintéticos; integración **solo** contra la base desechable de `docker-compose.test.yml`.
+
+- Backend sin base: suite completa de 2191 pruebas, con 2186 aprobadas y 5 fallidas en `documentacion.test.ts`, que exige el inventario (modelos, endpoints, rutas públicas y módulos). Tras sincronizar la documentación, ese archivo pasó 12/12; la suite completa no se volvió a ejecutar. Incluye `parametros-mensaje-login.test.ts` (12 casos: normalización, límites, caracteres de control y coincidencia con el texto de respaldo de la interfaz).
+- Integración: los tres archivos nuevos (`parametros-mensaje-login`, `competition-deletion` y `dashboard-totales-genero`) y `c05-incorporaciones`, que ahora espera 43 migraciones: 77/77. Archivos existentes afectados (migraciones, rutas, permisos, cabeceras y competencias, 12 archivos): 256/256.
+- Contrapruebas temporales, restauradas byte a byte con huella verificada: no borrar inscripciones, contar con `UNION ALL` y quitar la exigencia de administración. Las tres fueron detectadas (9 pruebas fallidas).
+- Frontend: 934/934 en las áreas tocadas (60 archivos); tipos sin errores y lint sin errores nuevos. Tres expectativas que exigían los textos retirados cambiaron de sentido.
+
+**Pruebas — ronda 2 (correcciones).** Primero se reprodujo cada defecto; después se corrigió.
+
+- Recuentos: dos pruebas nuevas fallaron con el código anterior, tanto en individuales como en relevos. Tras la corrección, `competition-deletion` pasó 14/14 en tres ejecuciones seguidas, y junto con `competencia-predeterminada` y `competition-capacity`, 58/58. Contraprueba temporal: bloquear la competencia antes que sus pruebas produjo `40P01 deadlock detected` en la prueba del alta real; el archivo se restauró con su huella.
+- Resultado incierto: 14 pruebas nuevas de las dos pantallas fallaron con el código anterior (el aviso salía en `window.alert`); tras la corrección, 20/20.
+- Guardado del mensaje: la prueba nueva falló con el código anterior (campo editable durante el guardado); tras la corrección, 13/13. En conjunto, competencias, accesos y mensaje: 193/193.
+
+**Concurrencia efectivamente ejercitada** (integración, coordinada por estados observados en `pg_stat_activity` y por promesas, no por esperas fijas):
+
+- una inscripción insertada y sin confirmar se espera y entra en lo eliminado;
+- una inscripción que llega durante la eliminación es rechazada y no deja huérfanos;
+- una cancelación directa (individual y de relevo) intercalada entre el bloqueo y el borrado;
+- cancelaciones **reales** (`cancelRegistration` y `cancelRelayRegistration`) en curso, detenidas al auditar;
+- el **alta real** (`createRegistration`) que llena el cupo, detenida tras insertar: la eliminación la espera, el alta cierra la competencia y ninguna se interbloquea;
+- dos guardados simultáneos del mensaje del login.
+
+**Revisión visual** (backend y Vite locales, contra la base desechable con datos sintéticos).
+
+- **Ronda 1, API real:** panel a 1280 px sin desplazamiento horizontal, con los totales coincidentes con los datos sembrados, y a 375 px con la tabla desplazable dentro de su contenedor; guardado del mensaje y su lectura en el login al recargar, con el salto de línea y las etiquetas como texto; eliminación real desde el listado (de la predeterminada) y desde la competencia seleccionada, con recuentos coincidentes y Catálogos, personas y membresías intactos; altas sin los textos y edición de club con los suyos.
+- **Ronda 2, pérdida de respuesta simulada:** con `fetch` interceptado en la página, el DELETE real llegó una sola vez al servidor y el cliente recibió un error de red. El listado mostró la incertidumbre y «Comprobar de nuevo», y después «ya no existe»; desde la competencia seleccionada volvió al listado con ese mensaje. Con el `PUT` del mensaje retrasado, el campo y los botones quedaron bloqueados hasta la respuesta.
+
+**Inventarios:** 42 modelos de Prisma, 141 endpoints, 17 módulos en `backend/src/modules` y 43 migraciones. Se actualizaron en consecuencia el inventario de endpoints de este README, `docs/internas/01_Propuesta_Base.md` y `docs/internas/13_Resumen_Final.md`, y la lista de rutas públicas de `documentacion.test.ts`.
+
+**Limitaciones**
+
+- La compatibilidad con la **edición concurrente de integrantes** de un relevo se analizó en el código (borra integrantes y después actualiza el relevo, el mismo sentido que la eliminación), pero ese intercalado no se ensayó. Tampoco se ensayó marcar la predeterminada durante una eliminación.
+- Que una competencia **siga existiendo** al comprobar no garantiza que una eliminación aún pendiente no termine aplicándose después; por eso el mensaje pide recargar antes de reintentar.
+- El respaldo del mensaje ante un fallo de **su** lectura tiene solo pruebas simuladas. Con la API caída por completo, la aplicación conserva su pantalla previa de «No se pudo contactar al servidor» antes de llegar al login.
+- La pérdida de respuesta se simuló interceptando `fetch`; no se observó una caída real de la red.
+- La migración `20261118000000_parametros_sistema` no está aplicada en el entorno local de trabajo ni en producción.
+
 ## Inventario completo de endpoints
 
-**138 endpoints**, agrupados por el módulo que los declara. Esta lista no está
+**141 endpoints**, agrupados por el módulo que los declara. Esta lista no está
 escrita a mano: `backend/tests/documentacion.test.ts` la compara con las rutas que
 el código declara y **falla si alguna sobra o falta**. Además comprueba que
 ninguna ruta fuera de las públicas se quede sin guardia, y que el permiso exacto
@@ -2299,6 +2377,14 @@ fuera de producción o con `ENABLE_SWAGGER=true`.
 |---|---|
 | POST | `/competitions/import-meet-events/analyze` |
 | POST | `/competitions/import-meet-events` |
+
+### `parametros`
+
+| Método | Ruta |
+|---|---|
+| GET | `/administracion/mensaje-de-acceso` |
+| PUT | `/administracion/mensaje-de-acceso` |
+| GET | `/mensaje-de-acceso` |
 
 ### `persons`
 

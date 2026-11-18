@@ -155,7 +155,16 @@ describe.each(FICHAS)("ficha de $ficha", (f) => {
     expect(campo()).toBeEnabled();
     expect(campo()).not.toBeRequired();
     expect(botonCrear()).not.toBeInTheDocument();
-    expect(screen.getByText(/se crean después de guardar/i)).toBeInTheDocument();
+    // El alta ya no lleva texto de ayuda bajo el campo, ni una referencia a él.
+    expect(screen.queryByText(/se crean después de guardar/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Puede dejarlo vacío/i)).not.toBeInTheDocument();
+    expect(campo()).not.toHaveAttribute("aria-describedby");
+  });
+
+  it("EDICIÓN conserva su texto de ayuda bajo el campo, referido por aria-describedby", async () => {
+    await montarEdicion(f.registro());
+    expect(screen.getByText(/Puede asignarlo, cambiarlo o dejarlo vacío mientras no haya credenciales/)).toHaveAttribute("id", "ayuda-username");
+    expect(campo()).toHaveAttribute("aria-describedby", "ayuda-username");
   });
 
   it("ALTA sin nombre: se envía null y no se crea ninguna cuenta", async () => {

@@ -328,7 +328,8 @@ export function PersonFormPage() {
               id="clubAsignado"
               value={clubAsignado}
               onChange={(e) => setClubAsignado(e.target.value)}
-              aria-describedby="clubAsignadoAyuda"
+              aria-describedby={clubesActivos === null && !errorClubes ? "clubAsignadoCarga" : errorClubes ? "clubAsignadoError" : undefined}
+              aria-busy={clubesActivos === null && !errorClubes ? true : undefined}
             >
               <option value="">Sin asignación</option>
               {(clubesActivos ?? []).map((c) => (
@@ -337,12 +338,16 @@ export function PersonFormPage() {
                 </option>
               ))}
             </select>
-            <p id="clubAsignadoAyuda" style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "-0.4rem" }}>
-              {clubesActivos === null && !errorClubes
-                ? "Cargando clubes activos..."
-                : "Con un club, la persona queda en su plantel como nadadora desde hoy (fecha de Chile). No se crean credenciales."}
-            </p>
-            {errorClubes && <p className="error-message">{errorClubes}. Puede crear la persona sin asignación.</p>}
+            {clubesActivos === null && !errorClubes && (
+              <p id="clubAsignadoCarga" role="status" style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "-0.4rem" }}>
+                Cargando clubes activos...
+              </p>
+            )}
+            {errorClubes && (
+              <p id="clubAsignadoError" className="error-message">
+                {errorClubes}. Puede crear la persona sin asignación.
+              </p>
+            )}
           </>
         )}
 

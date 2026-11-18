@@ -3,6 +3,7 @@ import { AuthProvider } from "./modules/auth/AuthContext";
 import { AccesosProvider } from "./modules/auth/AccesosContext";
 import { RequiereFuncion, CambioDeContrasenaPermitido } from "./modules/auth/RequiereFuncion";
 import { AccesosPorRolPage } from "./modules/accesos/AccesosPorRolPage";
+import { MensajeDeAccesoPage } from "./modules/accesos/MensajeDeAccesoPage";
 import { ToastProvider } from "./shared/ToastProvider";
 import { LoginPage } from "./modules/auth/LoginPage";
 import { ForceChangePasswordPage } from "./modules/auth/ForceChangePasswordPage";
@@ -113,6 +114,7 @@ export function App() {
             <Route path="/auditoria" element={<AuditLogPage />} />
             {/* Accesos por rol: exclusiva de administración (la API también lo exige). */}
             <Route path="/administracion/accesos" element={<AccesosPorRolPage />} />
+            <Route path="/administracion/mensaje-de-acceso" element={<MensajeDeAccesoPage />} />
             {/* Resumen por club: exclusivo de administración (la API también lo exige). */}
             <Route path="/reportes/resumen-por-club" element={<ClubSummaryReportPage />} />
             {/* Clubes y nadadores: exclusivo de administración (la API también lo exige). */}

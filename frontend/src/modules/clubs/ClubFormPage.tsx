@@ -283,11 +283,14 @@ export function ClubFormPage() {
             <PersonPicker label="Representante legal" value={legalRepresentativePersonId} onChange={setLegalRepresentativePersonId} />
           </div>
         ) : (
-          <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "0.9rem" }}>
-            Solo los clubes con personalidad jurídica pueden tener representante legal.
-            {representanteActual &&
-              ` Actualmente está designado(a) ${representanteActual.person.fullName}; hay que retirarlo con el estado en «Sí» antes de cambiarlo.`}
-          </p>
+          // En el ALTA no se muestra la frase; la regla y su validación no cambian.
+          isEdit && (
+            <p style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "0.9rem" }}>
+              Solo los clubes con personalidad jurídica pueden tener representante legal.
+              {representanteActual &&
+                ` Actualmente está designado(a) ${representanteActual.person.fullName}; hay que retirarlo con el estado en «Sí» antes de cambiarlo.`}
+            </p>
+          )
         )}
 
         <label style={{ marginTop: "1rem" }}>Membresía ACHMN</label>

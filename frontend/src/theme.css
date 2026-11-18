@@ -397,6 +397,12 @@ label {
   border-bottom: 1px solid var(--brand-gray-100);
   font-size: 0.9rem;
 }
+/* Panel de administración: siete columnas; menos relleno lateral para que quepan sin desplazar. */
+.data-table.tabla-panel th,
+.data-table.tabla-panel td {
+  padding-left: 0.65rem;
+  padding-right: 0.65rem;
+}
 .data-table tr:hover td {
   background: var(--brand-bg);
 }

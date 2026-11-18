@@ -12,7 +12,8 @@ import { evaluarUsernameEditado, problemaDeUsername } from "./usernameFormato";
  *
  * Tres estados, y cada uno se explica:
  *   - ALTA: el campo es editable y opcional; las credenciales se crean después
- *     de guardar. Registrar y dar acceso siguen siendo pasos separados.
+ *     de guardar. Registrar y dar acceso siguen siendo pasos separados. Sin
+ *     texto de ayuda bajo el campo.
  *   - SIN CUENTA: el campo es editable; «Guardar» lo persiste y «Crear
  *     credenciales» lo asigna y crea la cuenta en una sola operación. El botón
  *     no se puede pulsar mientras el nombre esté vacío o mal formado.
@@ -72,17 +73,18 @@ export function CredencialesDeAcceso({ modo, username, usernameOriginal, onUsern
         readOnly={bloqueado}
         disabled={bloqueado}
         aria-invalid={problema ? true : undefined}
-        aria-describedby="ayuda-username"
+        aria-describedby={modo === "alta" ? undefined : "ayuda-username"}
       />
       {problema && !bloqueado && <p className="error-message">{problema}</p>}
 
-      <p id="ayuda-username" style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "-0.4rem" }}>
-        {bloqueado
-          ? "No se puede modificar: las credenciales de acceso se crearon con este nombre."
-          : modo === "alta"
-            ? "Puede dejarlo vacío. Las credenciales se crean después de guardar, con el botón «Crear credenciales»."
+      {/* En el ALTA no hay texto de ayuda bajo el campo; la edición conserva el suyo. */}
+      {modo === "edicion" && (
+        <p id="ayuda-username" style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "-0.4rem" }}>
+          {bloqueado
+            ? "No se puede modificar: las credenciales de acceso se crearon con este nombre."
             : "Puede asignarlo, cambiarlo o dejarlo vacío mientras no haya credenciales. Una vez creadas, ya no se puede modificar."}
-      </p>
+        </p>
+      )}
 
       {modo === "edicion" &&
         (bloqueado ? (

@@ -1298,3 +1298,19 @@ model AccesoPorRol {
   @@id([rol, funcion])
   @@map("accesos_por_rol")
 }
+
+// ---------------------------------------------------------------------------
+// PARÁMETROS DEL SISTEMA editables por administración.
+//
+// Clave → texto. Hoy existe una sola clave, `login.mensaje`: el mensaje bajo el
+// botón «Ingresar», que el login lee sin sesión. SIN fila, rige el valor por
+// defecto del código (`parametros.service.ts`), así que la migración no inserta
+// nada. Las claves admitidas y sus límites los valida el servicio; la base exige
+// además un texto no vacío y acotado.
+model ParametroSistema {
+  clave         String   @id @db.VarChar(80)
+  valor         String
+  actualizadoEn DateTime @default(now()) @map("actualizado_en")
+
+  @@map("parametros_sistema")
+}

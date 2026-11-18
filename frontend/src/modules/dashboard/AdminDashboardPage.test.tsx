@@ -26,6 +26,8 @@ beforeEach(() => {
   getStats.mockResolvedValue({
     clubCount: 12,
     swimmerCount: 345,
+    maleSwimmerCount: 200,
+    femaleSwimmerCount: 145,
     activeCompetitionsCount: 3,
     openRegistrationsCount: 1,
     registrationsByCompetition: [],
@@ -53,7 +55,7 @@ describe("tarjetas del resumen general", () => {
     expect(hijos).toEqual(["12", "Clubes activos"]);
   });
 
-  it("lo mismo en las cuatro tarjetas", async () => {
+  it("lo mismo en todas las tarjetas, con varones y damas junto a «Nadadores registrados»", async () => {
     render(
       <MemoryRouter>
         <AdminDashboardPage />
@@ -64,6 +66,8 @@ describe("tarjetas del resumen general", () => {
     const esperado: [string, string][] = [
       ["Clubes activos", "12"],
       ["Nadadores registrados", "345"],
+      ["Varones registrados", "200"],
+      ["Damas registradas", "145"],
       ["Competencias activas", "3"],
       ["Con inscripciones abiertas", "1"],
     ];
@@ -85,5 +89,59 @@ describe("tarjetas del resumen general", () => {
     expect(tarjeta.style.textAlign).toBe("center");
     expect(tarjeta.style.alignItems).toBe("center");
     expect(tarjeta.style.flexDirection).toBe("column");
+  });
+});
+
+describe("nadadores inscritos por competencia", () => {
+  it("muestra varones, damas y total de PERSONAS, separados de inscripciones y equipos", async () => {
+    getStats.mockResolvedValue({
+      clubCount: 1,
+      swimmerCount: 3,
+      maleSwimmerCount: 2,
+      femaleSwimmerCount: 1,
+      activeCompetitionsCount: 1,
+      openRegistrationsCount: 1,
+      registrationsByCompetition: [
+        {
+          competitionId: "c-1",
+          competitionName: "Competencia Sintética",
+          status: "open",
+          individualCount: 7,
+          relayTeamsCount: 2,
+          swimmersCount: 9,
+          maleSwimmersCount: 5,
+          femaleSwimmersCount: 4,
+        },
+      ],
+    });
+    render(
+      <MemoryRouter>
+        <AdminDashboardPage />
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByText("Competencia Sintética")).toBeTruthy());
+
+    const encabezados = screen.getAllByRole("columnheader").map((th) => th.textContent?.replace(/[▲▼↕⇅]/g, "").trim());
+    expect(encabezados).toEqual([
+      "Competencia",
+      "Estado",
+      "Varones",
+      "Damas",
+      "Total nadadores",
+      "Inscripciones individuales",
+      "Equipos de relevo",
+    ]);
+    const celdas = screen.getByText("Competencia Sintética").closest("tr")!.querySelectorAll("td");
+    expect(Array.from(celdas).map((c) => c.textContent)).toEqual(["Competencia Sintética", "Abierta", "5", "4", "9", "7", "2"]);
+  });
+
+  it("sin competencias, la fila vacía ocupa las siete columnas", async () => {
+    render(
+      <MemoryRouter>
+        <AdminDashboardPage />
+      </MemoryRouter>
+    );
+    const vacia = await screen.findByText("No hay competencias activas en este momento.");
+    expect(vacia.getAttribute("colspan")).toBe("7");
   });
 });

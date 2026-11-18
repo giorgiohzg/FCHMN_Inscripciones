@@ -23,6 +23,7 @@ import { auditRoutes } from "./modules/audit/audit.routes";
 import { dashboardRoutes } from "./modules/dashboard/dashboard.routes";
 import { meetImportRoutes } from "./modules/meet-import/meet-import.routes";
 import { accesosRoutes } from "./modules/accesos/accesos.routes";
+import { parametrosRoutes } from "./modules/parametros/parametros.routes";
 import { manejadorDeErrores } from "./shared/manejadorDeErrores";
 import { prisma } from "./shared/prisma.client";
 import { env, swaggerHabilitadoEn, urlPublicaApiDe, type Env } from "./shared/env";
@@ -258,6 +259,7 @@ export async function buildServer(config: Env = env, opciones: { flujoDeRegistro
   await app.register(dashboardRoutes);
   await app.register(meetImportRoutes);
   await app.register(accesosRoutes);
+  await app.register(parametrosRoutes);
 
   /**
    * VIVACIDAD (`/health`) y DISPONIBILIDAD (`/ready`) son preguntas distintas y
