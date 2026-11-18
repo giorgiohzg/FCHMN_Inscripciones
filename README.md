@@ -1499,9 +1499,9 @@ El endpoint incluye ambos tipos de inscripción en un mismo paquete por club.
   real si el nadador (o el equipo de relevo) tiene uno cargado; si no, se exporta
   como `0`.
 
-### Géneros, nombres de archivo, categoría y exhibición de los relevos (estado: publicada en el repositorio y validada localmente, con importación manual satisfactoria del candidato derivado; pendiente de despliegue y actualización del entorno local)
+### Géneros, nombres de archivo, categoría y exhibición de los relevos (estado: publicada, desplegada en la API y actualizada en el backend local, con exportación real importada satisfactoriamente en Meet Manager dentro del alcance comprobado)
 
-> **Estado:** **publicada en el repositorio y validada localmente, con importación manual satisfactoria del candidato derivado; pendiente de despliegue y actualización del entorno local.** El **servicio desplegado todavía no contiene esta corrección**: hasta desplegarla, lo que se descarga de producción sigue con el formato anterior (género de la prueba copiado del nadador, `MIX`, mes en inglés, `X` de exhibición en los relevos con marca y un correlativo desde 100 como categoría). Sin cambios de esquema, migraciones, seed, variables, permisos ni rutas.
+> **Estado:** **publicada, desplegada en la API y actualizada en el backend local, con exportación real importada satisfactoriamente en Meet Manager dentro del alcance comprobado.** El código desplegado en la API es el commit `34cfb9b8f4b1c7bb720fe54371f0630ba184fd0d`; la web sigue en `0b1cf37` y el mantenimiento en `430c4cb` (ver el punto 4). Sin cambios de esquema, migraciones, seed, variables, permisos ni rutas. *Antecedente:* al publicarse, este bloque indicaba que el servicio desplegado todavía no contenía la corrección y que lo descargado de producción seguía con el formato anterior (género de la prueba copiado del nadador, `MIX`, mes en inglés, `X` de exhibición en los relevos con marca y un correlativo desde 100 como categoría), con el despliegue y la actualización del entorno local pendientes.
 
 **Qué cambia** (posiciones contadas **desde 0**, como `slice`; la columna en base 1 es la siguiente).
 
@@ -1513,6 +1513,8 @@ El endpoint incluye ambos tipos de inscripción en un mismo paquete por club.
 - **No cambian:** marcas, integrantes y orden de postas, número de prueba, distancia, estilo, piscina, inscripciones individuales ni datos almacenados.
 
 **Evidencia de la categoría** (exportaciones de Team Manager revisadas fuera del repositorio, sin datos personales en este documento). En una, los dos relevos, de pruebas distintas, llevan `200`. En otra, tres relevos llevan `160`, `200` y `240`, dos de ellos en la misma prueba, y la suma de edades de cada equipo cae en 160-199, 200-239 y 240-279 respectivamente. Es decir, el campo es el límite inferior del tramo y no un identificador único. **Dependencia del catálogo:** el archivo lleva la `minAge` tal como esté configurada. Solo se observaron 160, 200 y 240; si las categorías de relevo del catálogo no reproducen los tramos de Team Manager, el archivo llevará el límite configurado. No se revisó el catálogo de producción.
+
+**Separación de evidencias.** El punto 1 son pruebas automatizadas con datos sintéticos; los puntos 2 y 3, un candidato derivado fuera del repositorio y su importación manual; el 4, el despliegue y comprobaciones operativas sin credenciales, que no validan el contenido del ZIP; el 5, una exportación obtenida del servicio desplegado y su importación manual. Ninguna sustituye a las otras.
 
 **1. Pruebas del generador y del servicio real** (datos sintéticos; la integración, solo contra la base desechable de `docker-compose.test.yml`; rondas separadas).
 
@@ -1533,14 +1535,55 @@ El endpoint incluye ambos tipos de inscripción en un mismo paquete por club.
 - Con el candidato corregido, el usuario confirmó que la importación fue correcta. **Sus capturas muestran** la categoría 200 en ambos relevos, «Exh» desmarcado, las marcas 4:00,00 y 5:00,00, y «Gen X» conservado en el relevo mixto.
 - El informe de inscripciones de Meet Manager posterior a esa importación (privado) muestra 41 inscripciones individuales y 2 relevos, los relevos como `X200` y `F200`, y ninguna marca precedida de `X`. Es una revisión manual del usuario, no una prueba automatizada.
 
-**4. Servicio desplegado.** **No contiene esta corrección.** Falta desplegarla en API y web, actualizar el entorno local y comprobar una exportación obtenida del servicio desplegado.
+**4. Servicio desplegado.** *Antecedente:* aquí constaba que el servicio desplegado no contenía esta corrección y que faltaba desplegarla en API y web, actualizar el entorno local y comprobar una exportación obtenida del servicio desplegado. Se desplegó solo la API, porque la web no cambia (ver «Alcance»); se actualizó el backend local, y la exportación del servicio desplegado se comprobó en el punto 5.
+
+**CI.** La ejecución `44344704618` corresponde al SHA exacto `34cfb9b` (push en `main`) y se aprobó en el intento 1: Frontend (tipos, lint, pruebas y build), Derivados (avisos y Dockerfile de mantenimiento) y Backend (tipos, lint y pruebas).
+
+**Despliegue y comprobaciones operativas** (18-11-2026; Render en GMT-3, horas con `Z` en UTC). Son comprobaciones de disponibilidad sin credenciales, distintas de las pruebas funcionales y de la exportación real.
+
+- **Alcance.** Entre `0b1cf37` y `34cfb9b` solo cambian este README, el módulo `team-manager-export` del backend y sus pruebas; no cambian el frontend, Prisma, las migraciones, las dependencias, los Dockerfiles, compose, la configuración ni los scripts. Por eso se desplegó **solo la API**. La web quedó en `0b1cf37` y el mantenimiento en `430c4cb`, sin construcciones, ejecuciones ni cambios de configuración: la imagen de mantenimiento copia solo los derivados del seed (que no importan el exportador), el esquema, las migraciones y `operacion/`.
+- **Antes de operar:** API y web estaban en `0b1cf37`, Live y sin operaciones posteriores; el mantenimiento, en `430c4cb`.
+- **Respaldo previo:** se creó una exportación lógica nueva en la página Recovery con un solo clic; la tabla pasó de 8 a 9 filas y la nueva muestra la hora de panel 13:43 (16:43Z). El usuario la descargó al destino privado establecido: es el único archivo nuevo y no se sobrescribió ninguna copia anterior. Se comprobó la integridad del gzip y se listaron sus entradas: 46 (3 directorios y 43 archivos, ninguno vacío), con los mismos nombres que el respaldo anterior salvo la fecha de la carpeta, y un `toc.dat` con la firma de `pg_dump`. **No se probó su restauración.**
+- **API:** despliegue manual del commit exacto, `dep-dbuuiap5efls73bbtdsg`, iniciado a las 15:06:36 (18:06:36Z). La lectura del panel de las 18:07:13Z lo mostró exitoso y Live con `34cfb9b`, y los eventos registran «Deploy live for 34cfb9b». En sus registros (solo lectura, ventana de 18:06:30Z a 18:08:30Z), la instancia anterior atendió una petición a las 18:06:55Z y la nueva registró que escuchaba a las 18:07:05Z; solo hay mensajes informativos, sin errores. A las 18:07:31Z, `/api/health` respondió 200 con una instancia de 28 s de actividad; en las rondas posteriores a Live, `/api/ready` respondió 200 con la base `ok`.
+- **Rechazo sin credenciales de la exportación.** La ruta real es `GET /export/team-manager/zip` (en la web pública, bajo `/api/`), protegida por `requirePermission("export:team-manager")`. Sin credenciales responde **401** con `"error":"UNAUTHORIZED"`. Como contraste, justo antes de desplegar, una ruta inexistente y `POST` a la misma ruta respondieron **404** «Route … not found»: el 401 proviene de la autenticación, no de una ruta o un método inexistentes.
+- **Base:** no se ejecutaron migraciones ni seed, ni se cambiaron variables.
+
+**Disponibilidad: muestreo durante el despliegue** (sin credenciales, contra la web pública, con espera máxima de 15 s por petición). 13 rondas cada ~34 s, de 18:05:44Z (primera petición) a 18:12:35Z (última petición); cada ronda pidió `/login`, `/api/health`, `/api/ready` y la ruta real de la exportación, 52 peticiones en total. Por petición se registraron la hora, la duración, el estado HTTP, el código de salida del cliente, el error y si el cuerpo era el esperado.
+
+- **Resultado:** las 52 peticiones respondieron lo esperado (200 en las tres primeras rutas y 401 con `UNAUTHORIZED` en la exportación), con salida 0 del cliente, sin errores y con el cuerpo esperado.
+- **Según sus horas registradas:**
+  - 2 rondas (8 peticiones), de 18:05:44Z a 18:06:22Z, antes del inicio del despliegue (18:06:36Z);
+  - 1 ronda (4 peticiones), de 18:06:53Z a 18:06:55Z, después del inicio y antes de que la instancia nueva registrara que escuchaba;
+  - 10 rondas (40 peticiones), de 18:07:27Z a 18:12:35Z, después de la lectura del panel con Live (18:07:13Z); entre esa lectura y la última petición pasaron unos 5 min 22 s.
+- **Sin muestras entre 18:06:55Z y 18:07:27Z:** el cambio de instancia (18:07:05Z) cayó en ese intervalo y no quedó muestreado.
+- **Duraciones:** 0,53 s como máximo, salvo una petición a la exportación en la ronda de 18:10:51Z, que tardó 1,40 s y respondió el 401 esperado; su causa no se investigó.
+- El 401 de la exportación responde igual con la API anterior y con la nueva, así que las rondas no distinguen la versión.
+
+**Entorno local, en el mismo procedimiento** (solo el backend):
+
+- La imagen candidata se construyó desde una **copia limpia** del SHA exacto (exportación del commit, verificada contra él), no desde el árbol del checkout principal: backend `a463bb70f4e4`, sin errores de certificados y sin desactivar TLS. Un contenedor temporal confirmó que el código compilado incluye la categoría del relevo y los meses en español.
+- La imagen anterior se conserva para reversión como `prev-20261118-0b1cf37` (`ec3e8e3d04ad`); la candidata pasó a `latest`.
+- Se recreó solo el backend sin construir (`docker compose up -d --no-build backend`), que usa exactamente la imagen candidata. PostgreSQL arrancó como dependencia con el mismo contenedor y el mismo volumen de datos; el frontend no se recreó y siguió detenido. No se activó el perfil de mantenimiento ni se ejecutaron migraciones o seed.
+- El backend quedó sano: `/health` y `/ready` respondieron 200 y la exportación, 401 `UNAUTHORIZED` sin credenciales; su registro no mostró migraciones, seed ni errores. Al terminar, backend y PostgreSQL quedaron **detenidos**, como estaban.
+
+**Reversión del código:** en Render, volver la API al despliegue anterior de `0b1cf37` (`dep-dbub868jo6nc739ifn9g`); en local, volver a etiquetar `prev-20261118-0b1cf37` como `latest` y recrear solo el backend sin construir. La reversión afecta al código: **no deshace** las operaciones que los usuarios hayan guardado entretanto ni autoriza restaurar la base.
+
+**5. Exportación del servicio desplegado e importación manual** (revisión manual del usuario, en Meet Manager; no es una prueba automatizada). *Antecedente:* hasta aquí, la validación de una exportación del servicio desplegado figuraba como pendiente.
+
+- Tras el despliegue, el usuario descargó desde su sesión una exportación real del servicio actualizado; su contenido no se publica.
+- Antes de importarla se verificó en modo de solo lectura: 6 nadadores, 41 inscripciones individuales y 2 relevos; categoría 200 en ambos relevos; campos de exhibición vacíos en el HY3 y el CL2; género mixto y mes en español correctos; largos, checksums y finales de línea válidos.
+- Frente al candidato aprobado solo cambiaron los metadatos de generación y la marca del relevo mixto, de 4:00,00 a 3:59,68, que el usuario confirmó haber modificado en el sistema.
+- Después, el usuario confirmó la importación en Meet Manager con la categoría, «Exh» desmarcado, las marcas, los integrantes y «Gen X» correctos.
 
 **Limitaciones**
 
 - **Contradicción no resuelta:** una exportación de referencia de Team Manager con relevos con marca también traía la `X` en esas posiciones; no se sabe si allí se importaron como exhibición. La semántica de exhibición se basa en el comportamiento observado en Meet Manager.
 - La categoría depende de cómo estén configuradas las categorías de relevo en el catálogo; fuera de 160, 200 y 240 no hay evidencia.
-- La importación manual cubrió un solo club y una competencia, con un relevo mixto y uno femenino; no se importó un relevo masculino ni uno sin marca.
+- La importación del candidato y la de la exportación real cubrieron un solo club y una competencia, con un relevo mixto y uno femenino, ambos con marca; no acreditan relevos masculinos ni sin marca.
 - No hay prueba automatizada contra Meet Manager.
+- La disponibilidad y el 401 no validan el contenido del ZIP; esa validación es la revisión manual del punto 5.
+- No se demostró identidad binaria entre la imagen desplegada en Render y la local: provienen del mismo commit, pero se construyeron por separado.
+- No se afirma la ausencia absoluta de escrituras en las bases: solo que no se ejecutaron migraciones ni seed y que los registros revisados no mostraron errores.
 
 ### Semántica de la distancia en pruebas de relevo
 
