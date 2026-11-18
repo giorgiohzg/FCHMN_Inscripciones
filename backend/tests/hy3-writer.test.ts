@@ -140,6 +140,7 @@ describe("hy3-writer — buildE1 reconstruye líneas del fixture sintético", ()
     const esperada = lines.find((l) => l.startsWith("E1") && l.includes("332Álamo") && l.includes("50D"))!;
     const mine = buildE1({
       gender: "M",
+      eventGender: "M",
       swimmerId: 332,
       lastNameAbbrev: "Álamo",
       distanceMeters: 50,
@@ -154,6 +155,7 @@ describe("hy3-writer — buildE1 reconstruye líneas del fixture sintético", ()
     const esperada = lines.find((l) => l.startsWith("E1") && l.includes("339DeltaMM   200E"))!;
     const mine = buildE1({
       gender: "M",
+      eventGender: "M",
       swimmerId: 339,
       lastNameAbbrev: "Delta",
       distanceMeters: 200,
@@ -168,6 +170,7 @@ describe("hy3-writer — buildE1 reconstruye líneas del fixture sintético", ()
     const esperada = lines.find((l) => l.startsWith("E1") && l.includes("333BravoFF   400A"))!;
     const mine = buildE1({
       gender: "F",
+      eventGender: "F",
       swimmerId: 333,
       lastNameAbbrev: "Bravo",
       distanceMeters: 400,
@@ -198,7 +201,7 @@ describe("hy3-writer — buildF1/buildF3 reconstruyen relevos del fixture sinté
     const mine = buildF1({
       clubCode: "SINT",
       relayLetter: "A",
-      relayId: 160,
+      categoriaRelevo: 160,
       genderCode: "FFF",
       distanceMeters: 200,
       strokeCode: "E",
@@ -213,7 +216,7 @@ describe("hy3-writer — buildF1/buildF3 reconstruyen relevos del fixture sinté
     const mine = buildF1({
       clubCode: "SINT",
       relayLetter: "A",
-      relayId: 240,
+      categoriaRelevo: 240,
       genderCode: "MMM",
       distanceMeters: 200,
       strokeCode: "E",
@@ -228,7 +231,7 @@ describe("hy3-writer — buildF1/buildF3 reconstruyen relevos del fixture sinté
     const mine = buildF1({
       clubCode: "SINT",
       relayLetter: "A",
-      relayId: 280,
+      categoriaRelevo: 280,
       genderCode: "FFF",
       distanceMeters: 200,
       strokeCode: "A",
@@ -264,7 +267,7 @@ describe("hy3-writer — buildF1/buildF3 reconstruyen relevos del fixture sinté
     const withSeed = buildF1({
       clubCode: "SINT",
       relayLetter: "A",
-      relayId: 999,
+      categoriaRelevo: 999,
       genderCode: "MMM",
       distanceMeters: 200,
       strokeCode: "A",
@@ -275,9 +278,12 @@ describe("hy3-writer — buildF1/buildF3 reconstruyen relevos del fixture sinté
     expect(withSeed).not.toContain("0.00");
   });
 
-  it("la X de la columna 83 acompaña a la marca: sin marca no se escribe", () => {
-    const relevo = { clubCode: "SINT", relayLetter: "A", relayId: 999, genderCode: "MMM" as const, distanceMeters: 200, strokeCode: "A" as const, meetEventNumber: 5 };
-    expect(buildF1({ ...relevo, seedTimeSeconds: 125.5 })[83]).toBe("X");
+  // Antes esta prueba exigía la "X" de la posición 83 siempre que hubiera marca. Esa X es la
+  // marca de EXHIBICIÓN: Meet Manager importó como «Exh» los relevos con marca. Cambia el
+  // significado, no solo el valor: con marca o sin ella, la posición queda en blanco.
+  it("la posición 83 (exhibición) queda en blanco, con marca o sin ella", () => {
+    const relevo = { clubCode: "SINT", relayLetter: "A", categoriaRelevo: 200, genderCode: "MMM" as const, distanceMeters: 200, strokeCode: "A" as const, meetEventNumber: 5 };
+    expect(buildF1({ ...relevo, seedTimeSeconds: 125.5 })[83]).toBe(" ");
     expect(buildF1({ ...relevo, seedTimeSeconds: 0 })[83]).toBe(" ");
   });
 });
@@ -286,6 +292,7 @@ describe("hy3-writer — utilidades de formato", () => {
   it("buildE1/buildF1 usan el curso indicado (S=piscina corta) en vez de 'L' por defecto cuando se entrega courseCode", () => {
     const e1WithShortCourse = buildE1({
       gender: "F",
+      eventGender: "F",
       swimmerId: 1,
       lastNameAbbrev: "Perez",
       distanceMeters: 50,
@@ -299,7 +306,7 @@ describe("hy3-writer — utilidades de formato", () => {
     const f1WithShortCourse = buildF1({
       clubCode: "SINT",
       relayLetter: "A",
-      relayId: 1,
+      categoriaRelevo: 1,
       genderCode: "FFF",
       distanceMeters: 200,
       strokeCode: "A",
@@ -314,6 +321,7 @@ describe("hy3-writer — utilidades de formato", () => {
   it("buildE1/buildF1 siguen usando 'L' (piscina larga) por defecto si no se entrega courseCode", () => {
     const e1Default = buildE1({
       gender: "F",
+      eventGender: "F",
       swimmerId: 1,
       lastNameAbbrev: "Perez",
       distanceMeters: 50,

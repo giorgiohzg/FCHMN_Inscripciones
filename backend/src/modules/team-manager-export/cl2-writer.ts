@@ -9,7 +9,11 @@ import { formatHy3Date, type ExportMeet, type TeamManagerExportModel, type Expor
  * tanto sale del estándar SDIF, sin contraste contra Hy-Tek, va marcado como
  * INFERENCIA:
  *   - prueba o relevo SIN marca: "NT";
- *   - relevo Combinado: estilo 7; relevo mixto: sexo X.
+ *   - relevo Combinado: estilo 7.
+ * Una segunda exportación de referencia, con pruebas individuales mixtas y un
+ * relevo mixto combinado, ya sí trae el estilo 7 y el sexo X del relevo mixto, y
+ * muestra que la columna 66 del D0 es el género de la PRUEBA ("X" en una mixta),
+ * no una copia del sexo de la persona de la columna 65.
  *
  * ESTRUCTURA DE CADA LÍNEA (cierto en las 115):
  *   columnas 0-155  contenido
@@ -153,8 +157,8 @@ export function buildD0(swimmer: ExportSwimmer, entry: ExportEntry, courseCode: 
   c += padRight("", 4); // adjunto y ciudadanía
   c += formatHy3Date(swimmer.birthDate);
   c += padLeft(String(swimmer.age), 2);
-  c += swimmer.gender;
-  c += swimmer.gender; // sexo de la prueba
+  c += swimmer.gender; // sexo de la persona
+  c += entry.eventGender; // género de la prueba: X si es mixta, aunque la persona sea M o F
   c += padLeft(String(entry.distanceMeters), 4);
   c += ESTILO_SDIF[entry.strokeCode];
   c += padLeft(String(entry.meetEventNumber), 3);
@@ -176,8 +180,11 @@ export function buildD3(swimmer: ExportSwimmer): string {
   return buildCl2Line(c);
 }
 
+/** El código de tres letras del F1 del HY3, en la única columna de sexo del E0. */
+const SEXO_DEL_RELEVO: Record<TeamManagerExportModel["relays"][number]["genderCode"], "M" | "F" | "X"> = { MMM: "M", FFF: "F", XXX: "X" };
+
 export function buildE0(relay: TeamManagerExportModel["relays"][number], clubCode: string, meet: ExportMeet): string {
-  const sexo = relay.genderCode === "MMM" ? "M" : relay.genderCode === "FFF" ? "F" : "X";
+  const sexo = SEXO_DEL_RELEVO[relay.genderCode];
   let c = "E01";
   c += padRight("", 8);
   c += relay.relayLetter;
@@ -193,8 +200,12 @@ export function buildE0(relay: TeamManagerExportModel["relays"][number], clubCod
   c += formatHy3Date(meet.startDate);
   c += padLeft(formatCl2Time(relay.seedTimeSeconds), 8);
   c += meet.courseCode;
-  c = padRight(c, 154);
-  c += relay.seedTimeSeconds > 0 ? "X" : " "; // misma marca que la columna 83 del F1 del HY3
+  // Posición 154 (desde 0): exhibición, el mismo dato que la posición 83 del F1 del HY3.
+  // Antes llevaba "X" siempre que había marca, y el relevo se importaba como «Exh». El
+  // sistema no tiene relevos de exhibición: queda en blanco, y la marca sigue en 45-52.
+  // La categoría del relevo no tiene campo propio aquí: la referencia deja "UNOV" y la
+  // suma de edades (34-36) en blanco, y así se mantiene.
+  c = padRight(c, 155);
   return buildCl2Line(c);
 }
 

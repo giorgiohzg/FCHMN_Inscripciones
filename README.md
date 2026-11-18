@@ -1350,7 +1350,10 @@ Meet Manager importa.
 > difería: el `A1` decía `Sist. FCHMN` donde va `Hy-Tek, Ltd`, y la hora corría una
 > columna el resto de la línea. **Es la causa probable, no demostrada**: no se ha
 > podido ejecutar Meet Manager para aislar cuál de las diferencias lo provoca.
-> **La importación real en HY-Tek sigue pendiente de comprobarse.**
+> *Antecedente:* aquí constaba que la importación real en HY-Tek seguía pendiente.
+> Después, el usuario importó manualmente en Meet Manager un **candidato derivado**
+> (no una exportación del servicio desplegado) con resultado satisfactorio: ver
+> «Géneros, nombres de archivo, categoría y exhibición de los relevos».
 
 ### Verificación
 
@@ -1402,10 +1405,12 @@ Meet Manager importa.
 ### Limitaciones documentadas honestamente
 
 - **Lo que el `.CL2` real no contenía y por tanto es inferencia.** Sale del estándar
-  SDIF, sin contraste contra Hy-Tek: una prueba o relevo **sin marca** (`NT`), el
-  relevo **combinado** (estilo `7`), el relevo **mixto** (sexo `X`), un código de club
-  de 5 caracteres, y un nadador **que solo nada relevos**, que no lleva `D0` y aparece
-  únicamente en sus `F0`. Son los primeros sitios donde mirar si un caso real falla.
+  SDIF, sin contraste contra Hy-Tek: una prueba o relevo **sin marca** (`NT`), un
+  código de club de 5 caracteres, y un nadador **que solo nada relevos**, que no lleva
+  `D0` y aparece únicamente en sus `F0`. Son los primeros sitios donde mirar si un caso
+  real falla. *Antecedente:* el relevo **combinado** (estilo `7`) y el relevo **mixto**
+  (sexo `X`) figuraban aquí como inferencia; una exportación de referencia de Team
+  Manager con un relevo mixto combinado los trae así.
 - **Sede**: el `B1` de ambos formatos lleva la constante `cduc` de la muestra. El
   sistema no modela este dato.
 - **Nombres con caracteres especiales (ñ, á, é, etc.)**: se encontró un caso en el
@@ -1476,8 +1481,12 @@ Se decodificó igual que el resto — byte a byte
   Un hallazgo relevante: cuando NO hay marca de referencia, el campo se escribe
   como `0.00` con **punto** decimal (formato inglés) — a diferencia de una marca
   real, que usa **coma** decimal (formato chileno) igual que en `E1`. Tampoco lleva
-  el marcador de estado `C` que sí lleva `E1` (esa posición queda en blanco). Con
-  marca lleva una `X` en la columna 83; sin marca, no.
+  el marcador de estado `C` que sí lleva `E1` (esa posición queda en blanco).
+  *Antecedente:* aquí constaba que, con marca, el `F1` lleva una `X` en la columna 83
+  (y el `E0` del CL2 otra en la 154). Esa `X` es la marca de **exhibición**: Meet
+  Manager importó como «Exh» los relevos con marca. Ahora ambas posiciones van en
+  blanco, con marca o sin ella, y la marca se conserva en su campo. Ver «Géneros,
+  nombres de archivo, categoría y exhibición de los relevos».
 - **`F3`** (los 4 integrantes del equipo, en orden): mismo `swimmerId` que su
   registro `D1` — un nadador que compite en un relevo pero en ninguna prueba
   individual igual recibe su línea `D1` (sin `E1` después), tal como en la muestra
@@ -1489,6 +1498,49 @@ El endpoint incluye ambos tipos de inscripción en un mismo paquete por club.
 - El campo de "tiempo de marca de referencia" (seed time) se exporta con el valor
   real si el nadador (o el equipo de relevo) tiene uno cargado; si no, se exporta
   como `0`.
+
+### Géneros, nombres de archivo, categoría y exhibición de los relevos (estado: publicada en el repositorio y validada localmente, con importación manual satisfactoria del candidato derivado; pendiente de despliegue y actualización del entorno local)
+
+> **Estado:** **publicada en el repositorio y validada localmente, con importación manual satisfactoria del candidato derivado; pendiente de despliegue y actualización del entorno local.** El **servicio desplegado todavía no contiene esta corrección**: hasta desplegarla, lo que se descarga de producción sigue con el formato anterior (género de la prueba copiado del nadador, `MIX`, mes en inglés, `X` de exhibición en los relevos con marca y un correlativo desde 100 como categoría). Sin cambios de esquema, migraciones, seed, variables, permisos ni rutas.
+
+**Qué cambia** (posiciones contadas **desde 0**, como `slice`; la columna en base 1 es la siguiente).
+
+- **Sexo de la persona y género de la prueba, separados.** La persona conserva M o F (HY3: `D1` posición 2, `E1` posición 2 y `F3`; CL2: `D0` posición 65 y `F0`). La prueba lleva el suyo, tomado de `competitionEvent.event.gender`: `E1` posiciones 13-14 (`XX` en una prueba mixta) y `D0` posición 66 (`X`). Antes ambos campos copiaban el sexo del nadador.
+- **Género mixto en los dos formatos.** El relevo mixto escribe `XXX` en el `F1` (posiciones 12-14; antes `MIX`) y `X` en el `E0` (posición 20, ya era así). `MMM`/`M` y `FFF`/`F` no cambian.
+- **Mes en español en los nombres de archivo** (`ene` a `dic`): el ZIP, el `.HY3` y el `.CL2` comparten la base, por ejemplo `SIGLA-Entries-Competencia-06ene2027-001`. El día se lee en UTC, como antes, y las fechas dentro de los archivos siguen siendo numéricas (`MMDDYYYY`).
+- **Campos de exhibición vacíos.** `F1` posición 83 y `E0` posición 154 quedan en blanco, tenga el relevo marca o no; el sistema no tiene relevos de exhibición. Antes llevaban `X` siempre que había marca, y Meet Manager marcaba «Exh» y anteponía la `X` a la marca. **Las marcas se conservan**: `F1` posiciones 51-58 con el curso en la 59 (`0.00` sin marca) y `E0` posiciones 45-52 con el curso en la 53 (`NT` sin marca).
+- **Categoría del relevo en el HY3.** `F1` posiciones 9-11 llevan la **categoría registrada del relevo**: la `minAge` de la categoría con que quedó inscrito, que el sistema resuelve al inscribir por la suma de edades de los integrantes a la fecha de corte (200 para 200-239), ajustada a la derecha. Ya **no hay un contador desde 100** (100, 101…), que Meet Manager leía como categoría. Un valor que no sea un entero de 0 a 999 detiene la exportación en vez de recortarse. Dos relevos de pruebas distintas pueden compartir categoría. El CL2 no tiene campo de categoría: el `E0` conserva `UNOV` y la suma de edades (posiciones 34-36) en blanco, como la referencia.
+- **No cambian:** marcas, integrantes y orden de postas, número de prueba, distancia, estilo, piscina, inscripciones individuales ni datos almacenados.
+
+**Evidencia de la categoría** (exportaciones de Team Manager revisadas fuera del repositorio, sin datos personales en este documento). En una, los dos relevos, de pruebas distintas, llevan `200`. En otra, tres relevos llevan `160`, `200` y `240`, dos de ellos en la misma prueba, y la suma de edades de cada equipo cae en 160-199, 200-239 y 240-279 respectivamente. Es decir, el campo es el límite inferior del tramo y no un identificador único. **Dependencia del catálogo:** el archivo lleva la `minAge` tal como esté configurada. Solo se observaron 160, 200 y 240; si las categorías de relevo del catálogo no reproducen los tramos de Team Manager, el archivo llevará el límite configurado. No se revisó el catálogo de producción.
+
+**1. Pruebas del generador y del servicio real** (datos sintéticos; la integración, solo contra la base desechable de `docker-compose.test.yml`; rondas separadas).
+
+- **Ronda de géneros y nombres.**
+  - `tests/team-manager-genero-prueba.test.ts`, nueva: 32 casos. Con el código anterior fallaron 22, por los motivos esperados. Dos salvedades: el cambio de `MIX` a `XXX` vive en el servicio, así que solo falló su función nueva por no existir; y el escritor del `F1` ya copiaba `XXX` si se le entregaba. Pruebas del generador: 178/178.
+  - Integración: 5 pruebas nuevas en `import-export-services.integration.test.ts`, que llaman a `buildTeamManagerExport` y abren el ZIP que devuelve (sin armar el modelo a mano); el archivo pasó 115/115. Contrapruebas temporales en el servicio, restauradas byte a byte: volver a derivar el género de la prueba del sexo del nadador y volver a emitir `MIX` hicieron fallar las pruebas correspondientes.
+- **Ronda de categoría y exhibición.**
+  - `tests/team-manager-relevos-categoria-exhibicion.test.ts`, nueva: 17 casos (relevos masculinos, femeninos y mixtos, con y sin marca; categorías 200, 200, 240 y 160; integrantes; largos, checksums, Latin-1 y CRLF). Con el código anterior fallaron 10, por los dos defectos. Cambiaron de significado tres expectativas antiguas que exigían la `X` con marca (`hy3-writer.test.ts` y `cl2-writer.test.ts`), y el campo `relayId` pasó a `categoriaRelevo`, con valores de categoría realistas en los fixtures. Pruebas del generador: 195/195.
+  - Integración: 4 pruebas nuevas con categorías por suma de edades (200, 200, 240 y 160), que coinciden con las que guarda el sistema para cada inscripción; el archivo pasó 119/119. Una contraprueba temporal que volvía al correlativo desde 100 hizo fallar la prueba de categoría y la de huella; el servicio se restauró byte a byte.
+- **Huellas fijas de SEC-02.** Se actualizaron en cada ronda conservando las anteriores: deshaciendo **solo** los campos corregidos (y recalculando el checksum de esas líneas) el archivo vuelve exactamente a la huella previa. En la segunda ronda solo cambió el HY3, porque ese montaje inscribe el relevo sin marca.
+- Tipos sin errores y lint limpio en el área.
+
+**2. Verificación independiente del candidato derivado** (fuera del repositorio). Para probar en Meet Manager se derivó un paquete del ZIP que FCHMN ya había generado para un club real; su contenido no se publica. Primero se corrigieron los campos de género, `XXX` y el mes del nombre. Después, a partir de ese mismo candidato ya importado, solo la categoría (`F1` posiciones 9-11), la exhibición (`F1` 83 y `E0` 154) y sus checksums; cada `F1` derivado coincide con lo que escribe el generador corregido. Un verificador independiente confirmó: 6 nadadores, 41 inscripciones individuales y 2 relevos; personas, inscripciones individuales, integrantes, orden de postas y marcas idénticos al origen; largos, checksums, CRLF y codificación válidos, y los mismos nombres y fechas de entrada en el ZIP. **No es una exportación del servicio desplegado.**
+
+**3. Importación manual del candidato derivado** (informada por el usuario, en Meet Manager).
+
+- Con el primer candidato (solo géneros y mes), las inscripciones se cargaron, pero los relevos quedaron como exhibición y con categorías `A 100` y `A 101` en vez de `A 200`: los dos defectos corregidos aquí.
+- Con el candidato corregido, el usuario confirmó que la importación fue correcta. **Sus capturas muestran** la categoría 200 en ambos relevos, «Exh» desmarcado, las marcas 4:00,00 y 5:00,00, y «Gen X» conservado en el relevo mixto.
+- El informe de inscripciones de Meet Manager posterior a esa importación (privado) muestra 41 inscripciones individuales y 2 relevos, los relevos como `X200` y `F200`, y ninguna marca precedida de `X`. Es una revisión manual del usuario, no una prueba automatizada.
+
+**4. Servicio desplegado.** **No contiene esta corrección.** Falta desplegarla en API y web, actualizar el entorno local y comprobar una exportación obtenida del servicio desplegado.
+
+**Limitaciones**
+
+- **Contradicción no resuelta:** una exportación de referencia de Team Manager con relevos con marca también traía la `X` en esas posiciones; no se sabe si allí se importaron como exhibición. La semántica de exhibición se basa en el comportamiento observado en Meet Manager.
+- La categoría depende de cómo estén configuradas las categorías de relevo en el catálogo; fuera de 160, 200 y 240 no hay evidencia.
+- La importación manual cubrió un solo club y una competencia, con un relevo mixto y uno femenino; no se importó un relevo masculino ni uno sin marca.
+- No hay prueba automatizada contra Meet Manager.
 
 ### Semántica de la distancia en pruebas de relevo
 

@@ -5,7 +5,15 @@ import { audit } from "../audit/audit.service";
 import { relayTotalMetersForExport } from "../../shared/relayDistance.util";
 import { buildHy3File, strokeNameToHy3Code, type RelayLegInfo } from "./hy3-writer";
 import { buildCl2File } from "./cl2-writer";
-import { textoExportable, type ExportRelay, type ExportSwimmer, type TeamManagerExportModel } from "./export-model";
+import {
+  codigoGeneroRelevo,
+  generoDePrueba,
+  nombresDelPaquete,
+  textoExportable,
+  type ExportRelay,
+  type ExportSwimmer,
+  type TeamManagerExportModel,
+} from "./export-model";
 import { computeAge } from "../../shared/age.util";
 import { fechasDeLaCompetencia } from "./competition-dates";
 import { assertClubAccess, type ActorContext } from "../../shared/actorContext";
@@ -46,8 +54,6 @@ const NOMBRES_ZIP_SIN_MARCA_UTF8 = {
   encode: (texto: string) => Buffer.from(texto, "latin1"),
   decode: (bytes: Buffer) => bytes.toString("latin1"),
 };
-
-const MESES = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
 /** Lo que entrega la exportación: el ZIP, y cada archivo por separado. */
 export interface TeamManagerExport {
@@ -190,6 +196,8 @@ export async function buildTeamManagerExport(
   const relayRegistrations = await prisma.relayRegistration.findMany({
     where: { clubId, status: "confirmed", competitionEvent: { competitionId } },
     include: {
+      // La categoría con la que quedó inscrito el equipo (resuelta por la suma de edades al corte).
+      category: { select: { minAge: true } },
       members: { include: { person: true }, orderBy: { orderPosition: "asc" } },
       competitionEvent: {
         include: { event: { include: { distance: true, stroke: true } } },
@@ -267,6 +275,9 @@ export async function buildTeamManagerExport(
         strokeCode: strokeNameToHy3Code(reg.competitionEvent.event.stroke.name),
         meetEventNumber: reg.competitionEvent.displayOrder ?? 1,
         seedTimeSeconds: (reg.seedTimeCentiseconds ?? 0) / 100, // 0 = "sin marca de referencia" si no se ingresó
+        // El de la PRUEBA, del programa de la competencia: una prueba mixta va como X
+        // aunque la nade un hombre o una mujer. El sexo de la persona va en `gender`.
+        eventGender: generoDePrueba(reg.competitionEvent.event.gender),
       })),
     };
     swimmers.push(swimmer);
@@ -274,8 +285,6 @@ export async function buildTeamManagerExport(
   }
 
   // -------- Relevos (F1 + F3) --------
-  const GENDER_CODE: Record<"male" | "female" | "mixed", "MMM" | "FFF" | "MIX"> = { male: "MMM", female: "FFF", mixed: "MIX" };
-  let relayId = 100; // igual convención de ancho (3 dígitos) que la exportación real; el valor exacto no importa, solo que sea único
   const relays: ExportRelay[] = [];
 
   /**
@@ -306,8 +315,10 @@ export async function buildTeamManagerExport(
   for (const relay of relayRegistrations) {
     relays.push({
       relayLetter: "A", // un club solo puede tener un equipo por prueba+categoría (regla de negocio ya validada al inscribir)
-      relayId: relayId++,
-      genderCode: GENDER_CODE[relay.competitionEvent.event.gender],
+      // La categoría de ESTA inscripción (límite inferior del tramo, p. ej. 200 para
+      // 200-239), no un correlativo: antes un contador desde 100 daba 100, 101...
+      categoriaRelevo: relay.category.minAge,
+      genderCode: codigoGeneroRelevo(relay.competitionEvent.event.gender), // XXX si es mixto, no MIX
       // `Event.distance` YA es la distancia total del relevo (4×50 se guarda
       // como 200), que es exactamente lo que espera el registro F1. Antes
       // aquí se multiplicaba por 4 asumiendo que el valor era por posta, así
@@ -345,16 +356,11 @@ export async function buildTeamManagerExport(
     relays,
   };
 
-  // Misma forma de nombre que el paquete de Team Manager, en ASCII para que viaje
-  // sin problemas en la cabecera HTTP. El "-001" es fijo: el sistema no numera envíos.
-  const seguro = (texto: string) => texto.replace(/[^\w\- ]/g, "").replace(/\s+/g, "_");
-  const dia = String(inicioCompetencia.getUTCDate()).padStart(2, "0");
-  const fecha = `${dia}${MESES[inicioCompetencia.getUTCMonth()]}${inicioCompetencia.getUTCFullYear()}`;
-  const base = `${seguro(club.code)}-Entries-${seguro(competition.name)}-${fecha}-001`;
-
-  const hy3 = { filename: `${base}.HY3`, content: buildHy3File(model) };
-  const cl2 = { filename: `${base}.CL2`, content: buildCl2File(model) };
-  const filename = `${base}.zip`;
+  // Misma forma de nombre que el paquete de Team Manager, con el mes en español.
+  const nombres = nombresDelPaquete(club.code, competition.name, inicioCompetencia);
+  const hy3 = { filename: nombres.hy3, content: buildHy3File(model) };
+  const cl2 = { filename: nombres.cl2, content: buildCl2File(model) };
+  const filename = nombres.zip;
 
   const paquete = new AdmZip(undefined, { decoder: NOMBRES_ZIP_SIN_MARCA_UTF8 } as Partial<AdmZip.InitOptions>);
   // Latin-1, no UTF-8: Team Manager es un programa de la era DOS/Windows clásico.

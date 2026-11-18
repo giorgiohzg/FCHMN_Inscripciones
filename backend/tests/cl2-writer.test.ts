@@ -52,21 +52,21 @@ const MODELO: TeamManagerExportModel = {
     // Solo relevos: D1 en HY3, y en CL2 únicamente sus F0.
     nadador(1, { lastName: "Solorrelevo", firstName: "Berta", run: "9999999-9", gender: "F", age: 41, ageAtMeet: 40 }),
     nadador(2, { lastName: "De la Fuente", firstName: "Carla", run: "12345678-K", gender: "F", entries: [
-      { distanceMeters: 50, strokeCode: "A", meetEventNumber: 3, seedTimeSeconds: 35 },
-      { distanceMeters: 400, strokeCode: "E", meetEventNumber: 12, seedTimeSeconds: 754.2 },
-      { distanceMeters: 100, strokeCode: "C", meetEventNumber: 7, seedTimeSeconds: 0 },
+      { distanceMeters: 50, strokeCode: "A", meetEventNumber: 3, seedTimeSeconds: 35, eventGender: "F" },
+      { distanceMeters: 400, strokeCode: "E", meetEventNumber: 12, seedTimeSeconds: 754.2, eventGender: "F" },
+      { distanceMeters: 100, strokeCode: "C", meetEventNumber: 7, seedTimeSeconds: 0, eventGender: "F" },
     ] }),
     nadador(3, { lastName: "Nuñez", firstName: "Dora", run: "7654321-0", entries: [
-      { distanceMeters: 200, strokeCode: "B", meetEventNumber: 9, seedTimeSeconds: 83.45 },
+      { distanceMeters: 200, strokeCode: "B", meetEventNumber: 9, seedTimeSeconds: 83.45, eventGender: "F" },
     ] }),
     nadador(4, { lastName: "Ruiz", firstName: "Eva", run: "20000000-2", gender: "F", entries: [
-      { distanceMeters: 100, strokeCode: "D", meetEventNumber: 21, seedTimeSeconds: 61.5 },
+      { distanceMeters: 100, strokeCode: "D", meetEventNumber: 21, seedTimeSeconds: 61.5, eventGender: "F" },
     ] }),
   ],
   relays: [
     {
       relayLetter: "A",
-      relayId: 100,
+      categoriaRelevo: 200,
       genderCode: "FFF",
       distanceMeters: 200,
       strokeCode: "A",
@@ -81,8 +81,8 @@ const MODELO: TeamManagerExportModel = {
     },
     {
       relayLetter: "A",
-      relayId: 101,
-      genderCode: "MIX",
+      categoriaRelevo: 240,
+      genderCode: "XXX",
       distanceMeters: 400,
       strokeCode: "E",
       meetEventNumber: 14,
@@ -217,7 +217,9 @@ describe("estructura del archivo CL2", () => {
     expect(d3.slice(33, 46)).toBe("F".repeat(13));
   });
 
-  it("E0 con marca: relevo libre (6), fecha de inicio, marca y la X de la columna 154", () => {
+  // Antes exigía la "X" de la posición 154 con marca: es la de EXHIBICIÓN, y convertía en
+  // «Exh» a los relevos con marca al importarlos. Ahora la posición queda en blanco.
+  it("E0 con marca: relevo libre (6), fecha de inicio, marca y la posición 154 en blanco", () => {
     const e0 = de(CL2, "E0")[0]!;
     expect(e0[11]).toBe("A");
     expect(e0.slice(12, 18)).toBe("  SINT");
@@ -229,7 +231,7 @@ describe("estructura del archivo CL2", () => {
     expect(e0.slice(37, 45)).toBe("11082030");
     expect(e0.slice(45, 53)).toBe(" 2:55,38");
     expect(e0[53]).toBe("S");
-    expect(e0[154]).toBe("X");
+    expect(e0[154]).toBe(" ");
   });
 
   it("E0 sin marca: NT y sin X; combinado (7) y mixto (X)", () => {
@@ -329,9 +331,11 @@ describe("el HY3 y el CL2 representan las mismas inscripciones", () => {
     expect(marcasCl2).toEqual(marcasHy3);
   });
 
-  it("la X del relevo con marca coincide en los dos formatos", () => {
-    expect(de(HY3, "F1").map((l) => l[83])).toEqual(["X", " "]);
-    expect(de(CL2, "E0").map((l) => l[154])).toEqual(["X", " "]);
+  // Antes: "X" en el relevo con marca, en los dos formatos. Es la marca de exhibición
+  // (ver la cabecera del E0): ahora ninguno de los dos la lleva, tenga marca o no.
+  it("ningún relevo lleva la marca de exhibición, en ninguno de los dos formatos", () => {
+    expect(de(HY3, "F1").map((l) => l[83])).toEqual([" ", " "]);
+    expect(de(CL2, "E0").map((l) => l[154])).toEqual([" ", " "]);
   });
 });
 

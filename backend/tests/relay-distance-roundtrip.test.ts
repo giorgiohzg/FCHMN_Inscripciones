@@ -27,7 +27,7 @@ function ev3ConLineas(...lineas: string[]): string {
 
 /**
  * Distancia tal como la escribe el registro F1, en su posición de columna
- * fija: "F1"(2) + clubCode(5) + letra(1) + espacio(1) + relayId(3) +
+ * fija: "F1"(2) + clubCode(5) + letra(1) + espacio(1) + categoriaRelevo(3) +
  * genderCode(3) + relleno(3) = 18, y la distancia ocupa 3 caracteres.
  */
 function distanciaEnF1(linea: string): number {
@@ -36,7 +36,7 @@ function distanciaEnF1(linea: string): number {
 
 /**
  * Distancia del registro E1: "E1"(2) + gender(1) + relleno(2) +
- * swimmerId(3) + apellido(5) + gender duplicado(2) = 15, y la distancia
+ * swimmerId(3) + apellido(5) + género de la prueba duplicado(2) = 15, y la distancia
  * ocupa 6 caracteres.
  */
 function distanciaEnE1(linea: string): number {
@@ -47,8 +47,8 @@ function f1(distanceMeters: number): string {
   return buildF1({
     clubCode: "CLBA",
     relayLetter: "A",
-    relayId: 1,
-    genderCode: "MIX",
+    categoriaRelevo: 1,
+    genderCode: "XXX",
     distanceMeters,
     strokeCode: "A",
     meetEventNumber: 1,
@@ -95,6 +95,7 @@ describe("modelo → HY3: la distancia se exporta sin volver a multiplicar", () 
   it("una prueba individual de 50 se exporta como 50 en el registro E1", () => {
     const linea = buildE1({
       gender: "F",
+      eventGender: "F",
       swimmerId: 1,
       lastNameAbbrev: "PEREZ",
       distanceMeters: 50,
@@ -128,6 +129,7 @@ describe("ida y vuelta completa EV3 → modelo → HY3", () => {
     const parsed = parseEv3File(ev3ConLineas("33;33;F;1;I;W;0;109;100;D;0;;;N;0;;;;;;;1;33;1;09:45AM;S;4;3;1;0*>"));
     const linea = buildE1({
       gender: "F",
+      eventGender: "F",
       swimmerId: 1,
       lastNameAbbrev: "PEREZ",
       distanceMeters: parsed.events[0]!.distanceMeters,

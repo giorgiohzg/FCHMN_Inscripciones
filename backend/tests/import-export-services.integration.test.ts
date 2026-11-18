@@ -32,9 +32,10 @@ import * as catalogsCategories from "../src/modules/catalogs/categories.service"
 import * as catalogsEvents from "../src/modules/catalogs/events.service";
 import * as reportsService from "../src/modules/reports/reports.service";
 import { buildTeamManagerExport } from "../src/modules/team-manager-export/team-manager-export.service";
-import { isValidCl2Line } from "../src/modules/team-manager-export/cl2-writer";
+import { computeCl2Checksum, isValidCl2Line } from "../src/modules/team-manager-export/cl2-writer";
 import { formatHy3Date } from "../src/modules/team-manager-export/hy3-writer";
 import { computeHy3Checksum } from "../src/modules/team-manager-export/hy3-checksum";
+import { formatRunConGuion } from "../src/shared/run.util";
 import {
   importCompetitionFromMeetEventsZip,
   analizarArchivoDeImportacion,
@@ -1706,6 +1707,449 @@ describe("buildTeamManagerExport (invocación real)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// buildTeamManagerExport — sexo del nadador frente a género de la PRUEBA
+// ---------------------------------------------------------------------------
+
+/**
+ * Programa SINTÉTICO con pruebas mixtas y de control, en enero. Una exportación
+ * que Meet Manager importa correctamente mostró que el sexo de la persona (M/F)
+ * y el género de la prueba (X si es mixta) son datos distintos: aquí el género
+ * sale del EVENTO de la competencia y se comprueba en el ZIP que devuelve el
+ * servicio, no en un modelo armado a mano.
+ */
+const PROGRAMA_DE_GENEROS = [
+  { orden: 1, relevo: false, metros: 50, estilo: "Libre", genero: "mixed" },
+  { orden: 2, relevo: false, metros: 100, estilo: "Pecho", genero: "mixed" },
+  { orden: 3, relevo: false, metros: 100, estilo: "Espalda", genero: "male" },
+  { orden: 4, relevo: false, metros: 200, estilo: "Mariposa", genero: "female" },
+  { orden: 5, relevo: true, metros: 200, estilo: "Libre", genero: "mixed" },
+  { orden: 6, relevo: true, metros: 200, estilo: "Combinado", genero: "male" },
+  { orden: 7, relevo: true, metros: 200, estilo: "Libre", genero: "female" },
+] as const;
+
+async function montarCompetenciaDeGeneros() {
+  const individual = await prisma.testType.findUniqueOrThrow({ where: { name: "Individual" } });
+  const relevo = await prisma.testType.findUniqueOrThrow({ where: { name: "Relevo" } });
+  const tipoJornada = await prisma.sessionType.findUniqueOrThrow({ where: { name: "Mañana" } });
+
+  const club = await createClub("Club Generos", "CLBG", "club_generos");
+  const clubUser = await createUser({ username: "club_generos", roleNames: ["club"], clubId: club.id });
+
+  // Cuatro hombres (H1-H4) y cuatro mujeres (M1-M4), todos sintéticos.
+  const personas: Record<string, { id: string; run: string; gender: "male" | "female" }> = {};
+  for (const [i, clave] of ["H1", "H2", "H3", "H4", "M1", "M2", "M3", "M4"].entries()) {
+    const gender = clave.startsWith("H") ? "male" : "female";
+    const p = await createPerson({ run: `8200000${i + 1}`, username: `generos_${clave}`, firstName: `Genero${clave}`, gender, birthYear: 1990 });
+    await addActiveMembership(club.id, p.id, clubUser.id);
+    personas[clave] = { id: p.id, run: p.run, gender };
+  }
+
+  const categoria = await catalogsCategories.createCategory({ testTypeId: individual.id, name: "Master Generos", minAge: 20, maxAge: 60 }, SYSTEM_ACTOR);
+  const categoriaRelevo = await catalogsCategories.createCategory({ testTypeId: relevo.id, name: "Relevo Generos", minAge: 0, maxAge: 500 }, SYSTEM_ACTOR);
+  const piscina = await prisma.pool.create({ data: { name: "Piscina Sintetica", courseLength: "short_25m" } });
+
+  const ahora = new Date();
+  const competencia = await competitionsService.createCompetition(
+    {
+      name: "Copa Generos",
+      registrationStartAt: new Date(ahora.getTime() - 86_400_000),
+      registrationEndAt: new Date(ahora.getTime() + 86_400_000),
+      ageCutoffDate: new Date(ahora.getFullYear(), 11, 31),
+      maxIndividualEventsPerSwimmer: 10,
+      // Algunos integrantes nadan dos relevos en la misma jornada.
+      maxRelayEventsPerSwimmerPerSession: 3,
+      poolId: piscina.id,
+    },
+    SYSTEM_ACTOR
+  );
+  await competitionsService.transitionCompetition(competencia.id, "schedule", SYSTEM_ACTOR);
+  const fecha = await structureService.addCompetitionDate(competencia.id, new Date("2031-01-06T00:00:00.000Z"), SYSTEM_ACTOR);
+  const jornada = await structureService.addSession(fecha.id, tipoJornada.id, SYSTEM_ACTOR);
+
+  const pruebas = new Map<number, string>();
+  for (const p of PROGRAMA_DE_GENEROS) {
+    const distancia = await prisma.distance.findUniqueOrThrow({ where: { meters: p.metros } });
+    const estilo = await prisma.stroke.findUniqueOrThrow({ where: { name: p.estilo } });
+    const evento = await catalogsEvents.createEvent(
+      { testTypeId: (p.relevo ? relevo : individual).id, distanceId: distancia.id, strokeId: estilo.id, gender: p.genero },
+      SYSTEM_ACTOR
+    );
+    const ce = await competitionEventsService.addCompetitionEvent(
+      competencia.id,
+      { eventId: evento.id, competitionSessionId: jornada.id, categoryIds: [(p.relevo ? categoriaRelevo : categoria).id], displayOrder: p.orden },
+      SYSTEM_ACTOR
+    );
+    pruebas.set(p.orden, ce.id);
+  }
+
+  /** Marca inscrita por persona y número de prueba, en centésimas; todas distintas de cero. */
+  const marcas = new Map<string, number>();
+  const inscribir = async (clave: string, orden: number, centesimas: number) => {
+    await registrationsService.createRegistration(
+      { competitionEventId: pruebas.get(orden)!, clubId: club.id, personId: personas[clave]!.id, seedTimeCentiseconds: centesimas },
+      ADMIN_ACTOR
+    );
+    marcas.set(`${personas[clave]!.run}|${orden}`, centesimas);
+  };
+  // Prueba 1, mixta: los ocho (cada integrante de relevo necesita una individual).
+  for (const [i, clave] of ["H1", "H2", "H3", "H4", "M1", "M2", "M3", "M4"].entries()) await inscribir(clave, 1, 3011 + i * 101);
+  // Prueba 2, mixta: un hombre y una mujer.
+  await inscribir("H1", 2, 8925);
+  await inscribir("M1", 2, 9907);
+  // Controles: prueba 3 masculina y 4 femenina.
+  await inscribir("H1", 3, 7533);
+  await inscribir("M1", 4, 20852);
+
+  const equipos = { 5: ["M1", "H1", "M2", "H2"], 6: ["H1", "H2", "H3", "H4"], 7: ["M1", "M2", "M3", "M4"] } as const;
+  const marcasRelevo = new Map<number, number>([[5, 15012], [6, 16234], [7, 17045]]);
+  for (const [orden, equipo] of Object.entries(equipos)) {
+    await relayService.createRelayRegistration(
+      {
+        competitionEventId: pruebas.get(Number(orden))!,
+        clubId: club.id,
+        personIds: equipo.map((c) => personas[c]!.id),
+        seedTimeCentiseconds: marcasRelevo.get(Number(orden)),
+      },
+      ADMIN_ACTOR
+    );
+  }
+
+  return { competencia, club, personas, marcas, marcasRelevo, equipos };
+}
+
+describe("buildTeamManagerExport — sexo del nadador y género de la prueba (invocación real)", () => {
+  const HY3_ESTILO: Record<string, string> = { Libre: "A", Espalda: "B", Pecho: "C", Mariposa: "D", Combinado: "E" };
+  const SDIF_ESTILO: Record<string, string> = { Libre: "1", Espalda: "2", Pecho: "3", Mariposa: "4", Combinado: "5" };
+  const SEXO: Record<string, string> = { male: "M", female: "F", mixed: "X" };
+  const prueba = (orden: number) => PROGRAMA_DE_GENEROS.find((p) => p.orden === orden)!;
+  /** "61,25", "1:01,25" o "0.00"/"NT" → centésimas, sin pasar por los formateadores del generador. */
+  const centesimas = (texto: string) => {
+    const limpio = texto.trim().replace(",", ".");
+    if (limpio === "NT" || limpio === "0.00") return 0;
+    const [m, s] = limpio.includes(":") ? limpio.split(":") : ["0", limpio];
+    return Math.round((Number(m) * 60 + Number(s)) * 100);
+  };
+
+  async function exportar() {
+    const escenario = await montarCompetenciaDeGeneros();
+    const resultado = await buildTeamManagerExport(escenario.competencia.id, escenario.club.id, ADMIN_ACTOR);
+    const entradas = new AdmZip(resultado.zip).getEntries();
+    const archivo = (ext: string) =>
+      entradas
+        .find((e) => e.entryName.endsWith(ext))!
+        .getData()
+        .toString("latin1")
+        .split("\r\n")
+        .filter(Boolean);
+    const sexoPorRun = new Map(Object.values(escenario.personas).map((p) => [formatRunConGuion(p.run), SEXO[p.gender]!]));
+    return { ...escenario, resultado, nombres: entradas.map((e) => e.entryName), hy3: archivo(".HY3"), cl2: archivo(".CL2"), sexoPorRun };
+  }
+  const de = (lineas: string[], tipo: string) => lineas.filter((l) => l.startsWith(tipo));
+
+  it("el ZIP y sus dos archivos comparten la base, con el mes en español", async () => {
+    const { resultado, nombres } = await exportar();
+    const base = "CLBG-Entries-Copa_Generos-06ene2031-001";
+    expect(resultado.filename).toBe(`${base}.zip`);
+    expect(nombres.sort()).toEqual([`${base}.CL2`, `${base}.HY3`]);
+    expect(resultado.hy3.filename).toBe(`${base}.HY3`);
+    expect(resultado.cl2.filename).toBe(`${base}.CL2`);
+  });
+
+  it("todas las líneas con su largo y su checksum", async () => {
+    const { hy3, cl2 } = await exportar();
+    expect(hy3.filter((l) => l.length !== 130 || l.slice(128) !== computeHy3Checksum(l.slice(0, 128)))).toEqual([]);
+    expect(cl2.filter((l) => !isValidCl2Line(l))).toEqual([]);
+    expect(de(hy3, "E1")).toHaveLength(12);
+    expect(de(cl2, "D0")).toHaveLength(12);
+  });
+
+  it("HY3: la persona conserva su sexo y la prueba lleva el suyo (XX en las mixtas)", async () => {
+    const { hy3, sexoPorRun, marcas } = await exportar();
+    const runPorId = new Map(de(hy3, "D1").map((l) => [l.slice(5, 8).trim(), l.slice(69, 88).trim()]));
+    for (const d1 of de(hy3, "D1")) expect(d1[2]).toBe(sexoPorRun.get(d1.slice(69, 88).trim()));
+
+    const vistos = new Set<string>();
+    for (const e1 of de(hy3, "E1")) {
+      const run = runPorId.get(e1.slice(5, 8).trim())!;
+      const p = prueba(Number(e1.slice(39, 41)));
+      expect(e1[2], `sexo de la persona en la prueba ${p.orden}`).toBe(sexoPorRun.get(run));
+      expect(e1.slice(13, 15), `género de la prueba ${p.orden}`).toBe(SEXO[p.genero]!.repeat(2));
+      expect(Number(e1.slice(15, 21))).toBe(p.metros);
+      expect(e1[21]).toBe(HY3_ESTILO[p.estilo]);
+      expect(centesimas(e1.slice(51, 59)), "marca inscrita").toBe(marcas.get(`${run.replace("-", "")}|${p.orden}`));
+      vistos.add(`${e1[2]}${e1.slice(13, 15)}${p.orden}`);
+    }
+    // Un hombre y una mujer en las mixtas; los controles con su propio género.
+    expect([...vistos].sort()).toEqual(["FFF4", "FXX1", "FXX2", "MMM3", "MXX1", "MXX2"]);
+  });
+
+  it("CL2: la columna 65 es la persona y la 66 la prueba (X en las mixtas)", async () => {
+    const { cl2, sexoPorRun, marcas } = await exportar();
+    const vistos = new Set<string>();
+    for (const d0 of de(cl2, "D0")) {
+      const run = d0.slice(39, 51).trim();
+      const p = prueba(Number(d0.slice(72, 75)));
+      expect(d0[65], `sexo de la persona en la prueba ${p.orden}`).toBe(sexoPorRun.get(run));
+      expect(d0[66], `género de la prueba ${p.orden}`).toBe(SEXO[p.genero]);
+      expect(Number(d0.slice(67, 71))).toBe(p.metros);
+      expect(d0[71]).toBe(SDIF_ESTILO[p.estilo]);
+      expect(centesimas(d0.slice(88, 96)), "marca inscrita").toBe(marcas.get(`${run.replace("-", "")}|${p.orden}`));
+      vistos.add(`${d0[65]}${d0[66]}${p.orden}`);
+    }
+    expect([...vistos].sort()).toEqual(["FF4", "FX1", "FX2", "MM3", "MX1", "MX2"]);
+  });
+
+  it("relevos: XXX en el F1 y X en el E0 del mixto; los controles MMM/M y FFF/F; marcas e integrantes", async () => {
+    const { hy3, cl2, sexoPorRun, personas, equipos, marcasRelevo } = await exportar();
+    const runPorId = new Map(de(hy3, "D1").map((l) => [l.slice(5, 8).trim(), l.slice(69, 88).trim()]));
+    const CODIGO: Record<string, string> = { mixed: "XXX", male: "MMM", female: "FFF" };
+    const sexoEsperado = (orden: 5 | 6 | 7) => equipos[orden].map((c) => SEXO[personas[c]!.gender]).join("");
+
+    expect(hy3.join("\n")).not.toContain("MIX");
+    const f1 = de(hy3, "F1");
+    const f3 = de(hy3, "F3");
+    expect(f1).toHaveLength(3);
+    f1.forEach((linea, i) => {
+      const p = prueba(Number(linea.slice(39, 41)));
+      expect(linea.slice(12, 15), `relevo ${p.orden}`).toBe(CODIGO[p.genero]);
+      expect(Number(linea.slice(18, 21))).toBe(p.metros);
+      expect(linea[21]).toBe(HY3_ESTILO[p.estilo]);
+      expect(centesimas(linea.slice(51, 59)), "marca del relevo").toBe(marcasRelevo.get(p.orden));
+      const integrantes = [0, 1, 2, 3].map((k) => f3[i]!.slice(5 + k * 13, 8 + k * 13).trim());
+      expect([0, 1, 2, 3].map((k) => f3[i]![2 + k * 13]).join("")).toBe(integrantes.map((id) => sexoPorRun.get(runPorId.get(id)!)).join(""));
+      expect([0, 1, 2, 3].map((k) => f3[i]![2 + k * 13]).join("")).toBe(sexoEsperado(p.orden as 5 | 6 | 7));
+    });
+
+    const e0 = de(cl2, "E0");
+    expect(e0).toHaveLength(3);
+    for (const linea of e0) {
+      const p = prueba(Number(linea.slice(26, 29)));
+      expect(linea[20], `relevo ${p.orden}`).toBe(SEXO[p.genero]);
+      expect(Number(linea.slice(21, 25))).toBe(p.metros);
+      expect(linea[25]).toBe(p.estilo === "Combinado" ? "7" : "6");
+      expect(centesimas(linea.slice(45, 53)), "marca del relevo").toBe(marcasRelevo.get(p.orden));
+    }
+    // Cada F0 conserva el sexo de su integrante, también en el mixto.
+    for (const f0 of de(cl2, "F0")) expect(f0[75]).toBe(sexoPorRun.get(f0.slice(50, 62).trim()));
+    expect(de(cl2, "F0").map((l) => l[75]).join("")).toBe(f1.map((l) => sexoEsperado(Number(l.slice(39, 41)) as 5 | 6 | 7)).join(""));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildTeamManagerExport — categoría y exhibición de los relevos
+// ---------------------------------------------------------------------------
+
+/**
+ * Relevos con la categoría que el sistema les asigna por la suma de edades al corte, y con
+ * marca. Antes el F1 llevaba un correlativo desde 100 (100, 101...) en el campo de la
+ * categoría, y una "X" de exhibición en el F1 y el E0 de todo relevo con marca.
+ *
+ * Mixto y femenino suman 224 y 233 (categoría 200-239); el masculino, 240 (240-279), y un
+ * mixto SIN marca, 186 (160-199). Edades al 31-12-2031; todo SINTÉTICO.
+ */
+const PROGRAMA_DE_RELEVOS = [
+  { orden: 1, relevo: false, metros: 50, estilo: "Libre", genero: "mixed" },
+  { orden: 3, relevo: true, metros: 200, estilo: "Combinado", genero: "mixed" },
+  { orden: 9, relevo: true, metros: 200, estilo: "Libre", genero: "female" },
+  { orden: 10, relevo: true, metros: 200, estilo: "Libre", genero: "male" },
+  { orden: 23, relevo: true, metros: 200, estilo: "Libre", genero: "mixed" },
+] as const;
+
+async function montarCompetenciaDeRelevos() {
+  const individual = await prisma.testType.upsert({ where: { name: "Individual" }, update: {}, create: { name: "Individual", swimmersCount: 1 } });
+  const relevo = await prisma.testType.upsert({ where: { name: "Relevo" }, update: {}, create: { name: "Relevo", swimmersCount: 4 } });
+  const tipoJornada = await prisma.sessionType.upsert({ where: { name: "Mañana" }, update: {}, create: { name: "Mañana" } });
+
+  const club = await createClub("Club Relevos", "CLBR", "club_relevos");
+  const clubUser = await createUser({ username: "club_relevos", roleNames: ["club"], clubId: club.id });
+
+  const CORTE = 2031;
+  const EDADES = { A: ["female", 43], B: ["male", 55], C: ["male", 38], D: ["female", 88], E: ["female", 50], G: ["female", 52], H: ["male", 62], I: ["male", 85] } as const;
+  const personas: Record<string, { id: string; run: string }> = {};
+  for (const [i, [clave, [gender, edad]]] of Object.entries(EDADES).entries()) {
+    const p = await createPerson({ run: `8300000${i + 1}`, username: `relevos_${clave}`, firstName: `Relevo${clave}`, gender, birthYear: CORTE - edad });
+    await addActiveMembership(club.id, p.id, clubUser.id);
+    personas[clave] = { id: p.id, run: p.run };
+  }
+
+  const categoria = await catalogsCategories.createCategory({ testTypeId: individual.id, name: "Master Relevos", minAge: 18, maxAge: 99 }, SYSTEM_ACTOR);
+  const tramos: Array<[number, number]> = [[100, 119], [120, 159], [160, 199], [200, 239], [240, 279], [280, 319]];
+  const categoriasRelevo = [];
+  for (const [min, max] of tramos) {
+    categoriasRelevo.push(await catalogsCategories.createCategory({ testTypeId: relevo.id, name: `Relevo ${min}-${max}`, minAge: min, maxAge: max }, SYSTEM_ACTOR));
+  }
+  const piscina = await prisma.pool.create({ data: { name: "Piscina Relevos", courseLength: "short_25m" } });
+
+  const ahora = new Date();
+  const competencia = await competitionsService.createCompetition(
+    {
+      name: "Copa Relevos",
+      registrationStartAt: new Date(ahora.getTime() - 86_400_000),
+      registrationEndAt: new Date(ahora.getTime() + 86_400_000),
+      ageCutoffDate: new Date(Date.UTC(CORTE, 11, 31)),
+      maxIndividualEventsPerSwimmer: 10,
+      maxRelayEventsPerSwimmerPerSession: 4,
+      poolId: piscina.id,
+    },
+    SYSTEM_ACTOR
+  );
+  await competitionsService.transitionCompetition(competencia.id, "schedule", SYSTEM_ACTOR);
+  const fecha = await structureService.addCompetitionDate(competencia.id, new Date(`${CORTE}-01-06T00:00:00.000Z`), SYSTEM_ACTOR);
+  const jornada = await structureService.addSession(fecha.id, tipoJornada.id, SYSTEM_ACTOR);
+
+  const pruebas = new Map<number, string>();
+  for (const p of PROGRAMA_DE_RELEVOS) {
+    const distancia = await prisma.distance.upsert({ where: { meters: p.metros }, update: {}, create: { meters: p.metros } });
+    const estilo = await prisma.stroke.upsert({ where: { name: p.estilo }, update: {}, create: { name: p.estilo } });
+    const evento = await catalogsEvents.createEvent(
+      { testTypeId: (p.relevo ? relevo : individual).id, distanceId: distancia.id, strokeId: estilo.id, gender: p.genero },
+      SYSTEM_ACTOR
+    );
+    const ce = await competitionEventsService.addCompetitionEvent(
+      competencia.id,
+      {
+        eventId: evento.id,
+        competitionSessionId: jornada.id,
+        categoryIds: p.relevo ? categoriasRelevo.map((c) => c.id) : [categoria.id],
+        displayOrder: p.orden,
+      },
+      SYSTEM_ACTOR
+    );
+    pruebas.set(p.orden, ce.id);
+  }
+
+  // Cada integrante de relevo necesita una inscripción individual confirmada.
+  const marcasIndividuales = new Map<string, number>();
+  for (const [i, clave] of Object.keys(EDADES).entries()) {
+    const centesimas = 3105 + i * 37;
+    await registrationsService.createRegistration(
+      { competitionEventId: pruebas.get(1)!, clubId: club.id, personId: personas[clave]!.id, seedTimeCentiseconds: centesimas },
+      ADMIN_ACTOR
+    );
+    marcasIndividuales.set(formatRunConGuion(personas[clave]!.run), centesimas);
+  }
+
+  const equipos = { 3: ["A", "B", "C", "D"], 9: ["D", "E", "A", "G"], 10: ["B", "C", "H", "I"], 23: ["A", "B", "C", "E"] } as const;
+  const marcasRelevo: Record<number, number | undefined> = { 3: 24000, 9: 30000, 10: 17538, 23: undefined };
+  for (const [orden, equipo] of Object.entries(equipos)) {
+    await relayService.createRelayRegistration(
+      {
+        competitionEventId: pruebas.get(Number(orden))!,
+        clubId: club.id,
+        personIds: equipo.map((c) => personas[c]!.id),
+        seedTimeCentiseconds: marcasRelevo[Number(orden)],
+      },
+      ADMIN_ACTOR
+    );
+  }
+  return { competencia, club, personas, equipos, marcasRelevo, marcasIndividuales, EDADES };
+}
+
+describe("buildTeamManagerExport — categoría y exhibición de los relevos (invocación real)", () => {
+  /** "240,00", "4:00,00", "0.00" o "NT" → centésimas, sin pasar por los formateadores del generador. */
+  const centesimas = (texto: string) => {
+    const limpio = texto.trim().replace(",", ".");
+    if (limpio === "NT" || limpio === "0.00") return 0;
+    const [m, s] = limpio.includes(":") ? limpio.split(":") : ["0", limpio];
+    return Math.round((Number(m) * 60 + Number(s)) * 100);
+  };
+  const de = (lineas: string[], tipo: string) => lineas.filter((l) => l.startsWith(tipo));
+
+  async function exportar() {
+    const escenario = await montarCompetenciaDeRelevos();
+    const resultado = await buildTeamManagerExport(escenario.competencia.id, escenario.club.id, ADMIN_ACTOR);
+    const entradas = new AdmZip(resultado.zip).getEntries();
+    const archivo = (ext: string) =>
+      entradas
+        .find((e) => e.entryName.endsWith(ext))!
+        .getData()
+        .toString("latin1")
+        .split("\r\n")
+        .filter(Boolean);
+    return { ...escenario, hy3: archivo(".HY3"), cl2: archivo(".CL2") };
+  }
+
+  it("F1: la categoría de cada inscripción (200, 200, 240 y 160), la misma que guarda el sistema", async () => {
+    const { hy3, competencia } = await exportar();
+    const porPrueba = Object.fromEntries(de(hy3, "F1").map((l) => [Number(l.slice(39, 41)), l.slice(9, 12)]));
+    expect(porPrueba).toEqual({ 3: "200", 9: "200", 10: "240", 23: "160" });
+
+    const guardadas = await prisma.relayRegistration.findMany({
+      where: { competitionEvent: { competitionId: competencia.id } },
+      select: { category: { select: { minAge: true } }, competitionEvent: { select: { displayOrder: true } } },
+    });
+    expect(Object.fromEntries(guardadas.map((r) => [r.competitionEvent.displayOrder, String(r.category.minAge)]))).toEqual(porPrueba);
+  });
+
+  it("ningún relevo queda como exhibición, tenga marca o no; las marcas se conservan", async () => {
+    const { hy3, cl2, marcasRelevo } = await exportar();
+    for (const f1 of de(hy3, "F1")) {
+      const orden = Number(f1.slice(39, 41));
+      expect(f1[83], `F1 de la prueba ${orden}`).toBe(" ");
+      expect(centesimas(f1.slice(51, 59)), `marca del relevo ${orden}`).toBe(marcasRelevo[orden] ?? 0);
+      expect(f1[59]).toBe("S");
+    }
+    for (const e0 of de(cl2, "E0")) {
+      const orden = Number(e0.slice(26, 29));
+      expect(e0[154], `E0 de la prueba ${orden}`).toBe(" ");
+      expect(centesimas(e0.slice(45, 53)), `marca del relevo ${orden}`).toBe(marcasRelevo[orden] ?? 0);
+      expect(e0[53]).toBe("S");
+    }
+  });
+
+  it("género, distancia, estilo, número de prueba e integrantes en el orden de las postas", async () => {
+    const { hy3, cl2, personas, equipos, EDADES } = await exportar();
+    const SEXO: Record<string, string> = { male: "M", female: "F" };
+    const clavePorRun = new Map(Object.entries(personas).map(([clave, p]) => [formatRunConGuion(p.run), clave]));
+    const clavePorId = new Map(de(hy3, "D1").map((l) => [l.slice(5, 8).trim(), clavePorRun.get(l.slice(69, 88).trim())!]));
+
+    const f1 = de(hy3, "F1");
+    const f3 = de(hy3, "F3");
+    const porNumero = (a: string[], b: string[]) => Number(a[0]) - Number(b[0]);
+    expect(f1.map((l) => [l.slice(39, 41).trim(), l.slice(12, 15), l.slice(18, 22)]).sort(porNumero)).toEqual([
+      ["3", "XXX", "200E"],
+      ["9", "FFF", "200A"],
+      ["10", "MMM", "200A"],
+      ["23", "XXX", "200A"],
+    ]);
+    f1.forEach((linea, i) => {
+      const orden = Number(linea.slice(39, 41)) as keyof typeof equipos;
+      const integrantes = [0, 1, 2, 3].map((k) => clavePorId.get(f3[i]!.slice(5 + k * 13, 8 + k * 13).trim()));
+      expect(integrantes, `integrantes del relevo ${orden}`).toEqual([...equipos[orden]]);
+      expect([0, 1, 2, 3].map((k) => f3[i]![2 + k * 13]).join("")).toBe(equipos[orden].map((c) => SEXO[EDADES[c][0]]).join(""));
+      expect([0, 1, 2, 3].map((k) => f3[i]!.slice(13 + k * 13, 15 + k * 13)).join("")).toBe("F1F2F3F4");
+    });
+
+    expect(de(cl2, "E0").map((l) => [l.slice(26, 29).trim(), l[20]!, l.slice(21, 26), l.slice(30, 37)]).sort(porNumero)).toEqual([
+      ["3", "X", " 2007", "UNOV   "],
+      ["9", "F", " 2006", "UNOV   "],
+      ["10", "M", " 2006", "UNOV   "],
+      ["23", "X", " 2006", "UNOV   "],
+    ]);
+    // En el CL2, cada E0 va seguido de sus cuatro F0, en el orden de las postas.
+    const relevosCl2 = cl2.flatMap((l, i) => (l.startsWith("E0") ? [{ orden: Number(l.slice(26, 29)), f0: cl2.slice(i + 1, i + 5) }] : []));
+    expect(relevosCl2).toHaveLength(4);
+    for (const { orden, f0 } of relevosCl2) {
+      expect(f0.every((l) => l.startsWith("F0") && Number(l.slice(11, 14)) === orden)).toBe(true);
+      expect(f0.map((l) => clavePorRun.get(l.slice(50, 62).trim())), `F0 del relevo ${orden}`).toEqual([...equipos[orden as keyof typeof equipos]]);
+    }
+  });
+
+  it("las inscripciones individuales no cambian, y todas las líneas tienen su largo y su checksum", async () => {
+    const { hy3, cl2, marcasIndividuales } = await exportar();
+    const runPorId = new Map(de(hy3, "D1").map((l) => [l.slice(5, 8).trim(), l.slice(69, 88).trim()]));
+    expect(de(hy3, "E1")).toHaveLength(8);
+    for (const e1 of de(hy3, "E1")) {
+      expect(e1.slice(13, 15)).toBe("XX");
+      expect(centesimas(e1.slice(51, 59))).toBe(marcasIndividuales.get(runPorId.get(e1.slice(5, 8).trim())!));
+    }
+    expect(de(cl2, "D0").map((l) => l[66])).toEqual(Array(8).fill("X"));
+    expect(hy3.filter((l) => l.length !== 130 || l.slice(128) !== computeHy3Checksum(l.slice(0, 128)))).toEqual([]);
+    expect(cl2.filter((l) => !isValidCl2Line(l))).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // buildTeamManagerExport — ALCANCE del actor (etapa 2)
 // ---------------------------------------------------------------------------
 
@@ -2808,9 +3252,60 @@ describe("SEC-02: los reportes no entregan el RUN y Team Manager sí", () => {
    * entradas. Se tomaron ANTES de tocar los reportes, con el mismo montaje y el reloj en
    * 2026-06-15T15:00:00Z, y se comprobó que son estables en dos corridas. Si Team Manager cambiara
    * a propósito, estas huellas se actualizan; si cambian sin querer, es una regresión.
+   *
+   * Cambio a propósito: el género de la PRUEBA dejó de copiarse del sexo del nadador. Este montaje
+   * tiene una prueba y un relevo mixtos, así que el E1 lleva "XX", el D0 una "X" en la columna 66 y el
+   * F1 "XXX" en vez de "MIX". Las huellas ANTERIORES se conservan: deshaciendo SOLO esos campos (y
+   * recalculando el checksum de esas líneas) el archivo vuelve a ser idéntico byte a byte al previo,
+   * lo que prueba que no cambió nada más.
+   *
+   * Segundo cambio a propósito: el F1 lleva en las posiciones 9-11 la CATEGORÍA del relevo (la
+   * `minAge` de su categoría; aquí "Relevo Export", 0-500, así que "  0"), no un correlativo desde
+   * 100; y la "X" de exhibición (F1 posición 83, E0 posición 154) ya no se escribe por tener marca.
+   * Este montaje inscribe el relevo sin marca, así que solo cambia la categoría del HY3; el CL2 queda
+   * igual. Deshaciendo SOLO esos campos se vuelve exactamente a las huellas de la corrección de género.
    */
-  const HUELLA_HY3 = "b65ce6e2d2209e49234486a2170d96ba8ae1c228a6805a733e7ca51743dbe9d4";
-  const HUELLA_CL2 = "177343dccaf43433c75007e129744fe3c6164591bad479a1d09e4fe69e3d9179";
+  const HUELLA_HY3 = "3b9630f411edd06975c4dff94dcf1b8ce3d93d7342f070f23f1dee63cbb5e641";
+  const HUELLA_CL2 = "62835b4ad0246c63b21c3b3628931c7425ae01ec45d7ddf689f851c2480b6598";
+  const HUELLA_HY3_GENERO = "61443ead5e826245766decf1cf0b81ecdbc4ad15ec6e3a2b7ce39fde87ac5d20";
+  const HUELLA_CL2_GENERO = HUELLA_CL2;
+  const HUELLA_HY3_ANTERIOR = "b65ce6e2d2209e49234486a2170d96ba8ae1c228a6805a733e7ca51743dbe9d4";
+  const HUELLA_CL2_ANTERIOR = "177343dccaf43433c75007e129744fe3c6164591bad479a1d09e4fe69e3d9179";
+
+  /** Como escribía el generador los relevos ANTES: correlativo desde 100 y "X" si había marca. */
+  function conLosRelevosAnteriores(hy3: string, cl2: string) {
+    let correlativo = 100;
+    const hy3Antes = hy3.split("\r\n").map((l) => {
+      if (!l.startsWith("F1")) return l;
+      const conMarca = l.slice(51, 59).trim() !== "0.00";
+      let c = l.slice(0, 9) + String(correlativo++).padStart(3, " ") + l.slice(12, 128);
+      c = c.slice(0, 83) + (conMarca ? "X" : " ") + c.slice(84);
+      return c + computeHy3Checksum(c);
+    });
+    const cl2Antes = cl2.split("\r\n").map((l) => {
+      if (!l.startsWith("E0")) return l;
+      const c = l.slice(0, 154) + (l.slice(45, 53).trim() !== "NT" ? "X" : " ") + l.slice(155, 156);
+      return `${c} N${computeCl2Checksum(c)}`;
+    });
+    return { hy3: hy3Antes.join("\r\n"), cl2: cl2Antes.join("\r\n") };
+  }
+
+  /** El archivo tal como lo escribía el generador ANTES: el género de la prueba copiado del nadador y "MIX". */
+  function conElGeneroAnterior(hy3: string, cl2: string) {
+    const hy3Antes = hy3.split("\r\n").map((l) => {
+      let c = l.slice(0, 128);
+      if (l.startsWith("E1")) c = c.slice(0, 13) + l[2]! + l[2]! + c.slice(15);
+      else if (l.startsWith("F1") && c.slice(12, 15) === "XXX") c = c.slice(0, 12) + "MIX" + c.slice(15);
+      else return l;
+      return c + computeHy3Checksum(c);
+    });
+    const cl2Antes = cl2.split("\r\n").map((l) => {
+      if (!l.startsWith("D0")) return l;
+      const c = l.slice(0, 66) + l[65]! + l.slice(67, 156);
+      return `${c} N${computeCl2Checksum(c)}`;
+    });
+    return { hy3: hy3Antes.join("\r\n"), cl2: cl2Antes.join("\r\n") };
+  }
 
   describe("Team Manager conserva el RUN, con su formato vigente", () => {
     afterEach(() => {
@@ -2827,6 +3322,16 @@ describe("SEC-02: los reportes no entregan el RUN y Team Manager sí", () => {
       const cl2 = Buffer.from(exportado.cl2.content, "latin1");
       const huella = (b: Buffer) => createHash("sha256").update(b).digest("hex");
       expect({ hy3: huella(hy3), cl2: huella(cl2) }).toEqual({ hy3: HUELLA_HY3, cl2: HUELLA_CL2 });
+      const relevosAntes = conLosRelevosAnteriores(exportado.hy3.content, exportado.cl2.content);
+      expect({ hy3: huella(Buffer.from(relevosAntes.hy3, "latin1")), cl2: huella(Buffer.from(relevosAntes.cl2, "latin1")) }).toEqual({
+        hy3: HUELLA_HY3_GENERO,
+        cl2: HUELLA_CL2_GENERO,
+      });
+      const antes = conElGeneroAnterior(relevosAntes.hy3, relevosAntes.cl2);
+      expect({ hy3: huella(Buffer.from(antes.hy3, "latin1")), cl2: huella(Buffer.from(antes.cl2, "latin1")) }).toEqual({
+        hy3: HUELLA_HY3_ANTERIOR,
+        cl2: HUELLA_CL2_ANTERIOR,
+      });
 
       // Los cuatro RUN del montaje, con guion antes del dígito verificador, en AMBOS archivos.
       for (const run of ["8000000-1", "8000000-2", "8000000-3", "8000000-4"]) {

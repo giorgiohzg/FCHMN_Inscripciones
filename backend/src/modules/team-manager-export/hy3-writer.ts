@@ -1,5 +1,5 @@
 import { buildHy3Line } from "./hy3-checksum";
-import { formatHy3Date, type TeamManagerExportModel } from "./export-model";
+import { formatHy3Date, type CodigoGeneroRelevo, type GeneroDePrueba, type TeamManagerExportModel } from "./export-model";
 
 export { formatHy3Date };
 
@@ -178,7 +178,10 @@ export function buildD1(swimmer: SwimmerInfo): string {
 // E1 — prueba individual inscrita
 // --------------------------------------------------------------------------
 export interface IndividualEntryInfo {
+  /** Sexo del NADADOR (columna 2). */
   gender: "M" | "F";
+  /** Género de la PRUEBA (columnas 13-14): M, F o X si es mixta. Ver `GeneroDePrueba`. */
+  eventGender: GeneroDePrueba;
   swimmerId: number;
   lastNameAbbrev: string; // primeros 5 caracteres del apellido
   distanceMeters: number;
@@ -209,7 +212,8 @@ export function buildE1(entry: IndividualEntryInfo): string {
   content += padRight("", 2);
   content += padLeft(String(entry.swimmerId), 3);
   content += padRight(entry.lastNameAbbrev, 5);
-  content += entry.gender + entry.gender; // observado: género duplicado
+  // Género de la prueba, dos veces ("XX" en una mixta), no el sexo del nadador.
+  content += entry.eventGender + entry.eventGender;
   content += padLeft(String(entry.distanceMeters), 6);
   content += entry.strokeCode;
   content += padRight("", 2);
@@ -242,17 +246,37 @@ export function joinHy3Lines(lines: string[]): string {
 // "0.00" (con PUNTO decimal, formato inglés) en vez de "0,00" — cuando SÍ
 // hay tiempo, usa coma decimal igual que E1. El registro F1 tampoco lleva
 // el marcador de estado "C" que sí lleva E1 (esa posición queda en blanco).
+//
+// Posiciones del F1 contadas desde 0, como `slice`:
+//   9-11  categoría del relevo (ver `categoriaRelevo`);
+//   83    exhibición: Meet Manager importa como «Exh» el relevo que lleva aquí
+//         una "X". El sistema no tiene relevos de exhibición, así que va en blanco.
 // --------------------------------------------------------------------------
 export interface RelayEntryInfo {
   clubCode: string; // ej. "SINT"
   relayLetter: string; // "A", "B"... (un club solo puede tener un equipo por prueba+categoría, así que en la práctica siempre es "A")
-  relayId: number; // id interno correlativo del archivo, solo necesita ser único
-  genderCode: "MMM" | "FFF" | "MIX";
+  /**
+   * Categoría del relevo: el límite inferior de su tramo de suma de edades (200 para
+   * 200-239), que es la `minAge` de la categoría de la inscripción. NO es un
+   * identificador: en exportaciones de Team Manager vale 200 en dos relevos de
+   * pruebas distintas, y 160, 200 y 240 en otra (dos de ellos en la misma prueba),
+   * siempre el tramo de la suma de edades de sus integrantes.
+   */
+  categoriaRelevo: number;
+  genderCode: CodigoGeneroRelevo; // género de la prueba: MMM, FFF o XXX (mixto)
   distanceMeters: number; // distancia TOTAL del relevo (4 × la distancia de cada posta)
   strokeCode: "A" | "B" | "C" | "D" | "E";
   meetEventNumber: number;
   seedTimeSeconds: number; // 0 = sin marca de referencia
   courseCode?: "L" | "S"; // L=piscina larga (50m), S=piscina corta (25m) — L por defecto si no se indica
+}
+
+/** Las tres posiciones de la categoría, ajustada a la derecha. Lo que no cabe se rechaza: recortarlo cambiaría la categoría. */
+function categoriaDelF1(categoria: number): string {
+  if (!Number.isInteger(categoria) || categoria < 0 || categoria > 999) {
+    throw new Error(`Categoría de relevo inválida para el F1: ${categoria} (se espera un entero de 0 a 999, el límite inferior del tramo)`);
+  }
+  return padLeft(String(categoria), 3);
 }
 
 export function buildF1(entry: RelayEntryInfo): string {
@@ -261,7 +285,7 @@ export function buildF1(entry: RelayEntryInfo): string {
   content += padRight(entry.clubCode, 5);
   content += entry.relayLetter;
   content += " ";
-  content += padLeft(String(entry.relayId), 3);
+  content += categoriaDelF1(entry.categoriaRelevo);
   content += entry.genderCode;
   content += padRight("", 3);
   content += padLeft(String(entry.distanceMeters), 3);
@@ -278,9 +302,10 @@ export function buildF1(entry: RelayEntryInfo): string {
   content += entry.seedTimeSeconds > 0 ? padLeft(formatHy3Time_SecondsComma(entry.seedTimeSeconds), 8) : padLeft("0.00", 8);
   content += entry.courseCode ?? "L"; // curso de la competencia
   content += padRight("", 23);
-  // Solo con marca: así en las exportaciones reales con y sin ella. Es el mismo dato
-  // que la "X" de la columna 154 del E0 del CL2.
-  content += entry.seedTimeSeconds > 0 ? "X" : " ";
+  // Posición 83: exhibición. Antes se escribía "X" siempre que había marca, y Meet
+  // Manager importaba el relevo como «Exh». La marca va en las posiciones 51-58; esta
+  // queda en blanco. Es el mismo dato que la posición 154 del E0 del CL2.
+  content += " ";
   content += padRight("", 7);
   content += " "; // los relevos NO llevan el marcador de estado "C" que sí lleva E1
   return buildHy3Line(padRight(content, 128));
