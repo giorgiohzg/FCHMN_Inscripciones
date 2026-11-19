@@ -140,11 +140,12 @@ describe("formulario de club", () => {
     expect(radios()[1]!.checked).toBe(false);
   });
 
-  it("al EDITAR un club sin personalidad jurídica conserva la frase sobre el representante legal", async () => {
+  it("al EDITAR un club sin personalidad jurídica tampoco se muestra la frase, ni el selector de representante", async () => {
     get.mockResolvedValue(club({ hasLegalStatus: false }));
     montarFicha("/clubes/c-1");
     await waitFor(() => expect(screen.getByDisplayValue("Club Sintético")).toBeInTheDocument());
-    expect(screen.getByText(/Solo los clubes con personalidad jurídica pueden tener representante legal/)).toBeInTheDocument();
+    expect(screen.queryByText(/Solo los clubes con personalidad jurídica pueden tener representante legal/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/PICKER representante legal/)).not.toBeInTheDocument();
   });
 
   it("un club que llega con null residual (columna aún anulable) se presenta como «No tiene»", async () => {
@@ -156,6 +157,21 @@ describe("formulario de club", () => {
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
     await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
     expect(update.mock.calls[0]![1].hasLegalStatus).toBe(false);
+  });
+
+  it("con representante designado y «No tiene», se conserva el aviso del designado sin la frase retirada", async () => {
+    get.mockResolvedValue(
+      club({
+        hasLegalStatus: true,
+        rut: "111111111",
+        staff: [{ id: "s", roleType: "legal_representative", person: { id: "p", fullName: "Persona Sintética", run: "1-9" } }],
+      })
+    );
+    montarFicha("/clubes/c-1");
+    await waitFor(() => expect(screen.getByDisplayValue("Club Sintético")).toBeInTheDocument());
+    fireEvent.click(radios()[1]!);
+    expect(screen.getByText("Actualmente está designado(a) Persona Sintética; hay que retirarlo con el estado en «Sí» antes de cambiarlo.")).toBeInTheDocument();
+    expect(screen.queryByText(/Solo los clubes con personalidad jurídica/)).not.toBeInTheDocument();
   });
 
   it("con representante designado, pasar a «No tiene» no se permite desde la pantalla", async () => {

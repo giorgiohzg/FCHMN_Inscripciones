@@ -161,10 +161,29 @@ describe.each(FICHAS)("ficha de $ficha", (f) => {
     expect(campo()).not.toHaveAttribute("aria-describedby");
   });
 
-  it("EDICIÓN conserva su texto de ayuda bajo el campo, referido por aria-describedby", async () => {
+  it("EDICIÓN: la persona conserva su texto de ayuda bajo el campo; el club ya no lo muestra", async () => {
     await montarEdicion(f.registro());
-    expect(screen.getByText(/Puede asignarlo, cambiarlo o dejarlo vacío mientras no haya credenciales/)).toHaveAttribute("id", "ayuda-username");
-    expect(campo()).toHaveAttribute("aria-describedby", "ayuda-username");
+    const ayuda = screen.queryByText(/Puede asignarlo, cambiarlo o dejarlo vacío mientras no haya credenciales/);
+    if (f.ficha === "persona") {
+      expect(ayuda).toHaveAttribute("id", "ayuda-username");
+      expect(campo()).toHaveAttribute("aria-describedby", "ayuda-username");
+    } else {
+      expect(ayuda).not.toBeInTheDocument();
+      expect(campo()).not.toHaveAttribute("aria-describedby");
+      expect(document.getElementById("ayuda-username")).toBeNull();
+    }
+    // El resto de la sección no cambia: sigue el aviso de que no hay credenciales y el botón.
+    expect(screen.getByText(/No tiene credenciales de acceso/)).toBeInTheDocument();
+    expect(botonCrear()).toBeInTheDocument();
+  });
+
+  it("EDICIÓN CON CUENTA: el campo sigue bloqueado; la explicación solo se muestra en la persona", async () => {
+    await montarEdicion(f.registro({ username: "con.cuenta", user: CUENTA("con.cuenta") }));
+    expect(campo()).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Restablecer contraseña" })).toBeInTheDocument();
+    const explicacion = screen.queryByText("No se puede modificar: las credenciales de acceso se crearon con este nombre.");
+    if (f.ficha === "persona") expect(explicacion).toBeInTheDocument();
+    else expect(explicacion).not.toBeInTheDocument();
   });
 
   it("ALTA sin nombre: se envía null y no se crea ninguna cuenta", async () => {
@@ -222,7 +241,9 @@ describe.each(FICHAS)("ficha de $ficha", (f) => {
     expect(campo().value).toBe("nuevo.acceso");
     expect(botonCrear()).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Restablecer contraseña/i })).toBeInTheDocument();
-    expect(screen.getByText(/No se puede modificar/)).toBeInTheDocument();
+    // La explicación bajo el campo solo se muestra en la ficha de persona; el bloqueo, en ambas.
+    if (f.ficha === "persona") expect(screen.getByText(/No se puede modificar/)).toBeInTheDocument();
+    else expect(screen.queryByText(/No se puede modificar/)).not.toBeInTheDocument();
   });
 
   it("FALLO: se muestra el error y el campo sigue editable con lo escrito", async () => {

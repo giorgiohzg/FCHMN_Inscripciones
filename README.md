@@ -2221,6 +2221,22 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
 - La pérdida de respuesta se simuló interceptando `fetch`; no se observó una caída real de la red.
 - La migración `20261118000000_parametros_sistema` no está aplicada en el entorno local de trabajo ni en producción.
 
+#### Ampliación: textos retirados también en Editar club (estado: publicada en el repositorio y validada localmente; pendiente de despliegue de la web y actualización del frontend local)
+
+> **Es una ampliación posterior y distinta** de los siete cambios de este bloque. Esos siete ya están migrados y desplegados, y el usuario los confirmó; su cierre documental sigue pendiente y no se hace aquí. Esta ampliación **no está desplegada**: cambia solo el frontend, sin tocar backend, esquema, migraciones ni dependencias.
+
+- **Editar club** deja de mostrar las dos explicaciones que ya no aparecían en Nuevo club: la frase «Solo los clubes con personalidad jurídica pueden tener representante legal.» y el texto bajo «Nombre de usuario» en «Credenciales de acceso», incluida la explicación que acompaña al campo bloqueado cuando ya existe cuenta.
+- **Editar persona conserva sus ayudas.** `CredencialesDeAcceso` es compartido: la ficha de club desactiva la ayuda con una propiedad propia (`ayudaEnEdicion`), y la persona conserva el comportamiento anterior.
+- **Se conservan:** la regla y la validación del representante legal; el aviso «Actualmente está designado(a)…», cuando ya hay un representante designado; las etiquetas, los campos, los errores y las validaciones; el bloqueo del nombre de usuario con cuenta existente; la creación y el restablecimiento de credenciales; los mensajes de resultado y las contraseñas temporales; y los demás textos de la ficha.
+- **Validación local:**
+  - pruebas de credenciales, clubes y personas, 100/100;
+  - tipos y lint aprobados;
+  - una contraprueba temporal (sin desactivar la ayuda en el club fallaron 3 casos), con el archivo restaurado y su huella verificada;
+  - revisión visual con datos sintéticos, sobre la base desechable, de Editar club, Editar persona y Nuevo club.
+- **Límites.**
+  - El caso de un club **con cuenta existente** se comprobó solo con pruebas simuladas: el club de la revisión visual no tenía cuenta.
+  - Preparar la revisión visual exigió aplicar `prisma migrate deploy` **únicamente** sobre la base desechable, que se reinicia vacía, y crear su marcador con el ayudante de la suite. Fue una excepción a la instrucción de no migrar de esa etapa. No se tocaron producción ni la base de trabajo.
+
 ## Inventario completo de endpoints
 
 **141 endpoints**, agrupados por el módulo que los declara. Esta lista no está

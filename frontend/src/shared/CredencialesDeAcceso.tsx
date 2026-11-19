@@ -50,13 +50,20 @@ interface Props {
   onRestablecerContrasena: () => void;
   creando: boolean;
   mensaje: string | null;
+  /**
+   * Texto de ayuda bajo «Nombre de usuario» en la EDICIÓN (por omisión, sí). La ficha de club
+   * lo omite; la de persona lo conserva. En el ALTA nunca se muestra.
+   */
+  ayudaEnEdicion?: boolean;
 }
 
-export function CredencialesDeAcceso({ modo, username, usernameOriginal, onUsernameChange, cuenta, onCrearCredenciales, onRestablecerContrasena, creando, mensaje }: Props) {
+export function CredencialesDeAcceso({ modo, username, usernameOriginal, onUsernameChange, cuenta, onCrearCredenciales, onRestablecerContrasena, creando, mensaje, ayudaEnEdicion = true }: Props) {
   // En edición, un nombre sin tocar no se valida (ver `evaluarUsernameEditado`).
   const problema = modo === "edicion" ? evaluarUsernameEditado(usernameOriginal, username).problema : problemaDeUsername(username);
   const vacio = username.trim() === "";
   const bloqueado = Boolean(cuenta);
+  // El campo sigue de solo lectura con cuenta aunque no se muestre la explicación.
+  const conAyuda = modo === "edicion" && ayudaEnEdicion;
 
   return (
     <section aria-labelledby="titulo-credenciales" style={{ marginTop: "1.5rem", paddingTop: "1rem", borderTop: "1px solid var(--brand-gray-100)" }}>
@@ -73,12 +80,12 @@ export function CredencialesDeAcceso({ modo, username, usernameOriginal, onUsern
         readOnly={bloqueado}
         disabled={bloqueado}
         aria-invalid={problema ? true : undefined}
-        aria-describedby={modo === "alta" ? undefined : "ayuda-username"}
+        aria-describedby={conAyuda ? "ayuda-username" : undefined}
       />
       {problema && !bloqueado && <p className="error-message">{problema}</p>}
 
-      {/* En el ALTA no hay texto de ayuda bajo el campo; la edición conserva el suyo. */}
-      {modo === "edicion" && (
+      {/* Sin texto de ayuda en el ALTA, ni en la edición cuando la ficha lo omite (club). */}
+      {conAyuda && (
         <p id="ayuda-username" style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "-0.4rem" }}>
           {bloqueado
             ? "No se puede modificar: las credenciales de acceso se crearon con este nombre."
