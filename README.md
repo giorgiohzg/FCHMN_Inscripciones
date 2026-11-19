@@ -2143,9 +2143,9 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
 - No se afirma identidad binaria entre las imágenes de Render y las locales. El paquete web local y el de producción tienen nombres distintos; la URL de API compilada es distinta y puede explicarlo, pero no se comprobó que sea la única causa.
 - No se afirma la ausencia de escrituras en la base durante el despliegue: no se revisó la actividad de los usuarios.
 
-### Mensaje del login, eliminación completa de competencias, textos de alta y totales por género (estado: publicada en el repositorio y validada localmente; pendiente de migración, despliegue y actualización del entorno local)
+### Mensaje del login, eliminación completa de competencias, textos de alta y totales por género (estado: publicada, migrada y desplegada en API y web; entorno local migrado y actualizado; confirmada manualmente por el usuario dentro del alcance comprobado)
 
-> **Estado:** **publicada en el repositorio y validada localmente; pendiente de migración, despliegue y actualización del entorno local.** Incluye una **migración aditiva**, `20261118000000_parametros_sistema`, todavía **no aplicada** ni en la base de trabajo local ni en producción. El servicio desplegado no contiene estos cambios.
+> **Estado:** **publicada, migrada y desplegada en API y web; entorno local migrado y actualizado; confirmada manualmente por el usuario dentro del alcance comprobado.** El código es `4833f0d` y la migración aditiva `20261118000000_parametros_sistema` está aplicada en producción y en la base local de trabajo. La web avanzó después a `bd1e321` y `6d5c410`, que solo cambian el frontend. Ver «Cierre del conjunto», al final de esta sección. *Antecedente:* al publicarse, el estado era «publicada en el repositorio y validada localmente; pendiente de migración, despliegue y actualización del entorno local», con la migración sin aplicar.
 
 **1. Mensaje del login editable por administración.**
 
@@ -2219,11 +2219,11 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
 - Que una competencia **siga existiendo** al comprobar no garantiza que una eliminación aún pendiente no termine aplicándose después; por eso el mensaje pide recargar antes de reintentar.
 - El respaldo del mensaje ante un fallo de **su** lectura tiene solo pruebas simuladas. Con la API caída por completo, la aplicación conserva su pantalla previa de «No se pudo contactar al servidor» antes de llegar al login.
 - La pérdida de respuesta se simuló interceptando `fetch`; no se observó una caída real de la red.
-- La migración `20261118000000_parametros_sistema` no está aplicada en el entorno local de trabajo ni en producción.
+- *Antecedente:* aquí constaba que la migración `20261118000000_parametros_sistema` no estaba aplicada en el entorno local de trabajo ni en producción. Después se aplicó en ambos (ver «Cierre del conjunto»).
 
-#### Ampliación: textos retirados también en Editar club (estado: publicada en el repositorio y validada localmente; pendiente de despliegue de la web y actualización del frontend local)
+#### Ampliación: textos retirados también en Editar club (estado: publicada y desplegada en la web; frontend local actualizado; confirmada manualmente por el usuario dentro del alcance comprobado)
 
-> **Es una ampliación posterior y distinta** de los siete cambios de este bloque. Esos siete ya están migrados y desplegados, y el usuario los confirmó; su cierre documental sigue pendiente y no se hace aquí. Esta ampliación **no está desplegada**: cambia solo el frontend, sin tocar backend, esquema, migraciones ni dependencias.
+> **Es una ampliación posterior y distinta** de los siete cambios de este bloque, y cambia solo el frontend, sin tocar backend, esquema, migraciones ni dependencias. **Desplegada en la web** desde `bd1e321` y con el frontend local actualizado; el usuario la confirmó manualmente (ver «Cierre del conjunto»). *Antecedente:* al publicarse, el estado era «publicada en el repositorio y validada localmente; pendiente de despliegue de la web y actualización del frontend local».
 
 - **Editar club** deja de mostrar las dos explicaciones que ya no aparecían en Nuevo club: la frase «Solo los clubes con personalidad jurídica pueden tener representante legal.» y el texto bajo «Nombre de usuario» en «Credenciales de acceso», incluida la explicación que acompaña al campo bloqueado cuando ya existe cuenta.
 - **Editar persona conserva sus ayudas.** `CredencialesDeAcceso` es compartido: la ficha de club desactiva la ayuda con una propiedad propia (`ayudaEnEdicion`), y la persona conserva el comportamiento anterior.
@@ -2237,9 +2237,9 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
   - El caso de un club **con cuenta existente** se comprobó solo con pruebas simuladas: el club de la revisión visual no tenía cuenta.
   - Preparar la revisión visual exigió aplicar `prisma migrate deploy` **únicamente** sobre la base desechable, que se reinicia vacía, y crear su marcador con el ayudante de la suite. Fue una excepción a la instrucción de no migrar de esa etapa. No se tocaron producción ni la base de trabajo.
 
-#### Ajustes visuales: ayuda de Editar persona y paneles sin frase inicial (estado: publicada en el repositorio y validada localmente; pendiente de despliegue de la web y actualización del frontend local)
+#### Ajustes visuales: ayuda de Editar persona y paneles sin frase inicial (estado: publicada y desplegada en la web; frontend local actualizado; confirmada manualmente por el usuario dentro del alcance comprobado)
 
-> **Entrega posterior y distinta** de los siete cambios y de la ampliación de Editar club, que se conservan como antecedentes. *Antecedente:* la ampliación de Editar club (`bd1e321`) ya se desplegó en la web; su cierre documental queda pendiente con el conjunto. Estos ajustes **no están desplegados**: cambian solo el frontend, sin tocar backend, esquema, migraciones ni dependencias.
+> **Entrega posterior y distinta** de los siete cambios y de la ampliación de Editar club. Cambia solo el frontend, sin tocar backend, esquema, migraciones ni dependencias. **Desplegada en la web** desde `6d5c410` y con el frontend local actualizado; el usuario la confirmó manualmente (ver «Cierre del conjunto»). *Antecedente:* al publicarse, el estado era «publicada en el repositorio y validada localmente; pendiente de despliegue de la web y actualización del frontend local».
 
 - **Ayuda de Editar persona.** El texto bajo «Nombre de usuario» (`ayuda-username`, en `CredencialesDeAcceso`) tenía un margen superior negativo que lo subía sobre el campo. Ahora tiene una separación positiva y queda debajo, también cuando hay un mensaje de error. Solo cambia esa ayuda, no los estilos generales de los formularios.
 - **Panel de Inscripción y Panel de Relevos.** Se retiran «Elija una competencia y un club para comenzar a inscribir.» y «Elija una competencia y un club para comenzar a armar relevos.», sin texto de reemplazo: hasta elegir competencia y club, el panel muestra solo sus selectores.
@@ -2254,6 +2254,97 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
   - Editar persona en escritorio y a 375 px, sin cuenta, con cuenta y con error de validación: la ayuda queda debajo del campo, sin superposición y con las líneas bien ajustadas;
   - Nueva persona sin ayuda;
   - los dos paneles en escritorio y a 375 px, sin la frase y sin huecos, con los selectores funcionando y el contenido visible al elegir competencia y club.
+
+#### Cierre del conjunto: migración, despliegues, verificación y confirmación
+
+> **Estado del conjunto:** los siete cambios (`4833f0d`), la ampliación de Editar club (`bd1e321`) y los ajustes visuales (`6d5c410`) están **publicados, desplegados y actualizados en el entorno local**, y el usuario los **confirmó manualmente** dentro del alcance comprobado. Horas en **UTC** y en **America/Santiago** (UTC−3 en estas fechas). Las operaciones del **19-11-2026 UTC** ocurrieron la **noche del 18-11 en Santiago**.
+
+**Estado final por componente**
+
+| Componente | Estado |
+|---|---|
+| API (`fchmn-api`) | `4833f0d` |
+| Mantenimiento (`fchmn-mantenimiento`) | `4833f0d`; Docker Command vacío, programación `0 6 1 1 *`, Auto-Deploy `Off` |
+| Web (`fchmn-web`) | `6d5c410` |
+| Base de producción y base local de trabajo | 43 migraciones, incluida `20261118000000_parametros_sistema` |
+| Backend local | imagen `d2ac7f58b220` |
+| Frontend local | imagen `a61971dc28eb` |
+| Imagen local de migraciones | `4a7595c23ed8` (43 migraciones) |
+| PostgreSQL local | mismo contenedor y mismo volumen de datos; servicios locales **detenidos** |
+
+La diferencia de SHA entre API y web es **intencional y compatible**: `bd1e321` y `6d5c410` solo cambian el frontend, sus pruebas y este README, y no tocan las llamadas a la API.
+
+**1. Pruebas automatizadas y contrapruebas.** Las de cada entrega, descritas en su bloque: rondas 1 y 2 de los siete cambios (con las reproducciones previas y la contraprueba del orden de bloqueos, que produjo `40P01 deadlock detected`), 100/100 con contraprueba en Editar club, y la ejecución con 7 fallos iniciales y 58/58 de los ajustes visuales. Las contrapruebas temporales se restauraron con su huella verificada.
+
+**2. Revisión visual con datos sintéticos.**
+- Siete cambios, rondas 1 y 2: **API real local** contra la base desechable. En la ronda 2 la pérdida de respuesta se **simuló** interceptando `fetch` sobre esa API real.
+- Editar club: **API real local** contra la base desechable; prepararla exigió migrar solo esa base.
+- Ajustes visuales: **API simulada** en la página, sin backend ni base de datos.
+
+**3. CI de cada entrega.** `44402986162` (`4833f0d`), `44428972838` (`bd1e321`) y `44441102926` (`6d5c410`): cada una fue la única ejecución de su SHA, por push y en el intento 1, aprobada en Frontend, Backend (incluidas migraciones sobre su base desechable e integración) y Derivados.
+
+**4. Migración y despliegues observados.**
+
+- **Respaldo previo de cada operación.** Antes de cada una se creó una exportación lógica nueva en Render, con un solo clic registrado. Se descargó al destino privado sin sobrescribir, y se comprobaron la integridad del gzip y la estructura del archivo. Fueron tres, a las 22:37 UTC (19:37 en Santiago) del 18-11, y a las 01:22 y 02:21 UTC del 19-11 (22:22 y 23:21 en Santiago del 18-11). La segunda tenía una tabla de datos más que la primera, porque es posterior a la migración. Antes de migrar la base local se hizo además un respaldo lógico local (salida 0, copia con huella coincidente y legible con `pg_restore --list`). **Ninguno tiene restauración probada.**
+- **Mantenimiento** (18-11): Manual Build `dep-dbv2l9utlv9c73fk9vug`, hacia las 22:46 UTC (19:46 en Santiago). El registro muestra el checkout de `4833f0d` y terminó en Deploy succeeded (52,7 s); construir no lanzó ejecuciones. Luego hubo tres ejecuciones con comando explícito, identificadas por sus filas (el contador general siguió en 30), entre las 22:48 y las 22:53 UTC:
+  1. `prisma migrate status`: 43 migraciones y como **única** pendiente `20261118000000_parametros_sistema`. Terminó con código 1 por esa pendiente, sin fallidas ni divergencias.
+  2. `prisma migrate deploy`: aplicó **solo** esa migración.
+  3. `prisma migrate status`: «Database schema is up to date!».
+
+  El Docker Command quedó **vacío**, comprobado al recargar; se conservaron programación y Auto-Deploy. **Sin seed.**
+- **Despliegues** (despliegue manual del SHA completo; el inicio es el que muestra el panel):
+
+  | Entrega | Servicio | Despliegue | Inicio UTC (Santiago) | Duración | Lectura de Live |
+  |---|---|---|---|---|---|
+  | `4833f0d` | API | `dep-dbv2pfjrjlhs73an8egg` | 18-11 22:54:54 (19:54:54) | 37,7 s | 22:55:43 UTC |
+  | `4833f0d` | web | `dep-dbv2qf8u01pc73clb8dg` | 18-11 22:57:02 (19:57:02) | 33,5 s | 22:57:39 UTC |
+  | `bd1e321` | web | `dep-dbv53gjm8hqs738vscq0` | 19-11 01:32:50 (18-11 22:32:50) | 32,7 s | 01:33:28 UTC |
+  | `6d5c410` | web | `dep-dbv5uctg1s2s73e9sbtg` | 19-11 02:30:11 (18-11 23:30:11) | 41,1 s | 02:31:06 UTC |
+
+  La columna «Lectura de Live» es la hora en que se leyó el panel, no el instante de la transición. En la entrega inicial, el registro de la API mostró la instancia nueva escuchando a las 22:55:30 UTC, sin errores. Las dos actualizaciones posteriores fueron **solo de la web**; la API y el mantenimiento no se tocaron.
+- **Entorno local, en cada entrega**, con candidatas construidas desde una copia limpia del SHA (verificada contra el commit), sin construir desde el checkout principal y sin desactivar TLS:
+  - En la entrega inicial, migración con orden explícita y sin seed (la orden por defecto del servicio `migrate` de Compose incluye el seed): `status` (misma única pendiente), `deploy` y `status` (al día), con la tabla nueva vacía.
+  - Después se recrearon backend y frontend sin construir; PostgreSQL conservó su contenedor y su volumen.
+  - En las dos actualizaciones se recreó **solo el frontend**, con `--no-build --no-deps`.
+  - En todos los casos se verificaron la imagen usada, la salud, `/login` y el contenido del paquete, y los servicios quedaron detenidos.
+
+**5. Comprobaciones HTTP sin credenciales** (acreditan disponibilidad y rechazo, no funcionamiento con sesión).
+- Tras la API nueva: `/api/health` y `/api/ready` 200; `/api/mensaje-de-acceso` 200 con el texto por defecto; administración del mensaje (GET y PUT) y `/api/dashboard/stats` 401.
+- Tras cada despliegue de la web: `/login` 200 con `no-store`, CSP, HSTS, `nosniff`, `DENY` y `no-referrer`. El paquete referenciado cambió y se sirvió como JavaScript con caché inmutable, con el contenido previsto de cada entrega: en `4833f0d`, las rutas y textos nuevos; en `bd1e321` y `6d5c410`, sin los textos retirados y con las ayudas de Editar persona; y en `6d5c410`, además, el elemento `ayuda-username` con su margen positivo. No se exigió 404 al paquete anterior.
+- **Muestreos**, uno por operación y no sumables como una ejecución única. Cada petición registró hora, duración, estado HTTP, salida y error, y todos dieron el estado y el cuerpo esperados, con salida 0 y sin errores:
+
+  | Operación | Rondas / peticiones | Ventana UTC | Después de la lectura de Live |
+  |---|---|---|---|
+  | Entrega inicial (API y web) | 16 / 80 | 18-11 22:53:55–23:02:40 | 9 rondas tras la web |
+  | Editar club (web) | 12 / 60 | 19-11 01:31:52–01:38:15 | 9 rondas |
+  | Ajustes visuales (web) | 13 / 65 | 19-11 02:29:16–02:36:15 | 9 rondas |
+
+  En la entrega inicial, la ruta nueva `/api/mensaje-de-acceso` respondió 404 hasta la ronda de las 22:55:11 y 200 con su texto desde la de las 22:55:45. Las demás muestras no se atribuyen a una versión concreta.
+
+**6. Confirmación manual del usuario.** El usuario informó que revisó y quedó conforme con:
+- el mensaje del login editable;
+- los totales por género del panel;
+- los textos retirados en las altas;
+- Editar club;
+- el espaciado de la ayuda en Editar persona;
+- el Panel de Inscripción y el Panel de Relevos.
+
+En la eliminación de competencias revisó la **advertencia y canceló la operación**: no se eliminó ninguna competencia real en producción. La eliminación efectiva, la reversión ante fallos, la concurrencia y la conservación de Catálogos se probaron **solo en la base desechable**. Es su revisión manual, sin cuentas, roles adicionales ni dispositivos indicados.
+
+**Reversión del código** (conserva datos y auditoría):
+- **Web**, al despliegue anterior que corresponda: `dep-dbv53gjm8hqs738vscq0` (`bd1e321`), `dep-dbv2qf8u01pc73clb8dg` (`4833f0d`) o, para volver antes de los siete cambios, `dep-dbub964ipgvc738d9nk0` (`0b1cf37`).
+- **API**, solo en este último caso y después de la web: `dep-dbuuiap5efls73bbtdsg` (`34cfb9b`).
+- **En local:** las imágenes conservadas con etiquetas `prev-20261118-…`: frontend de `bd1e321`, `4833f0d` y `0b1cf37`, backend de `34cfb9b` y migraciones de `430c4cb`.
+
+La tabla `parametros_sistema`, sus filas y la auditoría **no se eliminan**: la API anterior la ignora. Revertir el código no recupera competencias eliminadas por usuarios ni autoriza restaurar respaldos.
+
+**Limitaciones del conjunto**
+- El intercalado con la **edición de integrantes** se analizó, pero no se ensayó.
+- Cuando se pierde la respuesta de una eliminación, el resultado queda **incierto** hasta comprobarlo.
+- El respaldo del mensaje ante un fallo de su lectura se probó solo de forma **simulada**.
+- No se demostró identidad binaria entre las imágenes locales y las de Render. Los paquetes web locales y los de producción tienen nombres distintos y la URL de API compilada también difiere, pero **no se comprobó** que esa sea la única causa.
+- Los muestreos no acreditan disponibilidad continua entre muestras, y no se afirma la ausencia absoluta de escrituras durante las operaciones.
+- Las validaciones de los archivos de respaldo (gzip, estructura, lectura del índice) **no equivalen a restauraciones probadas**.
 
 ## Inventario completo de endpoints
 
