@@ -2237,6 +2237,24 @@ Pantalla exclusiva de administración (`/administracion/accesos`, menú «Acceso
   - El caso de un club **con cuenta existente** se comprobó solo con pruebas simuladas: el club de la revisión visual no tenía cuenta.
   - Preparar la revisión visual exigió aplicar `prisma migrate deploy` **únicamente** sobre la base desechable, que se reinicia vacía, y crear su marcador con el ayudante de la suite. Fue una excepción a la instrucción de no migrar de esa etapa. No se tocaron producción ni la base de trabajo.
 
+#### Ajustes visuales: ayuda de Editar persona y paneles sin frase inicial (estado: publicada en el repositorio y validada localmente; pendiente de despliegue de la web y actualización del frontend local)
+
+> **Entrega posterior y distinta** de los siete cambios y de la ampliación de Editar club, que se conservan como antecedentes. *Antecedente:* la ampliación de Editar club (`bd1e321`) ya se desplegó en la web; su cierre documental queda pendiente con el conjunto. Estos ajustes **no están desplegados**: cambian solo el frontend, sin tocar backend, esquema, migraciones ni dependencias.
+
+- **Ayuda de Editar persona.** El texto bajo «Nombre de usuario» (`ayuda-username`, en `CredencialesDeAcceso`) tenía un margen superior negativo que lo subía sobre el campo. Ahora tiene una separación positiva y queda debajo, también cuando hay un mensaje de error. Solo cambia esa ayuda, no los estilos generales de los formularios.
+- **Panel de Inscripción y Panel de Relevos.** Se retiran «Elija una competencia y un club para comenzar a inscribir.» y «Elija una competencia y un club para comenzar a armar relevos.», sin texto de reemplazo: hasta elegir competencia y club, el panel muestra solo sus selectores.
+- **Se conservan:** las ayudas de Editar persona, con y sin cuenta, y su asociación por `aria-describedby`; su ausencia en Nueva persona, Nuevo club y Editar club; los selectores, la competencia predeterminada, los estados de carga, los errores, los permisos y las condiciones para mostrar el contenido de cada panel; y las etiquetas, validaciones, el bloqueo del nombre con cuenta y las acciones de credenciales.
+- **Pruebas** (por ejecución):
+  - la primera, sobre los 15 archivos directamente afectados, tuvo 7 fallos, todos por expectativas que usaban la frase retirada como señal de que el contenido estaba oculto;
+  - esas expectativas se cambiaron por la señal directa, el resumen «Nadadores:», que solo aparece con competencia y club elegidos;
+  - en una segunda ejecución, los dos archivos ajustados pasaron 58/58. Los otros trece habían aprobado en la primera y no se volvieron a ejecutar.
+
+  Tipos sin errores, lint sin errores (las advertencias de los paneles son las mismas que en la versión publicada) y `git diff --check` limpio.
+- **Revisión visual con API simulada** (Vite local y `fetch` interceptado en la página, con datos sintéticos; **sin backend ni base de datos**, así que no es una prueba de integración):
+  - Editar persona en escritorio y a 375 px, sin cuenta, con cuenta y con error de validación: la ayuda queda debajo del campo, sin superposición y con las líneas bien ajustadas;
+  - Nueva persona sin ayuda;
+  - los dos paneles en escritorio y a 375 px, sin la frase y sin huecos, con los selectores funcionando y el contenido visible al elegir competencia y club.
+
 ## Inventario completo de endpoints
 
 **141 endpoints**, agrupados por el módulo que los declara. Esta lista no está

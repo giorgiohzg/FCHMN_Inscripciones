@@ -202,7 +202,9 @@ describe("no se carga nada hasta tener competencia Y club", () => {
     montar();
 
     await screen.findByText("Club Dos");
-    expect(screen.getByText(/Elija una competencia y un club/)).toBeInTheDocument();
+    // Sin competencia no se muestra el contenido del panel (ni texto que lo reemplace).
+    expect(screen.queryByText(/Nadadores:/)).toBeNull();
+    expect(screen.queryByText(/Elija una competencia y un club/)).toBeNull();
     expect(listClubEligibilityMatrix).not.toHaveBeenCalled();
     expect(listEnabledEvents).not.toHaveBeenCalled();
   });

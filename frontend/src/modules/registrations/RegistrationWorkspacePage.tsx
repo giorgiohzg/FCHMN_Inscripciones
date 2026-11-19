@@ -804,9 +804,8 @@ export function RegistrationWorkspacePage() {
 
       {error && <p className="error-message">{error}</p>}
 
-      {!competitionId || !clubId ? (
-        <p style={{ color: "var(--brand-gray-600)", fontSize: "0.9rem" }}>Elija una competencia y un club para comenzar a inscribir.</p>
-      ) : (
+      {/* Sin competencia y club elegidos no se muestra nada más: los selectores bastan. */}
+      {!competitionId || !clubId ? null : (
         <>
           <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap", fontSize: "0.82rem", background: "var(--brand-bg)", borderRadius: 6, padding: "0.4rem 0.75rem", marginBottom: "0.5rem" }}>
             <span>Nadadores: <strong>{eligibility.length}</strong></span>

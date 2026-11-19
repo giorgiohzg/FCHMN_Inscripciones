@@ -86,7 +86,7 @@ export function CredencialesDeAcceso({ modo, username, usernameOriginal, onUsern
 
       {/* Sin texto de ayuda en el ALTA, ni en la edición cuando la ficha lo omite (club). */}
       {conAyuda && (
-        <p id="ayuda-username" style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "-0.4rem" }}>
+        <p id="ayuda-username" style={{ fontSize: "0.78rem", color: "var(--brand-gray-600)", marginTop: "0.35rem" }}>
           {bloqueado
             ? "No se puede modificar: las credenciales de acceso se crearon con este nombre."
             : "Puede asignarlo, cambiarlo o dejarlo vacío mientras no haya credenciales. Una vez creadas, ya no se puede modificar."}

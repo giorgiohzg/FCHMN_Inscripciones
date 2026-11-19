@@ -166,7 +166,10 @@ for (const [nombre, Pantalla] of Object.entries(PANTALLAS)) {
  */
 const ADMIN_CON_CLUB: Sesion = { ownerType: "person", clubId: "club-1", personId: "p-1", roles: ["admin", "delegate"] };
 const SOLO_DELEGADO: Sesion = { ownerType: "person", clubId: "club-1", personId: "p-1", roles: ["delegate"] };
-const AVISO_SIN_ELECCION = /Elija una competencia y un club/;
+// Resumen que solo aparece con competencia Y club elegidos: su ausencia indica que el contenido
+// de la competencia no se muestra (antes se comprobaba con el aviso «Elija una competencia y un club…»,
+// que se retiró sin reemplazo).
+const CONTENIDO_DE_LA_COMPETENCIA = /Nadadores:/;
 
 for (const [nombre, Pantalla] of Object.entries(PANTALLAS)) {
   const vista = () => (
@@ -186,14 +189,14 @@ for (const [nombre, Pantalla] of Object.entries(PANTALLAS)) {
       sesion = ADMIN_CON_CLUB;
       const { rerender } = render(vista());
       await waitFor(() => expect(selector().value).toBe("O"));
-      await waitFor(() => expect(screen.queryByText(AVISO_SIN_ELECCION)).toBeNull());
+      await waitFor(() => expect(screen.getByText(CONTENIDO_DE_LA_COMPETENCIA)).toBeInTheDocument());
 
       cambiarSesion(rerender, SOLO_DELEGADO);
       await waitFor(() => expect(competitionsList).toHaveBeenCalledTimes(2));
       await waitFor(() => expect([...selector().options].map((o) => o.value)).toEqual(["", "A", "B"]));
       expect(selector().value).toBe("");
       // El contenido de la competencia descartada deja de mostrarse.
-      expect(await screen.findByText(AVISO_SIN_ELECCION)).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByText(CONTENIDO_DE_LA_COMPETENCIA)).toBeNull());
     });
 
     it("una selección MANUAL que desaparece de la lista también se limpia, y no se reemplaza por la predeterminada", async () => {
@@ -202,13 +205,13 @@ for (const [nombre, Pantalla] of Object.entries(PANTALLAS)) {
       const { rerender } = render(vista());
       await waitFor(() => expect(selector().value).toBe("B"));
       fireEvent.change(selector(), { target: { value: "O" } });
-      await waitFor(() => expect(screen.queryByText(AVISO_SIN_ELECCION)).toBeNull());
+      await waitFor(() => expect(screen.getByText(CONTENIDO_DE_LA_COMPETENCIA)).toBeInTheDocument());
 
       cambiarSesion(rerender, SOLO_DELEGADO);
       await waitFor(() => expect(competitionsList).toHaveBeenCalledTimes(2));
       await waitFor(() => expect([...selector().options].map((o) => o.value)).toEqual(["", "A", "B"]));
       expect(selector().value).toBe("");
-      expect(await screen.findByText(AVISO_SIN_ELECCION)).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByText(CONTENIDO_DE_LA_COMPETENCIA)).toBeNull());
     });
 
     it("una selección manual que SIGUE disponible se conserva al cambiar la lista", async () => {
@@ -248,7 +251,7 @@ for (const [nombre, Pantalla] of Object.entries(PANTALLAS)) {
       });
       expect([...selector().options].map((o) => o.value)).toEqual(["", "A", "B"]);
       expect(selector().value).toBe("");
-      expect(screen.getByText(AVISO_SIN_ELECCION)).toBeInTheDocument();
+      expect(screen.queryByText(CONTENIDO_DE_LA_COMPETENCIA)).toBeNull();
     });
   });
 }
