@@ -86,7 +86,6 @@ describe("rowsToCsv", () => {
  * no protegía los trozos internos.
  */
 import { neutralizeCsvCellBoundaries } from "../src/modules/reports/reports.rules";
-import { buildCsv } from "../src/modules/reports/reports.service";
 
 /** Modelo del peor caso: la planilla parte por `;` ignorando las comillas, y quita espacios y comillas del inicio de cada celda. */
 function celdasConSeparadorPuntoYComa(linea: string): string[] {
@@ -160,28 +159,5 @@ describe("rowsToCsv / escapeCsvValue con separador de lista distinto de la coma 
     // Con coma sigue entrecomillado, y el trozo tras `;` también queda neutralizado.
     expect(escapeCsvValue("Club,x;=1+1")).toBe(`"Club,x;'=1+1"`);
     expect(escapeCsvValue('Ana;"=1+1')).toBe(`"Ana;""'=1+1"`);
-  });
-
-  it("buildCsv conserva secciones, encabezados y número de columnas con valores hostiles", () => {
-    const individual = {
-      competencia: "Copa", club: "Club;=1+1;Z", nombreCompleto: "Ana Prueba;=1+1;x", fechaNacimiento: "05-05-1995", categoria: "Todo", prueba: "50m Libre",
-      distancia: "50m", estilo: "Libre", genero: "Mixto", fecha: "09-11-2026", jornada: "Mañana", tipoDePrueba: "Individual",
-    };
-    const relevo = {
-      competencia: "Copa", equipoClub: "Club;+1+1;Z", prueba: "50m Libre", categoria: "Relevo", genero: "Mixto", fecha: "09-11-2026", jornada: "Mañana",
-      integrante1: "A;=1+1;x", integrante2: "B", integrante3: "C", integrante4: "D",
-    };
-    const lineas = buildCsv([individual as never], [relevo as never], "administracion").split("\r\n");
-    expect(lineas[0]).toBe("INDIVIDUALES");
-    expect(lineas[3]).toBe("");
-    expect(lineas[4]).toBe("RELEVOS");
-    expect(lineas[2]!.split(",")).toHaveLength(12);
-    expect(lineas[5]!.split(",")).toHaveLength(11);
-    expect(lineas[2]).toContain("Club;'=1+1;Z");
-    expect(lineas[2]).toContain("Ana Prueba;'=1+1;x");
-    expect(lineas[6]).toContain("Club;'+1+1;Z");
-    for (const linea of lineas) {
-      for (const celda of celdasConSeparadorPuntoYComa(linea)) expect(EMPIEZA_COMO_FORMULA(celda), celda).toBe(false);
-    }
   });
 });

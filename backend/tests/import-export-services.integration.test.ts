@@ -3,7 +3,7 @@
  * exportación contra PostgreSQL:
  *
  *   - `importCompetitionFromMeetEventsZip` (el ZIP de Meet Events)
- *   - `getRegistrationsReport` + `buildCsv` / `buildXlsx` (los reportes)
+ *   - `getRegistrationsReport` y los archivos CSV, Excel y PDF del reporte detallado
  *   - `buildTeamManagerExport` (el ZIP con el .CL2 y el .HY3)
  *
  * Hasta ahora la Fase 3 se apoyaba en pruebas de funciones puras
@@ -31,6 +31,9 @@ import * as relayService from "../src/modules/relay-registrations/relay-registra
 import * as catalogsCategories from "../src/modules/catalogs/categories.service";
 import * as catalogsEvents from "../src/modules/catalogs/events.service";
 import * as reportsService from "../src/modules/reports/reports.service";
+import { csvDelReporteDetallado, ENCABEZADOS_DE_BLOQUES, textoDelNadador } from "../src/modules/reports/reporteDetallado.rules";
+import { bloqueDe, leerHojaDetallada, textoDe } from "./helpers/reporteDetalladoSintetico";
+import { pdfDelReporteDetallado, xlsxDelReporteDetallado } from "../src/modules/reports/reporteDetallado.archivos";
 import { buildTeamManagerExport } from "../src/modules/team-manager-export/team-manager-export.service";
 import { computeCl2Checksum, isValidCl2Line } from "../src/modules/team-manager-export/cl2-writer";
 import { formatHy3Date } from "../src/modules/team-manager-export/hy3-writer";
@@ -1345,12 +1348,12 @@ describe("getRegistrationsReport (invocación real)", () => {
     const { competencia } = await montarCompetenciaConInscripciones({ conPiscina: true, nombreClub: "=cmd|'/c calc'!A1" });
 
     const reporte = await reportsService.getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR);
-    const csv = reportsService.buildCsv(reporte.individualRows, reporte.relayRows, "administracion");
+    const csv = csvDelReporteDetallado(reporte);
 
     expect(csv).toContain("cmd|'/c calc'!A1");
     // Ninguna celda del CSV puede empezar con un carácter de fórmula.
     for (const linea of csv.split("\r\n")) {
-      for (const celda of linea.split(",")) {
+      for (const celda of linea.split(/[;,]/)) {
         const contenido = celda.replace(/^"/, "");
         expect(["=", "+", "@"].some((c) => contenido.startsWith(c)), `celda peligrosa: ${celda}`).toBe(false);
       }
@@ -1361,7 +1364,7 @@ describe("getRegistrationsReport (invocación real)", () => {
     const { competencia } = await montarCompetenciaConInscripciones({ conPiscina: true });
     const reporte = await reportsService.getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR);
 
-    const buffer = await reportsService.buildXlsx(reporte.individualRows, reporte.relayRows, "administracion");
+    const buffer = await xlsxDelReporteDetallado(reporte);
     // Un .xlsx es un ZIP: debe empezar con la firma PK.
     expect(buffer.subarray(0, 2).toString("latin1")).toBe("PK");
     expect(buffer.length).toBeGreaterThan(1000);
@@ -2706,55 +2709,49 @@ describe("Reportes: orden por apellido paterno y por número de programa", () =>
     expect(informe.relayRows[1]!.prueba).toMatch(/Libre/); // número 10
   });
 
-  it("CSV, XLSX y PDF: mismo orden y mismas filas que el informe, sin columnas nuevas", async () => {
+  it("CSV, XLSX y PDF: los nadadores y sus pruebas, en el orden de la vista agrupada y sin repetirse", async () => {
     const { competencia } = await montarEscenario();
     const informe = await reportsService.getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR);
-    const esperadas = informe.individualRows.map((r) => r.nombreCompleto);
+    const nadadores = informe.groupedByClub.flatMap((c) => c.swimmers);
+    expect(nadadores.map((s) => s.nombreCompleto)).toEqual(ESPERADO);
+    const pruebas = nadadores.flatMap((s) => s.jornadas.flatMap((j) => j.pruebas.map((p) => `${s.nombrePresentado}|${p.numero ?? ""}|${p.descripcion}`)));
 
     // CSV
-    const csv = reportsService.buildCsv(informe.individualRows, informe.relayRows, "administracion");
-    const lineasCsv = csv.split("\r\n");
-    const iInd = lineasCsv.indexOf("INDIVIDUALES");
-    const iRel = lineasCsv.indexOf("RELEVOS");
-    const filasInd = lineasCsv.slice(iInd + 2, iRel - 1); // cabecera, filas, línea en blanco
-    expect(filasInd).toHaveLength(informe.individualRows.length);
-    expect(filasInd.map((l) => l.split(",")[2])).toEqual(esperadas); // columna «nombre completo»
-    expect(lineasCsv[iInd + 1]!.split(",")).toHaveLength(12); // sin la columna RUN y sin otras añadidas
-    expect(lineasCsv[iRel + 1]!.split(",")).toHaveLength(11);
-    expect(lineasCsv.slice(iRel + 2).filter(Boolean)).toHaveLength(informe.relayRows.length);
+    const csv = csvDelReporteDetallado(informe).split("\r\n").map((l) => l.split(";"));
+    const columna = (nombre: string) => csv[0]!.map((c) => c.replace("\uFEFF", "")).indexOf(nombre);
+    const sinComillas = (v: string) => v.replace(/^"|"$/g, "");
+    const filas = csv.slice(1);
+    expect(filas.filter((f) => f[columna("Sección")] === "Nadador").map((f) => sinComillas(f[columna("Nadador")]!))).toEqual(nadadores.map((s) => s.nombrePresentado));
+    expect(
+      filas
+        .filter((f) => f[columna("Sección")] === "Prueba")
+        .map((f) => `${sinComillas(f[columna("Nadador")]!)}|${f[columna("N° prueba")]}|${f[columna("Prueba")]}`)
+    ).toEqual(pruebas);
+    const filaDelClub = filas.find((f) => f[columna("Sección")] === "Club")!;
+    expect([filaDelClub[columna("Total nadadores")], filaDelClub[columna("Total relevos")]]).toEqual(["4", "2"]);
 
     // XLSX
     const libro = new ExcelJS.Workbook();
-    await libro.xlsx.load((await reportsService.buildXlsx(informe.individualRows, informe.relayRows, "administracion")) as never);
-    const hojaInd = libro.getWorksheet("Individuales")!;
-    const nombresXlsx: string[] = [];
-    hojaInd.eachRow((fila, n) => {
-      if (n > 1) nombresXlsx.push(String(fila.getCell(3).value));
-    });
-    expect(nombresXlsx).toEqual(esperadas);
-    expect(hojaInd.getRow(1).cellCount).toBe(12);
-    expect(libro.getWorksheet("Relevos")!.rowCount).toBe(1 + informe.relayRows.length);
+    await libro.xlsx.load((await xlsxDelReporteDetallado(informe)) as never);
+    const enExcel = leerHojaDetallada(libro.getWorksheet("Inscripciones")!).flatMap((c) => c.nadadores);
+    expect(enExcel.map((n) => [n.linea, ...n.filas.flatMap((f) => f.bloques)])).toEqual(
+      nadadores.map((s) => [`${s.numero}. ${textoDelNadador(s)}`, ...s.jornadas.flatMap((j) => j.pruebas.map(bloqueDe))])
+    );
 
-    // PDF: se descomprimen sus flujos y se leen las líneas de texto en el orden en que
-    // quedaron en el archivo (no se renderiza ni se abre en un visor: es una extracción
-    // del contenido generado). Las líneas de «Individuales» siguen el orden del informe.
-    const pdf = await reportsService.buildPdf(informe.competitionName, informe.individualRows, informe.relayRows);
+    // PDF: se leen las líneas de texto del contenido generado, en su orden (no se renderiza).
+    const pdf = await pdfDelReporteDetallado(informe);
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     const lineasPdf = lineasDeTextoDelPdf(pdf);
-    const iIndPdf = lineasPdf.indexOf("Individuales");
-    const iRelPdf = lineasPdf.indexOf("Relevos");
-    expect(iIndPdf).toBeGreaterThanOrEqual(0);
-    expect(iRelPdf).toBeGreaterThan(iIndPdf);
-    const individualesPdf = lineasPdf.slice(iIndPdf + 1, iRelPdf);
-    expect(individualesPdf).toHaveLength(informe.individualRows.length);
-    informe.individualRows.forEach((r, i) => {
-      expect(individualesPdf[i]).toBe(`${r.club} — ${r.nombreCompleto} — ${r.prueba} — ${r.categoria} — ${r.fecha} ${r.jornada}`);
-    });
-    // Relevos: una línea por equipo (la lista de integrantes puede partirse en varias líneas del PDF, así que
-    // se buscan las que empiezan con el club del equipo, en el orden del informe).
-    const relevosPdf = lineasPdf.slice(iRelPdf + 1).filter((l) => l.startsWith(`${informe.relayRows[0]!.equipoClub} — `));
-    expect(relevosPdf).toHaveLength(informe.relayRows.length);
-    informe.relayRows.forEach((r, i) => expect(relevosPdf[i]).toContain(`${r.equipoClub} — ${r.prueba} — ${r.categoria}`));
+    expect(lineasPdf.filter((l) => /^\d+\. /.test(l))).toEqual(nadadores.map((s) => `${s.numero}. ${textoDelNadador(s)}`));
+    // Todo el contenido, en orden, sin los espacios en que una descripción larga se haya partido.
+    const compacto = (t: string) => t.replace(/\s+/g, "");
+    const cuerpo = compacto(lineasPdf.join(""));
+    let desde = 0;
+    for (const p of nadadores.flatMap((s) => s.jornadas.flatMap((j) => j.pruebas))) {
+      const i = cuerpo.indexOf(compacto(bloqueDe(p)), desde);
+      expect(i, bloqueDe(p)).toBeGreaterThanOrEqual(0);
+      desde = i + 1;
+    }
   });
 
   it("permisos y alcance no cambian: un club solo ve lo suyo, y el contenido es el mismo", async () => {
@@ -2809,27 +2806,29 @@ describe("Reportes: orden por apellido paterno y por número de programa", () =>
     expect(planas.map((r) => r.prueba)).toEqual(["100m Espalda", "100m Pecho", "50m Libre", "100m Mariposa", "200m Mariposa"]);
     expect(planas.map((r) => r.prueba)).toEqual(ana.pruebas.map((l) => l.text.replace(/ \d+:\d{2},\d{2}$/, "")));
 
-    // CSV y XLSX respetan ese mismo orden relativo.
-    const csv = reportsService.buildCsv(informe.individualRows, informe.relayRows, "administracion").split("\r\n");
-    const filasCsv = csv.slice(csv.indexOf("INDIVIDUALES") + 2, csv.indexOf("RELEVOS") - 1).filter((l) => l.includes("Ana Araya Soto"));
-    expect(filasCsv.map((l) => l.split(",")[5])).toEqual(planas.map((r) => r.prueba)); // columna «prueba»
+    // La jornada (es una sola) y los tres archivos respetan ese mismo orden relativo.
+    expect(ana.jornadas.flatMap((j) => j.pruebas.filter((p) => p.tipo === "individual").map((p) => `${p.numero}|${textoDe(p)}`))).toEqual(vista);
+    const csv = csvDelReporteDetallado(informe).split("\r\n").map((l) => l.split(";"));
+    const iPrueba = csv[0]!.indexOf("Prueba");
+    const iTipo = csv[0]!.indexOf("Tipo de prueba");
+    const filasCsv = csv.filter((f) => f.some((c) => c.includes("ARAYA SOTO, ANA")) && f[iTipo] === "Individual");
+    expect(filasCsv.map((f) => f[iPrueba])).toEqual(planas.map((r) => r.prueba));
     const libro = new ExcelJS.Workbook();
-    await libro.xlsx.load((await reportsService.buildXlsx(informe.individualRows, informe.relayRows, "administracion")) as never);
-    const pruebasXlsx: string[] = [];
-    libro.getWorksheet("Individuales")!.eachRow((fila, n) => {
-      if (n > 1 && String(fila.getCell(3).value) === "Ana Araya Soto") pruebasXlsx.push(String(fila.getCell(6).value));
-    });
-    expect(pruebasXlsx).toEqual(planas.map((r) => r.prueba));
+    await libro.xlsx.load((await xlsxDelReporteDetallado(informe)) as never);
+    const anaXlsx = leerHojaDetallada(libro.getWorksheet("Inscripciones")!).flatMap((c) => c.nadadores).find((n) => n.linea.includes("ARAYA SOTO, ANA"))!;
+    expect(anaXlsx.filas.flatMap((f) => f.bloques).filter((b) => !b.includes("Relevo"))).toEqual(
+      ana.jornadas.flatMap((j) => j.pruebas.filter((p) => p.tipo === "individual").map(bloqueDe))
+    );
 
-    // PDF: mismas líneas, mismo orden (extracción del contenido generado).
-    const pdf = await reportsService.buildPdf(informe.competitionName, informe.individualRows, informe.relayRows);
-    const lineasPdf = lineasDeTextoDelPdf(pdf);
-    // Solo la sección «Individuales» (Ana también figura como integrante en la de «Relevos»).
-    const delPdf = lineasPdf.slice(lineasPdf.indexOf("Individuales"), lineasPdf.indexOf("Relevos")).filter((l) => l.includes("Ana Araya Soto"));
-    expect(delPdf.map((l) => l.split(" — ")[2])).toEqual(planas.map((r) => r.prueba));
+    // PDF: mismas líneas, mismo orden (extracción del contenido generado), entre Ana y la nadadora siguiente.
+    const lineasPdf = lineasDeTextoDelPdf(await pdfDelReporteDetallado(informe));
+    const desde = lineasPdf.findIndex((l) => l.includes("ARAYA SOTO, ANA"));
+    const hasta = lineasPdf.findIndex((l, i) => i > desde && /^\d+\. /.test(l));
+    const suyas = ana.jornadas.flatMap((j) => j.pruebas.filter((p) => p.tipo === "individual").map((p) => p.descripcion));
+    expect(lineasPdf.slice(desde, hasta).filter((l) => suyas.includes(l))).toEqual(suyas);
   });
 
-  it("la categoría y el club mostrados NO cambian por el orden de presentación: la del primer registro entregado, no la de la primera prueba del programa", async () => {
+  it("la categoría mostrada NO cambia por el orden de presentación: la del primer registro entregado, no la de la primera prueba del programa", async () => {
     const base = await montarCompetenciaConInscripciones({ conPiscina: true });
     const [n1] = base.nadadores as [{ id: string }];
     // La prueba de la base de n1 queda en el programa 9 (categoría «Master Export»).
@@ -3083,7 +3082,7 @@ describe("SEC-02: los reportes no entregan el RUN y Team Manager sí", () => {
       expect(informe.individualRows.length, rol).toBeGreaterThan(0);
       sinRunEnJson(informe);
       for (const fila of informe.groupedByClub.flatMap((g) => g.swimmers)) {
-        expect(Object.keys(fila).sort(), rol).toEqual(["apellidoMaterno", "apellidoPaterno", "categoria", "edad", "genero", "nombreCompleto", "nombres", "personId", "pruebas", "relevos"]);
+        expect(Object.keys(fila).sort(), rol).toEqual(["apellidoMaterno", "apellidoPaterno", "categoria", "detalle", "edad", "genero", "jornadas", "nombreCompleto", "nombrePresentado", "nombres", "numero", "personId", "pruebas", "relevos"]);
       }
       // AUD-10: la administración recibe la fecha completa; los demás roles, la edad en su lugar.
       const nacimiento = rol === "admin" ? "fechaNacimiento" : "edad";
@@ -3126,49 +3125,33 @@ describe("SEC-02: los reportes no entregan el RUN y Team Manager sí", () => {
     expect(porRun[0]).toBe(m.homonimos[1]!.id);
   });
 
-  it("CSV: la columna RUN no existe (ni vacía), los encabezados son los esperados y cada dato queda bajo el suyo", async () => {
+  it("CSV: la columna RUN no existe (ni vacía), los encabezados son los esperados y todas las filas tienen las mismas columnas", async () => {
     const m = await montarEscena();
     const informe = await reportsService.getRegistrationsReport({ competitionId: m.competencia.id }, ADMIN_ACTOR);
-    const csv = reportsService.buildCsv(informe.individualRows, informe.relayRows, "administracion");
+    const csv = csvDelReporteDetallado(informe);
     const lineas = csv.split("\r\n");
-    const iInd = lineas.indexOf("INDIVIDUALES");
-    const iRel = lineas.indexOf("RELEVOS");
 
-    expect(lineas[iInd + 1]).toBe("Competencia,Club,Nombre completo,Fecha de nacimiento,Categoría,Prueba,Distancia,Estilo,Género,Fecha,Jornada,Tipo de prueba");
-    expect(lineas[iRel + 1]).toBe("Competencia,Club,Prueba,Categoría,Género,Fecha,Jornada,Integrante 1,Integrante 2,Integrante 3,Integrante 4");
-    expect(lineas[iInd + 1]!.toLowerCase()).not.toContain("run");
-    const filas = lineas.slice(iInd + 2, iRel - 1).map((l) => l.split(","));
-    expect(filas).toHaveLength(informe.individualRows.length);
-    for (const [i, f] of filas.entries()) {
-      expect(f, `fila ${i}: 12 celdas`).toHaveLength(12);
-      expect(f[2]).toBe(informe.individualRows[i]!.nombreCompleto);
-      expect(f[3]).toBe((informe.individualRows[i] as { fechaNacimiento?: string }).fechaNacimiento);
-      expect(f[5]).toBe(informe.individualRows[i]!.prueba);
-    }
+    expect(lineas[0]).toBe(
+      "\uFEFFSección;Competencia;Club;Total nadadores;Total pruebas individuales;Total relevos;N° nadador;Nadador;Edad;Categoría;Género;Fecha;Jornada;N° prueba;Tipo de prueba;Prueba;Tiempo"
+    );
+    expect(lineas[0]!.toLowerCase()).not.toContain("run");
+    for (const [i, l] of lineas.entries()) expect(l.split(";"), `fila ${i}`).toHaveLength(17);
+    expect(lineas.filter((l) => l.startsWith("Prueba;")).length).toBe(informe.groupedByClub.flatMap((c) => c.swimmers).flatMap((s) => s.jornadas).flatMap((j) => j.pruebas).length);
     for (const c of TODOS_LOS_CENTINELAS) expect(csv).not.toContain(c);
   });
 
   it("XLSX: reabierto no tiene la columna RUN, y ninguna de sus partes XML contiene el RUN", async () => {
     const m = await montarEscena();
     const informe = await reportsService.getRegistrationsReport({ competitionId: m.competencia.id }, ADMIN_ACTOR);
-    const buffer = await reportsService.buildXlsx(informe.individualRows, informe.relayRows, "administracion");
+    const buffer = await xlsxDelReporteDetallado(informe);
 
     const libro = new ExcelJS.Workbook();
     await libro.xlsx.load(buffer as never);
-    const ind = libro.getWorksheet("Individuales")!;
-    expect((ind.getRow(1).values as unknown[]).slice(1)).toEqual([
-      "Competencia", "Club", "Nombre completo", "Fecha de nacimiento", "Categoría", "Prueba", "Distancia", "Estilo", "Género", "Fecha", "Jornada", "Tipo de prueba",
-    ]);
-    expect(ind.getRow(1).cellCount).toBe(12);
-    ind.eachRow((fila, n) => {
-      if (n > 1) {
-        expect(fila.cellCount, `fila ${n}`).toBe(12);
-        expect(String(fila.getCell(3).value)).toBe(informe.individualRows[n - 2]!.nombreCompleto);
-      }
-    });
-    expect(libro.getWorksheet("Relevos")!.getRow(1).cellCount).toBe(11);
-    expect(ind.columnCount, "sin columna oculta ni vacía").toBe(12);
-    ind.columns.forEach((col) => expect(col.hidden).toBeFalsy());
+    expect(libro.worksheets.map((h) => h.name)).toEqual(["Inscripciones"]);
+    const hoja = libro.worksheets[0]!;
+    expect([1, 3, 4, 6, 7].map((c) => hoja.getRow(2).getCell(c).value)).toEqual([...ENCABEZADOS_DE_BLOQUES]);
+    expect(hoja.columnCount, "sin columna oculta ni vacía").toBe(7);
+    hoja.columns.forEach((col) => expect(col.hidden).toBeFalsy());
 
     // Todas las partes del ZIP, en texto: cadenas compartidas, hojas, propiedades del documento.
     const partes = new AdmZip(buffer).getEntries();
@@ -3179,22 +3162,14 @@ describe("SEC-02: los reportes no entregan el RUN y Team Manager sí", () => {
     }
   });
 
-  it("PDF: por extracción de texto no hay RUN, ni sus formas, ni los paréntesis que lo rodeaban; tampoco dentro de lo comprimido", async () => {
+  it("PDF: por extracción de texto no hay RUN ni sus formas; tampoco dentro de lo comprimido", async () => {
     const m = await montarEscena();
     const informe = await reportsService.getRegistrationsReport({ competitionId: m.competencia.id }, ADMIN_ACTOR);
-    const pdf = await reportsService.buildPdf(informe.competitionName, informe.individualRows, informe.relayRows);
+    const pdf = await pdfDelReporteDetallado(informe);
 
     const lineas = lineasDeTextoDelPdf(pdf);
-    const iInd = lineas.indexOf("Individuales");
-    const iRel = lineas.indexOf("Relevos");
-    const individuales = lineas.slice(iInd + 1, iRel);
-    expect(individuales).toHaveLength(informe.individualRows.length);
-    informe.individualRows.forEach((r, i) => {
-      expect(individuales[i]).toBe(`${r.club} — ${r.nombreCompleto} — ${r.prueba} — ${r.categoria} — ${r.fecha} ${r.jornada}`);
-    });
-    const relevos = lineas.slice(iRel + 1).join(" ");
-    expect(relevos).toContain("Integrantes: Nadador1 Prueba, Nadador2 Prueba, Nadador3 Prueba, Nadador4 Prueba");
-
+    const nadadores = informe.groupedByClub.flatMap((c) => c.swimmers);
+    expect(lineas.filter((l) => /^\d+\. /.test(l))).toEqual(nadadores.map((s) => `${s.numero}. ${textoDelNadador(s)}`));
     for (const c of TODOS_LOS_CENTINELAS) {
       expect(lineas.join("\n")).not.toContain(c);
       expect(pdf.toString("latin1")).not.toContain(c);
@@ -3203,7 +3178,6 @@ describe("SEC-02: los reportes no entregan el RUN y Team Manager sí", () => {
         expect(flujo.toLowerCase(), `ni codificado: ${c}`).not.toContain(hex(c).toLowerCase());
       }
     }
-    expect(lineas.join("\n")).not.toMatch(/\([^)]*\)/); // ningún paréntesis: era donde iba el RUN
   });
 
   it("por HTTP, con administrador y con la cuenta del club: JSON, CSV, XLSX y PDF sin RUN, con los mismos permisos", async () => {
@@ -3342,8 +3316,8 @@ describe("SEC-02: los reportes no entregan el RUN y Team Manager sí", () => {
       // Y los reportes del MISMO torneo no llevan ninguno de los cuatro, en ninguna forma.
       vi.useRealTimers();
       const informe = await reportsService.getRegistrationsReport({ competitionId: competencia.id }, ADMIN_ACTOR);
-      const csv = reportsService.buildCsv(informe.individualRows, informe.relayRows, "administracion");
-      const xlsx = await reportsService.buildXlsx(informe.individualRows, informe.relayRows, "administracion");
+      const csv = csvDelReporteDetallado(informe);
+      const xlsx = await xlsxDelReporteDetallado(informe);
       for (const run of ["8000000-1", "80000001", "80000002", "80000003", "80000004"]) {
         expect(csv).not.toContain(run);
         expect(JSON.stringify(informe)).not.toContain(run);

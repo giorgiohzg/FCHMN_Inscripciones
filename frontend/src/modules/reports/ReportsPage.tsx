@@ -10,6 +10,7 @@ import { CircledNumber } from "../../shared/CircledNumber";
 import { traerTodasLasPaginas } from "../../shared/paginacion";
 import { competenciaPreseleccionada } from "../../shared/competenciaPredeterminada";
 import { partesDeLineaDelReporte } from "./presentacionReporte";
+import { TablaDeClub } from "./TablaDeClub";
 import { useAccesos } from "../auth/AccesosContext";
 import { avisarSiFuncionDeshabilitada } from "../../shared/apiClient";
 
@@ -329,15 +330,18 @@ export function ReportsPage() {
           )}
 
           {result.groupedByClub.map((club) => (
-            <div key={club.clubName} style={{ marginTop: "1.25rem" }}>
+            // Clave: la identidad del club; con una API anterior, que no la envía, el nombre (por él agrupaba).
+            <div key={club.clubId ?? club.clubName} style={{ marginTop: "1.25rem" }}>
               {/* Subtítulo: club, con los totales entre paréntesis sin negrita */}
               <h2 style={{ fontSize: "1.05rem", color: "var(--brand-navy)", borderBottom: "1px solid var(--brand-gray-100)", paddingBottom: "0.3rem" }}>
                 <strong>{club.clubName}</strong>{" "}
                 <span style={{ fontWeight: 400, fontSize: "0.85rem", color: "var(--brand-gray-600)" }}>
-                  ({club.totalNadadores} nadadores, {club.totalPruebasIndividuales} pruebas individuales, {club.totalRelevos} relevos)
+                  ({club.totalesTexto ?? `${club.totalNadadores} nadadores, ${club.totalPruebasIndividuales} pruebas individuales, ${club.totalRelevos} relevos`})
                 </span>
               </h2>
-              {club.swimmers.map((s, index) => {
+              {club.swimmers.every((s) => s.jornadas) && <TablaDeClub nadadores={club.swimmers} />}
+              {/* TRANSICIÓN: con una API anterior, que aún no agrupa por jornada, las listas de siempre. */}
+              {!club.swimmers.every((s) => s.jornadas) && club.swimmers.map((s, index) => {
                 const linea = partesDeLineaDelReporte(s);
                 return (
                 // Clave: el identificador interno de la persona; nunca el nombre (puede repetirse) ni el RUN.

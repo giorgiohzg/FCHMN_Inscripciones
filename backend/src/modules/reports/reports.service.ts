@@ -1,49 +1,24 @@
-import ExcelJS from "exceljs";
-import PDFDocument from "pdfkit";
 import { prisma } from "../../shared/prisma.client";
 import { getDefaultAgeCutoffDate } from "../../shared/age.util";
-import { formatSwimTimeReadable } from "../../shared/swimTime.util";
 import {
   mapIndividualRegistrationToRow,
   mapRelayRegistrationToRow,
-  rowsToCsv,
-  neutralizeSpreadsheetFormula,
-  groupReportByClubAndSwimmer,
   compararFilasIndividuales,
   compararFilasDeRelevo,
   lineaDePrueba,
+  tiempoDeInscripcion,
   type PersonaOrdenable,
   type IndividualReportRow,
   type VistaDeReporte,
   type RelayReportRow,
   type SwimmerEventEntry,
-  type ClubGroup,
+  type JornadaDeEntrada,
 } from "./reports.rules";
+import { armarReporteDetallado } from "./reporteDetallado.rules";
 import type { RegistrationsReportQuery } from "./reports.schemas";
 import { resolveClubFilter, scopedPersonId, type ActorContext } from "../../shared/actorContext";
 import { NotFoundError, ValidationError } from "../../shared/errors";
 import { exigirCompetenciaVisible } from "../competitions/competitions.visibilidad";
-
-const INDIVIDUAL_HEADERS = [
-  "Competencia",
-  "Club",
-  "Nombre completo",
-  "Fecha de nacimiento",
-  "Categoría",
-  "Prueba",
-  "Distancia",
-  "Estilo",
-  "Género",
-  "Fecha",
-  "Jornada",
-  "Tipo de prueba",
-];
-
-/**
- * AUD-10: los roles que no son administración reciben «Edad» en el lugar de «Fecha de
- * nacimiento»; el orden y las demás columnas, incluida «Categoría», no cambian.
- */
-const INDIVIDUAL_HEADERS_CON_EDAD = INDIVIDUAL_HEADERS.map((h) => (h === "Fecha de nacimiento" ? "Edad" : h));
 
 /**
  * Vista del reporte según el ALCANCE EFECTIVO del actor (`buildActorContext`), nunca según
@@ -53,20 +28,6 @@ const INDIVIDUAL_HEADERS_CON_EDAD = INDIVIDUAL_HEADERS.map((h) => (h === "Fecha 
 export function vistaDeReporteParaActor(actor: ActorContext): VistaDeReporte {
   return actor.scope.kind === "admin" ? "administracion" : "general";
 }
-
-const RELAY_HEADERS = [
-  "Competencia",
-  "Club",
-  "Prueba",
-  "Categoría",
-  "Género",
-  "Fecha",
-  "Jornada",
-  "Integrante 1",
-  "Integrante 2",
-  "Integrante 3",
-  "Integrante 4",
-];
 
 /**
  * Sección 16: "Listado de Nadadores Inscritos", con los filtros exigidos
@@ -254,7 +215,8 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
   if (excesoReal) throw excesoReal;
 
   /**
-   * ORDEN de las filas planas (las que consumen JSON, CSV, XLSX y PDF).
+   * ORDEN de las filas planas, que hoy consume solo el JSON (CSV, XLSX y PDF presentan la vista
+   * agrupada; ver `reporteDetallado.rules.ts`).
    *
    * Los criterios son los de la vista agrupada (`reports.rules.ts`), aplicados a
    * lo que cada formato tiene por fila:
@@ -271,9 +233,10 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
    * resultado no dependa del orden en que la base devuelva las filas.
    *
    * Se ordenan COPIAS: `individualRegs` y `relayRegs` conservan el orden de la
-   * base, que es el que decide la categoría y el club mostrados de cada nadador
-   * en la vista agrupada (la primera inscripción que llega, individuales antes
-   * que relevos). Ordenar esos arreglos cambiaría esa selección.
+   * base, que es el que decide la categoría mostrada de cada nadador en cada club
+   * de la vista agrupada (la de la primera inscripción que llega, individuales antes
+   * que relevos). Ordenar esos arreglos cambiaría esa selección. El club no depende
+   * del orden: es el de cada inscripción.
    */
   const ordenable = (p: { id: string; run: string; fullName: string; paternalLastName: string | null; maternalLastName: string | null; firstName: string | null }): PersonaOrdenable => ({
     paternalLastName: p.paternalLastName,
@@ -283,14 +246,13 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
     run: p.run,
     personId: p.id,
   });
-  const tiempoDe = (centisegundos: number | null) => (centisegundos !== null ? formatSwimTimeReadable(centisegundos) : null);
   const lineaIndividual = (r: (typeof individualRegs)[number]) =>
-    lineaDePrueba(r.competitionEvent.displayOrder, `${r.competitionEvent.event.distance.meters}m ${r.competitionEvent.event.stroke.name}`, tiempoDe(r.seedTimeCentiseconds));
+    lineaDePrueba(r.competitionEvent.displayOrder, `${r.competitionEvent.event.distance.meters}m ${r.competitionEvent.event.stroke.name}`, tiempoDeInscripcion(r.seedTimeCentiseconds));
   const lineaRelevo = (r: (typeof relayRegs)[number]) =>
     lineaDePrueba(
       r.competitionEvent.displayOrder,
       `Relevo ${r.competitionEvent.event.distance.meters}m ${r.competitionEvent.event.stroke.name} (${GENDER_LABELS_ES[r.competitionEvent.event.gender]})`,
-      tiempoDe(r.seedTimeCentiseconds)
+      tiempoDeInscripcion(r.seedTimeCentiseconds)
     );
   const individualesOrdenadas = individualRegs
     .map((r) => ({ r, orden: { clubName: r.club.name, persona: ordenable(r.person), linea: lineaIndividual(r), id: r.id } }))
@@ -344,6 +306,27 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
   // específica que la del relevo, que es por edad combinada del equipo).
   // Se arman desde `individualRegs`/`relayRegs` SIN ordenar (ver arriba): el
   // orden de presentación no interviene en esa selección.
+  //
+  // El menor número de programa de cada jornada se toma de TODA la competencia, no de lo filtrado:
+  // así el orden de las jornadas no cambia según el club, la persona o la prueba que se pida.
+  const programaPorJornada = new Map(
+    (
+      await prisma.competitionEvent.groupBy({
+        by: ["competitionSessionId"],
+        where: { competitionId: query.competitionId },
+        _min: { displayOrder: true },
+      })
+    ).map((g) => [g.competitionSessionId, g._min.displayOrder])
+  );
+  const jornadaDe = (ce: {
+    competitionSessionId: string;
+    competitionSession: { competitionDate: { date: Date }; sessionType: { name: string } };
+  }): JornadaDeEntrada => ({
+    id: ce.competitionSessionId,
+    fecha: ce.competitionSession.competitionDate.date,
+    nombre: ce.competitionSession.sessionType.name,
+    primerNumero: programaPorJornada.get(ce.competitionSessionId) ?? null,
+  });
   const swimmerEntries: SwimmerEventEntry[] = [
     ...individualRegs.map((r): SwimmerEventEntry => ({
       personId: r.personId,
@@ -352,14 +335,16 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
       paternalLastName: r.person.paternalLastName,
       maternalLastName: r.person.maternalLastName,
       firstName: r.person.firstName,
+      clubId: r.clubId,
       clubName: r.club.name,
       birthDate: r.person.birthDate,
       gender: r.person.gender,
       categoryName: r.category.name,
       eventNumber: r.competitionEvent.displayOrder,
       eventLabel: `${r.competitionEvent.event.distance.meters}m ${r.competitionEvent.event.stroke.name}`,
-      timeLabel: tiempoDe(r.seedTimeCentiseconds),
+      timeLabel: tiempoDeInscripcion(r.seedTimeCentiseconds),
       kind: "individual",
+      jornada: jornadaDe(r.competitionEvent),
     })),
     ...relayRegs.flatMap((r): SwimmerEventEntry[] =>
       r.members
@@ -375,146 +360,29 @@ export async function getRegistrationsReport(query: RegistrationsReportQuery, ac
           paternalLastName: m.person.paternalLastName,
           maternalLastName: m.person.maternalLastName,
           firstName: m.person.firstName,
+          clubId: r.clubId,
           clubName: r.club.name,
           birthDate: m.person.birthDate,
           gender: m.person.gender,
           categoryName: r.category.name,
           eventNumber: r.competitionEvent.displayOrder,
           eventLabel: `Relevo ${r.competitionEvent.event.distance.meters}m ${r.competitionEvent.event.stroke.name} (${GENDER_LABELS_ES[r.competitionEvent.event.gender]})`,
-          timeLabel: tiempoDe(r.seedTimeCentiseconds),
+          timeLabel: tiempoDeInscripcion(r.seedTimeCentiseconds),
           kind: "relay",
+          jornada: jornadaDe(r.competitionEvent),
         }))
     ),
   ];
   // Cantidad de EQUIPOS de relevo distintos por club — no se puede derivar
-  // sumando `relevos` por nadador (cada equipo aporta 4 integrantes).
-  const relayTeamCountByClub = new Map<string, number>();
+  // sumando `relevos` por nadador (cada equipo aporta 4 integrantes). Por
+  // identificador: el nombre del club no es único.
+  const equiposPorClubId = new Map<string, number>();
   for (const r of relayRegs) {
-    relayTeamCountByClub.set(r.club.name, (relayTeamCountByClub.get(r.club.name) ?? 0) + 1);
+    equiposPorClubId.set(r.clubId, (equiposPorClubId.get(r.clubId) ?? 0) + 1);
   }
-  const groupedByClub: ClubGroup[] = groupReportByClubAndSwimmer(swimmerEntries, ageCutoffDate, relayTeamCountByClub);
+  const detallado = armarReporteDetallado(competition.name, swimmerEntries, ageCutoffDate, equiposPorClubId);
 
-  return { competitionName: competition.name, individualRows, relayRows, groupedByClub };
+  return { ...detallado, individualRows, relayRows };
 }
 
 const GENDER_LABELS_ES: Record<"male" | "female" | "mixed", string> = { male: "Varones", female: "Damas", mixed: "Mixto" };
-
-/**
- * La celda de nacimiento depende de la vista. Si una fila no corresponde a la vista pedida
- * (por ejemplo, una fila con fecha en un archivo con «Edad»), se rechaza en vez de dejar la
- * fecha bajo otro encabezado o la columna desalineada.
- */
-function celdaDeNacimiento(r: IndividualReportRow, vista: VistaDeReporte): string {
-  if (vista === "administracion" && "fechaNacimiento" in r) return r.fechaNacimiento;
-  if (vista === "general" && "edad" in r && !("fechaNacimiento" in r)) return String(r.edad);
-  throw new Error("Fila de reporte individual que no corresponde a la vista del archivo");
-}
-
-function individualRowToArray(r: IndividualReportRow, vista: VistaDeReporte): string[] {
-  return [
-    r.competencia,
-    r.club,
-    r.nombreCompleto,
-    celdaDeNacimiento(r, vista),
-    r.categoria,
-    r.prueba,
-    r.distancia,
-    r.estilo,
-    r.genero,
-    r.fecha,
-    r.jornada,
-    r.tipoDePrueba,
-  ];
-}
-function relayRowToArray(r: RelayReportRow): string[] {
-  return [
-    r.competencia,
-    r.equipoClub,
-    r.prueba,
-    r.categoria,
-    r.genero,
-    r.fecha,
-    r.jornada,
-    r.integrante1,
-    r.integrante2,
-    r.integrante3,
-    r.integrante4,
-  ];
-}
-
-const encabezadosIndividuales = (vista: VistaDeReporte) => (vista === "administracion" ? INDIVIDUAL_HEADERS : INDIVIDUAL_HEADERS_CON_EDAD);
-
-export function buildCsv(individualRows: IndividualReportRow[], relayRows: RelayReportRow[], vista: VistaDeReporte): string {
-  const parts: string[] = [];
-  parts.push("INDIVIDUALES");
-  parts.push(rowsToCsv(encabezadosIndividuales(vista), individualRows.map((r) => individualRowToArray(r, vista))));
-  parts.push("");
-  parts.push("RELEVOS");
-  parts.push(rowsToCsv(RELAY_HEADERS, relayRows.map(relayRowToArray)));
-  return parts.join("\r\n");
-}
-
-export async function buildXlsx(individualRows: IndividualReportRow[], relayRows: RelayReportRow[], vista: VistaDeReporte): Promise<Buffer> {
-  const workbook = new ExcelJS.Workbook();
-
-  /**
-   * El riesgo de inyección de fórmulas es el MISMO que en el CSV: un nombre
-   * de club que empiece con `=` se escribe como fórmula en la celda y Excel
-   * la evalúa al abrir el archivo. Se neutraliza con la misma función que
-   * usa el CSV, para que ambos formatos no puedan divergir.
-   */
-  const seguro = (celdas: string[]): string[] => celdas.map(neutralizeSpreadsheetFormula);
-
-  const sheet1 = workbook.addWorksheet("Individuales");
-  sheet1.addRow(encabezadosIndividuales(vista)).font = { bold: true };
-  individualRows.forEach((r) => sheet1.addRow(seguro(individualRowToArray(r, vista))));
-  sheet1.columns.forEach((col) => {
-    col.width = 18;
-  });
-
-  const sheet2 = workbook.addWorksheet("Relevos");
-  sheet2.addRow(RELAY_HEADERS).font = { bold: true };
-  relayRows.forEach((r) => sheet2.addRow(seguro(relayRowToArray(r))));
-  sheet2.columns.forEach((col) => {
-    col.width = 18;
-  });
-
-  const buffer = await workbook.xlsx.writeBuffer();
-  return Buffer.from(buffer);
-}
-
-export async function buildPdf(
-  competitionName: string,
-  individualRows: IndividualReportRow[],
-  relayRows: RelayReportRow[]
-): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 30, size: "A4", layout: "landscape" });
-    const chunks: Buffer[] = [];
-    doc.on("data", (chunk) => chunks.push(chunk));
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-    doc.on("error", reject);
-
-    doc.fontSize(16).text(`Listado de Nadadores Inscritos — ${competitionName}`, { align: "left" });
-    doc.moveDown();
-
-    doc.fontSize(12).text("Individuales", { underline: true });
-    doc.moveDown(0.3);
-    doc.fontSize(8);
-    individualRows.forEach((r) => {
-      doc.text(`${r.club} — ${r.nombreCompleto} — ${r.prueba} — ${r.categoria} — ${r.fecha} ${r.jornada}`);
-    });
-
-    doc.moveDown();
-    doc.fontSize(12).text("Relevos", { underline: true });
-    doc.moveDown(0.3);
-    doc.fontSize(8);
-    relayRows.forEach((r) => {
-      doc.text(
-        `${r.equipoClub} — ${r.prueba} — ${r.categoria} — ${r.fecha} ${r.jornada} — Integrantes: ${[r.integrante1, r.integrante2, r.integrante3, r.integrante4].filter(Boolean).join(", ")}`
-      );
-    });
-
-    doc.end();
-  });
-}

@@ -1,10 +1,11 @@
 import { computeAge } from "../../shared/age.util";
+import { formatSwimTimeReadable } from "../../shared/swimTime.util";
 
 /**
  * Sección 16: "Listado de Nadadores Inscritos". Se aíslan como funciones
  * puras (input plano -> fila de reporte) para poder testear el formato
- * exacto sin necesidad de base de datos, y para reutilizarlas igual en
- * JSON, CSV, XLSX y PDF (una sola fuente de verdad del "shape" de la fila).
+ * exacto sin necesidad de base de datos. Las filas planas son hoy solo del JSON; la pantalla y los
+ * archivos CSV, Excel y PDF presentan la vista agrupada (ver `reporteDetallado.rules.ts`).
  *
  * NINGUNA SALIDA DE REPORTE LLEVA EL RUN, para ningún rol, administrador incluido
  * (decisión funcional de SEC-02). El RUN sigue almacenado y el backend lo usa
@@ -12,8 +13,8 @@ import { computeAge } from "../../shared/age.util";
  * forma parte de las filas, de la vista agrupada ni de los nombres de integrantes.
  * La excepción es el archivo de Team Manager, que es otro módulo con su propio formato.
  *
- * FECHA DE NACIMIENTO (AUD-10). Solo la administración la recibe completa en las filas
- * individuales (JSON, CSV y XLSX). Los demás roles reciben en su lugar la EDAD, calculada
+ * FECHA DE NACIMIENTO (AUD-10). Solo la administración la recibe completa, en las filas
+ * individuales del JSON; los archivos llevan solo la edad, para todos los roles. Los demás roles reciben en su lugar la EDAD, calculada
  * con la misma fecha de corte que la vista agrupada (`ageCutoffDate` de la competencia o,
  * si falta, `getDefaultAgeCutoffDate()`), nunca con la fecha actual. La fecha completa no
  * viaja en ninguna otra propiedad de esas respuestas; internamente se sigue usando para
@@ -228,11 +229,33 @@ export function rowsToCsv(headers: string[], rows: string[][]): string {
 
 const REPORT_GENDER_LABELS: Record<"male" | "female", string> = { male: "Varones", female: "Damas" };
 
+/**
+ * Jornada REAL de una prueba: la sesión de la competencia (una fecha y un tipo de jornada). Dos
+ * jornadas del mismo nombre en días distintos son sesiones distintas y no se unen.
+ */
+export interface JornadaDeEntrada {
+  /** Identificador de la sesión: la clave de agrupación. */
+  id: string;
+  /** Día de calendario, guardado como medianoche UTC: se presenta y se ordena por su día UTC. */
+  fecha: Date;
+  nombre: string;
+  /**
+   * Menor número de programa de la sesión en TODA la competencia (no solo en lo filtrado), o
+   * `null` si ninguna de sus pruebas tiene número. Solo ordena; ver `compararJornadas`.
+   */
+  primerNumero: number | null;
+}
+
 export interface SwimmerEventEntry {
   personId: string;
   /** SOLO para desempatar el orden (ver `compararNadadores`). Nunca llega a una salida del reporte. */
   run: string;
   fullName: string;
+  /**
+   * Club GUARDADO en la inscripción (o en el equipo de relevo), no la membresía vigente de la persona.
+   * Es la identidad de agrupación: el nombre del club no es único.
+   */
+  clubId: string;
   clubName: string;
   birthDate: Date;
   gender: "male" | "female";
@@ -248,11 +271,33 @@ export interface SwimmerEventEntry {
   eventLabel: string; // ej. "50m Libre"
   timeLabel: string | null; // ej. "1:25,67" o null si no se ingresó tiempo
   kind: "individual" | "relay";
+  jornada: JornadaDeEntrada;
 }
 
 export interface ReportEventLine {
   number: number | null; // número de la prueba en el programa — se muestra como número encerrado en un círculo, sin paréntesis
   text: string; // ej. "50m Libre 1:25,67" — ya sin el número ni paréntesis
+}
+
+/** Una prueba (individual o relevo) dentro de una jornada del nadador. */
+export interface PruebaDeJornada {
+  /** Número de programa; `null` si la prueba no lo tiene. */
+  numero: number | null;
+  tipo: "individual" | "relevo";
+  descripcion: string; // ej. "100m Pecho" o "Relevo 200m Libre (Mixto)"
+  /** Tiempo inscrito, ej. "1:39,07"; `null` si la inscripción no tiene tiempo. */
+  tiempo: string | null;
+  /** Lo que se muestra en «Tiempo»: el tiempo o `TEXTO_SIN_TIEMPO`. El mismo en pantalla y en los tres archivos. */
+  tiempoTexto: string;
+}
+
+/** Las pruebas de un nadador en UNA sesión de la competencia. */
+export interface JornadaDelNadador {
+  jornadaId: string;
+  fecha: string; // DD-MM-AAAA
+  jornada: string;
+  titulo: string; // "DD-MM-AAAA Jornada"
+  pruebas: PruebaDeJornada[];
 }
 
 export interface ClubGroupSwimmerRow {
@@ -266,8 +311,8 @@ export interface ClubGroupSwimmerRow {
   /**
    * Componentes del nombre tal como están guardados (`null` si faltan, como en las personas
    * históricas), SOLO para que la pantalla presente la línea como `PATERNO MATERNO, NOMBRE`. No
-   * cambian `nombreCompleto` ni el orden, que sigue siendo el de `compararNadadores`. No se usan
-   * en CSV, XLSX, PDF ni Team Manager, que no leen la vista agrupada.
+   * cambian `nombreCompleto` ni el orden, que sigue siendo el de `compararNadadores`. Team Manager
+   * no lee la vista agrupada.
    */
   apellidoPaterno: string | null;
   apellidoMaterno: string | null;
@@ -275,11 +320,19 @@ export interface ClubGroupSwimmerRow {
   edad: number;
   categoria: string;
   genero: string;
+  /**
+   * Individuales y relevos, agrupados por su fecha y jornada reales. Es lo que presentan la pantalla
+   * y las exportaciones. `pruebas` y `relevos` (las mismas líneas, sin jornada) se conservan para
+   * los totales y para una web anterior, que aún las lee.
+   */
+  jornadas: JornadaDelNadador[];
   pruebas: ReportEventLine[];
   relevos: ReportEventLine[];
 }
 
 export interface ClubGroup {
+  /** Identidad del club: dos clubes distintos pueden tener el mismo nombre. */
+  clubId: string;
   clubName: string;
   totalNadadores: number;
   totalPruebasIndividuales: number;
@@ -289,8 +342,8 @@ export interface ClubGroup {
 
 // --------------------------------------------------------------------------
 // ORDEN del reporte. Todos los criterios viven aquí, como funciones puras, y los
-// usan tanto la vista agrupada como las filas planas de CSV / XLSX / PDF: así los
-// formatos no pueden divergir.
+// usan tanto la vista agrupada (pantalla, CSV, Excel y PDF) como las filas planas del
+// JSON: así no pueden divergir.
 // --------------------------------------------------------------------------
 
 /**
@@ -301,6 +354,18 @@ export interface ClubGroup {
 const COLACION = new Intl.Collator("es", { sensitivity: "base" });
 
 const limpio = (v: string | null | undefined): string => (v ?? "").trim();
+
+/** Lo que se muestra cuando la inscripción no tiene tiempo guardado: nunca un vacío ambiguo. */
+export const TEXTO_SIN_TIEMPO = "Sin tiempo";
+
+/**
+ * Tiempo legible de una inscripción, con sus centésimas, o `null` si NO tiene tiempo guardado. La
+ * ausencia son solo `null` y `undefined`, comprobados explícitamente: un número guardado, incluido
+ * el 0, se presenta como tal y nunca se toma por ausente (ni una ausencia, por cero).
+ */
+export function tiempoDeInscripcion(centesimas: number | null | undefined): string | null {
+  return centesimas === null || centesimas === undefined ? null : formatSwimTimeReadable(centesimas);
+}
 
 /** Compara dos textos que pueden faltar: los que faltan van DESPUÉS de los presentes. */
 function compararOpcionales(a: string | null | undefined, b: string | null | undefined): number {
@@ -395,7 +460,7 @@ export function compararNumerosDePrograma(a: number | null | undefined, b: numbe
  * (descripción y tiempo) y no por el orden en que llegaron.
  *
  * Es el ÚNICO criterio de presentación de pruebas: lo usan la vista agrupada
- * (`groupReportByClubAndSwimmer`) y las filas planas que consumen CSV, XLSX y PDF
+ * (`groupReportByClubAndSwimmer`) y las filas planas del JSON
  * (`reports.service.ts`), de modo que dos filas equivalentes de un mismo nadador
  * salen en el mismo orden relativo en ambas. El identificador de la inscripción
  * entra solo como ÚLTIMO desempate en las filas planas (ver el servicio), nunca
@@ -411,13 +476,77 @@ export function compararLineasDePrueba(a: ReportEventLine, b: ReportEventLine): 
  * ordenar las filas planas: así el texto que desempata es el que se ve.
  */
 export function lineaDePrueba(eventNumber: number | null, eventLabel: string, timeLabel: string | null): ReportEventLine {
-  const text = timeLabel ? `${eventLabel} ${timeLabel}` : eventLabel;
+  const text = timeLabel !== null ? `${eventLabel} ${timeLabel}` : eventLabel;
   return { number: eventNumber, text };
 }
 
 const porTexto = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0);
 
-/** Lo que se necesita para ordenar una fila PLANA de individuales (CSV / XLSX / PDF / JSON). */
+/** Mañana, luego Tarde y después las demás: el orden canónico de la aplicación (`frontend/src/shared/sessionOrder.ts`). */
+function rangoDeJornada(nombre: string): number {
+  const n = nombre.trim().toLowerCase();
+  if (n === "mañana" || n === "manana") return 0;
+  if (n === "tarde") return 1;
+  return 2;
+}
+
+/** Día de calendario en UTC (AAAA-MM-DD): las fechas de competencia se guardan como medianoche UTC. */
+const diaUtc = (d: Date) => d.toISOString().slice(0, 10);
+
+/**
+ * Orden de las jornadas: fecha cronológica y, dentro del día, según la programación:
+ *   1. Mañana, Tarde y las demás, como en los paneles y en la ficha de la competencia;
+ *   2. entre las demás (Noche, Especial…), la que abre antes el programa (menor número de prueba);
+ *   3. nombre e identificador, para un resultado estable.
+ * El número no decide entre Mañana y Tarde: si el programa reinicia su numeración en cada jornada,
+ * la tarde podría quedar antes que la mañana.
+ */
+export function compararJornadas(a: JornadaDeEntrada, b: JornadaDeEntrada): number {
+  return (
+    porTexto(diaUtc(a.fecha), diaUtc(b.fecha)) ||
+    rangoDeJornada(a.nombre) - rangoDeJornada(b.nombre) ||
+    compararNumerosDePrograma(a.primerNumero, b.primerNumero) ||
+    COLACION.compare(a.nombre, b.nombre) ||
+    porTexto(a.id, b.id)
+  );
+}
+
+/**
+ * Agrupa las entradas de UN nadador por sesión (nunca por el nombre de la jornada) y las ordena:
+ * jornadas con `compararJornadas` y, dentro de cada una, individuales y relevos juntos por
+ * `compararLineasDePrueba` (número de programa numérico, ausentes al final, desempate por texto).
+ */
+export function agruparPorJornada(entradas: readonly SwimmerEventEntry[]): JornadaDelNadador[] {
+  const porSesion = new Map<string, { jornada: JornadaDeEntrada; entradas: SwimmerEventEntry[] }>();
+  for (const e of entradas) {
+    const grupo = porSesion.get(e.jornada.id);
+    if (grupo) grupo.entradas.push(e);
+    else porSesion.set(e.jornada.id, { jornada: e.jornada, entradas: [e] });
+  }
+  return [...porSesion.values()]
+    .sort((x, y) => compararJornadas(x.jornada, y.jornada))
+    .map(({ jornada, entradas: suyas }) => {
+      const fecha = formatDate(jornada.fecha);
+      return {
+        jornadaId: jornada.id,
+        fecha,
+        jornada: jornada.nombre,
+        titulo: `${fecha} ${jornada.nombre}`,
+        pruebas: suyas
+          .map((e) => ({ e, linea: formatEventLine(e) }))
+          .sort((x, y) => compararLineasDePrueba(x.linea, y.linea))
+          .map(({ e, linea }) => ({
+            numero: linea.number,
+            tipo: e.kind === "individual" ? ("individual" as const) : ("relevo" as const),
+            descripcion: e.eventLabel,
+            tiempo: e.timeLabel,
+            tiempoTexto: e.timeLabel ?? TEXTO_SIN_TIEMPO,
+          })),
+      };
+    });
+}
+
+/** Lo que se necesita para ordenar una fila PLANA de individuales (JSON). */
 export interface FilaIndividualOrdenable {
   clubName: string;
   persona: PersonaOrdenable;
@@ -463,42 +592,53 @@ function formatEventLine(entry: SwimmerEventEntry): ReportEventLine {
  * Agrupa las inscripciones (individuales + relevos, ya aplanadas a una
  * entrada por nadador por prueba) en: club (subtítulo, con sus totales) ->
  * nadador (una línea, con edad/categoría/género) -> sus pruebas y
- * relevos. `entries` debe traer primero las individuales y después los
- * relevos de cada nadador, para que la categoría mostrada priorice la de
- * sus pruebas individuales (más específica) sobre la de sus relevos (por
- * edad combinada del equipo) cuando tiene ambas. `relayTeamCountByClub`
- * es la cantidad de EQUIPOS de relevo distintos por club (no se puede
- * derivar contando `relevos` por nadador, porque cada equipo aporta 4
- * integrantes y se contaría 4 veces).
+ * relevos.
+ *
+ * IDENTIDAD: cada línea de nadador es una combinación de CLUB y PERSONA (`clubId` + `personId`,
+ * nunca sus nombres). Una persona con inscripciones guardadas en dos clubes de la competencia
+ * aparece en ambos, en cada uno con lo inscrito por ese club: ninguna prueba se traslada.
+ *
+ * CATEGORÍA: la de la primera entrada de esa combinación. `entries` debe traer primero las
+ * individuales y después los relevos, para que la categoría mostrada priorice la de sus pruebas
+ * individuales (más específica) sobre la de sus relevos (por edad combinada del equipo) cuando tiene
+ * ambas EN ESE CLUB; la de un club no se mezcla con la de otro.
+ *
+ * `equiposPorClubId` es la cantidad de EQUIPOS de relevo distintos por club (no se puede derivar
+ * contando `relevos` por nadador, porque cada equipo aporta 4 integrantes y se contaría 4 veces).
  */
 export function groupReportByClubAndSwimmer(
   entries: SwimmerEventEntry[],
   ageCutoffDate: Date,
-  relayTeamCountByClub: Map<string, number> = new Map()
+  equiposPorClubId: Map<string, number> = new Map()
 ): ClubGroup[] {
   interface Accum {
     persona: PersonaOrdenable;
     birthDate: Date;
     gender: "male" | "female";
-    /** Club y categoría de la PRIMERA inscripción vista del nadador (ver más abajo): no los decide el orden de presentación. */
-    clubName: string;
+    /** Categoría de la PRIMERA inscripción vista de la persona EN ESTE CLUB: no la decide el orden de presentación. */
     categoria: string;
     pruebas: ReportEventLine[];
     relevos: ReportEventLine[];
+    entradas: SwimmerEventEntry[];
   }
-  const swimmers = new Map<string, Accum>();
+  const clubes = new Map<string, { clubId: string; clubName: string; nadadores: Map<string, Accum> }>();
 
   /**
-   * SELECCIÓN de club y categoría, separada del orden de las listas: es la de
-   * siempre, la de la primera entrada que llega de cada nadador. El servicio
-   * entrega primero las individuales y luego los relevos, así que la individual
-   * manda sobre el relevo. NO es «la de la primera prueba del programa»: eso
-   * sería una regla nueva. Las listas `pruebas` y `relevos` se ordenan después,
-   * solo para mostrarlas.
+   * El CLUB es el de cada inscripción. La CATEGORÍA, separada del orden de las listas, es la de la
+   * primera entrada que llega de la persona en ese club. El servicio entrega primero las
+   * individuales y luego los relevos, así que la individual manda sobre el relevo. NO es «la de la
+   * primera prueba del programa»: eso sería una regla nueva. Las listas `pruebas` y `relevos` se
+   * ordenan después, solo para mostrarlas.
    */
   for (const e of entries) {
-    if (!swimmers.has(e.personId)) {
-      swimmers.set(e.personId, {
+    let club = clubes.get(e.clubId);
+    if (!club) {
+      club = { clubId: e.clubId, clubName: e.clubName, nadadores: new Map() };
+      clubes.set(e.clubId, club);
+    }
+    let s = club.nadadores.get(e.personId);
+    if (!s) {
+      s = {
         persona: {
           paternalLastName: e.paternalLastName,
           maternalLastName: e.maternalLastName,
@@ -509,49 +649,47 @@ export function groupReportByClubAndSwimmer(
         },
         birthDate: e.birthDate,
         gender: e.gender,
-        clubName: e.clubName,
         categoria: e.categoryName,
         pruebas: [],
         relevos: [],
-      });
+        entradas: [],
+      };
+      club.nadadores.set(e.personId, s);
     }
-    const s = swimmers.get(e.personId)!;
+    s.entradas.push(e);
     const line = formatEventLine(e);
     if (e.kind === "individual") s.pruebas.push(line);
     else s.relevos.push(line);
   }
 
-  const byClub = new Map<string, { persona: PersonaOrdenable; fila: ClubGroupSwimmerRow }[]>();
-  for (const s of swimmers.values()) {
-    if (!byClub.has(s.clubName)) byClub.set(s.clubName, []);
-    byClub.get(s.clubName)!.push({
-      persona: s.persona,
-      fila: {
-        personId: s.persona.personId,
-        nombreCompleto: s.persona.fullName,
-        apellidoPaterno: s.persona.paternalLastName ?? null,
-        apellidoMaterno: s.persona.maternalLastName ?? null,
-        nombres: s.persona.firstName ?? null,
-        edad: computeAge(s.birthDate, ageCutoffDate),
-        categoria: s.categoria,
-        genero: REPORT_GENDER_LABELS[s.gender],
-        pruebas: s.pruebas.slice().sort(compararLineasDePrueba),
-        relevos: s.relevos.slice().sort(compararLineasDePrueba),
-      },
-    });
-  }
-
-  return Array.from(byClub.entries())
-    .sort(([a], [b]) => compararClubes(a, b))
-    .map(([clubName, swimmerRows]) => {
+  return [...clubes.values()]
+    .sort((a, b) => compararClubes(a.clubName, b.clubName) || porTexto(a.clubId, b.clubId))
+    .map(({ clubId, clubName, nadadores }) => {
       // Por apellido paterno, NO por edad: la edad se muestra pero no ordena.
-      const sortedSwimmers = swimmerRows.slice().sort((x, y) => compararNadadores(x.persona, y.persona)).map((x) => x.fila);
+      const swimmers = [...nadadores.values()]
+        .sort((x, y) => compararNadadores(x.persona, y.persona))
+        .map(
+          (s): ClubGroupSwimmerRow => ({
+            personId: s.persona.personId,
+            nombreCompleto: s.persona.fullName,
+            apellidoPaterno: s.persona.paternalLastName ?? null,
+            apellidoMaterno: s.persona.maternalLastName ?? null,
+            nombres: s.persona.firstName ?? null,
+            edad: computeAge(s.birthDate, ageCutoffDate),
+            categoria: s.categoria,
+            genero: REPORT_GENDER_LABELS[s.gender],
+            jornadas: agruparPorJornada(s.entradas),
+            pruebas: s.pruebas.slice().sort(compararLineasDePrueba),
+            relevos: s.relevos.slice().sort(compararLineasDePrueba),
+          })
+        );
       return {
+        clubId,
         clubName,
-        totalNadadores: sortedSwimmers.length,
-        totalPruebasIndividuales: sortedSwimmers.reduce((sum, s) => sum + s.pruebas.length, 0),
-        totalRelevos: relayTeamCountByClub.get(clubName) ?? 0,
-        swimmers: sortedSwimmers,
+        totalNadadores: swimmers.length,
+        totalPruebasIndividuales: swimmers.reduce((sum, s) => sum + s.pruebas.length, 0),
+        totalRelevos: equiposPorClubId.get(clubId) ?? 0,
+        swimmers,
       };
     });
 }

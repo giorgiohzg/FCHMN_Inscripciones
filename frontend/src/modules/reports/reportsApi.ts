@@ -47,6 +47,28 @@ export interface ReportEventLine {
   text: string;
 }
 
+/** Una prueba (individual o relevo) dentro de una jornada del nadador. */
+export interface PruebaDeJornada {
+  /** Número de programa; `null` si la prueba no lo tiene. */
+  numero: number | null;
+  tipo: "individual" | "relevo";
+  descripcion: string;
+  /** `null` si la inscripción no tiene tiempo. */
+  tiempo: string | null;
+  /** Lo que se muestra en «Tiempo»: el tiempo o «Sin tiempo», el mismo texto de los archivos. */
+  tiempoTexto: string;
+}
+
+/** Las pruebas de un nadador en UNA sesión de la competencia (una fecha y una jornada). */
+export interface JornadaDelNadador {
+  /** Clave estable de la sesión: dos jornadas del mismo nombre en días distintos son distintas. */
+  jornadaId: string;
+  fecha: string; // DD-MM-AAAA, ya presentada por el servidor
+  jornada: string;
+  titulo: string; // "DD-MM-AAAA Jornada"
+  pruebas: PruebaDeJornada[];
+}
+
 export interface ClubGroupSwimmerRow {
   /**
    * Identificador INTERNO de la persona: la clave estable de la fila (el nombre puede repetirse).
@@ -66,11 +88,24 @@ export interface ClubGroupSwimmerRow {
   edad: number;
   categoria: string;
   genero: string;
+  /**
+   * ESTRUCTURA COMÚN con CSV, Excel y PDF, ya agrupada, ordenada y con sus textos por el servidor:
+   * la pantalla la recorre sin reagrupar ni reordenar. Opcionales por la TRANSICIÓN: una API anterior
+   * no los envía y la pantalla cae a `pruebas` y `relevos`, sin fecha ni jornada.
+   */
+  numero?: number;
+  nombrePresentado?: string;
+  detalle?: string;
+  jornadas?: JornadaDelNadador[];
   pruebas: ReportEventLine[];
   relevos: ReportEventLine[];
 }
 export interface ClubGroup {
+  /** Identidad del club (dos clubes pueden tener el mismo nombre). Opcional por la TRANSICIÓN: una API anterior no lo envía. */
+  clubId?: string;
   clubName: string;
+  /** "6 nadadores, 41 pruebas individuales, 0 relevos", el mismo texto de las exportaciones. Opcional: ver arriba. */
+  totalesTexto?: string;
   totalNadadores: number;
   totalPruebasIndividuales: number;
   totalRelevos: number;

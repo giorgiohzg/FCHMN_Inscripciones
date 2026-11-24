@@ -9,8 +9,8 @@
  *   - Pruebas y relevos de un nadador: por número de programa NUMÉRICO; los
  *     repetidos o ausentes, por descripción y tiempo; el id solo al final.
  *   - Todo determinista: el orden de PRESENTACIÓN no depende del orden de entrada.
- *   - Categoría y club mostrados: NO son parte del orden; los decide la primera
- *     inscripción que entrega el servicio (individuales antes que relevos), como siempre.
+ *   - Categoría mostrada: NO es parte del orden; la decide la primera inscripción de la persona EN
+ *     ESE CLUB que entrega el servicio (individuales antes que relevos). El club es el de cada inscripción.
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -31,6 +31,7 @@ function entry(over: Partial<SwimmerEventEntry> = {}): SwimmerEventEntry {
     personId: "p1",
     run: "1",
     fullName: "Nombre Apellido",
+    clubId: over.clubName ?? "Delfines", // un club por nombre, salvo que la prueba diga otra cosa
     clubName: "Delfines",
     birthDate: new Date("2000-03-15T00:00:00Z"),
     gender: "female",
@@ -39,6 +40,7 @@ function entry(over: Partial<SwimmerEventEntry> = {}): SwimmerEventEntry {
     eventLabel: "50m Libre",
     timeLabel: null,
     kind: "individual",
+    jornada: { id: "s1", fecha: new Date("2027-01-06T00:00:00Z"), nombre: "Mañana", primerNumero: 1 },
     ...over,
   };
 }
@@ -221,7 +223,7 @@ describe("pruebas y relevos de un nadador: número de programa NUMÉRICO", () =>
   });
 });
 
-describe("categoría y club mostrados: los de la primera inscripción entregada, NO los de la primera prueba del programa", () => {
+describe("categoría mostrada: la de la primera inscripción entregada en el club, NO la de la primera prueba del programa", () => {
   const swimmer = (entries: SwimmerEventEntry[]) => groupReportByClubAndSwimmer(entries, CORTE)[0]!.swimmers[0]!;
 
   it("con individuales y relevos, la categoría es la de la individual (el servicio las entrega primero)", () => {
@@ -274,14 +276,16 @@ describe("categoría y club mostrados: los de la primera inscripción entregada,
     expect(swimmer([entradas[1]!, entradas[0]!]).categoria).toBe("R1");
   });
 
-  it("el club mostrado es el de la primera inscripción que llega, con las mismas reglas", () => {
+  it("el club es el de cada inscripción: en dos clubes, la persona aparece en ambos, y la categoría de uno no pasa al otro", () => {
     const entradas = [
       entry({ clubName: "Club Z", categoryName: "Z", eventNumber: 9, eventLabel: "Individual" }),
       entry({ kind: "relay", clubName: "Club A", categoryName: "A", eventNumber: 1, eventLabel: "Relevo" }),
     ];
     const grupos = groupReportByClubAndSwimmer(entradas, CORTE);
-    expect(grupos.map((g) => g.clubName)).toEqual(["Club Z"]);
-    expect(grupos[0]!.swimmers[0]!.relevos).toHaveLength(1);
+    expect(grupos.map((g) => [g.clubName, g.swimmers.map((s) => [s.categoria, s.pruebas.length, s.relevos.length])])).toEqual([
+      ["Club A", [["A", 0, 1]]],
+      ["Club Z", [["Z", 1, 0]]],
+    ]);
   });
 
   it("nombre, edad y género provienen de la persona, no de la prueba", () => {

@@ -2,8 +2,9 @@
  * AUD-10 y AUD-14 (unitarias, sin base de datos).
  *
  * AUD-10: la fila individual del reporte lleva la fecha de nacimiento completa solo en la vista de
- * administración; en la vista general lleva la edad a la fecha de corte, en la misma posición. CSV y
- * XLSX cambian solo el encabezado «Fecha de nacimiento» por «Edad».
+ * administración; en la vista general lleva la edad a la fecha de corte, en la misma posición. CSV,
+ * Excel y PDF presentan la vista agrupada: solo la edad, para todos los roles (ver
+ * `reporte-detallado.test.ts`).
  *
  * AUD-14: un nadador recibe su propio RUN entre los integrantes del relevo, y la propiedad `run` de
  * sus compañeros no viene; administración y alcance de club reciben el relevo tal cual. El objeto
@@ -13,9 +14,8 @@
  * en `privacidad-reportes-relevos.integration.test.ts`.
  */
 import { describe, it, expect } from "vitest";
-import ExcelJS from "exceljs";
-import { mapIndividualRegistrationToRow, type IndividualReportRow } from "../src/modules/reports/reports.rules";
-import { buildCsv, buildXlsx, vistaDeReporteParaActor } from "../src/modules/reports/reports.service";
+import { mapIndividualRegistrationToRow } from "../src/modules/reports/reports.rules";
+import { vistaDeReporteParaActor } from "../src/modules/reports/reports.service";
 import { presentarRelevoParaActor } from "../src/modules/relay-registrations/relay-registrations.service";
 import type { ActorContext } from "../src/shared/actorContext";
 
@@ -35,9 +35,6 @@ const ENTRADA = {
 
 const CLAVES_ADMIN = ["competencia", "club", "nombreCompleto", "fechaNacimiento", "categoria", "prueba", "distancia", "estilo", "genero", "fecha", "jornada", "tipoDePrueba"];
 const CLAVES_GENERAL = CLAVES_ADMIN.map((k) => (k === "fechaNacimiento" ? "edad" : k));
-const ENCABEZADOS_ADMIN = ["Competencia", "Club", "Nombre completo", "Fecha de nacimiento", "Categoría", "Prueba", "Distancia", "Estilo", "Género", "Fecha", "Jornada", "Tipo de prueba"];
-const ENCABEZADOS_GENERAL = ENCABEZADOS_ADMIN.map((h) => (h === "Fecha de nacimiento" ? "Edad" : h));
-
 const actor = (scope: ActorContext["scope"]): ActorContext => ({ userId: "u-sintetico", isAdmin: scope.kind === "admin", scope, canRegisterPostClose: false });
 
 describe("AUD-10: fila individual según la vista", () => {
@@ -64,45 +61,6 @@ describe("AUD-10: fila individual según la vista", () => {
     expect(vistaDeReporteParaActor(actor({ kind: "admin" }))).toBe("administracion");
     expect(vistaDeReporteParaActor(actor({ kind: "club", clubId: "c" }))).toBe("general");
     expect(vistaDeReporteParaActor(actor({ kind: "swimmer", personId: "p" }))).toBe("general");
-  });
-});
-
-describe("AUD-10: CSV y XLSX según la vista", () => {
-  const admin = mapIndividualRegistrationToRow(ENTRADA, { vista: "administracion" });
-  const general = mapIndividualRegistrationToRow(ENTRADA, { vista: "general", fechaDeCorte: new Date("2030-06-30") });
-
-  it("CSV: «Edad» en lugar de «Fecha de nacimiento», mismo orden y valores bajo su encabezado", () => {
-    const lineasAdmin = buildCsv([admin], [], "administracion").split("\r\n");
-    const lineasGeneral = buildCsv([general], [], "general").split("\r\n");
-    expect(lineasAdmin[1]).toBe(ENCABEZADOS_ADMIN.join(","));
-    expect(lineasGeneral[1]).toBe(ENCABEZADOS_GENERAL.join(","));
-    expect(lineasAdmin[2]!.split(",")[3]).toBe("31-12-1990");
-    expect(lineasGeneral[2]!.split(",")[3]).toBe("39");
-    // Las otras once celdas son idénticas.
-    const sinNacimiento = (l: string) => l.split(",").filter((_, i) => i !== 3);
-    expect(sinNacimiento(lineasGeneral[2]!)).toEqual(sinNacimiento(lineasAdmin[2]!));
-    expect(lineasGeneral.join("\n")).not.toContain("1990");
-  });
-
-  it("CSV sin filas: el encabezado también depende de la vista", () => {
-    expect(buildCsv([], [], "general").split("\r\n")[1]).toBe(ENCABEZADOS_GENERAL.join(","));
-    expect(buildCsv([], [], "administracion").split("\r\n")[1]).toBe(ENCABEZADOS_ADMIN.join(","));
-  });
-
-  it("XLSX: mismos encabezados y celdas alineadas", async () => {
-    const libro = new ExcelJS.Workbook();
-    await libro.xlsx.load((await buildXlsx([general], [], "general")) as never);
-    const hoja = libro.getWorksheet("Individuales")!;
-    expect((hoja.getRow(1).values as unknown[]).slice(1)).toEqual(ENCABEZADOS_GENERAL);
-    expect(String(hoja.getRow(2).getCell(4).value)).toBe("39");
-    expect(String(hoja.getRow(2).getCell(5).value)).toBe("35-39");
-    expect(hoja.columnCount).toBe(12);
-  });
-
-  it("una fila que no corresponde a la vista se rechaza en vez de dejar la fecha bajo «Edad»", async () => {
-    expect(() => buildCsv([admin], [], "general")).toThrow(/vista/);
-    expect(() => buildCsv([general], [], "administracion")).toThrow(/vista/);
-    await expect(buildXlsx([admin as IndividualReportRow], [], "general")).rejects.toThrow(/vista/);
   });
 });
 

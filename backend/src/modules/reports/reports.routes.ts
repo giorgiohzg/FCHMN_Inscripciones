@@ -1,5 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import * as reportsService from "./reports.service";
+import { csvDelReporteDetallado } from "./reporteDetallado.rules";
+import { pdfDelReporteDetallado, xlsxDelReporteDetallado } from "./reporteDetallado.archivos";
 import * as resumenPorClub from "./resumenPorClub.service";
 import * as clubesYNadadores from "./clubesYNadadores.service";
 import * as clubesYNadadoresReglas from "./clubesYNadadores.rules";
@@ -90,9 +92,9 @@ export async function reportsRoutes(app: FastifyInstance) {
     }
 
     const actor = buildActorContext(req);
-    const { competitionName, individualRows, relayRows } = await reportsService.getRegistrationsReport(parsed.data, actor);
-    // AUD-10: la vista sale del mismo alcance efectivo con que se armaron las filas.
-    const vista = reportsService.vistaDeReporteParaActor(actor);
+    // Los tres archivos presentan la MISMA estructura agrupada que la pantalla, con los mismos filtros y alcance.
+    const reporte = await reportsService.getRegistrationsReport(parsed.data, actor);
+    const { competitionName, individualRows, relayRows } = reporte;
     const safeName = competitionName.replace(/[^\w\- ]/g, "").replace(/\s+/g, "_");
 
     // El archivo se genera ANTES de auditar. Antes la auditoría se escribía
@@ -106,11 +108,11 @@ export async function reportsRoutes(app: FastifyInstance) {
 
     let body: string | Buffer;
     if (format === "csv") {
-      body = reportsService.buildCsv(individualRows, relayRows, vista);
+      body = csvDelReporteDetallado(reporte);
     } else if (format === "xlsx") {
-      body = await reportsService.buildXlsx(individualRows, relayRows, vista);
+      body = await xlsxDelReporteDetallado(reporte);
     } else {
-      body = await reportsService.buildPdf(competitionName, individualRows, relayRows);
+      body = await pdfDelReporteDetallado(reporte);
     }
 
     await audit({

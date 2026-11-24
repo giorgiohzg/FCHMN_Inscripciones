@@ -107,6 +107,7 @@ describe("reports.rules — groupReportByClubAndSwimmer", () => {
       personId: "p1",
       run: "11.111.111-1",
       fullName: "María Pérez",
+      clubId: overrides.clubName ?? "Delfines",
       clubName: "Delfines",
       birthDate: new Date("2000-03-15T00:00:00Z"),
       gender: "female",
@@ -115,6 +116,7 @@ describe("reports.rules — groupReportByClubAndSwimmer", () => {
       eventLabel: "50m Libre",
       timeLabel: "0:35,10",
       kind: "individual",
+      jornada: { id: "s1", fecha: new Date("2027-01-06T00:00:00Z"), nombre: "Mañana", primerNumero: 1 },
       ...overrides,
     };
   }

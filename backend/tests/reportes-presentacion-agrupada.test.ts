@@ -20,6 +20,7 @@ function entrada(o: Partial<SwimmerEventEntry> & { personId: string }): SwimmerE
   return {
     run: `run-${o.personId}`,
     fullName: "Sin Nombre",
+    clubId: o.clubName ?? "Club Sintético",
     clubName: "Club Sintético",
     birthDate: new Date("1972-05-10T00:00:00Z"),
     gender: "male",
@@ -28,6 +29,7 @@ function entrada(o: Partial<SwimmerEventEntry> & { personId: string }): SwimmerE
     eventLabel: "50m Libre",
     timeLabel: null,
     kind: "individual",
+    jornada: { id: "s1", fecha: new Date("2027-01-06T00:00:00Z"), nombre: "Mañana", primerNumero: 1 },
     ...o,
   };
 }

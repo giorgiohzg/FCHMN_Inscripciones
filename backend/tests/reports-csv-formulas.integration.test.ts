@@ -19,8 +19,8 @@ let competitionId = "";
 const CLUB_HOSTIL = "Club;=1+1;Z";
 const NOMBRES = ["Hugo;=1+1;x", "Ines;+1+1;x", "Juan;-1+1;x", "Kira ;=2*3;x"];
 
-/** Peor caso: parte por `;`, `|` y tabulador ignorando comillas, y quita espacios y comillas del inicio de cada celda. */
-const celdasPosibles = (texto: string): string[] => texto.split(/[;|\t\r\n]/).map((c) => c.replace(/^[ "]+/, ""));
+/** Peor caso: parte por `;`, coma, `|` y tabulador ignorando comillas, y quita espacios y comillas del inicio de cada celda. */
+const celdasPosibles = (texto: string): string[] => texto.split(/[;,|\t\r\n]/).map((c) => c.replace(/^[ "]+/, ""));
 
 beforeAll(async () => {
   await truncateAllTables(prisma);
@@ -74,21 +74,23 @@ describe("exportación CSV completa (flujo real)", () => {
 
     // Los valores se conservan salvo la comilla simple que neutraliza el trozo peligroso.
     expect(csv).toContain("Club;'=1+1;Z");
-    expect(csv).toContain("Hugo;'=1+1;x Prueba");
-    expect(csv).toContain("Ana-María Prueba");
-    expect(csv).toContain('"Pérez, Soto Prueba"');
+    expect(csv).toContain("PRUEBA, HUGO;'=1+1;X");
+    expect(csv).toContain("PRUEBA, ANA-MARÍA");
+    expect(csv).toContain('"PRUEBA, PÉREZ, SOTO"');
   });
 
-  it("conserva secciones, encabezados, número de columnas y una fila por inscripción", async () => {
+  it("BOM, encabezados, mismas columnas en todas las filas y una fila de prueba por inscripción", async () => {
     const res = await app.inject({ method: "GET", url: `/reports/registrations/export?competitionId=${competitionId}&format=csv`, headers: { authorization: `Bearer ${token}` } });
-    const lineas = res.body.split("\r\n");
-    expect(lineas[0]).toBe("INDIVIDUALES");
-    expect(lineas[1]).toBe("Competencia,Club,Nombre completo,Fecha de nacimiento,Categoría,Prueba,Distancia,Estilo,Género,Fecha,Jornada,Tipo de prueba");
-    const filas = lineas.slice(2, lineas.indexOf(""));
-    expect(filas).toHaveLength(NOMBRES.length + 2);
-    // Sin comas dentro de los valores (la de «Pérez, Soto» va entrecomillada): 12 columnas.
-    for (const fila of filas.filter((f) => !f.includes('"'))) expect(fila.split(",")).toHaveLength(12);
-    expect(lineas).toContain("RELEVOS");
+    // En bytes: el BOM UTF-8 llega tal cual al archivo.
+    expect([...res.rawPayload.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+    const lineas = res.rawPayload.subarray(3).toString("utf8").split("\r\n");
+    expect(lineas[0]).toBe(
+      "Sección;Competencia;Club;Total nadadores;Total pruebas individuales;Total relevos;N° nadador;Nadador;Edad;Categoría;Género;Fecha;Jornada;N° prueba;Tipo de prueba;Prueba;Tiempo"
+    );
+    expect(lineas.filter((l) => l.startsWith("Prueba;"))).toHaveLength(NOMBRES.length + 2);
+    expect(lineas.map((l) => l.split(";")[0]).slice(1, 6)).toEqual(["Competencia", "Club", "Nadador", "Jornada", "Prueba"]);
+    // Fuera de lo entrecomillado (los valores hostiles llevan «;»), 17 columnas en cada fila.
+    for (const l of lineas) expect(l.replace(/"(?:[^"]|"")*"/g, "x").split(";"), l).toHaveLength(17);
   });
 
   it("no cambia los permisos: sin sesión, 401", async () => {

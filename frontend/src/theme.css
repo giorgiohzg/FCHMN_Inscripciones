@@ -811,3 +811,71 @@ label {
   color: var(--brand-navy);
   overflow-wrap: anywhere;
 }
+
+/* ---------- Reporte detallado («Generar reporte»): pruebas en dos bloques por jornada ---------- */
+.reporte-tabla {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  background: transparent;
+}
+.reporte-tabla th,
+.reporte-tabla td {
+  padding: 0.15rem 0.5rem;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  vertical-align: top;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.reporte-tabla thead th {
+  font-weight: 600;
+  font-size: 0.78rem;
+  color: var(--brand-gray-600);
+  border-bottom: 1px solid var(--brand-gray-100);
+}
+.reporte-tabla thead th:nth-child(1) { width: 22%; }
+.reporte-tabla thead th:nth-child(2),
+.reporte-tabla thead th:nth-child(4) { width: 28%; }
+.reporte-tabla thead th:nth-child(3),
+.reporte-tabla thead th:nth-child(5) { width: 11%; }
+/* El segundo bloque se separa del primero, y «Prueba» va sobre la descripción (tras la columna del número). */
+.reporte-tabla thead th:nth-child(2) { padding-left: calc(0.9rem + 18px); }
+.reporte-tabla thead th:nth-child(4) { padding-left: calc(2.2rem + 18px); }
+.reporte-tabla .reporte-fila td:nth-child(4) { padding-left: 1.8rem; }
+.reporte-tabla .reporte-nadador th {
+  padding: 0.6rem 0.5rem 0.2rem;
+  font-size: 0.9rem;
+  color: inherit;
+}
+.reporte-tabla tbody + tbody .reporte-nadador th { border-top: 1px solid var(--brand-gray-100); }
+.reporte-tabla .reporte-fila td { color: var(--brand-gray-600); }
+.reporte-tabla .reporte-fila .reporte-jornada { padding-left: 1.2rem; color: var(--brand-navy); }
+.reporte-tabla .reporte-tiempo { text-align: right; overflow-wrap: normal; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.reporte-tabla .reporte-sin-tiempo { font-style: italic; }
+.reporte-prueba-contenido { display: flex; align-items: flex-start; gap: 0.4rem; }
+.reporte-numero { width: 18px; flex-shrink: 0; display: inline-flex; justify-content: center; }
+.reporte-descripcion { min-width: 0; overflow-wrap: anywhere; }
+
+/* Con poco ancho, UNA columna de pruebas y en el mismo orden: jornada, y debajo cada prueba con su tiempo. */
+@media (max-width: 760px) {
+  .reporte-tabla,
+  .reporte-tabla thead,
+  .reporte-tabla tbody { display: block; }
+  .reporte-tabla tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .reporte-tabla thead th:nth-child(n) { width: auto; }
+  .reporte-tabla thead th:nth-child(1),
+  .reporte-tabla thead th:nth-child(4),
+  .reporte-tabla thead th:nth-child(5),
+  .reporte-tabla .reporte-jornada-repetida,
+  .reporte-tabla .reporte-vacia { display: none; }
+  .reporte-tabla .reporte-nadador th,
+  .reporte-tabla .reporte-jornada { grid-column: 1 / -1; }
+  .reporte-tabla thead th:nth-child(n),
+  .reporte-tabla .reporte-fila td:nth-child(n),
+  .reporte-tabla .reporte-nadador th { padding-left: 0.2rem; padding-right: 0.2rem; }
+  .reporte-tabla .reporte-fila .reporte-jornada { padding-top: 0.25rem; font-weight: 600; }
+  .reporte-prueba-contenido { gap: 0.3rem; }
+}

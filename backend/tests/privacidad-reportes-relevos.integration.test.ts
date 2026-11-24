@@ -2,11 +2,12 @@
  * AUD-10 y AUD-14 (integración, flujo HTTP real con login y `buildActorContext`).
  *
  * AUD-10 — reportes de inscritos:
- *   - administración (también admin + nadador): fecha de nacimiento completa en JSON, CSV y XLSX,
- *     con la estructura de siempre;
+ *   - administración (también admin + nadador): fecha de nacimiento completa en las filas individuales
+ *     del JSON, con la estructura de siempre;
  *   - club, delegado, entrenador, representante legal, personal del club que también es nadador y
  *     nadador: la EDAD (a la fecha de corte de la competencia o, si falta, la de siempre) en el lugar
- *     de la fecha, sin la fecha en ninguna parte de la respuesta; CSV/XLSX con «Edad»;
+ *     de la fecha, sin la fecha en ninguna parte de la respuesta;
+ *   - CSV, Excel y PDF presentan la vista agrupada: solo la edad, para todos los roles;
  *   - mismas filas, orden, filtros y totales que antes; ningún reporte con RUN; la neutralización de
  *     fórmulas sigue.
  *
@@ -53,8 +54,6 @@ const ROLES_ADMIN = ["admin", "admin_nad"] as const;
 const ROLES_GENERALES = ["club_alfa", "deleg_nad", "coach_a", "replegal_a", "nadador_n1"] as const;
 const CLAVES_ADMIN = ["competencia", "club", "nombreCompleto", "fechaNacimiento", "categoria", "prueba", "distancia", "estilo", "genero", "fecha", "jornada", "tipoDePrueba"];
 const CLAVES_GENERAL = CLAVES_ADMIN.map((k) => (k === "fechaNacimiento" ? "edad" : k));
-const ENCABEZADOS_ADMIN = "Competencia,Club,Nombre completo,Fecha de nacimiento,Categoría,Prueba,Distancia,Estilo,Género,Fecha,Jornada,Tipo de prueba";
-const ENCABEZADOS_GENERAL = ENCABEZADOS_ADMIN.replace("Fecha de nacimiento", "Edad");
 
 const ddmmyyyy = (iso: string) => iso.split("-").reverse().join("-");
 /** Todas las formas en que la fecha completa podría filtrarse: dd-mm-yyyy, yyyy-mm-dd e ISO. */
@@ -269,68 +268,55 @@ describe("AUD-10: JSON del reporte por rol", () => {
 });
 
 describe("AUD-10: CSV, XLSX y PDF por rol", () => {
-  const filasCsv = (csv: string) => {
-    const l = csv.split("\r\n");
-    return { encabezado: l[1]!, filas: l.slice(2, l.indexOf("")).map((x) => x.split(",")), relevos: l.slice(l.indexOf("RELEVOS")) };
+  // Los tres archivos presentan la vista agrupada: solo la edad, para todos los roles. La fecha de
+  // nacimiento no sale en ninguno, tampoco para administración.
+  const sinNacimientos = (texto: string, contexto: string) => {
+    for (const iso of Object.values(NACIMIENTOS)) for (const forma of formasDeFecha(iso)) expect(texto, `${contexto}: «${forma}»`).not.toContain(forma);
+    expect(texto, contexto).not.toMatch(/nacimiento|RUNPRIV/i);
   };
 
-  it("CSV: la administración conserva «Fecha de nacimiento»; los demás, «Edad» en su lugar, con valores alineados", async () => {
-    const adminJson = await informe("admin");
+  it("CSV: la edad de la vista agrupada, sin fecha de nacimiento, y solo las personas del alcance de cada rol", async () => {
     for (const rol of [...ROLES_ADMIN, ...ROLES_GENERALES]) {
       const res = await exportar(rol, "csv");
       expect(res.statusCode, rol).toBe(200);
-      const esAdmin = (ROLES_ADMIN as readonly string[]).includes(rol);
       const json = await informe(rol);
-      const { encabezado, filas, relevos: rel } = filasCsv(res.body);
-      expect(encabezado, rol).toBe(esAdmin ? ENCABEZADOS_ADMIN : ENCABEZADOS_GENERAL);
-      expect(rel[1], rol).toBe("Competencia,Club,Prueba,Categoría,Género,Fecha,Jornada,Integrante 1,Integrante 2,Integrante 3,Integrante 4");
-      expect(filas, rol).toHaveLength(json.individualRows.length);
-      filas.forEach((f, i) => {
-        const fila = json.individualRows[i]!;
-        expect(f, `${rol} fila ${i}`).toHaveLength(12);
-        expect(f[2]).toBe(fila.nombreCompleto);
-        expect(f[3]).toBe(esAdmin ? fila.fechaNacimiento : String(fila.edad));
-        expect(f[4]).toBe(fila.categoria);
-        expect(f[5]).toBe(fila.prueba);
-        expect(["'=Club Alfa", "Club Beta"], "club neutralizado").toContain(f[1]);
-      });
-      expect(filas.some((f) => f[1] === "'=Club Alfa"), rol).toBe(true);
+      const filas = res.body.replace("\uFEFF", "").split("\r\n").map((l) => l.split(";").map((c) => c.replace(/^"|"$/g, "")));
+      const i = (h: string) => filas[0]!.indexOf(h);
+      const nadadores = json.groupedByClub.flatMap((g) => g.swimmers);
+      expect(filas.filter((f) => f[0] === "Nadador").map((f) => [f[i("Nadador")], f[i("Edad")], f[i("Categoría")]]), rol).toEqual(
+        nadadores.map((s) => [(s as unknown as { nombrePresentado: string }).nombrePresentado, String(s.edad), (s as unknown as { categoria: string }).categoria])
+      );
+      const clubes = new Set(filas.slice(2).map((f) => f[i("Club")]));
+      for (const c of clubes) expect(["'=Club Alfa", "Club Beta"], "club neutralizado").toContain(c);
+      expect(clubes.has("'=Club Alfa"), rol).toBe(true);
       for (const celda of res.body.split(/[,;\r\n]/)) expect(/^[=+@]/.test(celda.replace(/^"/, "")), `${rol}: «${celda}»`).toBe(false);
-      expect(res.body, rol).not.toContain("RUNPRIV");
-      if (!esAdmin) for (const iso of Object.values(NACIMIENTOS)) for (const forma of formasDeFecha(iso)) expect(res.body, `${rol}: «${forma}»`).not.toContain(forma);
+      sinNacimientos(res.body, rol);
     }
-    expect(adminJson.individualRows).toHaveLength(6);
   });
 
-  it("XLSX: mismos encabezados que el CSV de cada rol, 12 columnas, valores alineados y sin fecha en ninguna parte para los demás", async () => {
+  it("XLSX: ninguna parte del libro lleva la fecha de nacimiento ni el RUN", async () => {
     for (const rol of [...ROLES_ADMIN, ...ROLES_GENERALES]) {
       const res = await exportar(rol, "xlsx");
       expect(res.statusCode, rol).toBe(200);
-      const esAdmin = (ROLES_ADMIN as readonly string[]).includes(rol);
       const json = await informe(rol);
       const libro = new ExcelJS.Workbook();
       await libro.xlsx.load(res.rawPayload as never);
-      const hoja = libro.getWorksheet("Individuales")!;
-      expect((hoja.getRow(1).values as unknown[]).slice(1).join(","), rol).toBe(esAdmin ? ENCABEZADOS_ADMIN : ENCABEZADOS_GENERAL);
-      expect(hoja.columnCount, rol).toBe(12);
-      expect(hoja.rowCount - 1, rol).toBe(json.individualRows.length);
-      json.individualRows.forEach((fila, i) => {
-        const r = hoja.getRow(i + 2);
-        expect(String(r.getCell(3).value)).toBe(fila.nombreCompleto);
-        expect(String(r.getCell(4).value)).toBe(esAdmin ? fila.fechaNacimiento : String(fila.edad));
-        expect(String(r.getCell(5).value)).toBe(fila.categoria);
-        expect(["'=Club Alfa", "Club Beta"], "club neutralizado").toContain(String(r.getCell(2).value));
+      const enHoja: string[] = [];
+      libro.getWorksheet("Inscripciones")!.eachRow((fila) => {
+        const a = String(fila.getCell(1).value);
+        if (/^\d+\. /.test(a)) enHoja.push(a.replace(/^\d+\. /, ""));
       });
-      expect(libro.getWorksheet("Relevos")!.getRow(1).cellCount, rol).toBe(11);
-      for (const parte of new AdmZip(res.rawPayload).getEntries()) {
-        const texto = parte.getData().toString("utf8");
-        expect(texto, `${rol} ${parte.entryName}`).not.toContain("RUNPRIV");
-        if (!esAdmin) for (const iso of Object.values(NACIMIENTOS)) for (const forma of formasDeFecha(iso)) expect(texto, `${rol} ${parte.entryName}: «${forma}»`).not.toContain(forma);
-      }
+      expect(enHoja, rol).toEqual(
+        json.groupedByClub.flatMap((g) => g.swimmers).map((s) => {
+          const x = s as unknown as { nombrePresentado: string; detalle: string };
+          return `${x.nombrePresentado} ${x.detalle}`;
+        })
+      );
+      for (const parte of new AdmZip(res.rawPayload).getEntries()) sinNacimientos(parte.getData().toString("utf8"), `${rol} ${parte.entryName}`);
     }
   });
 
-  it("PDF: se sigue generando para todos los roles, sin la fecha de nacimiento (su formato no la incluye)", async () => {
+  it("PDF: se sigue generando para todos los roles", async () => {
     for (const rol of ["admin", "club_alfa", "nadador_n1"]) {
       const res = await exportar(rol, "pdf");
       expect(res.statusCode, rol).toBe(200);
