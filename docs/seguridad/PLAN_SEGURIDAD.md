@@ -24,6 +24,7 @@ producción. Este documento no autoriza ninguna operación sobre producción.
 | **Errores de Nginx** | AUD-03 (capa Nginx): errores de petición sin el mensaje original, con la consulta y el `Referer` | **Publicado y desplegado en la web, dentro de su alcance; AUD-03 no queda cerrada en todas las capas.** Ver «Errores de Nginx» |
 | **zlib del sistema** | Aviso residual de AUD-B: `zlib` 1.3.2-r1 → 1.4-r0 en API, migraciones y web | **Desplegada en la API y la web y construida en mantenimiento; versión efectiva en producción sin verificar.** Ver «zlib del sistema» |
 | **Campos del upstream** | Observabilidad de la incidencia 504: cuatro campos del upstream en `fchmn_acceso` | **Publicada y desplegada en la web.** Ver «Campos del upstream en el registro de acceso» |
+| **Resolución en segundo plano** | Nginx de la web: dirección de la API resuelta fuera de las peticiones y registro general por el receptor sanitizado | **Publicada en el repositorio; pendiente de despliegue y actualización del frontend local.** Incidente no resuelto: causa de las pérdidas DNS sin determinar. Ver «Resolución de la API en segundo plano» |
 | **zlib incorporada en Node** | Evaluación documental de la zlib de Node 22.23.4 (`1.3.1-e00f703`) y su exposición en el proyecto | **Evaluada; sin cambios.** No se identificó una exposición concreta que justifique actualizar Node ahora; riesgo residual acotado. Ver «zlib incorporada en Node» |
 | **npm fuera de ejecución** | Aviso residual de AUD-B: npm/npx retirados de las imágenes finales de API, migraciones y mantenimiento | **Retirada publicada y desplegada en la API y construida en mantenimiento.** Ver «npm fuera de las imágenes de ejecución» |
 | **AUD-V** | Fórmulas en el CSV de inscritos (Excel 16.0, es-CL, separador `;`) | **Completada: publicada, desplegada (API y web en `d105823`) y probada en local y en CI.** Ver «AUD-V» |
@@ -1635,6 +1636,8 @@ Cron: **no se ejecutó**. Tenía 26 ejecuciones antes y 26 después, ninguna en 
 - **Fallos internos no reproducidos:** agotamiento de memoria, disco o descriptores y fallos del motor njs no se provocaron; solo hay evidencia del código. El timeout de **conexión** tampoco se reprodujo: no había un mecanismo controlado sin privilegios ni reglas de red.
 - El manejador se ejecutó con njs 1.0.2 en la imagen; las pruebas automáticas lo ejecutan con Node, no con njs.
 
+**Cambio posterior del registro general.** Lo anterior describe la entrega original, en la que `nginx.conf` conservaba el registro general en stderr. Con «Resolución de la API en segundo plano» ese registro pasa también por este receptor (canal `errores_generales`); el estado y los límites de ese cambio están en su sección.
+
 **Cierre (despliegue de la web).** `fchmn-web` pasó de `5d0692f` a `6da7fd9cfd52e13f317bb3d913c5b26bbff77033` ([despliegue](https://dashboard.render.com/web/srv-dbh48scs728c73arlf8g/deploys/dep-dbot7k15efls73eueqng)): Render informó «Deploy succeeded» y Live, con Auto-Deploy desactivado. CI del código `42628838096`, éxito. La API y el mantenimiento no se desplegaron.
 - **Evidencia en producción:** Render acredita el commit y el estado desplegados. Por HTTP, sin credenciales: `/login` y `/api/ready` con 200 (base de datos disponible), `/api/auth/me` con 401, `Cache-Control: no-store` y la CSP conservada (`connect-src 'self'`, sin `localhost`). Eso acredita disponibilidad y cabeceras, no el funcionamiento del canal de errores.
 - **Protección funcional:** probada solo en local con la imagen candidata (sección anterior). En producción no se provocaron fallos de upstream, cortes, timeouts, fallos del receptor ni recargas, y no se inspeccionaron los registros de la web.
@@ -1738,6 +1741,54 @@ Los 23 que quedan son los del `npm` de la imagen base de Node (mismos paquetes y
 - **Registro, dos líneas de `/api/health`** a las 20:09:16 y 20:09:17 UTC del 2026-11-09: `estado` numérico (200) y los cuatro campos del upstream como cadenas. La atribución a las peticiones normales hechas en ese momento es por **coincidencia temporal**, no una identificación demostrada.
 - **Límites:** en producción solo se comprobó una petición normal al upstream; los fallos y reintentos se validaron localmente. Los campos ayudan a interpretar fases e intentos, pero **no garantizan diagnosticar todos los incidentes**, no identifican el destino ni demuestran un DNS obsoleto. **La causa del 504 sigue indeterminada.** Los 23 avisos de `npm` y los demás residuales siguen pendientes.
  No cambia el comportamiento ante la indisponibilidad ni identifica la causa.
+
+## Resolución de la API en segundo plano (publicada en el repositorio; pendiente de despliegue y actualización del frontend local)
+
+**Objetivo, y solo este.** Tolerar fallos **temporales** de la actualización DNS mientras exista una dirección de la API conocida y operativa. No elimina todos los 502 y **no declara resuelto el incidente**.
+
+**Motivo (observado en producción, solo lectura, 2026-11-24 UTC).** Después de desplegar `e5881c5`, el Nginx de la web respondió 502 cuatro veces, a los 5 s: 11:21:13 (una sonda de disponibilidad), 11:57:06 y 12:06:07 (inicio de sesión) y 11:58:32 (exportación de un reporte). En cada una, el receptor de errores registró `clase` `dns`, `errno` 110 (resolución agotada), los campos del upstream quedaron vacíos (ningún intento de conexión registrado) y en los registros consultados de la API no aparece la petición: sus identificadores correlativos no dejan hueco. Eso no demuestra por sí solo que nunca llegara. En los 7 días consultables no se encontró otro 502 ni otro error `dns`; la cobertura se obtuvo con búsquedas, no leyendo todas las líneas.
+- **Causa de que faltaran las respuestas DNS: sin determinar.** No se sabe qué servidor o consulta (A o AAAA) falló. Los cuatro son posteriores al arranque de la instancia nueva: esa coincidencia no demuestra relación con el despliegue ni permite descartarla.
+- **Incidente separado:** un timeout de conexión del cliente de muestreo a las 11:15:15 UTC, sin causa y sin relación demostrada con lo anterior.
+- **Auditoría:** esos fallos no aparecen en ella porque se escriben en la API, y no hay rastro de que llegaran a ella. No se agregan errores HTTP a la auditoría de negocio.
+
+**Mecanismo** (código de Nginx 1.30.6). Con `proxy_pass` por variable, Nginx resolvía el nombre dentro de la petición, esperaba las respuestas A y AAAA y repetía una consulta sin respuesta a los 5 s (`resend_timeout`, fijo), el mismo instante en que `resolver_timeout 5s` abandonaba: una sola respuesta perdida era un 502. Se evaluó subir ese plazo a 12 s y se descartó: recuperaba pérdidas breves con esperas de 5 a 10 s y seguía fallando en las largas.
+
+**Cambio.**
+- `frontend/nginx/default.conf.template`: `upstream api_interna` con `zone api_interna 64k`, `server ${API_INTERNA} resolve` y `keepalive 0`; el proxy de `/api/` lo usa. Un worker consulta el nombre cada ~11 s y publica las direcciones en la zona compartida; las peticiones no esperan al DNS. `keepalive 0` mantiene una conexión por petición (desde Nginx 1.29.7 un `upstream` conserva conexiones por omisión). `max_fails` y `fail_timeout` quedan con su valor predeterminado: `max_fails=0` se probó aparte y no dio una mejora clara.
+- `frontend/nginx/25-resolver.sh`: `valid=10s` y `resolver_timeout 5s`, sin cambios; IPv6 sigue activo y los servidores son los de la plataforma. El plazo ahora es lo que dura un intento en segundo plano y la pausa antes del siguiente.
+- `frontend/nginx/nginx.conf` y `njs/registro-errores.js`: ver «Registro general».
+- Sin cambios en el cliente, la API, los plazos de conexión y lectura del proxy ni la auditoría. No se agregan reintentos.
+
+**Qué pasa cuando la actualización falla.**
+
+| Respuesta DNS | Efecto |
+|---|---|
+| Sin respuesta o SERVFAIL; A correcta y AAAA sin respuesta | **Conserva** la dirección, sin vencimiento, y reintenta cada ~10 s |
+| NXDOMAIN o respuesta vacía; A correcta y AAAA con NXDOMAIN | **Borra** la dirección: 502 inmediato hasta la siguiente respuesta correcta |
+| Arranque sin DNS | Sin dirección que conservar: 502 inmediato hasta la primera resolución |
+
+**Registro general.** La resolución en segundo plano no pertenece a ninguna petición, y Nginx escribe sus fallos en el registro general con el nombre interno de la API. Por eso el registro general (`notice` o más grave) va por syslog al mismo receptor, con otra etiqueta, y sale como `"canal":"errores_generales"` con los mismos cuatro campos cerrados. Clases nuevas: `sin_destino` (ninguna dirección conocida) y `proceso` (arranque, señales y fin de workers); `errno` admite 3 (NXDOMAIN en la clase `dns`). En claro quedan solo `crit`, `alert` y `emerg` del proceso.
+- **Se pierde detalle:** el texto de los avisos de arranque, señales y errores corrientes.
+- **Se pueden perder mensajes:** UDP no garantiza la entrega y, durante el arranque o el apagado, puede no haber un worker atendiendo el receptor.
+- **Sin bucle:** el receptor sigue escribiendo en stderr, nunca en syslog.
+
+**Validación local** (datos sintéticos; sin tráfico a producción).
+- *Guardas* (en la CI; no ejecutan Nginx): `frontend-resolver-dns.test.ts` (el guion real del resolutor y el `upstream` exacto), `frontend-registro-errores.test.ts` (canal general, clases y configuración) y `frontend-cabeceras.test.ts` (proxy). 153 pruebas en los cuatro archivos de Nginx; se comprobó que detectan siete alteraciones de la configuración.
+- *Simulación* (`scripts/diagnostico/simular-dns-nginx.mjs`; Docker, fuera de la CI): Nginx real, dos DNS controlados y una API sintética en red interna. La configuración anterior falla las comprobaciones de tolerancia; con el registro general anterior, se detecta el nombre interno en la salida.
+- *Imagen construida* desde una copia controlada, sin promoverla: cumple los once escenarios con un worker y los siete decisivos con cuatro. Pérdida de 6 y de 32 s con la API viva: todas 200, máximo 34 ms. Cambio de dirección con la anterior rechazando: 502 inmediatos durante 7 s. Dirección anterior desaparecida durante la pérdida: 504 a los 10 s y recuperación automática (la última 504 terminó 14 s después de volver el DNS). Arranque sin DNS y NXDOMAIN: 502 inmediatos, recuperados a los 5 y 9 s. Un POST ya recibido no se repite. Estáticos idénticos a los de la imagen anterior. Una ejecución por escenario.
+- *Compose desechable* (cuatro workers, API sintética): contrato del proxy idéntico al de la imagen anterior en diez peticiones (prefijo, rutas, parámetros, cuerpos, cabeceras y cookies). Al recrear la API con otra dirección, 8,0 s de 502 (7,6 s con la anterior). Con la API detenida unos 12 s, 22 respuestas 504 de 10 s (7 con la anterior, que daba sobre todo 502 inmediatos).
+- *Salida completa del contenedor* (4.272 líneas, con marcadores en consultas, `Referer`, cookies, cabeceras y cuerpos, peticiones mal formadas, muerte de un worker, saturación y apagado): 0 apariciones del marcador y del nombre interno.
+- *Cliente:* el login de la imagen, en un navegador y contra una API sintética lenta, esperó más de 12 s sin cortar; la descarga de archivos se revisó solo en el código.
+
+**Límites.**
+- **No observado en producción:** qué responde el DNS de la plataforma, cuántas direcciones entrega y si este cambio habría evitado los cuatro 502. Es una hipótesis respaldada por la simulación.
+- **No protege** al arrancar sin DNS, ante NXDOMAIN ni ante una respuesta vacía.
+- **Dirección antigua sin vencimiento:** mientras el DNS no responda, se sigue usando. Si dejó de servir, un 502 inmediato puede pasar a ser un **504 a los 10 s** (`proxy_connect_timeout`) hasta que el DNS vuelva.
+- **Varias direcciones:** con el valor predeterminado de `max_fails`, si todas fallan a la vez hay unos 10 s de 502 aunque se recuperen antes.
+- La salida sanitizada se comprobó en los casos ensayados; no es una garantía general ni cierra AUD-03 en todas las capas.
+
+**Versión de Nginx: tarea separada.** La instalación sigue en 1.30.6. Nginx publicó 1.30.7 (2026-11-18) y 1.30.8 (2026-11-23) con correcciones de seguridad. De los avisos oficiales revisados que corrigen, ninguno corresponde a una función que use la configuración actual (no hay TLS, HTTP/2, HTTP/3, correo, `alias` ni subpeticiones). Esa lectura no equivale a estar libre de vulnerabilidades ni a un escaneo; la actualización (versión, digest, compatibilidad de njs, inventario y avisos) queda pendiente como tarea propia.
+
 ## npm fuera de las imágenes de ejecución (retirada publicada y desplegada en la API y construida en mantenimiento, dentro de su alcance)
 
 **Motivo.** Aviso residual de AUD-B: el escáner marcaba 23 avisos en el `npm` 10.9.9 que trae la imagen base de Node, presente en la API, en migraciones y en mantenimiento aunque ninguna de ellas lo ejecuta.

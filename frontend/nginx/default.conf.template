@@ -112,6 +112,33 @@ log_format fchmn_acceso escape=json
     '"upstream_response_time":"$upstream_response_time",'
     '"agente":"$http_user_agent"}';
 
+# LA API, CON SU DIRECCIÓN RESUELTA EN SEGUNDO PLANO.
+#
+# OBJETIVO, sin más: tolerar fallos TEMPORALES de la actualización DNS mientras exista una dirección conocida
+# y operativa. No elimina todos los 502 ni corrige la causa de las pérdidas de DNS que se observaron.
+#
+# `resolve` hace que UN worker consulte el nombre cada ~11 s (`valid=10s` del resolutor) y publique las
+# direcciones en la zona compartida. Las peticiones usan lo que haya en la zona: nunca esperan al DNS.
+# (El `proxy_pass` con variable que había antes resolvía DENTRO de la petición: una respuesta perdida la
+# hacía esperar los 5 s de `resolver_timeout` y terminar en 502.)
+#
+# QUÉ PASA CUANDO LA ACTUALIZACIÓN FALLA (Nginx 1.30.6, `ngx_http_upstream_zone_module.c`):
+#   - sin respuesta o SERVFAIL: se CONSERVA la última dirección, sin vencimiento, y se reintenta cada ~10 s;
+#   - NXDOMAIN, respuesta vacía, o AAAA con NXDOMAIN aunque A sea correcta: se BORRA; 502 inmediato
+#     («no live upstreams», clase `sin_destino`) hasta la siguiente respuesta correcta (~11 s);
+#   - al ARRANCAR sin DNS no hay dirección que conservar: 502 inmediato hasta la primera resolución.
+# Si la dirección conservada dejó de servir: 502 si rechaza, 504 a los 10 s (`proxy_connect_timeout`) si no
+# contesta, hasta que el DNS vuelva.
+#
+# `keepalive 0`: desde Nginx 1.29.7 un `upstream` conserva conexiones por omisión. Se desactiva para seguir
+# con una conexión por petición: reutilizar una que la API acaba de cerrar sería un 502 nuevo, y en un POST
+# no se puede repetir. `max_fails`/`fail_timeout` quedan con su valor por omisión.
+upstream api_interna {
+    zone api_interna 64k;
+    server ${API_INTERNA} resolve;
+    keepalive 0;
+}
+
 server {
     listen ${PORT};
     server_name _;
@@ -167,31 +194,24 @@ server {
     # se lea primero, no porque haga falta.
     # ------------------------------------------------------------------------
     location /api/ {
-        # EL DESTINO ES UNA VARIABLE, no un nombre escrito en el archivo.
+        # EL DESTINO ES EL `upstream api_interna` de arriba, no un nombre escrito en el archivo.
         #
         # `${API_INTERNA}` lo completa `envsubst` al arrancar con el valor del
         # entorno (ver el Dockerfile), de modo que el nombre del servicio de la
         # API es configuración del despliegue y no código. Cambiarlo no exige
-        # reconstruir la imagen.
-        #
-        # Y se pasa a `proxy_pass` a través de `$destino_api` —una variable de
-        # Nginx— a propósito: con un nombre literal, Nginx resuelve el DNS UNA
-        # VEZ al arrancar y conserva esa IP indefinidamente; con una variable,
-        # resuelve en cada petición y sigue al backend si cambia de dirección.
-        # Esa forma exige una directiva `resolver`, que escribe al arrancar
-        # /docker-entrypoint.d/25-resolver.sh leyendo /etc/resolv.conf.
-        set $destino_api "${API_INTERNA}";
+        # reconstruir la imagen. El `upstream` sigue al backend si cambia de
+        # dirección; para eso necesita la directiva `resolver`, que escribe al
+        # arrancar /docker-entrypoint.d/25-resolver.sh leyendo /etc/resolv.conf.
 
         # Se quita el prefijo `/api` ANTES de reenviar: la API no sabe nada de
         # él y sirve en `/auth/...`, `/persons/...`, etc.
         #
         # Se hace con `rewrite ... break` y un `proxy_pass` SIN ruta, en vez de
-        # con la sustitución automática de `proxy_pass http://destino/`. El
-        # motivo es que esa sustitución automática no se aplica igual cuando el
-        # destino es una variable; así el comportamiento es explícito y no
-        # depende de ese matiz. La cadena de consulta se conserva sola.
+        # con la sustitución automática de `proxy_pass http://destino/`: así el
+        # comportamiento es explícito y no depende de cómo se escriba el destino.
+        # La cadena de consulta se conserva sola.
         rewrite ^/api/(.*)$ /$1 break;
-        proxy_pass http://$destino_api;
+        proxy_pass http://api_interna;
 
         proxy_http_version 1.1;
         proxy_set_header Connection "";

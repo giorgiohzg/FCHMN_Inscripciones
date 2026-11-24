@@ -158,7 +158,7 @@ describe("dónde se incluye el fragmento", () => {
   it("conserva el fallback de la SPA, el proxy de /api y la reescritura de cookies", () => {
     expect(bloque("location /")).toContain("try_files $uri $uri/ /index.html;");
     const api = bloque("location /api/");
-    expect(api).toContain('set $destino_api "${API_INTERNA}";');
+    expect(api).toContain("rewrite ^/api/(.*)$ /$1 break;\n        proxy_pass http://api_interna;");
     expect(api).toContain("proxy_cookie_path /auth /api/auth;");
     expect(SERVIDOR).toContain("listen ${PORT};");
   });

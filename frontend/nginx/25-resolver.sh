@@ -8,14 +8,12 @@
 #
 # POR QUE HACE FALTA, y conviene entenderlo porque no es evidente.
 #
-# `default.conf.template` NO escribe la direccion de la API dentro de
-# `proxy_pass`, sino en una VARIABLE de Nginx. Eso es deliberado:
+# `default.conf.template` declara la API como `server ... resolve` dentro de un
+# `upstream` con `zone`: Nginx vuelve a resolver el nombre en segundo plano.
 #
-#   proxy_pass http://nombre-fijo;   Nginx resuelve el nombre UNA VEZ, al
-#                                    arrancar, y se queda con esa IP para
-#                                    siempre.
-#   proxy_pass http://$variable;     Nginx resuelve en CADA peticion, y respeta
-#                                    el tiempo de validez del DNS.
+#   server nombre;           Nginx resuelve el nombre UNA VEZ, al arrancar, y se
+#                            queda con esa IP para siempre.
+#   server nombre resolve;   Nginx lo resuelve cada ~11 s y sigue los cambios.
 #
 # La diferencia importa en cualquier plataforma donde el backend cambie de
 # direccion al redesplegarse —que es lo normal en la nube—. Con la primera
@@ -23,8 +21,8 @@
 # devolveria 502 hasta que alguien reiniciara el frontend, sin ninguna pista
 # de por que. Con la segunda, se entera sola.
 #
-# El precio de la segunda forma es que Nginx EXIGE una directiva `resolver`: se
-# niega a arrancar con «no resolver defined to resolve ...». Y la direccion del
+# El precio de la segunda forma es que Nginx EXIGE una directiva `resolver`: sin
+# ella no puede resolver el nombre. Y la direccion del
 # servidor DNS no se puede saber al construir la imagen, porque depende de donde
 # se ejecute: en Docker Compose es el DNS interno de Docker, en una plataforma
 # de nube es el suyo.
@@ -55,6 +53,11 @@ fi
 # `valid=10s` acota cuanto se recuerda una respuesta: suficiente para no
 # consultar en cada peticion, y lo bastante corto para seguir un redespliegue
 # del backend sin intervencion.
+#
+# `resolver_timeout` ya no lo espera ninguna peticion: es lo que dura un intento
+# de la actualizacion en segundo plano, y tambien la pausa antes del siguiente
+# (que va al otro servidor). 5 s y no mas: cuando el DNS vuelve, la direccion se
+# actualiza antes. Se comprueba con `node scripts/diagnostico/simular-dns-nginx.mjs`.
 {
   echo "# Generado al arrancar por /docker-entrypoint.d/25-resolver.sh"
   echo "# a partir de /etc/resolv.conf. No editar a mano."

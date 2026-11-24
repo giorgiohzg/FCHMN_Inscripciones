@@ -206,10 +206,15 @@ Tres detalles que no son obvios y están resueltos en
   1 MB, y la API acepta archivos de hasta 15 MB (4 MB en la carga masiva por
   Excel): sin esto, una importación mediana moriría con un 413 que la
   aplicación nunca vería.
-- **El destino es una variable de Nginx, no un nombre fijo.** Así se resuelve el
-  DNS en cada petición y la web sigue a la API cuando cambia de dirección al
-  redesplegarse. Esa forma exige una directiva `resolver`, que
+- **La dirección de la API se resuelve en segundo plano** (publicada en el repositorio; pendiente de despliegue y actualización del frontend local).
+  El destino es un `upstream` con zona compartida y `server … resolve`: Nginx
+  consulta el DNS cada ~11 s (caché de 10 s, `resolver_timeout` de 5 s) y la web
+  sigue a la API cuando cambia de dirección al redesplegarse. Si la consulta no
+  recibe respuesta, se conserva la última dirección. `keepalive 0` mantiene una
+  conexión por petición. Esa forma exige una directiva `resolver`, que
   `frontend/nginx/25-resolver.sh` escribe al arrancar leyendo `/etc/resolv.conf`.
+  Detalle y límites en `docs/seguridad/PLAN_SEGURIDAD.md` («Resolución de la API
+  en segundo plano»).
 
 La dirección de la API se configura con la variable `API_INTERNA`: **el nombre
 del servicio no está escrito en ningún archivo del repositorio.**
@@ -988,6 +993,10 @@ así que una ejecución accidental no rompe nada.
    > fchmn-api could not be resolved (3: Host not found)
    > ```
    >
+   > (Así se veía entonces. Con el registro sanitizado ese texto ya no aparece:
+   > hay que buscar `"clase":"dns","errno":3` y, con la resolución en segundo
+   > plano, también `"clase":"sin_destino"` en las peticiones.)
+   >
    > **Por qué.** El nombre corto resuelve gracias a las *search domains* de
    > `/etc/resolv.conf`, que Render rellena con su espacio de nombres interno:
    >
@@ -1089,9 +1098,10 @@ Debe responder algo como `{"status":"ok","uptime":12}`.
 
 - **502 o 504** → el proxy no alcanza la API. **La causa más probable, y la que
   ocurrió en el primer ensayo, es que `API_INTERNA` lleve el nombre corto.**
-  Abre **fchmn-web → Logs** y busca la línea del error: si dice
-  `… could not be resolved (3: Host not found)`, es exactamente eso; vuelve al
-  recuadro «El nombre corto no sirve» del Paso 7. Si el error es otro, revisa
+  Abre **fchmn-web → Logs** y busca `dns`: si la línea dice
+  `"clase":"dns","errno":3` (nombre inexistente), es exactamente eso; vuelve al
+  recuadro «El nombre corto no sirve» del Paso 7. `errno` 110 es otra cosa: el
+  DNS no respondió a tiempo. Si el error es otro, revisa
   que ambos servicios estén en la **misma región** y que la API sea un
   **Private Service** en marcha, con su `PORT` coincidiendo con el puerto de
   `API_INTERNA`.
@@ -1783,6 +1793,10 @@ mayores, hay que subir los dos límites, no solo uno.
 → Es esperable mientras la API arranca. Si persiste más de un minuto, mira los
 registros de la API: lo más probable es que no esté arrancando (ver la entrada
 de variables con errores).
+→ Con la resolución en segundo plano (publicada en el repositorio; pendiente de despliegue y actualización del frontend local),
+la dirección nueva se usa en unos 11 s si el DNS responde. Si el DNS **no responde**, la web sigue con la
+anterior; y si esa dirección ya no contesta, el error pasa a ser un **504 a los
+10 s** en vez de un 502 inmediato, hasta que el DNS vuelva. Se recupera sola.
 
 **El despliegue de la API falla con un error sobre la base de datos**
 → Revisa que `DATABASE_URL` esté **enlazada** a `fchmn-postgres`, no escrita a
@@ -1923,7 +1937,8 @@ comandos**:
   colar `9.9.9.9` por delante queda auditada igualmente con `190.44.12.77`. Esa
   simulación no reflejaba el borde real de Render; el mecanismo vigente es
   `IP_CLIENTE_FUENTE` (Paso 6).
-- **El resolutor DNS** se genera al arrancar a partir de `/etc/resolv.conf`, y
+- **El resolutor DNS** (ensayo del mecanismo anterior, con el destino en una
+  variable) se genera al arrancar a partir de `/etc/resolv.conf`, y
   `envsubst` sustituye la dirección de la API dejando intactas las variables de
   Nginx.
 
@@ -2370,13 +2385,12 @@ Lo que queda abierto es esto, por orden de urgencia:
    `API_INTERNA` lleva el nombre completo `…svc.cluster.local` porque el
    resolutor de Nginx no aplica las *search domains* (Paso 7). Funciona, pero
    incorpora un detalle de la infraestructura de Render que ellos no garantizan.
-   **La mejora**: en `default.conf.template`, pasar el destino a `proxy_pass` de
-   forma literal en vez de por variable, para que resuelva el sistema operativo
-   —que sí aplica los sufijos— y el nombre corto baste. El precio es perder la
-   reresolución en cada petición, que es justo lo que hoy permite seguir a la API
+   **La mejora**: declarar el destino sin `resolve`, para que resuelva el sistema
+   operativo —que sí aplica los sufijos— y el nombre corto baste. El precio es
+   perder la resolución periódica, que es justo lo que permite seguir a la API
    cuando cambia de dirección; habría que evaluar cuál de los dos problemas pesa
-   más. **No es urgente**: el síntoma, si algún día aparece, es un 502 con el
-   error exacto en los registros y el arreglo es cambiar una variable.
+   más. **No es urgente**: el síntoma, si algún día aparece, es un 502 con
+   `"clase":"dns","errno":3` en los registros y el arreglo es cambiar una variable.
 5. **Un dominio propio**: deseable por imagen y continuidad, pero ya no hace
    falta para nada técnico. Ver «Un dominio propio: mejora posterior, no
    requisito».

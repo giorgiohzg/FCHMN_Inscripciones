@@ -1,5 +1,5 @@
 /**
- * GUARDA DEL RECEPTOR DE ERRORES DE PETICIÓN DE NGINX (AUD-03, capa Nginx).
+ * GUARDA DEL RECEPTOR DE ERRORES DE NGINX (AUD-03, capa Nginx): los de petición y los del registro general.
  *
  * Dos partes:
  *   - El MANEJADOR njs (`frontend/nginx/njs/registro-errores.js`), ejecutado aquí con Node: la salida
@@ -70,7 +70,9 @@ const CTX = `, client: 127.0.0.1, server: , request: "GET /api/persons?search=${
 describe("proyección de mensajes reales de Nginx", () => {
   const casos: [string, string, number | string, string][] = [
     ["connect() failed (111: Connection refused) while connecting to upstream", "conexion_rechazada", 111, "error"],
-    ["api.interna could not be resolved (3: Host not found)", "dns", "otro", "error"],
+    ["api.interna could not be resolved (3: Host not found)", "dns", 3, "error"],
+    ["api.interna could not be resolved (110: Operation timed out)", "dns", 110, "error"],
+    ["no live upstreams while connecting to upstream", "sin_destino", "ninguno", "error"],
     ["upstream timed out (110: Operation timed out) while reading response header from upstream", "timeout", 110, "error"],
     ["upstream sent no valid HTTP/1.0 header while reading response header from upstream", "respuesta_invalida", "ninguno", "error"],
     ["readv() failed (104: Connection reset by peer) while reading upstream", "lectura_upstream", 104, "error"],
@@ -93,6 +95,37 @@ describe("proyección de mensajes reales de Nginx", () => {
     m.procesar(s, `<185>x: [alert] 1#1: *1 http finalize non-active request: "/api/persons?search=${MARCA}"` + CTX);
     permitida(emitidas[0]!);
     expect(JSON.parse(emitidas[0]!)).toMatchObject({ nivel: "alert", clase: "finalizacion_no_activa" });
+  });
+});
+
+describe("registro general (etiqueta fchmn_general): mismo esquema, otro canal y ningún texto original", () => {
+  // Formatos tomados de Nginx 1.30.6: sin identificador de conexión ni contexto de petición.
+  const G = (pri: number, nivel: string) => `<${pri}>Nov 24 13:49:44 fchmn_general: 2026/11/24 13:49:44 [${nivel}] 44#44: `;
+  const casos: [string, string, string, string, number | string][] = [
+    [G(187, "error"), `${MARCA}.svc.interno could not be resolved (110: Operation timed out)`, "error", "dns", 110],
+    [G(187, "error"), `${MARCA}.svc.interno could not be resolved (3: Host not found)`, "error", "dns", 3],
+    [G(187, "error"), `${MARCA}.svc.interno could not be resolved (2: Server failure)`, "error", "dns", 2],
+    [G(187, "error"), `${MARCA}.svc.interno could not be resolved (5: Operation refused)`, "error", "dns", "otro"],
+    [G(189, "notice"), "start worker process 44", "notice", "proceso", "ninguno"],
+    [G(189, "notice"), "signal 15 (SIGTERM) received, exiting", "notice", "proceso", "ninguno"],
+    [G(185, "alert"), "worker process 44 exited on signal 9", "alert", "proceso", "ninguno"],
+    [G(187, "error"), `algo nuevo con ${MARCA}`, "error", "desconocido", "ninguno"],
+  ];
+  it.each(casos)("%s%s", (cabecera, mensaje, nivel, clase, errno) => {
+    const { s, emitidas } = sesion();
+    m.procesar(s, cabecera + mensaje);
+    expect(emitidas).toHaveLength(1);
+    permitida(emitidas[0]!);
+    expect(JSON.parse(emitidas[0]!)).toEqual({ canal: "errores_generales", nivel, clase, errno });
+  });
+
+  it("la etiqueta solo cuenta al principio: un mensaje de petición no puede imitarla", () => {
+    for (const intento of ["fchmn_general: ", `${G(187, "error")}x`]) {
+      const { s, emitidas } = sesion();
+      m.procesar(s, H + intento + CTX);
+      permitida(emitidas[0]!);
+      expect(JSON.parse(emitidas[0]!)).toMatchObject({ canal: "errores_peticion" });
+    }
   });
 });
 
@@ -218,15 +251,23 @@ describe("configuración", () => {
   const nginx = efectivas(NGINX);
   const servidor = efectivas(SERVIDOR);
 
-  it("conserva la configuración principal de la imagen oficial", () => {
+  it("conserva la configuración principal de la imagen oficial, salvo el registro general", () => {
     for (const d of [
-      "user  nginx;", "error_log  /var/log/nginx/error.log notice;", "pid        /run/nginx.pid;",
+      "user  nginx;", "pid        /run/nginx.pid;",
       "worker_connections  1024;", "include       /etc/nginx/mime.types;", "default_type  application/octet-stream;",
       "access_log  /var/log/nginx/access.log  main;", "sendfile        on;", "keepalive_timeout  65;",
       "include /etc/nginx/conf.d/*.conf;",
     ]) expect(nginx, d).toContain(d);
     // `30-tune-worker-processes.sh` busca la directiva al principio de línea.
     expect(NGINX).toMatch(/^worker_processes {2}auto;$/m);
+  });
+
+  it("el registro general va al receptor; en claro, solo crit o más grave", () => {
+    const principal = efectivas(NGINX.slice(0, NGINX.indexOf("\nevents {")));
+    expect(principal.filter((l) => l.startsWith("error_log"))).toEqual([
+      "error_log  /var/log/nginx/error.log crit;",
+      "error_log  syslog:server=127.0.0.1:5140,nohostname,tag=fchmn_general notice;",
+    ]);
   });
 
   it("carga solo el módulo njs de stream", () => {
